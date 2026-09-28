@@ -1,0 +1,276 @@
+/* app/globals.css */
+@import "tailwindcss";
+
+/*
+  Світла тема, як у макеті. Темної поки немає, тому `dark:` прив'язаний
+  до класу, якого ми не ставимо: системна тема телефона не має
+  перефарбовувати сторінку. Той самий прийом, що в mealcart.
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+  Токени з DESIGN.md. Кольори глобуса живуть окремо в
+  lib/globe/palette.ts: three.js не читає CSS-змінних.
+*/
+:root {
+  color-scheme: light;
+  --radius: 1rem;
+
+  --bg: oklch(0.973 0.006 265);
+  --surface: oklch(1 0 0);
+  --ink: oklch(0.206 0.036 264);
+  --ink-muted: oklch(0.51 0.032 265);
+  --line: oklch(0.927 0.01 262);
+  --brand: oklch(0.532 0.202 264);
+  --brand-ink: oklch(1 0 0);
+  /* Зелений «онлайн» тільки крапкою або поруч зі словом: як текст на
+     тлі дає 3,2:1, для дрібного тексту замало. */
+  --online: oklch(0.615 0.158 151);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-onest), system-ui, sans-serif;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-online: var(--online);
+
+  /* Семантична z-шкала замість випадкових 999 */
+  --z-map-overlay: 10;
+  --z-controls: 20;
+
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/*
+  Підписи на глобусі. Це DOM поверх WebGL: текст лишається різким на
+  будь-якому масштабі, а біле гало відділяє його від рельєфу без
+  плашки.
+*/
+.globe-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+/* Підпис під купкою маркерів, трохи вбік, як на макеті. */
+.globe-city {
+  position: absolute;
+  top: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  white-space: nowrap;
+  text-shadow:
+    0 0 2px var(--surface),
+    0 0 4px var(--surface),
+    0 0 8px var(--surface);
+  pointer-events: none;
+  user-select: none;
+}
+
+.globe-city[data-side="right"] {
+  left: 2px;
+}
+
+.globe-city[data-side="left"] {
+  right: 2px;
+}
+
+.globe-country {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--surface) 92%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--brand) 18%, transparent),
+    0 4px 14px -6px color-mix(in oklch, var(--ink) 30%, transparent);
+  font-size: 14px;
+  font-weight: 600;
+  color: oklch(0.36 0.12 264);
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Запит: синя крапка з білим обідком. */
+.globe-request {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--brand);
+  box-shadow:
+    0 0 0 2px var(--surface),
+    0 1px 4px 1px color-mix(in oklch, var(--ink) 25%, transparent);
+  pointer-events: none;
+}
+
+/* Свіжий запит пульсує, поки до нього тягнуться дуги. */
+.globe-request[data-live="true"] {
+  width: 11px;
+  height: 11px;
+}
+
+.globe-request[data-live="true"]::before,
+.globe-request[data-live="true"]::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  border: 1.5px solid color-mix(in oklch, var(--brand) 55%, transparent);
+  animation: globe-pulse 2.4s var(--ease-out-quint) infinite;
+}
+
+.globe-request[data-live="true"]::after {
+  animation-delay: 1.2s;
+}
+
+@keyframes globe-pulse {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globe-request[data-live="true"]::before,
+  .globe-request[data-live="true"]::after {
+    animation: none;
+    transform: scale(2);
+    opacity: 0.5;
+  }
+}
+
+/*
+  Повзунок масштабу: тонка доріжка й порожнисте кільце, як на макеті.
+  Стилі для обох рушіїв, бо спільного псевдоелемента немає.
+*/
+.globe-zoom-range {
+  appearance: none;
+  height: 20px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.globe-zoom-range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.globe-zoom-range::-moz-range-track {
+  height: 2px;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.globe-zoom-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--brand);
+}
+
+.globe-zoom-range::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--brand);
+}
+
+.globe-zoom-range:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+/*
+  Хмари по краях. Висота від екрана, ширина за пропорціями картинки.
+  Тінь знизу окреслює білу хмару на світлому тлі, без неї вона зникає.
+  Повільний дрейф робить сцену живою; хто просив менше руху, бачить
+  нерухомі хмари.
+*/
+.globe-cloud {
+  position: absolute;
+  bottom: -8%;
+  height: 86%;
+  width: auto;
+  max-width: none;
+  user-select: none;
+  filter: drop-shadow(0 16px 26px oklch(0.42 0.09 260 / 0.24))
+    drop-shadow(0 2px 4px oklch(0.42 0.09 260 / 0.1));
+  animation: globe-cloud-drift 26s ease-in-out infinite alternate;
+}
+
+.globe-cloud-left {
+  left: 0;
+  translate: -22% 0;
+}
+
+.globe-cloud-right {
+  right: 0;
+  translate: 24% 0;
+  animation-delay: -13s;
+}
+
+@keyframes globe-cloud-drift {
+  from {
+    transform: translateX(-1.5%);
+  }
+  to {
+    transform: translateX(1.5%);
+  }
+}
+
+/* На телефоні хмари лише в кутах, щоб не закривати країну. */
+@media (max-width: 640px) {
+  .globe-cloud {
+    height: 44%;
+    bottom: -4%;
+  }
+
+  .globe-cloud-left {
+    translate: -38% 0;
+  }
+
+  .globe-cloud-right {
+    translate: 40% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .globe-cloud {
+    animation: none;
+  }
+}

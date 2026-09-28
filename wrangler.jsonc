@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Та сама схема, що в mealcart: OpenNext збирає Next у воркер, статика
+  // їде через ASSETS. Акаунт, домени й бази допишемо, коли буде куди
+  // деплоїти; зараз тут лише мінімум, з яким працює `cf:preview`.
+  "name": "uposhuku",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "env": {
+    "development": {
+      "name": "uposhuku-development",
+      "vars": { "DEPLOY_ENV": "development" },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      }
+    },
+    "production": {
+      "name": "uposhuku",
+      "vars": { "DEPLOY_ENV": "production" },
+      "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+      }
+    }
+  }
+}

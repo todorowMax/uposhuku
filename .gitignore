@@ -1,0 +1,12 @@
+*.tsbuildinfo
+.DS_Store
+.dev.vars
+.env
+.env.local
+.next/
+.open-next/
+.wrangler/
+.cache/
+cloudflare-env.d.ts
+node_modules/
+tsconfig.tsbuildinfo
