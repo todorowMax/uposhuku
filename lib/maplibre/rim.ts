@@ -21,10 +21,16 @@ const signedArea = (ring: Ring) => {
 };
 
 /**
- * Стрічка шириною `widthKm` назовні від кожного зовнішнього кільця: кільце,
- * зсунуте назовні, з дірою по самому кордону. Цілим кільцем, а не
- * чотирикутником на ребро: у шматків були б торцеві стінки, і на стінці
- * плато проступали б вертикальні смуги.
+ * Стрічка шириною `widthKm` назовні від кожного зовнішнього кільця.
+ *
+ * Складена з трикутників: по два на ребро кордону, між вершиною кордону і
+ * її зсунутою копією. Сусідні ребра ділять зсунуту вершину, тож щілин між
+ * шматками немає і внутрішні стінки ховаються в товщі стрічки, без
+ * вертикальних смуг на стінці плато.
+ *
+ * Не кільцем з дірою: у вузьких лиманах зсунуте кільце перетинає саме
+ * себе, MapLibre ріже такий багатокутник на трикутники хибно, і через
+ * пів країни тягнуться довгі тонкі «скалки». Трикутник завжди простий.
  */
 export const ukraineRim = (widthKm: number): Feature<MultiPolygon> => {
   const geometry = (ukraine as { geometry: { type: string; coordinates: Ring[][] | Ring[] } }).geometry;
@@ -60,7 +66,14 @@ export const ukraineRim = (widthKm: number): Feature<MultiPolygon> => {
         lat + (my * widthKm * miter) / KM_PER_DEG,
       ];
     });
-    return [[...shifted, shifted[0]], [...outer].reverse()];
+    return ring.flatMap((point, i) => {
+      const next = ring[(i + 1) % n];
+      const [shiftedPoint, shiftedNext] = [shifted[i], shifted[(i + 1) % n]];
+      return [
+        [[point, next, shiftedNext, point]],
+        [[point, shiftedNext, shiftedPoint, point]],
+      ];
+    });
   });
-  return { type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: rims } };
+  return { type: "Feature", properties: {}, geometry: { type: "MultiPolygon", coordinates: rims.flat() } };
 };
