@@ -68,16 +68,15 @@ export function RequestComposer() {
 
       <ul className="pointer-events-auto mt-3 flex items-center gap-5 rounded-full px-3 py-1.5 text-[13px] font-medium text-ink">
         <li className="flex items-center gap-2">
-          <PyramidGlyph />
+          <span aria-hidden className="globe-legend-face" />
           Виконавці
         </li>
         <li className="flex items-center gap-2">
           <span aria-hidden className="size-2.5 rounded-full bg-brand ring-2 ring-surface" />
           Запити
         </li>
-        <li className="flex items-center gap-2 text-ink-muted">
-          <span aria-hidden className="size-2 rounded-full bg-online" />
-          23 онлайн зараз
+        <li className="hidden items-center gap-2 text-ink-muted sm:flex">
+          Розмір фото — розміщення
         </li>
       </ul>
     </div>
@@ -94,15 +93,5 @@ function ComposerTool({ label, children }: { label: string; children: React.Reac
     >
       {children}
     </button>
-  );
-}
-
-/** Той самий знак, що на карті й у логотипі: дві грані різного тону. */
-function PyramidGlyph() {
-  return (
-    <svg aria-hidden width="13" height="12" viewBox="0 0 13 12">
-      <polygon points="6.5,0 0,12 6.5,9.6" fill="#4f7ff0" />
-      <polygon points="6.5,0 6.5,9.6 13,12" fill="#2553d6" />
-    </svg>
   );
 }

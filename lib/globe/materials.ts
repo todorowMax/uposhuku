@@ -2,14 +2,12 @@
 //
 // Матеріали глобуса. Рельєф уже намальований у текстурах, тому поверхня
 // не освітлюється: світло сцени лише зіпсувало б відмивку, затемнивши
-// півкулю. Освітлення лишається для об'ємних речей: стінок плато й
-// пірамідок виконавців.
+// півкулю.
 
 import {
   Color,
   DoubleSide,
   MeshBasicMaterial,
-  MeshLambertMaterial,
   ShaderMaterial,
   Vector4,
   type Texture,
@@ -165,11 +163,4 @@ export const createSideMaterial = () =>
   new MeshBasicMaterial({
     color: GLOBE_PALETTE.ukraineSide,
     side: DoubleSide,
-  });
-
-/** Пірамідки виконавців. Пласке затінення дає дві грані різного тону. */
-export const createPerformerMaterial = () =>
-  new MeshLambertMaterial({
-    color: GLOBE_PALETTE.performer,
-    flatShading: true,
   });

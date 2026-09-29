@@ -1,16 +1,17 @@
-// lib/globe/html.ts
-//
-// DOM-вузли для шару htmlElements у globe.gl: підписи міст, плашка
-// «Україна» і крапки запитів. globe.gl центрує вузол на точці, тому
-// підпис міста сидить усередині нульового якоря й відсувається вбік
-// стилями, а сам якір стоїть рівно на координатах.
-
+// Легкі DOM-підписи поверх глобуса; інтерактивні люди й групи — у WebGL.
 import type { City, GeoPoint, WorkRequest } from "@/lib/map/types";
 
 export type HtmlMarker =
-  | ({ kind: "city" } & City)
+  | ({ kind: "city"; grouped: boolean } & City)
   | ({ kind: "country"; id: string; name: string } & GeoPoint)
   | ({ kind: "request" } & WorkRequest);
+
+/** Один локальний атлас 4×4 замість десятків мережевих запитів. */
+export const avatarPosition = (index: number) => {
+  const column = index % 4;
+  const row = Math.floor(index / 4) % 4;
+  return `${(column / 3) * 100}% ${(row / 3) * 100}%`;
+};
 
 export const createMarkerElement = (marker: HtmlMarker): HTMLElement => {
   if (marker.kind === "request") {
@@ -30,6 +31,7 @@ export const createMarkerElement = (marker: HtmlMarker): HTMLElement => {
   const label = document.createElement("span");
   label.className = "globe-city";
   label.dataset.side = marker.labelSide ?? "right";
+  label.dataset.grouped = String(marker.grouped);
   label.textContent = marker.name;
   anchor.appendChild(label);
   return anchor;

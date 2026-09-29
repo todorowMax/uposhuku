@@ -6,10 +6,12 @@ import {
   AmbientLight,
   ClampToEdgeWrapping,
   DirectionalLight,
+  Object3D,
+  Raycaster,
   SRGBColorSpace,
+  Sprite,
   TextureLoader,
-  type Mesh,
-  type Object3D,
+  Vector2,
   type PerspectiveCamera,
   type Texture,
 } from "three";
@@ -17,6 +19,7 @@ import { GlobeZoomControl } from "@/components/globe/zoom-control";
 import {
   cameraPose,
   fitDistance,
+  GLOBE_RADIUS,
   localFrame,
   panView,
   plateauAltitude,
@@ -24,18 +27,24 @@ import {
   type MapView,
 } from "@/lib/globe/camera";
 import ukraine from "@/lib/globe/data/ukraine.geo.json";
-import { createMarkerElement, type HtmlMarker } from "@/lib/globe/html";
-import { createPyramid, createPyramidGeometry, placeOnSurface } from "@/lib/globe/markers";
+import { avatarPosition, createMarkerElement, type HtmlMarker } from "@/lib/globe/html";
+import {
+  createMarkerSprite,
+  disposeMarkerAssets,
+  loadMarkerAssets,
+  markerTexture,
+  placeMarkerSprite,
+  type MarkerAssets,
+  type VisualMarker,
+} from "@/lib/globe/visual-markers";
 import {
   createCapMaterial,
-  createPerformerMaterial,
   createSideMaterial,
   createSurfaceMaterial,
 } from "@/lib/globe/materials";
 import { GLOBE_PALETTE } from "@/lib/globe/palette";
 import { CITIES } from "@/lib/map/cities";
-import { DEMO_MATCHES, DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
-import { distanceKm } from "@/lib/map/scatter";
+import { DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
 import type { Performer } from "@/lib/map/types";
 
 /** Вертикальний кут огляду камери globe.gl, градуси. */
@@ -50,8 +59,6 @@ const TILT_DEG = 38;
 const PLATEAU_ALTITUDE = 0.004;
 /** Відстань камери, на якій плато має повну висоту: вся країна в кадрі. */
 const PLATEAU_FULL_DISTANCE = 17;
-/** Товщина дуг на повній висоті плато, кутові градуси. */
-const ARC_STROKE = 0.035;
 /** Ширина, яку кадр вміщає на рівні «Україна», км: країна плюс поля. */
 const UKRAINE_FRAME_KM = 1750;
 /**
@@ -68,22 +75,10 @@ const CITY_DISTANCE = 4;
 const FRAME_SHIFT = 0.18;
 /** Центр країни, куди дивиться камера на старті. */
 const START = { lat: 48.1, lng: 31.4 };
-/** Ширина пірамідки на екрані, CSS-пікселі, на будь-якому масштабі. */
-const PYRAMID_PX = 13;
-/** Довжина одного штриха дуги, км: однакова на короткій і довгій дузі. */
-const DASH_KM = 9;
 
 interface Size {
   width: number;
   height: number;
-}
-
-interface ArcDatum {
-  startLat: number;
-  startLng: number;
-  endLat: number;
-  endLng: number;
-  lengthKm: number;
 }
 
 const loadTexture = async (url: string): Promise<Texture> => {
@@ -104,28 +99,21 @@ const prefersReducedMotion = () =>
  */
 const RENDERER_CONFIG = { antialias: true, alpha: true, powerPreference: "high-performance" } as const;
 const polygonStrokeColor = () => GLOBE_PALETTE.ukraineStroke;
-const arcColor = () => GLOBE_PALETTE.arc;
-const arcDashLength = (datum: object) => DASH_KM / (datum as ArcDatum).lengthKm;
-const arcDashGap = (datum: object) => (DASH_KM * 0.8) / (datum as ArcDatum).lengthKm;
-const arcDashAnimateTime = (datum: object) => (datum as ArcDatum).lengthKm * 14;
-const htmlElement = (datum: object) => createMarkerElement(datum as HtmlMarker);
 
 export default function GlobeScene() {
   const stageRef = useRef<HTMLDivElement>(null);
   const globeRef = useRef<GlobeMethods | undefined>(undefined);
   const [size, setSize] = useState<Size | null>(null);
   const [textures, setTextures] = useState<{ world: Texture; region: Texture } | null>(null);
+  const [markerAssets, setMarkerAssets] = useState<MarkerAssets | null>(null);
   const [globeReady, setGlobeReady] = useState(false);
   const [zoom, setZoom] = useState(0);
-  // Висота, на якій стоять підписи й дуги. Оновлюється з кроком масштабу,
-  // а не щокадру: це перебудова шарів globe.gl, хоч і дешева.
-  const [markerAltitude, setMarkerAltitude] = useState(PLATEAU_ALTITUDE);
+  const [expandedCityId, setExpandedCityId] = useState<string | null>(null);
+  const [selectedPerformerId, setSelectedPerformerId] = useState<string | null>(null);
   const plateauRef = useRef<Object3D | null>(null);
+  const markerSpritesRef = useRef<Set<Sprite>>(new Set());
   const zoomRef = useRef(0);
   const viewRef = useRef<MapView>({ ...START, distance: 20, tilt: TILT_DEG });
-  const pyramidsRef = useRef(new Set<Mesh>());
-  /** Поточний масштаб пірамідки: нові маркери одразу потрібного розміру. */
-  const pyramidScaleRef = useRef(0.2);
   const animationRef = useRef<number | null>(null);
 
   // Розмір сцени беремо з контейнера, а не з вікна: над картою згодом
@@ -139,6 +127,22 @@ export default function GlobeScene() {
     });
     observer.observe(stage);
     return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    let loaded: MarkerAssets | null = null;
+    loadMarkerAssets().then((assets) => {
+      if (cancelled) disposeMarkerAssets(assets);
+      else {
+        loaded = assets;
+        setMarkerAssets(assets);
+      }
+    }).catch((error) => console.error("Не вдалося завантажити портрети карти", error));
+    return () => {
+      cancelled = true;
+      if (loaded) disposeMarkerAssets(loaded);
+    };
   }, []);
 
   useEffect(() => {
@@ -162,11 +166,6 @@ export default function GlobeScene() {
     };
   }, [textures]);
 
-  const pyramid = useMemo(
-    () => ({ geometry: createPyramidGeometry(), material: createPerformerMaterial() }),
-    []
-  );
-
   /** Межі наближення залежать від пропорцій екрана. */
   const distances = useMemo(() => {
     if (!size) return null;
@@ -175,12 +174,6 @@ export default function GlobeScene() {
     const far = fitDistance(frameKm, aspect, VERTICAL_FOV);
     return { far, near: Math.min(CITY_DISTANCE, far * 0.5) };
   }, [size]);
-
-  const unitsPerPixel = useCallback(
-    (distance: number) =>
-      size ? (2 * distance * Math.tan(((VERTICAL_FOV / 2) * Math.PI) / 180)) / size.height : 0,
-    [size]
-  );
 
   /** Ставить камеру за поточним видом. Викликається на кожен рух. */
   const applyView = useCallback(() => {
@@ -197,13 +190,6 @@ export default function GlobeScene() {
     // Україна опускається в кадрі.
     camera.setViewOffset(size.width, size.height, 0, -FRAME_SHIFT * size.height, size.width, size.height);
 
-    const scale = unitsPerPixel(view.distance) * PYRAMID_PX;
-    pyramidScaleRef.current = scale;
-    pyramidsRef.current.forEach((mesh) => {
-      placeOnSurface(mesh, mesh.userData.point as Performer, altitude);
-      mesh.scale.setScalar(scale);
-    });
-
     // Плато будується один раз на повну висоту, а нижчим стає масштабом
     // від центру Землі: напрямки не змінюються, тож широта й довгота
     // кожної точки ті самі, змінюється лише висота. Нижня кромка стінок
@@ -218,10 +204,27 @@ export default function GlobeScene() {
     }
     plateauRef.current?.scale.setScalar((1 + altitude) / (1 + PLATEAU_ALTITUDE));
 
+    // WebGL-спрайти та поверхня рухаються в одному кадрі. Ніякої
+    // React-зміни координат HTML-портретів після руху камери немає.
+    for (const sprite of markerSpritesRef.current) {
+      if (!sprite.parent) {
+        sprite.material.dispose();
+        markerSpritesRef.current.delete(sprite);
+        continue;
+      }
+      placeMarkerSprite(sprite, camera, size.height, altitude, size.width < 640);
+    }
+    // Пасивні підписи також тримаємо на висоті поверхні синхронно,
+    // без перебудови DOM-шару на кожному кроці масштабу.
+    globe.scene().traverse((object) => {
+      const type = (object as Object3D & { __globeObjType?: string }).__globeObjType;
+      if (type === "html") object.position.setLength(GLOBE_RADIUS * (1 + altitude));
+    });
+
     // globe.gl перераховує видимість підписів на цю подію: без неї
     // HTML-шар не знає, що камера зрушила.
     globe.controls().dispatchEvent({ type: "change" });
-  }, [size, unitsPerPixel]);
+  }, [size]);
 
   const setZoomLevel = useCallback(
     (next: number) => {
@@ -232,11 +235,6 @@ export default function GlobeScene() {
       const distance = zoomToDistance(clamped, distances.far, distances.near);
       viewRef.current = { ...viewRef.current, distance };
       applyView();
-      // Три значущі цифри: дрібніші зміни на екрані не видно, а кожна
-      // зміна перебудовує підписи й дуги.
-      setMarkerAltitude(
-        Number(plateauAltitude(distance, PLATEAU_ALTITUDE, PLATEAU_FULL_DISTANCE).toPrecision(3))
-      );
     },
     [applyView, distances]
   );
@@ -266,6 +264,58 @@ export default function GlobeScene() {
     [setZoomLevel]
   );
 
+  /** Група під'їжджає до центру кадру; при закритті повертаємо всю країну. */
+  const animateFocusTo = useCallback(
+    (cityId: string | null) => {
+      if (!distances) return;
+      stopAnimation();
+      const city = cityId ? CITIES.find((item) => item.id === cityId) : null;
+      const start = { ...viewRef.current };
+      const startZoom = zoomRef.current;
+      const targetZoom = city ? Math.max(startZoom, 0.78) : 0;
+      const target = city ?? START;
+      setExpandedCityId(city?.id ?? null);
+      setSelectedPerformerId(null);
+
+      const move = (progress: number) => {
+        viewRef.current = {
+          ...viewRef.current,
+          lat: start.lat + (target.lat - start.lat) * progress,
+          lng: start.lng + (target.lng - start.lng) * progress,
+        };
+        setZoomLevel(startZoom + (targetZoom - startZoom) * progress);
+      };
+      if (prefersReducedMotion()) return move(1);
+      const started = performance.now();
+      const step = (now: number) => {
+        const t = Math.min(1, (now - started) / 620);
+        move(1 - Math.pow(1 - t, 3));
+        animationRef.current = t < 1 ? requestAnimationFrame(step) : null;
+      };
+      animationRef.current = requestAnimationFrame(step);
+    },
+    [distances, setZoomLevel]
+  );
+
+  const pickMarker = useCallback(
+    (clientX: number, clientY: number) => {
+      const stage = stageRef.current;
+      const globe = globeRef.current;
+      if (!stage || !globe) return null;
+      const rect = stage.getBoundingClientRect();
+      const pointer = new Vector2(
+        ((clientX - rect.left) / rect.width) * 2 - 1,
+        -((clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const raycaster = new Raycaster();
+      raycaster.setFromCamera(pointer, globe.camera() as PerspectiveCamera);
+      const sprites = [...markerSpritesRef.current].filter((sprite) => sprite.parent);
+      const hit = raycaster.intersectObjects(sprites, false)[0];
+      return (hit?.object.userData.marker as VisualMarker | undefined) ?? null;
+    },
+    []
+  );
+
   const onGlobeReady = useCallback(() => {
     const globe = globeRef.current;
     if (!globe) return;
@@ -284,8 +334,7 @@ export default function GlobeScene() {
       }
     }
 
-    // Світло з північного заходу й згори: ліва грань пірамідки світла,
-    // права в тіні, як у знаку.
+    // Світло з північного заходу й згори для поверхні планети.
     const { up, north, east } = localFrame(START.lat, START.lng);
     const sun = new DirectionalLight(0xffffff, Math.PI * 0.6);
     sun.position
@@ -312,6 +361,7 @@ export default function GlobeScene() {
     const stage = stageRef.current;
     if (!stage || !size || !distances) return;
     const pointers = new Map<number, { x: number; y: number }>();
+    const starts = new Map<number, { x: number; y: number; wasPinch: boolean; moved: boolean }>();
     let pinch: { distance: number; zoom: number } | null = null;
     const zoomRange = Math.log(distances.far / distances.near);
 
@@ -321,16 +371,27 @@ export default function GlobeScene() {
     };
 
     const onDown = (event: PointerEvent) => {
+      if ((event.target as HTMLElement).closest("[data-globe-interactive]")) return;
       stopAnimation();
+      stage.style.cursor = "";
       stage.setPointerCapture(event.pointerId);
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-      if (pointers.size === 2) pinch = { distance: spread(), zoom: zoomRef.current };
+      starts.set(event.pointerId, { x: event.clientX, y: event.clientY, wasPinch: false, moved: false });
+      if (pointers.size === 2) {
+        pinch = { distance: spread(), zoom: zoomRef.current };
+        starts.forEach((start) => { start.wasPinch = true; });
+      }
       stage.dataset.dragging = "true";
     };
 
     const onMove = (event: PointerEvent) => {
       const previous = pointers.get(event.pointerId);
-      if (!previous) return;
+      if (!previous) {
+        stage.style.cursor = pickMarker(event.clientX, event.clientY) ? "pointer" : "";
+        return;
+      }
+      const start = starts.get(event.pointerId);
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 7) start.moved = true;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.size === 1) {
         viewRef.current = panView(
@@ -347,9 +408,18 @@ export default function GlobeScene() {
     };
 
     const onUp = (event: PointerEvent) => {
+      const start = starts.get(event.pointerId);
+      const isClick = event.type === "pointerup" && start && !start.wasPinch && !start.moved &&
+        pointers.size === 1;
       pointers.delete(event.pointerId);
+      starts.delete(event.pointerId);
       if (pointers.size < 2) pinch = null;
       if (pointers.size === 0) delete stage.dataset.dragging;
+      if (isClick) {
+        const marker = pickMarker(event.clientX, event.clientY);
+        if (marker?.kind === "performer") setSelectedPerformerId(marker.id);
+        else if (marker?.kind === "group") animateFocusTo(marker.expanded ? null : marker.cityId);
+      }
     };
 
     const onWheel = (event: WheelEvent) => {
@@ -371,60 +441,110 @@ export default function GlobeScene() {
       stage.removeEventListener("pointercancel", onUp);
       stage.removeEventListener("wheel", onWheel);
     };
-  }, [applyView, distances, setZoomLevel, size]);
+  }, [animateFocusTo, applyView, distances, pickMarker, setZoomLevel, size]);
 
   useEffect(() => stopAnimation, []);
 
+  useEffect(() => {
+    if (!expandedCityId && !selectedPerformerId) return;
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (selectedPerformerId) setSelectedPerformerId(null);
+      else animateFocusTo(null);
+    };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [animateFocusTo, expandedCityId, selectedPerformerId]);
+
   const polygons = useMemo(() => [ukraine], []);
+
+  const peopleByCity = useMemo(() => {
+    const groups = new Map<string, Performer[]>();
+    for (const performer of DEMO_PERFORMERS) {
+      const group = groups.get(performer.cityId) ?? [];
+      group.push(performer);
+      groups.set(performer.cityId, group);
+    }
+    return groups;
+  }, []);
+
+  const visualMarkers = useMemo<VisualMarker[]>(
+    () => {
+      const people: VisualMarker[] = [];
+      for (const city of CITIES) {
+        const members = peopleByCity.get(city.id) ?? [];
+        if (members.length >= 4) {
+          people.push({
+            kind: "group",
+            id: `group-${city.id}`,
+            cityId: city.id,
+            name: city.name,
+            lat: city.lat,
+            lng: city.lng,
+            count: members.length,
+            previews: members.slice(0, 2).map((member) => member.avatarIndex),
+            expanded: city.id === expandedCityId,
+          });
+        }
+        if (members.length < 4 || city.id === expandedCityId) {
+          people.push(
+            ...members.map((member) => ({
+              kind: "performer" as const,
+              ...member,
+              selected: member.id === selectedPerformerId,
+            }))
+          );
+        }
+      }
+      return people;
+    },
+    [expandedCityId, peopleByCity, selectedPerformerId]
+  );
 
   const htmlMarkers = useMemo<HtmlMarker[]>(
     () => [
-      ...DEMO_REQUESTS.map((request) => ({ kind: "request" as const, ...request })),
-      ...CITIES.filter((city) => city.label).map((city) => ({ kind: "city" as const, ...city })),
-      { kind: "country", id: "ua", name: "Україна", lat: 48.95, lng: 31.1 },
+        ...DEMO_REQUESTS.map((request) => ({ kind: "request" as const, ...request })),
+        ...CITIES.filter((city) => city.label).map((city) => ({
+          kind: "city" as const,
+          ...city,
+          grouped: (peopleByCity.get(city.id)?.length ?? 0) >= 4,
+        })),
+        { kind: "country", id: "ua", name: "Україна", lat: 48.95, lng: 31.1 },
     ],
-    []
+    [expandedCityId, peopleByCity]
   );
 
-  const arcs = useMemo<ArcDatum[]>(() => {
-    const requests = new Map(DEMO_REQUESTS.map((request) => [request.id, request]));
-    const performers = new Map(DEMO_PERFORMERS.map((performer) => [performer.id, performer]));
-    return DEMO_MATCHES.flatMap((match) => {
-      const from = requests.get(match.requestId);
-      const to = performers.get(match.performerId);
-      if (!from || !to) return [];
-      return [
-        {
-          startLat: from.lat,
-          startLng: from.lng,
-          endLat: to.lat,
-          endLng: to.lng,
-          lengthKm: distanceKm(from, to),
-        },
-      ];
-    });
-  }, []);
+  const htmlElement = useCallback((datum: object) => createMarkerElement(datum as HtmlMarker), []);
 
-  const reducedMotion = useMemo(prefersReducedMotion, []);
+  const customThreeObject = useCallback((datum: object) => {
+    if (!markerAssets || !size) return new Object3D();
+    const sprite = createMarkerSprite(markerAssets, datum as VisualMarker);
+    const globe = globeRef.current;
+    if (globe) {
+      const distance = viewRef.current.distance;
+      const altitude = plateauAltitude(distance, PLATEAU_ALTITUDE, PLATEAU_FULL_DISTANCE);
+      placeMarkerSprite(sprite, globe.camera() as PerspectiveCamera, size.height, altitude, size.width < 640);
+    }
+    markerSpritesRef.current.add(sprite);
+    return sprite;
+  }, [markerAssets, size]);
 
-  const createPerformerObject = useCallback(
-    (datum: object) => {
-      const mesh = createPyramid(
-        pyramid.geometry,
-        pyramid.material,
-        datum as Performer,
-        PLATEAU_ALTITUDE
-      );
-      mesh.userData.point = datum;
-      mesh.scale.setScalar(pyramidScaleRef.current);
-      pyramidsRef.current.add(mesh);
-      // Шар прибирає маркер зі сцени, коли даних стає менше: тоді й ми
-      // перестаємо його рухати.
-      mesh.addEventListener("removed", () => pyramidsRef.current.delete(mesh));
-      return mesh;
-    },
-    [pyramid]
-  );
+  const customThreeObjectUpdate = useCallback((object: Object3D, datum: object) => {
+    if (!(object instanceof Sprite) || !markerAssets || !size) return;
+    const marker = datum as VisualMarker;
+    object.userData.marker = marker;
+    object.material.map = markerTexture(markerAssets, marker);
+    object.material.needsUpdate = true;
+    object.center.set(0.5, marker.kind === "performer" ? 0.12 : 0.5);
+    object.renderOrder = marker.kind === "group" && marker.expanded ? 30 : 20;
+    const globe = globeRef.current;
+    if (!globe) return;
+    const altitude = plateauAltitude(viewRef.current.distance, PLATEAU_ALTITUDE, PLATEAU_FULL_DISTANCE);
+    placeMarkerSprite(object, globe.camera() as PerspectiveCamera, size.height, altitude, size.width < 640);
+  }, [markerAssets, size]);
+
+  const selectedPerformer = DEMO_PERFORMERS.find((person) => person.id === selectedPerformerId);
+  const expandedCity = CITIES.find((city) => city.id === expandedCityId);
 
   const visible = globeReady && Boolean(materials) && Boolean(distances);
 
@@ -433,7 +553,7 @@ export default function GlobeScene() {
       <div
         ref={stageRef}
         aria-label="Карта виконавців і запитів в Україні"
-        role="img"
+        role="region"
         className="absolute inset-0 cursor-grab touch-none select-none transition-opacity duration-700 data-[dragging=true]:cursor-grabbing"
         style={{ opacity: visible ? 1 : 0 }}
       >
@@ -459,25 +579,63 @@ export default function GlobeScene() {
             polygonStrokeColor={polygonStrokeColor}
             polygonCapCurvatureResolution={1}
             polygonsTransitionDuration={0}
-            customLayerData={DEMO_PERFORMERS}
-            customThreeObject={createPerformerObject}
+            customLayerData={markerAssets ? visualMarkers : []}
+            customThreeObject={customThreeObject}
+            customThreeObjectUpdate={customThreeObjectUpdate}
             htmlElementsData={htmlMarkers}
             htmlElement={htmlElement}
-            htmlAltitude={markerAltitude}
+            htmlAltitude={PLATEAU_ALTITUDE}
             htmlTransitionDuration={0}
-            arcsData={arcs}
-            arcColor={arcColor}
-            arcStroke={(ARC_STROKE * markerAltitude) / PLATEAU_ALTITUDE}
-            arcStartAltitude={markerAltitude}
-            arcEndAltitude={markerAltitude}
-            arcAltitudeAutoScale={0.22}
-            arcDashLength={arcDashLength}
-            arcDashGap={arcDashGap}
-            arcDashAnimateTime={reducedMotion ? 0 : arcDashAnimateTime}
-            arcsTransitionDuration={reducedMotion ? 0 : 1200}
           />
         )}
       </div>
+
+      {(expandedCity || selectedPerformer) && (
+        <div className="absolute bottom-20 left-4 z-[var(--z-controls)] w-[min(330px,calc(100vw-32px))] rounded-2xl bg-white/95 p-4 shadow-[0_16px_50px_-18px_rgb(22_48_112/0.38)] ring-1 ring-brand/15 backdrop-blur-md sm:bottom-6 sm:left-6">
+          {selectedPerformer ? (
+            <div className="flex items-center gap-3">
+              <span
+                className="globe-profile-photo shrink-0"
+                style={{ backgroundPosition: avatarPosition(selectedPerformer.avatarIndex) }}
+                aria-hidden
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-ink">{selectedPerformer.name}</p>
+                <p className="text-xs text-ink-muted">{selectedPerformer.specialty}</p>
+                <p className="mt-1 text-[11px] text-brand">
+                  {CITIES.find((city) => city.id === selectedPerformer.cityId)?.name} · демопрофіль
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPerformerId(null)}
+                aria-label="Закрити картку"
+                className="ml-auto self-start rounded-full px-1.5 text-lg leading-none text-ink-muted hover:text-ink"
+              >
+                ×
+              </button>
+            </div>
+          ) : expandedCity ? (
+            <div>
+              <p className="pr-8 text-sm font-semibold text-ink">
+                {expandedCity.name} · {peopleByCity.get(expandedCity.id)?.length} виконавців
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                Оберіть портрет або натисніть × на групі, щоб згорнути її.
+              </p>
+            </div>
+          ) : null}
+          {expandedCity && (
+            <button
+              type="button"
+              onClick={() => animateFocusTo(null)}
+              className="mt-3 flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-brand px-3 text-xs font-semibold text-white shadow-[0_6px_18px_-7px_rgb(27_91_223/70%)] transition-colors hover:brightness-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            >
+              <span aria-hidden>×</span> Згорнути групу · вся Україна
+            </button>
+          )}
+        </div>
+      )}
 
       <GlobeZoomControl
         value={zoom}

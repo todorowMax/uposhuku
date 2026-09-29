@@ -10,11 +10,11 @@ import { placeNear, scatterAround } from "./scatter";
 import type { Match, Performer, WorkRequest } from "./types";
 
 const PERFORMERS_PER_CITY: Record<string, number> = {
-  kyiv: 9,
-  lviv: 7,
-  kharkiv: 6,
-  dnipro: 5,
-  odesa: 4,
+  kyiv: 24,
+  lviv: 11,
+  kharkiv: 8,
+  dnipro: 6,
+  odesa: 9,
   zaporizhzhia: 2,
   vinnytsia: 2,
   ternopil: 2,
@@ -23,7 +23,27 @@ const PERFORMERS_PER_CITY: Record<string, number> = {
 };
 
 /** Крок спіралі, км: на масштабі країни купка міста читається однією плямою. */
-const SPACING_KM = 10;
+const SPACING_KM = 15;
+
+/** Вигадані люди для візуальної демонстрації, не профілі користувачів. */
+const MOCK_PROFILES = [
+  ["Олена Ковальчук", "UI/UX дизайнерка"],
+  ["Максим Бондар", "Full-stack розробник"],
+  ["Анна Мельник", "Продуктова дизайнерка"],
+  ["Данило Савченко", "Розробник застосунків"],
+  ["Артем Романюк", "Front-end розробник"],
+  ["Марія Шевченко", "Дизайнерка інтерфейсів"],
+  ["Ігор Петренко", "Розробник CRM"],
+  ["Софія Ткаченко", "No-code спеціалістка"],
+  ["Юлія Мороз", "Продуктова дизайнерка"],
+  ["Богдан Левченко", "Full-stack розробник"],
+  ["Катерина Павленко", "Web-дизайнерка"],
+  ["Олексій Гриценко", "Інженер автоматизації"],
+  ["Тарас Кравчук", "Front-end розробник"],
+  ["Наталія Дорошенко", "UI/UX дизайнерка"],
+  ["Сергій Коваль", "Розробник сервісів"],
+  ["Вікторія Литвин", "Дизайнерка продуктів"],
+] as const;
 
 /** Стабільний хеш рядка в [0, 1): «онлайн» не має мигати між рендерами. */
 const unitHash = (value: string): number => {
@@ -35,11 +55,23 @@ const unitHash = (value: string): number => {
   return (hash >>> 0) / 2 ** 32;
 };
 
-export const DEMO_PERFORMERS: Performer[] = CITIES.flatMap((city) => {
+export const DEMO_PERFORMERS: Performer[] = CITIES.flatMap((city, cityIndex) => {
   const count = PERFORMERS_PER_CITY[city.id] ?? 1;
   return scatterAround(city, count, SPACING_KM, inUkraine).map((point, i) => {
     const id = `${city.id}-${i}`;
-    return { id, cityId: city.id, ...point, online: unitHash(id) < 0.4 };
+    const avatarIndex = (cityIndex * 5 + i * 3) % MOCK_PROFILES.length;
+    const [name, specialty] = MOCK_PROFILES[avatarIndex];
+    const placement = i % 9 === 0 ? "featured" : i % 3 === 0 ? "plus" : "standard";
+    return {
+      id,
+      cityId: city.id,
+      ...point,
+      online: unitHash(id) < 0.4,
+      placement,
+      avatarIndex,
+      name,
+      specialty,
+    };
   });
 });
 

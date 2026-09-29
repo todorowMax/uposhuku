@@ -31,12 +31,8 @@ export const GLOBE_PALETTE = {
   /** Контур України. */
   ukraineStroke: "#5c7cc4",
 
-  /** Виконавці: пірамідки. */
-  performer: "#2553d6",
   /** Запити: крапки. */
   request: "#2a60df",
-  /** Дуги від запиту до виконавців. */
-  arc: "#2448b5",
 } as const;
 
 export type GlobeColor = keyof typeof GLOBE_PALETTE;

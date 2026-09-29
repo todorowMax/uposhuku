@@ -100,6 +100,42 @@ body {
   right: 2px;
 }
 
+.globe-city[data-grouped="true"] {
+  top: 39px;
+}
+
+/* Фото в картці виконавця лишається різким; позначки на карті тепер WebGL-спрайти. */
+.globe-profile-photo {
+  background-color: #dce8f5;
+  background-image: url("/globe/mock-avatars.png");
+  background-size: 400% 400%;
+  background-repeat: no-repeat;
+}
+
+.globe-profile-photo {
+  display: block;
+  width: 52px;
+  height: 52px;
+  border: 2px solid white;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #2768ef;
+}
+
+.globe-legend-face {
+  width: 17px;
+  height: 17px;
+  border: 1px solid white;
+  border-radius: 50%;
+  background: #dce8f5 url("/globe/mock-avatars.png") 0 0 / 400% 400% no-repeat;
+  box-shadow: 0 0 0 1.5px #2768ef;
+}
+
+@media (max-width: 640px) {
+  .globe-city[data-grouped="true"] {
+    top: 30px;
+  }
+}
+
 .globe-country {
   padding: 5px 12px;
   border-radius: 999px;

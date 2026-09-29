@@ -19,6 +19,12 @@ export interface Performer extends GeoPoint {
   id: string;
   cityId: string;
   online: boolean;
+  /** Лише візуальний рівень оплаченого розміщення в демо. */
+  placement: "standard" | "plus" | "featured";
+  /** Позиція портрета в локальному атласі 4×4. */
+  avatarIndex: number;
+  name: string;
+  specialty: string;
 }
 
 /** Запит: «що потрібно створити», теж з точністю до міста. */
