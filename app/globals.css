@@ -228,8 +228,7 @@ body {
   width: auto;
   max-width: none;
   user-select: none;
-  filter: drop-shadow(0 16px 26px oklch(0.42 0.09 260 / 0.24))
-    drop-shadow(0 2px 4px oklch(0.42 0.09 260 / 0.1));
+  filter: drop-shadow(0 12px 24px oklch(0.42 0.09 260 / 0.1));
   animation: globe-cloud-drift 26s ease-in-out infinite alternate;
 }
 
@@ -273,4 +272,22 @@ body {
   .globe-cloud {
     animation: none;
   }
+}
+
+/*
+  Поле запиту. Тінь двошарова і синювата, як панелі на макеті: широка
+  м'яка підкладка плюс тонкий контакт знизу.
+*/
+.composer {
+  box-shadow:
+    0 24px 60px -24px oklch(0.42 0.09 260 / 0.28),
+    0 2px 6px -2px oklch(0.42 0.09 260 / 0.1);
+  transition: box-shadow 200ms var(--ease-out-quint);
+}
+
+.composer:focus-within {
+  box-shadow:
+    0 0 0 3px color-mix(in oklch, var(--brand) 18%, transparent),
+    0 24px 60px -24px oklch(0.42 0.09 260 / 0.32),
+    0 2px 6px -2px oklch(0.42 0.09 260 / 0.1);
 }

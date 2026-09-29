@@ -31,7 +31,7 @@ const CLOUD_TINT: [number, number, number] = [0.975, 0.985, 1];
  * Наскільки поглибити тіні всередині хмари. На світлій сторінці біла
  * хмара без тіней зливається з тлом, об'єм читається саме з них.
  */
-const SHADOW_DEPTH = 2.4;
+const SHADOW_DEPTH = 1.7;
 
 /**
  * Небо як гладка функція від координат: квадратичний поліном по x і y
@@ -111,7 +111,10 @@ const main = async () => {
       const u = (sumSS * sumD - sumS * sumSD) / det;
       const a = Math.max(0, Math.min(1, (sumS * sumD - 3 * sumSD) / det));
       const lit = a > 0.02 ? Math.max(0, Math.min(255, u / a)) : 255;
-      const gray = Math.max(0, 255 - (255 - lit) * SHADOW_DEPTH);
+      // На прозорих краях оцінка яскравості ненадійна, і поглиблена тінь
+      // лягає брудною сірою облямівкою. Тінь проявляємо лише в щільній хмарі.
+      const density = Math.max(0, Math.min(1, (a - 0.15) / 0.45));
+      const gray = Math.max(0, 255 - (255 - lit) * SHADOW_DEPTH * density * density);
       out.data[i] = gray * CLOUD_TINT[0];
       out.data[i + 1] = gray * CLOUD_TINT[1];
       out.data[i + 2] = gray * CLOUD_TINT[2];
