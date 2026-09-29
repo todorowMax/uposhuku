@@ -31,10 +31,10 @@ const drawPortrait = (
 };
 
 /**
- * Маркер-портрет на полотні 192×192: фото в синьому кільці й маленький
+ * Маркер-портрет на полотні 192×192: фото у світлому кільці й маленький
  * якір знизу. MapLibre бере його як зображення символу.
  */
-export const createPortraitCanvas = (source: HTMLImageElement, index: number) => {
+export const createPortraitCanvas = (source: HTMLImageElement, index: number, selected = false) => {
   const canvas = document.createElement("canvas");
   canvas.width = PORTRAIT_SIZE;
   canvas.height = PORTRAIT_SIZE;
@@ -42,8 +42,8 @@ export const createPortraitCanvas = (source: HTMLImageElement, index: number) =>
   if (!context) throw new Error("Canvas 2D is unavailable");
   // Фото й маленький якір з'єднані в один «живий» маркер. Контур
   // залишає портрет упізнаваним навіть у найменшому платному рівні.
-  context.shadowColor = "rgba(20, 65, 145, .29)";
-  context.shadowBlur = 17;
+  context.shadowColor = selected ? "rgba(172, 103, 57, .48)" : "rgba(48, 68, 64, .22)";
+  context.shadowBlur = selected ? 32 : 17;
   context.shadowOffsetY = 6;
   context.fillStyle = "#ffffff";
   context.beginPath();
@@ -56,12 +56,12 @@ export const createPortraitCanvas = (source: HTMLImageElement, index: number) =>
   context.beginPath();
   context.arc(96, 83, 69, 0, Math.PI * 2);
   context.stroke();
-  context.strokeStyle = "#2469ef";
-  context.lineWidth = 5;
+  context.strokeStyle = selected ? "#e9a26d" : "#a3bdb0";
+  context.lineWidth = selected ? 10 : 5;
   context.beginPath();
   context.arc(96, 83, 75, 0, Math.PI * 2);
   context.stroke();
-  context.fillStyle = "#2469ef";
+  context.fillStyle = selected ? "#e9a26d" : "#a3bdb0";
   context.beginPath();
   context.moveTo(82, 152);
   context.quadraticCurveTo(96, 183, 110, 152);

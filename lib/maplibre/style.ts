@@ -18,7 +18,6 @@ import type { GeoJSON } from "geojson";
 import ukraine from "@/lib/map/data/ukraine.geo.json";
 import { MAP_PALETTE as P } from "@/lib/map/palette";
 import { DETAIL_ZOOM, STATIC_MAP, corners } from "@/lib/maplibre/static";
-import { ukraineRim } from "@/lib/maplibre/rim";
 
 /** Шрифти підписів з OpenFreeMap, мають кирилицю. */
 export const FONT_REGULAR = ["Noto Sans Regular"];
@@ -27,31 +26,8 @@ export const FONT_BOLD = ["Noto Sans Bold"];
 /** Масштаб, з якого з'являються об'ємні будинки. */
 export const BUILDINGS_ZOOM = 13;
 
-/** Плато України підняте на масштабі країни й тоне в землю ближче до міста. */
-const PLATEAU_HEIGHT = [
-  "interpolate",
-  ["linear"],
-  ["zoom"],
-  4,
-  26000,
-  6.5,
-  14000,
-  8.5,
-  0,
-] as const;
-
-/**
- * Кольори України саме для MapLibre. Плато тут напівпрозоре, тож верх
- * блакитніший за палітру текстур, а кромка насиченіша: інакше Україна зливається
- * з сірим суходолом навколо.
- */
-const UKRAINE = { cap: "#dde8fd", rim: "#4a7ae3", outline: "#3f6fdc" } as const;
-
-/** Кромка плато: синя стінка й контур по верхньому краю. */
-const RIM_WIDTH_KM = 3;
-/** Кромка й плато прозорішають, поки плато осідає в землю. */
-const plateauOpacity = (full: number) =>
-  ["interpolate", ["linear"], ["zoom"], 6.5, full, 8.5, 0] as unknown as number;
+/** Основний суцільний контур; маленькі острови залишаються на статичному шарі. */
+export const UKRAINE_TRACE_RING = ukraine.geometry.coordinates[0][0] as [number, number][];
 
 /** Шар тане, коли з'являються дані OSM. */
 const fadeOut = ["interpolate", ["linear"], ["zoom"], DETAIL_ZOOM, 1, DETAIL_ZOOM + 1.5, 0] as unknown as number;
@@ -84,7 +60,15 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       attribution: "Рельєф: AWS Terrain Tiles",
     },
     ukraine: { type: "geojson", data: ukraine as unknown as GeoJSON },
-    "ukraine-rim": { type: "geojson", data: ukraineRim(RIM_WIDTH_KM) },
+    "ukraine-trace": {
+      type: "geojson",
+      data: { type: "Feature", geometry: { type: "LineString", coordinates: UKRAINE_TRACE_RING }, properties: {} },
+      lineMetrics: true,
+    },
+    "ukraine-trace-head": {
+      type: "geojson",
+      data: { type: "Feature", geometry: { type: "Point", coordinates: UKRAINE_TRACE_RING[0] }, properties: {} },
+    },
     world: { type: "image", url: `${origin}/map/world.webp`, coordinates: corners(STATIC_MAP.world) },
     region: { type: "image", url: `${origin}/map/region.webp`, coordinates: corners(STATIC_MAP.region) },
   },
@@ -95,14 +79,22 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       type: "raster",
       source: "world",
       maxzoom: DETAIL_ZOOM + 1.5,
-      paint: { "raster-opacity": fadeOut, "raster-fade-duration": 0, "raster-resampling": "linear" },
+      paint: {
+        "raster-opacity": fadeOut, "raster-fade-duration": 0, "raster-resampling": "linear",
+        "raster-saturation": -0.35, "raster-contrast": -0.06, "raster-brightness-max": 0.97,
+        "raster-hue-rotate": 335,
+      },
     },
     {
       id: "region-static",
       type: "raster",
       source: "region",
       maxzoom: DETAIL_ZOOM + 1.5,
-      paint: { "raster-opacity": fadeOut, "raster-fade-duration": 0, "raster-resampling": "linear" },
+      paint: {
+        "raster-opacity": fadeOut, "raster-fade-duration": 0, "raster-resampling": "linear",
+        "raster-saturation": -0.35, "raster-contrast": -0.06, "raster-brightness-max": 0.97,
+        "raster-hue-rotate": 335,
+      },
     },
     {
       id: "relief",
@@ -122,7 +114,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       source: "osm",
       "source-layer": "park",
       minzoom: 10,
-      paint: { "fill-color": "#e7efe9", "fill-opacity": 0.8 },
+      paint: { "fill-color": "#d7e6dd", "fill-opacity": 0.8 },
     },
     {
       id: "water",
@@ -166,7 +158,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]],
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-color": "#d9dee8",
+        "line-color": "#cdd9d8",
         "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 9, 0.6, 14, 4, 17, 16],
       },
     },
@@ -179,50 +171,59 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor"]]],
       layout: { "line-cap": "round", "line-join": "round" },
       paint: {
-        "line-color": "#ffffff",
+        "line-color": "#f4f7f5",
         "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 9, 0.3, 14, 2.6, 17, 13],
       },
     },
-    // Україна: піднята плита. Верх напівпрозорий і
-    // блакитний, щоб крізь нього було видно рельєф і річки з текстури.
-    // Ближче до міста плита осідає й тане, щоб не накривати вулиці.
-    {
-      id: "ukraine-plateau",
-      type: "fill-extrusion",
-      source: "ukraine",
-      maxzoom: 9,
-      paint: {
-        "fill-extrusion-color": UKRAINE.cap,
-        "fill-extrusion-height": PLATEAU_HEIGHT as unknown as number,
-        "fill-extrusion-base": 0,
-        "fill-extrusion-opacity": plateauOpacity(0.6),
-        "fill-extrusion-vertical-gradient": false,
-      },
-    },
-    {
-      id: "ukraine-rim",
-      type: "fill-extrusion",
-      source: "ukraine-rim",
-      maxzoom: 9,
-      paint: {
-        "fill-extrusion-color": UKRAINE.rim,
-        "fill-extrusion-height": PLATEAU_HEIGHT as unknown as number,
-        "fill-extrusion-base": 0,
-        "fill-extrusion-opacity": plateauOpacity(0.85),
-        "fill-extrusion-vertical-gradient": false,
-      },
-    },
+    // Лише тонкий контур: рельєф і карта всередині країни лишаються відкритими.
     {
       id: "ukraine-outline",
       type: "line",
       source: "ukraine",
       maxzoom: 10,
       paint: {
-        "line-color": UKRAINE.outline,
-        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.2, 9, 2],
-        // Поки плато підняте, це лише основа стінки під кромкою; коли
-        // плато осіло, лінія лишається єдиним кордоном.
-        "line-opacity": ["interpolate", ["linear"], ["zoom"], 6.5, 0.4, 8.5, 0.9, 10, 0],
+        "line-color": "#b48264",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.8, 9, 2.4],
+        "line-opacity": 0.42,
+      },
+    },
+    {
+      id: "ukraine-trace-glow",
+      type: "line",
+      source: "ukraine-trace",
+      maxzoom: 10,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 10,
+        "line-blur": 4,
+        "line-opacity": 0,
+        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, "rgba(255,240,205,0)", 1, "rgba(255,240,205,0)"],
+      },
+    },
+    {
+      id: "ukraine-trace-core",
+      type: "line",
+      source: "ukraine-trace",
+      maxzoom: 10,
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: {
+        "line-width": 3.3,
+        "line-opacity": 0,
+        "line-gradient": ["interpolate", ["linear"], ["line-progress"], 0, "rgba(255,252,238,0)", 1, "rgba(255,252,238,0)"],
+      },
+    },
+    {
+      id: "ukraine-trace-dot",
+      type: "circle",
+      source: "ukraine-trace-head",
+      maxzoom: 10,
+      paint: {
+        "circle-radius": 3.2,
+        "circle-color": "#fff9e7",
+        "circle-stroke-color": "#d99c70",
+        "circle-stroke-width": 1,
+        "circle-opacity": 0,
+        "circle-pitch-alignment": "viewport",
       },
     },
     // Місто: білі «глиняні» будинки з реальною висотою з OpenStreetMap.
@@ -233,7 +234,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       "source-layer": "building",
       minzoom: BUILDINGS_ZOOM,
       paint: {
-        "fill-extrusion-color": "#fbfcfe",
+        "fill-extrusion-color": "#f4f7f4",
         "fill-extrusion-height": [
           "interpolate", ["linear"], ["zoom"],
           BUILDINGS_ZOOM, 0,
@@ -256,7 +257,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
         "text-font": FONT_REGULAR,
         "text-size": 11,
       },
-      paint: { "text-color": "#7b8494", "text-halo-color": "#ffffff", "text-halo-width": 1.4 },
+      paint: { "text-color": "#68777a", "text-halo-color": "#ffffff", "text-halo-width": 1.4 },
     },
   ],
 });

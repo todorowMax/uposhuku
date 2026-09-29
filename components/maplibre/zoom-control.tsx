@@ -19,7 +19,7 @@ const STEPS = 1000;
 export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps) {
   return (
     <div className="absolute right-4 bottom-4 z-[var(--z-controls)] flex items-stretch gap-3 sm:right-6 sm:bottom-6">
-      <label className="flex h-12 items-center gap-3 rounded-2xl bg-surface px-4 text-sm text-ink shadow-[0_8px_28px_-12px_rgb(15_23_40/0.35)] ring-1 ring-line">
+      <label className="glass-panel flex h-12 items-center gap-3 rounded-2xl px-4 text-sm text-ink">
         <span>Україна</span>
         <input
           type="range"
@@ -32,13 +32,13 @@ export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps)
         />
         <span>Місто</span>
       </label>
-      <div className="flex h-12 items-center rounded-2xl bg-surface shadow-[0_8px_28px_-12px_rgb(15_23_40/0.35)] ring-1 ring-line">
+      <div className="glass-panel flex h-12 items-center rounded-2xl">
         <button
           type="button"
           onClick={() => onStep(-1)}
           disabled={value <= 0}
           aria-label="Віддалити"
-          className="grid h-full w-12 place-items-center rounded-l-2xl text-ink transition-colors hover:bg-bg disabled:text-ink-muted/50"
+          className="grid h-full w-12 place-items-center rounded-l-2xl text-ink transition-colors hover:bg-white/65 disabled:text-ink-muted/50"
         >
           <Minus className="size-4" strokeWidth={2.25} />
         </button>
@@ -48,7 +48,7 @@ export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps)
           onClick={() => onStep(1)}
           disabled={value >= 1}
           aria-label="Наблизити"
-          className="grid h-full w-12 place-items-center rounded-r-2xl text-ink transition-colors hover:bg-bg disabled:text-ink-muted/50"
+          className="grid h-full w-12 place-items-center rounded-r-2xl text-ink transition-colors hover:bg-white/65 disabled:text-ink-muted/50"
         >
           <Plus className="size-4" strokeWidth={2.25} />
         </button>

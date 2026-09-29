@@ -1,13 +1,11 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from "next";
-import { Onest } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-// Onest несе українську кирилицю (і, ї, є, ґ), та сама гарнітура, що в mealcart.
-const onest = Onest({
-  subsets: ["cyrillic", "latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-onest",
+const fixel = localFont({
+  src: "../public/fonts/FixelVariable.ttf",
+  variable: "--font-fixel",
   display: "swap",
 });
 
@@ -19,7 +17,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f4f6fa",
+  themeColor: "#b9c0ca",
   viewportFit: "cover",
 };
 
@@ -29,7 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // свої атрибути ще до гідратації, і React лається на розбіжність.
     // suppressHydrationWarning діє лише на атрибути самого <html>, не на
     // вміст сторінки. data-map-ready ставимо вже після гідратації.
-    <html lang="uk" className={onest.variable} suppressHydrationWarning>
+    <html lang="uk" className={fixel.variable} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );

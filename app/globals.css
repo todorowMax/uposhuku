@@ -1,31 +1,22 @@
 /* app/globals.css */
 @import "tailwindcss";
 
-/*
-  Світла тема, як у макеті. Темної поки немає, тому `dark:` прив'язаний
-  до класу, якого ми не ставимо: системна тема телефона не має
-  перефарбовувати сторінку. Той самий прийом, що в mealcart.
-*/
+/* Світла сіро-блакитна тема. Системна темна тема її не перефарбовує. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
-  Токени з DESIGN.md. Кольори карти живуть окремо в lib/map/palette.ts:
-  стиль MapLibre не читає CSS-змінних.
-*/
+/* Кольори карти живуть окремо в lib/map/palette.ts: MapLibre не читає CSS-змінних. */
 :root {
   color-scheme: light;
-  --radius: 1rem;
+  --radius: 0.875rem;
 
-  --bg: oklch(0.973 0.006 265);
-  --surface: oklch(1 0 0);
-  --ink: oklch(0.206 0.036 264);
-  --ink-muted: oklch(0.51 0.032 265);
-  --line: oklch(0.927 0.01 262);
-  --brand: oklch(0.532 0.202 264);
-  --brand-ink: oklch(1 0 0);
-  /* Зелений «онлайн» тільки крапкою або поруч зі словом: як текст на
-     тлі дає 3,2:1, для дрібного тексту замало. */
-  --online: oklch(0.615 0.158 151);
+  --bg: #b9c0ca;
+  --surface: #f9faf9;
+  --ink: #30363a;
+  --ink-muted: #69777f;
+  --line: rgb(255 255 255 / 58%);
+  --brand: #303638;
+  --brand-ink: #ffffff;
+  --online: #748e80;
 }
 
 @theme inline {
@@ -34,7 +25,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --font-sans: var(--font-onest), system-ui, sans-serif;
+  --font-sans: var(--font-fixel), system-ui, sans-serif;
 
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -62,14 +53,10 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Обличчя в легенді поля запиту, з того самого атласу, що маркери. */
-.map-legend-face {
-  width: 17px;
-  height: 17px;
-  border: 1px solid white;
-  border-radius: 50%;
-  background: #dce8f5 url("/map/mock-avatars.png") 0 0 / 400% 400% no-repeat;
-  box-shadow: 0 0 0 1.5px #2768ef;
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 36px rgb(54 65 73 / 11%), inset 0 1px rgb(255 255 255 / 60%);
 }
 
 /*
@@ -119,52 +106,45 @@ body {
   border-radius: 6px;
 }
 
-/*
-  Поле запиту. Два стани на одній сітці, без перебудови DOM:
-
-  - порожнє: один рядок «+ | текст | кнопка», вузьке, пігулка;
-  - з текстом: текст на всю ширину згори, дії окремим поверхом знизу,
-    ширше й з меншим радіусом.
-
-  Тінь двошарова й синювата, як панелі на макеті. Ширина, радіус і
-  висота перетікають плавно; висоту auto браузер анімує лише з
-  interpolate-size (Chromium), решта просто перемикається.
-*/
+/* Те саме поле у двох станах; змінені лише матеріал і геометрія. */
 .composer {
+  background: rgb(255 255 255 / 77%);
+  -webkit-backdrop-filter: blur(18px) saturate(1.08);
+  backdrop-filter: blur(18px) saturate(1.08);
   interpolate-size: allow-keywords;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas: "plus input send";
   align-items: center;
   column-gap: 4px;
+  height: 58px;
   max-width: 560px;
   padding: 8px;
-  border-radius: 28px;
-  box-shadow:
-    0 20px 50px -24px oklch(0.42 0.09 260 / 0.26),
-    0 2px 6px -2px oklch(0.42 0.09 260 / 0.08);
+  border-radius: 16px;
+  box-shadow: 0 16px 38px -20px rgb(47 60 68 / 28%), inset 0 1px rgb(255 255 255 / 60%);
   transition:
-    max-width 320ms var(--ease-out-quint),
-    border-radius 260ms var(--ease-out-quint),
-    height 260ms var(--ease-out-quint),
-    box-shadow 200ms var(--ease-out-quint);
+    max-width 480ms cubic-bezier(0.22, 0.75, 0.25, 1),
+    border-radius 420ms cubic-bezier(0.22, 0.75, 0.25, 1),
+    height 480ms cubic-bezier(0.22, 0.75, 0.25, 1),
+    padding 480ms cubic-bezier(0.22, 0.75, 0.25, 1),
+    box-shadow 260ms ease;
 }
 
 .composer[data-expanded="true"] {
+  height: auto;
   grid-template-areas:
     "input input input"
     "plus . send";
   row-gap: 6px;
   max-width: 720px;
   padding: 12px 12px 10px;
-  border-radius: 22px;
+  border-radius: 16px;
 }
 
 .composer:focus-within {
   box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--brand) 16%, transparent),
-    0 20px 50px -24px oklch(0.42 0.09 260 / 0.3),
-    0 2px 6px -2px oklch(0.42 0.09 260 / 0.08);
+    0 0 0 3px rgb(78 98 98 / 16%),
+    0 16px 38px -20px rgb(47 60 68 / 28%);
 }
 
 .composer-input {
@@ -193,7 +173,7 @@ body {
 }
 
 .composer-menu {
-  box-shadow: 0 18px 40px -18px oklch(0.42 0.09 260 / 0.35);
+  box-shadow: 0 18px 40px -18px rgb(47 60 68 / 25%);
   animation: composer-menu-in 160ms var(--ease-out-quint);
   transform-origin: top left;
 }
@@ -271,7 +251,7 @@ html[data-map-ready] .map-skeleton {
 
 .map-skeleton-outline {
   fill: none;
-  stroke: #5c7cc4;
+  stroke: #88a99e;
   stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-dasharray: 1;
@@ -280,7 +260,7 @@ html[data-map-ready] .map-skeleton {
 }
 
 .map-skeleton-fill {
-  fill: #e4ebf7;
+  fill: #dce8e2;
   opacity: 0;
   animation: skeleton-fade 600ms ease-out 1.1s forwards;
 }
@@ -297,7 +277,7 @@ html[data-map-ready] .map-skeleton {
 }
 
 .map-skeleton-city {
-  fill: #2a60df;
+  fill: #8aa99e;
   stroke: #ffffff;
   stroke-width: 2;
   transform: scale(0);
@@ -307,7 +287,7 @@ html[data-map-ready] .map-skeleton {
 
 .map-skeleton-ring {
   fill: none;
-  stroke: #2a60df;
+  stroke: #8aa99e;
   stroke-width: 1.5;
   opacity: 0;
   animation: skeleton-pulse 1.4s ease-out infinite;

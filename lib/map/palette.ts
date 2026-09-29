@@ -1,38 +1,37 @@
 // lib/map/palette.ts
 //
-// Кольори карти в sRGB. Стиль MapLibre і canvas у скрипті текстур не
-// читають CSS-змінні, тому тут окрема копія. Значення зняті піпеткою з макета і
-// збігаються з токенами в app/globals.css, див. DESIGN.md.
+// Приглушена сіро-блакитна палітра референсу. MapLibre не читає CSS-змінних,
+// тому кольори карти й елементів інтерфейсу задані окремо.
 
 export const MAP_PALETTE = {
   /** Тло сторінки, на ньому ж тане горизонт. */
-  sky: "#f4f6fa",
+  sky: "#b9c0ca",
   /** Серпанок над далекою поверхнею, трохи темніший за тло. */
-  haze: "#e9edf3",
+  haze: "#d5dce4",
 
   /** Суходіл поза Україною: світлий холодний сірий. */
-  land: "#eef0f4",
+  land: "#e2e9e5",
   /** Тіні рельєфу на суходолі. */
-  landShadow: "#c9ced8",
+  landShadow: "#c3cec8",
   /** Кордони між іншими країнами. */
-  border: "#c3c9d4",
+  border: "#bec9c7",
 
   /** Мілина: шельф, Азовське море, озера. */
-  waterShallow: "#78a8de",
+  waterShallow: "#a2c6c7",
   /** Глибина: центр Чорного моря. */
-  waterDeep: "#4f86cf",
+  waterDeep: "#6fabb2",
   /** Річки. */
-  river: "#9db4e4",
+  river: "#a7c5c2",
 
   /** Верх «плато» України. */
-  ukraineCap: "#eaf0f9",
+  ukraineCap: "#efbd98",
   /** Стінки плато. */
-  ukraineSide: "#7c96c8",
+  ukraineSide: "#c28f6d",
   /** Контур України. */
-  ukraineStroke: "#5c7cc4",
+  ukraineStroke: "#b98362",
 
   /** Запити: крапки. */
-  request: "#2a60df",
+  request: "#91a99d",
 } as const;
 
 /** `#rrggbb` → [r, g, b] у 0..255. */

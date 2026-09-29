@@ -94,7 +94,7 @@ export function RequestComposer() {
         ref={formRef}
         onSubmit={submit}
         data-expanded={expanded}
-        className="composer pointer-events-auto relative w-full bg-surface ring-1 ring-line"
+        className="composer glass-panel pointer-events-auto relative w-full"
       >
         <label htmlFor="request" className="sr-only">
           Що потрібно створити?
@@ -116,7 +116,7 @@ export function RequestComposer() {
           aria-label="Додати файл, зображення або код"
           aria-expanded={menuOpen}
           aria-haspopup="menu"
-          className="composer-plus grid size-10 place-items-center rounded-full text-ink-muted transition-[color,background-color,transform] duration-150 hover:bg-bg hover:text-brand active:scale-[0.97] aria-expanded:bg-bg aria-expanded:text-brand"
+          className="composer-plus grid size-10 place-items-center rounded-xl text-ink-muted transition-[color,background-color,transform] duration-150 hover:bg-white/65 hover:text-ink active:scale-[0.97] aria-expanded:bg-white/65 aria-expanded:text-ink"
         >
           <Plus
             className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`}
@@ -128,7 +128,7 @@ export function RequestComposer() {
           type="submit"
           disabled={!expanded}
           aria-label="Знайти виконавців"
-          className="composer-send flex h-10 items-center justify-center gap-2 rounded-full bg-brand text-[15px] font-medium text-brand-ink transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[oklch(0.48_0.2_264)] active:scale-[0.97] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-brand"
+          className="composer-send flex h-10 items-center justify-center gap-2 rounded-xl bg-brand text-[15px] font-medium text-brand-ink transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[#4c5558] active:scale-[0.97] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-brand"
         >
           {expanded ? (
             <>
@@ -143,7 +143,7 @@ export function RequestComposer() {
         {menuOpen && (
           <div
             role="menu"
-            className="composer-menu absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl bg-surface p-1.5 ring-1 ring-line"
+            className="composer-menu glass-panel absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl p-1.5"
           >
             <MenuItem icon={<Paperclip className="size-4" strokeWidth={1.9} />} onClick={pick}>
               Прикріпити файл
@@ -158,19 +158,6 @@ export function RequestComposer() {
         )}
       </form>
 
-      <ul className="pointer-events-auto mt-3 flex items-center gap-5 rounded-full px-3 py-1.5 text-[13px] font-medium text-ink">
-        <li className="flex items-center gap-2">
-          <span aria-hidden className="map-legend-face" />
-          Виконавці
-        </li>
-        <li className="flex items-center gap-2">
-          <span aria-hidden className="size-2.5 rounded-full bg-brand ring-2 ring-surface" />
-          Запити
-        </li>
-        <li className="hidden items-center gap-2 text-ink-muted sm:flex">
-          Розмір фото — розміщення
-        </li>
-      </ul>
     </div>
   );
 }
@@ -189,7 +176,7 @@ function MenuItem({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-ink transition-colors hover:bg-bg"
+      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-ink transition-colors hover:bg-white/65"
     >
       <span className="text-ink-muted">{icon}</span>
       {children}
