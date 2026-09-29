@@ -18,6 +18,7 @@ import type { GeoJSON } from "geojson";
 import ukraine from "@/lib/globe/data/ukraine.geo.json";
 import { GLOBE_PALETTE as P } from "@/lib/globe/palette";
 import { DETAIL_ZOOM, STATIC_MAP, corners } from "@/lib/maplibre/static";
+import { ukraineRim } from "@/lib/maplibre/rim";
 
 /** Шрифти підписів з OpenFreeMap, мають кирилицю. */
 export const FONT_REGULAR = ["Noto Sans Regular"];
@@ -38,6 +39,19 @@ const PLATEAU_HEIGHT = [
   8.5,
   0,
 ] as const;
+
+/**
+ * Кольори України саме для MapLibre. Плато тут напівпрозоре, тож верх
+ * блакитніший за глобусний, а кромка насиченіша: інакше Україна зливається
+ * з сірим суходолом навколо.
+ */
+const UKRAINE = { cap: "#dde8fd", rim: "#4a7ae3", outline: "#3f6fdc" } as const;
+
+/** Кромка плато: синя стінка й контур по верхньому краю. */
+const RIM_WIDTH_KM = 3;
+/** Кромка й плато прозорішають, поки плато осідає в землю. */
+const plateauOpacity = (full: number) =>
+  ["interpolate", ["linear"], ["zoom"], 6.5, full, 8.5, 0] as unknown as number;
 
 /** Шар тане, коли з'являються дані OSM. */
 const fadeOut = ["interpolate", ["linear"], ["zoom"], DETAIL_ZOOM, 1, DETAIL_ZOOM + 1.5, 0] as unknown as number;
@@ -70,6 +84,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       attribution: "Рельєф: AWS Terrain Tiles",
     },
     ukraine: { type: "geojson", data: ukraine as unknown as GeoJSON },
+    "ukraine-rim": { type: "geojson", data: ukraineRim(RIM_WIDTH_KM) },
     world: { type: "image", url: `${origin}/map/world.webp`, coordinates: corners(STATIC_MAP.world) },
     region: { type: "image", url: `${origin}/map/region.webp`, coordinates: corners(STATIC_MAP.region) },
   },
@@ -168,18 +183,33 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
         "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 9, 0.3, 14, 2.6, 17, 13],
       },
     },
-    // Україна: піднята плита з синім контуром, як на глобусі. Ближче до
-    // міста осідає, щоб не накривати вулиці й будинки.
+    // Україна: піднята плита, як на глобусі. Верх напівпрозорий і
+    // блакитний, щоб крізь нього було видно рельєф і річки з текстури.
+    // Ближче до міста плита осідає й тане, щоб не накривати вулиці.
     {
       id: "ukraine-plateau",
       type: "fill-extrusion",
       source: "ukraine",
       maxzoom: 9,
       paint: {
-        "fill-extrusion-color": P.ukraineCap,
+        "fill-extrusion-color": UKRAINE.cap,
         "fill-extrusion-height": PLATEAU_HEIGHT as unknown as number,
         "fill-extrusion-base": 0,
-        "fill-extrusion-opacity": 0.92,
+        "fill-extrusion-opacity": plateauOpacity(0.6),
+        "fill-extrusion-vertical-gradient": false,
+      },
+    },
+    {
+      id: "ukraine-rim",
+      type: "fill-extrusion",
+      source: "ukraine-rim",
+      maxzoom: 9,
+      paint: {
+        "fill-extrusion-color": UKRAINE.rim,
+        "fill-extrusion-height": PLATEAU_HEIGHT as unknown as number,
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": plateauOpacity(0.85),
+        "fill-extrusion-vertical-gradient": false,
       },
     },
     {
@@ -188,9 +218,11 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       source: "ukraine",
       maxzoom: 10,
       paint: {
-        "line-color": P.ukraineStroke,
+        "line-color": UKRAINE.outline,
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.2, 9, 2],
-        "line-opacity": ["interpolate", ["linear"], ["zoom"], 8, 1, 10, 0],
+        // Поки плато підняте, це лише основа стінки під кромкою; коли
+        // плато осіло, лінія лишається єдиним кордоном.
+        "line-opacity": ["interpolate", ["linear"], ["zoom"], 6.5, 0.4, 8.5, 0.9, 10, 0],
       },
     },
     // Місто: білі «глиняні» будинки з реальною висотою з OpenStreetMap.
