@@ -25,7 +25,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="uk" className={onest.variable}>
+    // Розширення браузера (LanguageTool, Grammarly тощо) дописують на <html>
+    // свої атрибути ще до гідратації, і React лається на розбіжність.
+    // suppressHydrationWarning діє лише на атрибути самого <html>, не на
+    // вміст сторінки. data-map-ready ставимо вже після гідратації.
+    <html lang="uk" className={onest.variable} suppressHydrationWarning>
       <body className="min-h-dvh antialiased">{children}</body>
     </html>
   );
