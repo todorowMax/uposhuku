@@ -1,14 +1,16 @@
 // app/page.tsx
+import { RequestComposer } from "@/components/composer/request-composer";
 import { VibeGlobe } from "@/components/globe/vibe-globe";
 
 /*
- * Поки що тільки глобус. Шапка, поле запиту й картки з макета ляжуть
- * поверх нього окремими блоками.
+ * Глобус на весь екран і поле запиту над ним. Шапка й картки запиту та
+ * виконавця з макета ляжуть окремими блоками.
  */
 export default function HomePage() {
   return (
-    <main className="h-dvh w-full">
+    <main className="relative h-dvh w-full">
       <VibeGlobe />
+      <RequestComposer />
     </main>
   );
 }

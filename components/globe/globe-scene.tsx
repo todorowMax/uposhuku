@@ -13,7 +13,6 @@ import {
   type PerspectiveCamera,
   type Texture,
 } from "three";
-import { GlobeClouds } from "@/components/globe/clouds";
 import { GlobeZoomControl } from "@/components/globe/zoom-control";
 import {
   cameraPose,
@@ -63,11 +62,10 @@ const UKRAINE_FRAME_KM_NARROW = 1150;
 /** Найближча відстань камери, одиниці сцени (≈ 250 км до фокуса). */
 const CITY_DISTANCE = 4;
 /**
- * Зсув кадру вниз, частка висоти. Україна стоїть трохи нижче центру:
- * над нею лишається небо й вигин горизонту, куди згодом ляже поле
- * запиту.
+ * Зсув кадру вниз, частка висоти. Україна стоїть помітно нижче центру:
+ * над нею лишається небо й вигин горизонту, там поле запиту.
  */
-const FRAME_SHIFT = 0.08;
+const FRAME_SHIFT = 0.18;
 /** Центр країни, куди дивиться камера на старті. */
 const START = { lat: 48.1, lng: 31.4 };
 /** Ширина пірамідки на екрані, CSS-пікселі, на будь-якому масштабі. */
@@ -480,8 +478,6 @@ export default function GlobeScene() {
           />
         )}
       </div>
-
-      <GlobeClouds />
 
       <GlobeZoomControl
         value={zoom}
