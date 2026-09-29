@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TAGS, TAGS_BY_ID, TAG_GROUPS } from "@/lib/tags/dictionary";
 import { normalizeTagText } from "@/lib/tags/normalize";
+import { phraseKey } from "@/lib/tags/detect";
 
 /** Усі фрази, за якими тег шукається в тексті: id, назва й синоніми. */
 const phrasesOf = (tag: (typeof TAGS)[number]) => [tag.id, tag.label, ...tag.synonyms];
@@ -40,6 +41,21 @@ describe("словник тегів", () => {
         const other = owner.get(phrase);
         if (other && other !== tag.id) clashes.push(`«${phrase}»: ${other} і ${tag.id}`);
         owner.set(phrase, tag.id);
+      }
+    }
+    expect(clashes).toEqual([]);
+  });
+
+  // Те саме, але після відрізання закінчень: «бота» і «боти» — одна основа,
+  // тож і вони не можуть вести до різних тегів.
+  it("жодна основа фрази не належить двом тегам", () => {
+    const owner = new Map<string, string>();
+    const clashes: string[] = [];
+    for (const tag of TAGS) {
+      for (const key of new Set(phrasesOf(tag).map(phraseKey))) {
+        const other = owner.get(key);
+        if (other && other !== tag.id) clashes.push(`«${key}»: ${other} і ${tag.id}`);
+        owner.set(key, tag.id);
       }
     }
     expect(clashes).toEqual([]);

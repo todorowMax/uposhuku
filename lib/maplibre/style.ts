@@ -18,6 +18,7 @@ import type { GeoJSON } from "geojson";
 import ukraine from "@/lib/map/data/ukraine.geo.json";
 import { MAP_PALETTE as P } from "@/lib/map/palette";
 import { DETAIL_ZOOM, STATIC_MAP, corners } from "@/lib/maplibre/static";
+import { ukraineRim } from "@/lib/maplibre/rim";
 
 /** Шрифти підписів з OpenFreeMap, мають кирилицю. */
 export const FONT_REGULAR = ["Noto Sans Regular"];
@@ -25,6 +26,18 @@ export const FONT_BOLD = ["Noto Sans Bold"];
 
 /** Масштаб, з якого з'являються об'ємні будинки. */
 export const BUILDINGS_ZOOM = 13;
+
+/**
+ * Україна трохи піднята над картою. Нижче, ніж була синя плита (26 км):
+ * лише щоб країна читалася об'ємом, а світлова точка на кордоні
+ * лишалася біля підніжжя. Ближче до міста плита осідає в землю.
+ */
+const PLATEAU_HEIGHT = ["interpolate", ["linear"], ["zoom"], 4, 9000, 6.5, 5000, 8.5, 0] as unknown as number;
+/** Кромка плато: тонка золота стрічка назовні від кордону, км. */
+const RIM_WIDTH_KM = 2.5;
+/** Плато й кромка прозорішають, поки осідають. */
+const plateauOpacity = (full: number) =>
+  ["interpolate", ["linear"], ["zoom"], 6.5, full, 8.5, 0] as unknown as number;
 
 /** Основний суцільний контур; маленькі острови залишаються на статичному шарі. */
 export const UKRAINE_TRACE_RING = ukraine.geometry.coordinates[0][0] as [number, number][];
@@ -60,6 +73,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       attribution: "Рельєф: AWS Terrain Tiles",
     },
     ukraine: { type: "geojson", data: ukraine as unknown as GeoJSON },
+    "ukraine-rim": { type: "geojson", data: ukraineRim(RIM_WIDTH_KM) },
     "ukraine-trace": {
       type: "geojson",
       data: { type: "Feature", geometry: { type: "LineString", coordinates: UKRAINE_TRACE_RING }, properties: {} },
@@ -175,7 +189,37 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
         "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 9, 0.3, 14, 2.6, 17, 13],
       },
     },
-    // Лише тонкий контур: рельєф і карта всередині країни лишаються відкритими.
+    // Плато з ледь помітною теплою заливкою: рельєф і річки всередині
+    // країни лишаються видно.
+    {
+      id: "ukraine-plateau",
+      type: "fill-extrusion",
+      source: "ukraine",
+      maxzoom: 9,
+      paint: {
+        "fill-extrusion-color": P.ukraineCap,
+        "fill-extrusion-height": PLATEAU_HEIGHT,
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": plateauOpacity(0.07),
+        "fill-extrusion-vertical-gradient": false,
+      },
+    },
+    // Золота стінка по краю: окремий шар, бо fill-extrusion фарбує верх і
+    // стінки одним кольором (lib/maplibre/rim.ts).
+    {
+      id: "ukraine-rim",
+      type: "fill-extrusion",
+      source: "ukraine-rim",
+      maxzoom: 9,
+      paint: {
+        "fill-extrusion-color": "#b48264",
+        "fill-extrusion-height": PLATEAU_HEIGHT,
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": plateauOpacity(0.7),
+        "fill-extrusion-vertical-gradient": false,
+      },
+    },
+    // Контур і світлова точка — поверх плато.
     {
       id: "ukraine-outline",
       type: "line",

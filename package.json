@@ -25,6 +25,7 @@
     "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4.3.3",
     "clsx": "^2.1.1",
+    "gsap": "^3.15.0",
     "lucide-react": "^1.48.0",
     "maplibre-gl": "6.11.2",
     "next": "^15.5.26",

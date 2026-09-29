@@ -3,12 +3,26 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
+  type ReactNode,
 } from "react";
 import { ArrowRight, ArrowUp, Code2, ImageIcon, Paperclip, Plus } from "lucide-react";
+import { applyGlassPreference } from "@/lib/ui/glass";
+import { setRequestTags } from "@/lib/map/request-tags";
+import { Attachments, type Attachment } from "@/components/composer/attachments";
+import { TagRow } from "@/components/composer/tag-row";
+
+type TagEngine = typeof import("@/lib/tags/engine");
+
+/** Скільки файлів можна прикріпити до запиту. */
+const MAX_FILES = 10;
+/** Скільки сірих пропозицій показуємо поруч із тегами запиту. */
+const MAX_SUGGESTIONS = 6;
 
 /** Скільки рядків поле показує, перш ніж почати прокручуватися всередині. */
 const MAX_ROWS = 5;
@@ -25,9 +39,94 @@ const MAX_ROWS = 5;
 export function RequestComposer() {
   const [text, setText] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const [engine, setEngine] = useState<TagEngine | null>(null);
+  /** Теги, які людина прибрала: знову з тексту їх не додаємо. */
+  const [dismissed, setDismissed] = useState<string[]>([]);
+  /** Теги, додані з пропозицій одним кліком. */
+  const [added, setAdded] = useState<string[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const mirrorRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const expanded = text.trim() !== "";
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const filesRef = useRef<Attachment[]>([]);
+  filesRef.current = files;
+  const expanded = text.trim() !== "" || files.length > 0;
+
+  // Словник тегів вантажимо, щойно людина почала писати, а не з першим екраном.
+  useEffect(() => {
+    if (engine || text.trim() === "") return;
+    let cancelled = false;
+    import("@/lib/tags/engine").then((module) => {
+      if (!cancelled) setEngine(module);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [engine, text]);
+
+  // Порожнє поле — чистий аркуш: прибрані й додані теги забуваємо.
+  useEffect(() => {
+    if (text.trim() !== "") return;
+    setDismissed([]);
+    setAdded([]);
+  }, [text]);
+
+  const mentions = useMemo(
+    () => (engine ? engine.detectTagMentions(text).filter((mention) => !dismissed.includes(mention.tagId)) : []),
+    [engine, text, dismissed]
+  );
+  const selected = useMemo(
+    () => [...new Set([...mentions.map((mention) => mention.tagId), ...added])].filter((id) => !dismissed.includes(id)),
+    [mentions, added, dismissed]
+  );
+  const suggestions = useMemo(
+    () =>
+      engine
+        ? engine.suggestTags(selected, { exclude: dismissed, limit: MAX_SUGGESTIONS }).map((suggestion) => suggestion.tagId)
+        : [],
+    [engine, selected, dismissed]
+  );
+
+  // Карта відсіює виконавців за тегами запиту. Із затримкою: поки слово
+  // недописане, тег може з'явитися й зникнути, а карта не має смикатися.
+  useEffect(() => {
+    const timer = window.setTimeout(() => setRequestTags(selected), 350);
+    return () => window.clearTimeout(timer);
+  }, [selected]);
+
+  const removeTag = (id: string) => {
+    setDismissed((current) => [...current, id]);
+    setAdded((current) => current.filter((tag) => tag !== id));
+  };
+  const addTag = (id: string) => {
+    setAdded((current) => [...current, id]);
+    setDismissed((current) => current.filter((tag) => tag !== id));
+  };
+
+  // Прев'ю зображень живуть як blob-посилання: звільняємо, коли файл прибрали.
+  useEffect(() => () => filesRef.current.forEach((item) => item.url && URL.revokeObjectURL(item.url)), []);
+  const attach = (event: ChangeEvent<HTMLInputElement>) => {
+    const picked = [...(event.target.files ?? [])];
+    event.target.value = "";
+    setFiles((current) => [
+      ...current,
+      ...picked.slice(0, Math.max(0, MAX_FILES - current.length)).map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
+        file,
+        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+      })),
+    ]);
+    inputRef.current?.focus();
+  };
+  const detach = (id: string) => {
+    setFiles((current) => {
+      const item = current.find((entry) => entry.id === id);
+      if (item?.url) URL.revokeObjectURL(item.url);
+      return current.filter((entry) => entry.id !== id);
+    });
+  };
 
   /*
    * Висота під текст. Скидаємо в auto перед виміром, інакше scrollHeight
@@ -52,6 +151,9 @@ export function RequestComposer() {
     textarea.style.height = `${Math.min(natural, maxHeight)}px`;
     textarea.style.overflowY = natural > maxHeight ? "auto" : "hidden";
   }, [text, expanded]);
+
+  // Скло під полем лише там, де розмиття не гальмує (lib/ui/glass.ts).
+  useEffect(applyGlassPreference, []);
 
   // Меню закривається кліком повз нього і Escape.
   useEffect(() => {
@@ -83,10 +185,14 @@ export function RequestComposer() {
     }
   };
 
-  const pick = () => {
+  const pick = (kind: "file" | "image" | "code") => {
     setMenuOpen(false);
-    inputRef.current?.focus();
+    if (kind === "file") fileInputRef.current?.click();
+    else if (kind === "image") imageInputRef.current?.click();
+    else inputRef.current?.focus();
   };
+
+  const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0;
 
   return (
     <div className="pointer-events-none absolute inset-x-0 top-0 z-[var(--z-controls)] flex flex-col items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-14">
@@ -94,21 +200,47 @@ export function RequestComposer() {
         ref={formRef}
         onSubmit={submit}
         data-expanded={expanded}
+        data-tray={expanded && hasTray}
         className="composer glass-panel pointer-events-auto relative w-full"
       >
+        {expanded && hasTray && (
+          <div className="composer-tray">
+            <Attachments items={files} onRemove={detach} />
+            <TagRow
+              selected={selected}
+              suggestions={suggestions}
+              labelOf={engine?.tagLabel ?? ((id) => id)}
+              onRemove={removeTag}
+              onAdd={addTag}
+            />
+          </div>
+        )}
+
         <label htmlFor="request" className="sr-only">
           Що потрібно створити?
         </label>
-        <textarea
-          id="request"
-          ref={inputRef}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onKeyDown={onKeyDown}
-          rows={1}
-          placeholder="Що потрібно створити?"
-          className="composer-input resize-none bg-transparent text-base leading-6 text-ink outline-none placeholder:text-ink-muted/80"
-        />
+        <div className="composer-field">
+          {/* Копія тексту під полем: підкреслює слова, з яких узяті теги. */}
+          <div ref={mirrorRef} aria-hidden className="composer-input composer-mirror text-base leading-6">
+            {highlight(text, mentions)}
+          </div>
+          <textarea
+            id="request"
+            ref={inputRef}
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onKeyDown={onKeyDown}
+            onScroll={(event) => {
+              if (mirrorRef.current) mirrorRef.current.scrollTop = event.currentTarget.scrollTop;
+            }}
+            rows={1}
+            placeholder="Що потрібно створити?"
+            className="composer-input relative resize-none bg-transparent text-base leading-6 text-ink outline-none placeholder:text-ink-muted/80"
+          />
+        </div>
+
+        <input ref={fileInputRef} type="file" multiple hidden onChange={attach} />
+        <input ref={imageInputRef} type="file" accept="image/*" multiple hidden onChange={attach} />
 
         <button
           type="button"
@@ -145,13 +277,13 @@ export function RequestComposer() {
             role="menu"
             className="composer-menu glass-panel absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl p-1.5"
           >
-            <MenuItem icon={<Paperclip className="size-4" strokeWidth={1.9} />} onClick={pick}>
+            <MenuItem icon={<Paperclip className="size-4" strokeWidth={1.9} />} onClick={() => pick("file")}>
               Прикріпити файл
             </MenuItem>
-            <MenuItem icon={<ImageIcon className="size-4" strokeWidth={1.9} />} onClick={pick}>
+            <MenuItem icon={<ImageIcon className="size-4" strokeWidth={1.9} />} onClick={() => pick("image")}>
               Додати зображення
             </MenuItem>
-            <MenuItem icon={<Code2 className="size-4" strokeWidth={1.9} />} onClick={pick}>
+            <MenuItem icon={<Code2 className="size-4" strokeWidth={1.9} />} onClick={() => pick("code")}>
               Код або посилання на репозиторій
             </MenuItem>
           </div>
@@ -160,6 +292,25 @@ export function RequestComposer() {
 
     </div>
   );
+}
+
+/** Текст із підкресленими згадками тегів; кінцевий перенос рядка, як у textarea. */
+function highlight(text: string, mentions: { start: number; end: number }[]): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  for (const mention of mentions) {
+    if (mention.start < cursor) continue;
+    parts.push(text.slice(cursor, mention.start));
+    parts.push(
+      <mark key={mention.start} className="composer-mention">
+        {text.slice(mention.start, mention.end)}
+      </mark>
+    );
+    cursor = mention.end;
+  }
+  parts.push(text.slice(cursor));
+  if (text.endsWith("\n")) parts.push(" ");
+  return parts;
 }
 
 function MenuItem({

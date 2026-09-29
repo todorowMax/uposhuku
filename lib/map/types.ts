@@ -14,13 +14,35 @@ export interface City extends GeoPoint {
   labelSide?: "left" | "right";
 }
 
+export type PlacementTier = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Який це проєкт: від цього залежить мініатюра, поки немає справжніх скриншотів. */
+export type WorkKind = "site" | "app" | "bot" | "dashboard" | "design";
+
+export interface PortfolioWork {
+  id: string;
+  title: string;
+  kind: WorkKind;
+  /** Відтінок мініатюри, 0–360: сусідні роботи різного кольору. */
+  hue: number;
+}
+
 /** Виконавець стоїть у своєму місті, а не за точною адресою. */
 export interface Performer extends GeoPoint {
   id: string;
   cityId: string;
   online: boolean;
-  /** Лише візуальний рівень оплаченого розміщення в демо. */
-  placement: "standard" | "plus" | "featured";
+  /**
+   * Рівень оплаченого розміщення, 1–6: хто більше заплатив, у того більший
+   * портрет і він вище в списку. Лише розмір, без «зірочок» і рамок.
+   */
+  tier: PlacementTier;
+  /** Теги профілю: що людина робить. По них карта відсіює виконавців під запит. */
+  tags: string[];
+  /** «Про себе»: людина пише сама, у картці видно перші три рядки. */
+  bio: string;
+  /** Роботи в портфоліо, у картці — горизонтальною стрічкою. */
+  works: PortfolioWork[];
   /** Позиція портрета в локальному атласі 4×4. */
   avatarIndex: number;
   name: string;
