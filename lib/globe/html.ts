@@ -1,9 +1,8 @@
 // Легкі DOM-підписи поверх глобуса; інтерактивні люди й групи — у WebGL.
-import type { City, GeoPoint, WorkRequest } from "@/lib/map/types";
+import type { City, WorkRequest } from "@/lib/map/types";
 
 export type HtmlMarker =
   | ({ kind: "city"; grouped: boolean } & City)
-  | ({ kind: "country"; id: string; name: string } & GeoPoint)
   | ({ kind: "request" } & WorkRequest);
 
 /** Один локальний атлас 4×4 замість десятків мережевих запитів. */
@@ -19,12 +18,6 @@ export const createMarkerElement = (marker: HtmlMarker): HTMLElement => {
     dot.className = "globe-request";
     dot.dataset.live = String(marker.live);
     return dot;
-  }
-  if (marker.kind === "country") {
-    const pill = document.createElement("div");
-    pill.className = "globe-country";
-    pill.textContent = marker.name;
-    return pill;
   }
   const anchor = document.createElement("div");
   anchor.className = "globe-anchor";

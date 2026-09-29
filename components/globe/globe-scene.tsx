@@ -45,6 +45,7 @@ import {
 import { GLOBE_PALETTE } from "@/lib/globe/palette";
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
+import { distanceKm } from "@/lib/map/scatter";
 import type { Performer } from "@/lib/map/types";
 
 /** Вертикальний кут огляду камери globe.gl, градуси. */
@@ -75,6 +76,21 @@ const CITY_DISTANCE = 4;
 const FRAME_SHIFT = 0.18;
 /** Центр країни, куди дивиться камера на старті. */
 const START = { lat: 48.1, lng: 31.4 };
+/** Від скількох людей у місті вони збираються в ромб-групу. */
+const GROUP_MIN = 4;
+/** Міста, де людей досить для групи. */
+const GROUP_CITIES = CITIES.filter(
+  (city) => DEMO_PERFORMERS.filter((performer) => performer.cityId === city.id).length >= GROUP_MIN
+);
+/*
+ * Автовідкриття групи, коли людина сама наближається до міста колесом,
+ * щипком чи повзунком. Пороги з запасом (гістерезис): відкривається
+ * ближче, ніж закривається, тож на межі група не блимає.
+ */
+const AUTO_OPEN_ZOOM = 0.55;
+const AUTO_CLOSE_ZOOM = 0.4;
+const AUTO_OPEN_KM = 170;
+const AUTO_CLOSE_KM = 260;
 
 interface Size {
   width: number;
@@ -115,6 +131,41 @@ export default function GlobeScene() {
   const zoomRef = useRef(0);
   const viewRef = useRef<MapView>({ ...START, distance: 20, tilt: TILT_DEG });
   const animationRef = useRef<number | null>(null);
+  /** Поточна відкрита група для жестів, без чекання на рендер. */
+  const expandedRef = useRef<string | null>(null);
+  /** Автовідкриття вимкнене, поки камера сама під'їжджає до групи. */
+  const autoGroupRef = useRef(true);
+
+  useEffect(() => {
+    expandedRef.current = expandedCityId;
+  }, [expandedCityId]);
+
+  /** Відкриває групу міста в центрі кадру на близькому масштабі й згортає на далекому. */
+  const syncAutoGroup = useCallback(() => {
+    if (!autoGroupRef.current) return;
+    const view = viewRef.current;
+    const zoomLevel = zoomRef.current;
+    const current = expandedRef.current;
+    let next = current;
+    if (current) {
+      const city = GROUP_CITIES.find((item) => item.id === current);
+      if (zoomLevel < AUTO_CLOSE_ZOOM || !city || distanceKm(view, city) > AUTO_CLOSE_KM) next = null;
+    }
+    if (!next && zoomLevel >= AUTO_OPEN_ZOOM) {
+      let best = AUTO_OPEN_KM;
+      for (const city of GROUP_CITIES) {
+        const distance = distanceKm(view, city);
+        if (distance <= best) {
+          best = distance;
+          next = city.id;
+        }
+      }
+    }
+    if (next === current) return;
+    expandedRef.current = next;
+    setExpandedCityId(next);
+    setSelectedPerformerId(null);
+  }, []);
 
   // Розмір сцени беремо з контейнера, а не з вікна: над картою згодом
   // з'являться інші блоки.
@@ -235,13 +286,15 @@ export default function GlobeScene() {
       const distance = zoomToDistance(clamped, distances.far, distances.near);
       viewRef.current = { ...viewRef.current, distance };
       applyView();
+      syncAutoGroup();
     },
-    [applyView, distances]
+    [applyView, distances, syncAutoGroup]
   );
 
   const stopAnimation = () => {
     if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
     animationRef.current = null;
+    autoGroupRef.current = true;
   };
 
   /** Плавне наближення для кнопок: ease-out, без пружин. */
@@ -275,7 +328,9 @@ export default function GlobeScene() {
       const targetZoom = city ? Math.max(startZoom, 0.78) : 0;
       const target = city ?? START;
       setExpandedCityId(city?.id ?? null);
+      expandedRef.current = city?.id ?? null;
       setSelectedPerformerId(null);
+      autoGroupRef.current = false;
 
       const move = (progress: number) => {
         viewRef.current = {
@@ -285,12 +340,17 @@ export default function GlobeScene() {
         };
         setZoomLevel(startZoom + (targetZoom - startZoom) * progress);
       };
-      if (prefersReducedMotion()) return move(1);
+      if (prefersReducedMotion()) {
+        move(1);
+        autoGroupRef.current = true;
+        return;
+      }
       const started = performance.now();
       const step = (now: number) => {
         const t = Math.min(1, (now - started) / 620);
         move(1 - Math.pow(1 - t, 3));
         animationRef.current = t < 1 ? requestAnimationFrame(step) : null;
+        if (t >= 1) autoGroupRef.current = true;
       };
       animationRef.current = requestAnimationFrame(step);
     },
@@ -402,6 +462,7 @@ export default function GlobeScene() {
           VERTICAL_FOV
         );
         applyView();
+        syncAutoGroup();
       } else if (pointers.size === 2 && pinch) {
         setZoomLevel(pinch.zoom + Math.log(spread() / pinch.distance) / zoomRange);
       }
@@ -441,7 +502,7 @@ export default function GlobeScene() {
       stage.removeEventListener("pointercancel", onUp);
       stage.removeEventListener("wheel", onWheel);
     };
-  }, [animateFocusTo, applyView, distances, pickMarker, setZoomLevel, size]);
+  }, [animateFocusTo, applyView, distances, pickMarker, setZoomLevel, size, syncAutoGroup]);
 
   useEffect(() => stopAnimation, []);
 
@@ -473,7 +534,7 @@ export default function GlobeScene() {
       const people: VisualMarker[] = [];
       for (const city of CITIES) {
         const members = peopleByCity.get(city.id) ?? [];
-        if (members.length >= 4) {
+        if (members.length >= GROUP_MIN) {
           people.push({
             kind: "group",
             id: `group-${city.id}`,
@@ -486,7 +547,7 @@ export default function GlobeScene() {
             expanded: city.id === expandedCityId,
           });
         }
-        if (members.length < 4 || city.id === expandedCityId) {
+        if (members.length < GROUP_MIN || city.id === expandedCityId) {
           people.push(
             ...members.map((member) => ({
               kind: "performer" as const,
@@ -507,11 +568,10 @@ export default function GlobeScene() {
         ...CITIES.filter((city) => city.label).map((city) => ({
           kind: "city" as const,
           ...city,
-          grouped: (peopleByCity.get(city.id)?.length ?? 0) >= 4,
+          grouped: (peopleByCity.get(city.id)?.length ?? 0) >= GROUP_MIN,
         })),
-        { kind: "country", id: "ua", name: "Україна", lat: 48.95, lng: 31.1 },
     ],
-    [expandedCityId, peopleByCity]
+    [peopleByCity]
   );
 
   const htmlElement = useCallback((datum: object) => createMarkerElement(datum as HtmlMarker), []);

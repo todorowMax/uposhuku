@@ -136,21 +136,6 @@ body {
   }
 }
 
-.globe-country {
-  padding: 5px 12px;
-  border-radius: 999px;
-  background: color-mix(in oklch, var(--surface) 92%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in oklch, var(--brand) 18%, transparent),
-    0 4px 14px -6px color-mix(in oklch, var(--ink) 30%, transparent);
-  font-size: 14px;
-  font-weight: 600;
-  color: oklch(0.36 0.12 264);
-  white-space: nowrap;
-  pointer-events: none;
-  user-select: none;
-}
-
 /* Запит: синя крапка з білим обідком. */
 .globe-request {
   position: relative;
@@ -311,19 +296,95 @@ body {
 }
 
 /*
-  Поле запиту. Тінь двошарова і синювата, як панелі на макеті: широка
-  м'яка підкладка плюс тонкий контакт знизу.
+  Поле запиту. Два стани на одній сітці, без перебудови DOM:
+
+  - порожнє: один рядок «+ | текст | кнопка», вузьке, пігулка;
+  - з текстом: текст на всю ширину згори, дії окремим поверхом знизу,
+    ширше й з меншим радіусом.
+
+  Тінь двошарова й синювата, як панелі на макеті. Ширина, радіус і
+  висота перетікають плавно; висоту auto браузер анімує лише з
+  interpolate-size (Chromium), решта просто перемикається.
 */
 .composer {
+  interpolate-size: allow-keywords;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "plus input send";
+  align-items: center;
+  column-gap: 4px;
+  max-width: 560px;
+  padding: 8px;
+  border-radius: 28px;
   box-shadow:
-    0 24px 60px -24px oklch(0.42 0.09 260 / 0.28),
-    0 2px 6px -2px oklch(0.42 0.09 260 / 0.1);
-  transition: box-shadow 200ms var(--ease-out-quint);
+    0 20px 50px -24px oklch(0.42 0.09 260 / 0.26),
+    0 2px 6px -2px oklch(0.42 0.09 260 / 0.08);
+  transition:
+    max-width 320ms var(--ease-out-quint),
+    border-radius 260ms var(--ease-out-quint),
+    height 260ms var(--ease-out-quint),
+    box-shadow 200ms var(--ease-out-quint);
+}
+
+.composer[data-expanded="true"] {
+  grid-template-areas:
+    "input input input"
+    "plus . send";
+  row-gap: 6px;
+  max-width: 720px;
+  padding: 12px 12px 10px;
+  border-radius: 22px;
 }
 
 .composer:focus-within {
   box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--brand) 18%, transparent),
-    0 24px 60px -24px oklch(0.42 0.09 260 / 0.32),
-    0 2px 6px -2px oklch(0.42 0.09 260 / 0.1);
+    0 0 0 3px color-mix(in oklch, var(--brand) 16%, transparent),
+    0 20px 50px -24px oklch(0.42 0.09 260 / 0.3),
+    0 2px 6px -2px oklch(0.42 0.09 260 / 0.08);
+}
+
+.composer-input {
+  grid-area: input;
+  display: block;
+  width: 100%;
+  padding: 8px 4px;
+}
+
+.composer[data-expanded="true"] .composer-input {
+  padding: 2px 6px 4px;
+}
+
+.composer-plus {
+  grid-area: plus;
+}
+
+.composer-send {
+  grid-area: send;
+  width: 40px;
+}
+
+.composer[data-expanded="true"] .composer-send {
+  width: auto;
+  padding: 0 16px 0 14px;
+}
+
+.composer-menu {
+  box-shadow: 0 18px 40px -18px oklch(0.42 0.09 260 / 0.35);
+  animation: composer-menu-in 160ms var(--ease-out-quint);
+  transform-origin: top left;
+}
+
+@keyframes composer-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer,
+  .composer-menu {
+    transition: none;
+    animation: none;
+  }
 }
