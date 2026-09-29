@@ -10,3 +10,6 @@
 cloudflare-env.d.ts
 node_modules/
 tsconfig.tsbuildinfo
+
+# Воркер MapLibre, копіюється scripts/copy-maplibre-worker.mjs
+/public/maplibre/

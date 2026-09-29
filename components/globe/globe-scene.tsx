@@ -45,6 +45,7 @@ import {
 import { GLOBE_PALETTE } from "@/lib/globe/palette";
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
+import { setMapReady } from "@/lib/map/ready";
 import { distanceKm } from "@/lib/map/scatter";
 import type { Performer } from "@/lib/map/types";
 
@@ -76,6 +77,11 @@ const CITY_DISTANCE = 4;
 const FRAME_SHIFT = 0.18;
 /** Центр країни, куди дивиться камера на старті. */
 const START = { lat: 48.1, lng: 31.4 };
+/**
+ * Наскільки далеко від підпису міста курсор на фото ще гасить підпис, px:
+ * приблизно радіус найбільшої аватарки.
+ */
+const LABEL_HOVER_REACH_PX = 26;
 /** Від скількох людей у місті вони збираються в ромб-групу. */
 const GROUP_MIN = 4;
 /** Міста, де людей досить для групи. */
@@ -135,10 +141,44 @@ export default function GlobeScene() {
   const expandedRef = useRef<string | null>(null);
   /** Автовідкриття вимкнене, поки камера сама під'їжджає до групи. */
   const autoGroupRef = useRef(true);
+  /** Точка курсора, поки він над людиною чи групою; інакше null. */
+  const hoverPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  /*
+   * Підписи міст — DOM поверх WebGL, тож фото не можна підняти над ними
+   * через z-index. Натомість підпис поступається: коли курсор на фото чи
+   * ромбі поруч із підписом, той майже зникає, хай би з якого міста була
+   * людина. У розкритій групі підпис її міста ховається зовсім: назва й
+   * так у картці.
+   */
+  const syncCityLabels = useCallback(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const point = hoverPointRef.current;
+    stage.querySelectorAll<HTMLElement>(".globe-anchor[data-city]").forEach((anchor) => {
+      let state = "shown";
+      if (anchor.dataset.city === expandedRef.current) state = "hidden";
+      else if (point) {
+        const label = anchor.firstElementChild?.getBoundingClientRect();
+        const reach = LABEL_HOVER_REACH_PX;
+        if (
+          label &&
+          point.x > label.left - reach &&
+          point.x < label.right + reach &&
+          point.y > label.top - reach &&
+          point.y < label.bottom + reach
+        ) {
+          state = "faded";
+        }
+      }
+      if (anchor.dataset.label !== state) anchor.dataset.label = state;
+    });
+  }, []);
 
   useEffect(() => {
     expandedRef.current = expandedCityId;
-  }, [expandedCityId]);
+    syncCityLabels();
+  }, [expandedCityId, syncCityLabels]);
 
   /** Відкриває групу міста в центрі кадру на близькому масштабі й згортає на далекому. */
   const syncAutoGroup = useCallback(() => {
@@ -447,7 +487,11 @@ export default function GlobeScene() {
     const onMove = (event: PointerEvent) => {
       const previous = pointers.get(event.pointerId);
       if (!previous) {
-        stage.style.cursor = pickMarker(event.clientX, event.clientY) ? "pointer" : "";
+        const hovered = pickMarker(event.clientX, event.clientY);
+        stage.style.cursor = hovered ? "pointer" : "";
+        const hadPoint = hoverPointRef.current !== null;
+        hoverPointRef.current = hovered ? { x: event.clientX, y: event.clientY } : null;
+        if (hovered || hadPoint) syncCityLabels();
         return;
       }
       const start = starts.get(event.pointerId);
@@ -494,15 +538,23 @@ export default function GlobeScene() {
     stage.addEventListener("pointermove", onMove);
     stage.addEventListener("pointerup", onUp);
     stage.addEventListener("pointercancel", onUp);
+    const onLeave = () => {
+      if (!hoverPointRef.current) return;
+      hoverPointRef.current = null;
+      syncCityLabels();
+    };
+
     stage.addEventListener("wheel", onWheel, { passive: false });
+    stage.addEventListener("pointerleave", onLeave);
     return () => {
       stage.removeEventListener("pointerdown", onDown);
       stage.removeEventListener("pointermove", onMove);
       stage.removeEventListener("pointerup", onUp);
       stage.removeEventListener("pointercancel", onUp);
       stage.removeEventListener("wheel", onWheel);
+      stage.removeEventListener("pointerleave", onLeave);
     };
-  }, [animateFocusTo, applyView, distances, pickMarker, setZoomLevel, size, syncAutoGroup]);
+  }, [animateFocusTo, applyView, distances, pickMarker, setZoomLevel, size, syncAutoGroup, syncCityLabels]);
 
   useEffect(() => stopAnimation, []);
 
@@ -607,6 +659,12 @@ export default function GlobeScene() {
   const expandedCity = CITIES.find((city) => city.id === expandedCityId);
 
   const visible = globeReady && Boolean(materials) && Boolean(distances);
+
+  // Серверна заставка ховається, щойно глобус намальований.
+  useEffect(() => {
+    setMapReady(visible);
+    return () => setMapReady(false);
+  }, [visible]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">

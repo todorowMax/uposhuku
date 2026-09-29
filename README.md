@@ -88,6 +88,26 @@ public/globe/                   готові текстури й хмари
 справжніх адрес. Портрети вигадані й зберігаються локально.
 Промпт і спосіб підготовки мокового атласу — у `design/avatar-mock-asset.md`.
 
+## MapLibre-варіант (прототип)
+
+Поруч із глобусом — варіант на [MapLibre GL](https://maplibre.org/) для
+порівняння; перемикач «Глобус / MapLibre» унизу ліворуч, або `?map=maplibre`.
+
+- **Перший кадр статичний і весь наш:** текстури глобуса, перепроєктовані
+  в Web Mercator (`public/map/world.webp`, `region.webp`), шрифти підписів
+  (`public/map/fonts`), контур України, люди й запити. Мережа не потрібна.
+- **З масштабу 6,5** (`DETAIL_ZOOM`) вмикаються дані OpenStreetMap з
+  [OpenFreeMap](https://openfreemap.org/) (без ключів і лімітів) і рельєф
+  AWS Terrain Tiles, картинка плавно тане. З 13-го — білі 3D-будинки з
+  реальною висотою.
+- Групи — вбудована кластеризація MapLibre, підписи міст самі ховаються,
+  якщо наїжджають на фото.
+- Воркер MapLibre копіюється в `public/maplibre` перед `dev`/`build`
+  (`scripts/copy-maplibre-worker.mjs`, у `.gitignore`).
+- `npm run maplibre:assets` — перезібрати статичні картинки й шрифти.
+
+Код: `components/maplibre/`, `lib/maplibre/` (стиль і межі картинок).
+
 ## Дані й ліцензії
 
 - Висоти й глибини: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)

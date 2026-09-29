@@ -62,7 +62,12 @@ const drawPortrait = (
   context.restore();
 };
 
-const createPortraitTexture = (source: HTMLImageElement, index: number) => {
+/**
+ * Маркер-портрет на полотні 192×192: фото в синьому кільці й маленький
+ * якір знизу. Спільний для глобуса (текстура three.js) і MapLibre
+ * (зображення символу).
+ */
+export const createPortraitCanvas = (source: HTMLImageElement, index: number) => {
   const { canvas, context } = canvasContext();
   // Фото й маленький якір з'єднані в один «живий» маркер. Контур
   // залишає портрет упізнаваним навіть у найменшому платному рівні.
@@ -95,8 +100,11 @@ const createPortraitTexture = (source: HTMLImageElement, index: number) => {
   context.beginPath();
   context.arc(96, 162, 4, 0, Math.PI * 2);
   context.fill();
-  return textureFrom(canvas);
+  return canvas;
 };
+
+const createPortraitTexture = (source: HTMLImageElement, index: number) =>
+  textureFrom(createPortraitCanvas(source, index));
 
 /** Створюємо один локальний атлас портретів, без окремих мережевих запитів. */
 export const loadMarkerAssets = async (): Promise<MarkerAssets> => {

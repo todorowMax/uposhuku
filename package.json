@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-maplibre-worker.mjs",
     "dev": "next dev -p ${PORT:-3031}",
+    "prebuild": "node scripts/copy-maplibre-worker.mjs",
     "build": "next build",
     "start": "next start -p ${PORT:-3031}",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -11,18 +13,21 @@
     "test:unit": "vitest run --config vitest.config.mts tests/unit",
     "test:unit:watch": "vitest --config vitest.config.mts tests/unit",
     "clean:build": "rm -rf .next .open-next tsconfig.tsbuildinfo",
+    "precf:build": "node scripts/copy-maplibre-worker.mjs",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare preview --env development",
     "cf:deploy:development": "opennextjs-cloudflare deploy --env development",
     "cf:deploy:production": "opennextjs-cloudflare deploy --env production",
     "globe:assets": "tsx scripts/build-globe-assets.ts",
-    "clouds:assets": "tsx scripts/build-cloud-assets.ts"
+    "clouds:assets": "tsx scripts/build-cloud-assets.ts",
+    "maplibre:assets": "tsx scripts/build-maplibre-assets.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4.3.3",
     "clsx": "^2.1.1",
     "lucide-react": "^1.48.0",
+    "maplibre-gl": "6.11.2",
     "next": "^15.5.26",
     "postcss": "^8.5.28",
     "react": "^19.3.0",

@@ -104,6 +104,19 @@ body {
   top: 39px;
 }
 
+/* Підпис поступається фото: під курсором майже зникає, у розкритій групі ховається. */
+.globe-city {
+  transition: opacity 180ms var(--ease-out-quint);
+}
+
+.globe-anchor[data-label="faded"] .globe-city {
+  opacity: 0.12;
+}
+
+.globe-anchor[data-label="hidden"] .globe-city {
+  opacity: 0;
+}
+
 /* Фото в картці виконавця лишається різким; позначки на карті тепер WebGL-спрайти. */
 .globe-profile-photo {
   background-color: #dce8f5;
@@ -386,5 +399,191 @@ body {
   .composer-menu {
     transition: none;
     animation: none;
+  }
+}
+
+/* Маленький індикатор догрузки деталей MapLibre. */
+.map-detail-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in oklch, var(--brand) 22%, transparent);
+  border-top-color: var(--brand);
+  animation: map-spin 800ms linear infinite;
+}
+
+@keyframes map-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-detail-spinner {
+    animation-duration: 2400ms;
+  }
+}
+
+/*
+  Серверна заставка карти (components/map-skeleton.tsx). Лише CSS: вона в
+  першому HTML і має рухатися ще до завантаження JS. Ховається, коли сцена
+  поставила <html data-map-ready>.
+*/
+.map-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-map-overlay);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 1.5rem 0;
+  background: var(--bg);
+  pointer-events: none;
+  transition:
+    opacity 600ms var(--ease-out-quint),
+    transform 600ms var(--ease-out-quint),
+    visibility 0s linear 600ms;
+}
+
+html[data-map-ready] .map-skeleton {
+  opacity: 0;
+  transform: scale(1.02);
+  visibility: hidden;
+}
+
+.map-skeleton-svg {
+  width: 100%;
+  max-width: 560px;
+  overflow: visible;
+}
+
+.map-skeleton-outline {
+  fill: none;
+  stroke: #5c7cc4;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: skeleton-draw 1.6s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+}
+
+.map-skeleton-fill {
+  fill: #e4ebf7;
+  opacity: 0;
+  animation: skeleton-fade 600ms ease-out 1.1s forwards;
+}
+
+.map-skeleton-shine {
+  transform: translateX(-360px);
+  animation: skeleton-shine 1.8s ease-in-out 900ms infinite;
+}
+
+.map-skeleton-city,
+.map-skeleton-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.map-skeleton-city {
+  fill: #2a60df;
+  stroke: #ffffff;
+  stroke-width: 2;
+  transform: scale(0);
+  animation: skeleton-pop 350ms cubic-bezier(0.34, 1.9, 0.64, 1) forwards;
+  animation-delay: calc(1.6s + var(--i) * 120ms);
+}
+
+.map-skeleton-ring {
+  fill: none;
+  stroke: #2a60df;
+  stroke-width: 1.5;
+  opacity: 0;
+  animation: skeleton-pulse 1.4s ease-out infinite;
+  animation-delay: calc(1.9s + var(--i) * 280ms);
+}
+
+.map-skeleton-label {
+  margin-top: 1.5rem;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.map-skeleton-dots span {
+  opacity: 0.2;
+  animation: skeleton-dot 800ms ease-in-out infinite alternate;
+}
+
+.map-skeleton-dots span:nth-child(2) {
+  animation-delay: 200ms;
+}
+
+.map-skeleton-dots span:nth-child(3) {
+  animation-delay: 400ms;
+}
+
+@keyframes skeleton-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes skeleton-fade {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes skeleton-shine {
+  from {
+    transform: translateX(-360px);
+  }
+  to {
+    transform: translateX(660px);
+  }
+}
+
+@keyframes skeleton-pop {
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes skeleton-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@keyframes skeleton-dot {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-skeleton-outline,
+  .map-skeleton-fill,
+  .map-skeleton-city {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 1;
+    transform: none;
+  }
+
+  .map-skeleton-shine,
+  .map-skeleton-ring,
+  .map-skeleton-dots span {
+    animation: none;
+  }
+
+  .map-skeleton {
+    transition: opacity 200ms linear, visibility 0s linear 200ms;
   }
 }

@@ -1,15 +1,18 @@
 // app/page.tsx
 import { RequestComposer } from "@/components/composer/request-composer";
-import { VibeGlobe } from "@/components/globe/vibe-globe";
+import { MapEngineSwitch } from "@/components/map-engine-switch";
+import { MapSkeleton } from "@/components/map-skeleton";
 
 /*
- * Глобус на весь екран і поле запиту над ним. Шапка й картки запиту та
- * виконавця з макета ляжуть окремими блоками.
+ * Карта на весь екран і поле запиту над нею. Поки порівнюємо два рушії
+ * карти (глобус на globe.gl і MapLibre), між ними перемикач унизу ліворуч.
  */
 export default function HomePage() {
   return (
     <main className="relative h-dvh w-full">
-      <VibeGlobe />
+      {/* Заставка в першому HTML: видна до завантаження JS карти. */}
+      <MapSkeleton />
+      <MapEngineSwitch />
       <RequestComposer />
     </main>
   );

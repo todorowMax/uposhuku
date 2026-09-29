@@ -21,6 +21,7 @@ export const createMarkerElement = (marker: HtmlMarker): HTMLElement => {
   }
   const anchor = document.createElement("div");
   anchor.className = "globe-anchor";
+  anchor.dataset.city = marker.id;
   const label = document.createElement("span");
   label.className = "globe-city";
   label.dataset.side = marker.labelSide ?? "right";
