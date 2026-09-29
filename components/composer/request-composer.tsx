@@ -160,7 +160,7 @@ export function RequestComposer() {
 
       <ul className="pointer-events-auto mt-3 flex items-center gap-5 rounded-full px-3 py-1.5 text-[13px] font-medium text-ink">
         <li className="flex items-center gap-2">
-          <span aria-hidden className="globe-legend-face" />
+          <span aria-hidden className="map-legend-face" />
           Виконавці
         </li>
         <li className="flex items-center gap-2">

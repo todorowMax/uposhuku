@@ -1,10 +1,10 @@
-// lib/globe/palette.ts
+// lib/map/palette.ts
 //
-// Кольори глобуса в sRGB. three.js і canvas у скрипті текстур не читають
-// CSS-змінні, тому тут окрема копія. Значення зняті піпеткою з макета і
+// Кольори карти в sRGB. Стиль MapLibre і canvas у скрипті текстур не
+// читають CSS-змінні, тому тут окрема копія. Значення зняті піпеткою з макета і
 // збігаються з токенами в app/globals.css, див. DESIGN.md.
 
-export const GLOBE_PALETTE = {
+export const MAP_PALETTE = {
   /** Тло сторінки, на ньому ж тане горизонт. */
   sky: "#f4f6fa",
   /** Серпанок над далекою поверхнею, трохи темніший за тло. */
@@ -34,8 +34,6 @@ export const GLOBE_PALETTE = {
   /** Запити: крапки. */
   request: "#2a60df",
 } as const;
-
-export type GlobeColor = keyof typeof GLOBE_PALETTE;
 
 /** `#rrggbb` → [r, g, b] у 0..255. */
 export const hexToRgb = (hex: string): [number, number, number] => {

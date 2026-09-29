@@ -2,7 +2,7 @@
 
 import { Minus, Plus } from "lucide-react";
 
-interface GlobeZoomControlProps {
+interface MapZoomControlProps {
   /** 0: вся Україна, 1: місто. */
   value: number;
   onChange: (value: number) => void;
@@ -16,7 +16,7 @@ const STEPS = 1000;
  * Повзунок нативний: клавіатура, скрінрідери й дотик працюють без
  * додаткового коду.
  */
-export function GlobeZoomControl({ value, onChange, onStep }: GlobeZoomControlProps) {
+export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps) {
   return (
     <div className="absolute right-4 bottom-4 z-[var(--z-controls)] flex items-stretch gap-3 sm:right-6 sm:bottom-6">
       <label className="flex h-12 items-center gap-3 rounded-2xl bg-surface px-4 text-sm text-ink shadow-[0_8px_28px_-12px_rgb(15_23_40/0.35)] ring-1 ring-line">
@@ -28,7 +28,7 @@ export function GlobeZoomControl({ value, onChange, onStep }: GlobeZoomControlPr
           value={Math.round(value * STEPS)}
           onChange={(event) => onChange(Number(event.target.value) / STEPS)}
           aria-label="Масштаб карти від країни до міста"
-          className="globe-zoom-range w-24 sm:w-28"
+          className="map-zoom-range w-24 sm:w-28"
         />
         <span>Місто</span>
       </label>

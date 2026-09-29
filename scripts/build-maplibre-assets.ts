@@ -1,23 +1,23 @@
 // scripts/build-maplibre-assets.ts
 //
-// Статичний перший кадр MapLibre-варіанта: усе, що потрібно на масштабі
+// Статичний перший кадр карти: усе, що потрібно на масштабі
 // країни, лежить у нас і віддається одразу, без походів у мережу.
 //
-// 1. Текстури глобуса (public/globe/earth.webp і region.webp) у Web
+// 1. Текстури Землі (assets/textures/earth.webp і region.webp) у Web
 //    Mercator. Вони в рівнокутній проєкції (широта лінійна), а MapLibre
 //    тягне картинку між кутами лінійно в Меркаторі: без перепроєкції
 //    Україна з'їхала б приблизно на 1° (близько 100 км).
 // 2. Гліфи підписів (Noto Sans з OpenFreeMap) для латиниці, кирилиці й
 //    типографських знаків, щоб назви міст з'являлися разом з картою.
 //
-// Результат лежить у git (public/map), як і текстури глобуса.
-// Запуск: npm run maplibre:assets
+// Результат лежить у git (public/map), як і самі текстури.
+// Запуск: npm run map:assets
 
 import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { REGION } from "../lib/globe/region";
+import { REGION } from "../lib/map/region";
 import { STATIC_MAP } from "../lib/maplibre/static";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,14 +63,14 @@ const main = async () => {
 
   // Уся Земля, але Меркатор не доходить до полюсів: ріжемо по межах картинки.
   await toMercator(
-    "public/globe/earth.webp",
+    "assets/textures/earth.webp",
     STATIC_MAP.world,
     { top: 90, bottom: -90 },
     4096,
     "world.webp"
   );
   await toMercator(
-    "public/globe/region.webp",
+    "assets/textures/region.webp",
     STATIC_MAP.region,
     { top: REGION.latMax, bottom: REGION.latMin },
     3040,

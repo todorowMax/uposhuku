@@ -9,8 +9,8 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
-  Токени з DESIGN.md. Кольори глобуса живуть окремо в
-  lib/globe/palette.ts: three.js не читає CSS-змінних.
+  Токени з DESIGN.md. Кольори карти живуть окремо в lib/map/palette.ts:
+  стиль MapLibre не читає CSS-змінних.
 */
 :root {
   color-scheme: light;
@@ -62,170 +62,40 @@ body {
   font-family: var(--font-sans);
 }
 
-/*
-  Підписи на глобусі. Це DOM поверх WebGL: текст лишається різким на
-  будь-якому масштабі, а біле гало відділяє його від рельєфу без
-  плашки.
-*/
-.globe-anchor {
-  position: relative;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-
-/* Підпис під купкою маркерів, трохи вбік, як на макеті. */
-.globe-city {
-  position: absolute;
-  top: 12px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.005em;
-  color: var(--ink);
-  white-space: nowrap;
-  text-shadow:
-    0 0 2px var(--surface),
-    0 0 4px var(--surface),
-    0 0 8px var(--surface);
-  pointer-events: none;
-  user-select: none;
-}
-
-.globe-city[data-side="right"] {
-  left: 2px;
-}
-
-.globe-city[data-side="left"] {
-  right: 2px;
-}
-
-.globe-city[data-grouped="true"] {
-  top: 39px;
-}
-
-/* Підпис поступається фото: під курсором майже зникає, у розкритій групі ховається. */
-.globe-city {
-  transition: opacity 180ms var(--ease-out-quint);
-}
-
-.globe-anchor[data-label="faded"] .globe-city {
-  opacity: 0.12;
-}
-
-.globe-anchor[data-label="hidden"] .globe-city {
-  opacity: 0;
-}
-
-/* Фото в картці виконавця лишається різким; позначки на карті тепер WebGL-спрайти. */
-.globe-profile-photo {
-  background-color: #dce8f5;
-  background-image: url("/globe/mock-avatars.png");
-  background-size: 400% 400%;
-  background-repeat: no-repeat;
-}
-
-.globe-profile-photo {
-  display: block;
-  width: 52px;
-  height: 52px;
-  border: 2px solid white;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px #2768ef;
-}
-
-.globe-legend-face {
+/* Обличчя в легенді поля запиту, з того самого атласу, що маркери. */
+.map-legend-face {
   width: 17px;
   height: 17px;
   border: 1px solid white;
   border-radius: 50%;
-  background: #dce8f5 url("/globe/mock-avatars.png") 0 0 / 400% 400% no-repeat;
+  background: #dce8f5 url("/map/mock-avatars.png") 0 0 / 400% 400% no-repeat;
   box-shadow: 0 0 0 1.5px #2768ef;
-}
-
-@media (max-width: 640px) {
-  .globe-city[data-grouped="true"] {
-    top: 30px;
-  }
-}
-
-/* Запит: синя крапка з білим обідком. */
-.globe-request {
-  position: relative;
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--brand);
-  box-shadow:
-    0 0 0 2px var(--surface),
-    0 1px 4px 1px color-mix(in oklch, var(--ink) 25%, transparent);
-  pointer-events: none;
-}
-
-/* Свіжий запит пульсує, поки до нього тягнуться дуги. */
-.globe-request[data-live="true"] {
-  width: 11px;
-  height: 11px;
-}
-
-.globe-request[data-live="true"]::before,
-.globe-request[data-live="true"]::after {
-  content: "";
-  position: absolute;
-  inset: -4px;
-  border-radius: inherit;
-  border: 1.5px solid color-mix(in oklch, var(--brand) 55%, transparent);
-  animation: globe-pulse 2.4s var(--ease-out-quint) infinite;
-}
-
-.globe-request[data-live="true"]::after {
-  animation-delay: 1.2s;
-}
-
-@keyframes globe-pulse {
-  from {
-    transform: scale(1);
-    opacity: 1;
-  }
-  to {
-    transform: scale(3.2);
-    opacity: 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .globe-request[data-live="true"]::before,
-  .globe-request[data-live="true"]::after {
-    animation: none;
-    transform: scale(2);
-    opacity: 0.5;
-  }
 }
 
 /*
   Повзунок масштабу: тонка доріжка й порожнисте кільце, як на макеті.
-  Стилі для обох рушіїв, бо спільного псевдоелемента немає.
+  Стилі окремо для WebKit і Firefox, бо спільного псевдоелемента немає.
 */
-.globe-zoom-range {
+.map-zoom-range {
   appearance: none;
   height: 20px;
   background: transparent;
   cursor: pointer;
 }
 
-.globe-zoom-range::-webkit-slider-runnable-track {
+.map-zoom-range::-webkit-slider-runnable-track {
   height: 2px;
   border-radius: 999px;
   background: var(--line);
 }
 
-.globe-zoom-range::-moz-range-track {
+.map-zoom-range::-moz-range-track {
   height: 2px;
   border-radius: 999px;
   background: var(--line);
 }
 
-.globe-zoom-range::-webkit-slider-thumb {
+.map-zoom-range::-webkit-slider-thumb {
   appearance: none;
   width: 14px;
   height: 14px;
@@ -235,7 +105,7 @@ body {
   border: 2px solid var(--brand);
 }
 
-.globe-zoom-range::-moz-range-thumb {
+.map-zoom-range::-moz-range-thumb {
   width: 10px;
   height: 10px;
   border-radius: 999px;
@@ -243,69 +113,10 @@ body {
   border: 2px solid var(--brand);
 }
 
-.globe-zoom-range:focus-visible {
+.map-zoom-range:focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 4px;
   border-radius: 6px;
-}
-
-/*
-  Хмари по краях. Висота від екрана, ширина за пропорціями картинки.
-  Тінь знизу окреслює білу хмару на світлому тлі, без неї вона зникає.
-  Повільний дрейф робить сцену живою; хто просив менше руху, бачить
-  нерухомі хмари.
-*/
-.globe-cloud {
-  position: absolute;
-  bottom: -8%;
-  height: 86%;
-  width: auto;
-  max-width: none;
-  user-select: none;
-  filter: drop-shadow(0 12px 24px oklch(0.42 0.09 260 / 0.1));
-  animation: globe-cloud-drift 26s ease-in-out infinite alternate;
-}
-
-.globe-cloud-left {
-  left: 0;
-  translate: -22% 0;
-}
-
-.globe-cloud-right {
-  right: 0;
-  translate: 24% 0;
-  animation-delay: -13s;
-}
-
-@keyframes globe-cloud-drift {
-  from {
-    transform: translateX(-1.5%);
-  }
-  to {
-    transform: translateX(1.5%);
-  }
-}
-
-/* На телефоні хмари лише в кутах, щоб не закривати країну. */
-@media (max-width: 640px) {
-  .globe-cloud {
-    height: 44%;
-    bottom: -4%;
-  }
-
-  .globe-cloud-left {
-    translate: -38% 0;
-  }
-
-  .globe-cloud-right {
-    translate: 40% 0;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .globe-cloud {
-    animation: none;
-  }
 }
 
 /*

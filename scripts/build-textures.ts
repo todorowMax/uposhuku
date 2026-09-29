@@ -1,6 +1,6 @@
-// scripts/build-globe-assets.ts
+// scripts/build-textures.ts
 //
-// Малює текстури глобуса й контур України з відкритих даних. Результат
+// Малює рівнокутні текстури Землі й контур України з відкритих даних. Результат
 // лежить у git, скрипт потрібен лише щоб перемалювати: інша палітра,
 // інші межі латки, свіжіші кордони.
 //
@@ -16,20 +16,21 @@
 // Полотно: @napi-rs/canvas, лише як devDependency. Скрипт запускається
 // руками, у збірку воркера ця залежність не потрапляє.
 //
-// Запуск: npm run globe:assets (завантаження кешуються в .cache/globe)
+// Запуск: npm run map:textures (завантаження кешуються в .cache/textures),
+// потім npm run map:assets, щоб перепроєктувати їх для карти.
 
 import { createCanvas, loadImage, type SKRSContext2D } from "@napi-rs/canvas";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { GLOBE_PALETTE, hexToRgb } from "../lib/globe/palette";
-import { REGION, WORLD_TEXTURE_WIDTH, regionSize, type GeoBounds } from "../lib/globe/region";
+import { MAP_PALETTE, hexToRgb } from "../lib/map/palette";
+import { REGION, WORLD_TEXTURE_WIDTH, regionSize, type GeoBounds } from "../lib/map/region";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..");
-const cacheDir = resolve(root, ".cache/globe");
-const publicDir = resolve(root, "public/globe");
-const dataDir = resolve(root, "lib/globe/data");
+const cacheDir = resolve(root, ".cache/textures");
+const outDir = resolve(root, "assets/textures");
+const dataDir = resolve(root, "lib/map/data");
 
 const NATURAL_EARTH =
   "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/";
@@ -343,11 +344,11 @@ const paint = async (options: PaintOptions) => {
   );
 
   const p = {
-    land: hexToRgb(GLOBE_PALETTE.land),
-    shadow: hexToRgb(GLOBE_PALETTE.landShadow),
-    border: hexToRgb(GLOBE_PALETTE.border),
-    shallow: hexToRgb(GLOBE_PALETTE.waterShallow),
-    deep: hexToRgb(GLOBE_PALETTE.waterDeep),
+    land: hexToRgb(MAP_PALETTE.land),
+    shadow: hexToRgb(MAP_PALETTE.landShadow),
+    border: hexToRgb(MAP_PALETTE.border),
+    shallow: hexToRgb(MAP_PALETTE.waterShallow),
+    deep: hexToRgb(MAP_PALETTE.waterDeep),
   };
 
   const canvas = createCanvas(width, height);
@@ -384,7 +385,7 @@ const paint = async (options: PaintOptions) => {
 
   // Річки поверх: тонко, головні трохи товщі.
   if (options.rivers.length > 0) {
-    ctx.strokeStyle = GLOBE_PALETTE.river;
+    ctx.strokeStyle = MAP_PALETTE.river;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     for (const river of options.rivers) {
@@ -407,8 +408,8 @@ const paint = async (options: PaintOptions) => {
   }
 
   const bytes = await canvas.encode("webp", options.quality);
-  mkdirSync(publicDir, { recursive: true });
-  writeFileSync(resolve(publicDir, options.out), bytes);
+  mkdirSync(outDir, { recursive: true });
+  writeFileSync(resolve(outDir, options.out), bytes);
   console.log(`  ${options.out}: ${width}×${height}, ${(bytes.length / 1024).toFixed(0)} КБ`);
 };
 

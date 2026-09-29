@@ -5,9 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, Map as MapLibreMap, MapLayerMouseEvent } from "maplibre-gl";
 import type { FeatureCollection, Point } from "geojson";
-import { GlobeZoomControl } from "@/components/globe/zoom-control";
-import { createPortraitCanvas } from "@/lib/globe/visual-markers";
-import { GLOBE_PALETTE } from "@/lib/globe/palette";
+import { MapZoomControl } from "@/components/maplibre/zoom-control";
+import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas } from "@/lib/map/portrait";
+import { MAP_PALETTE } from "@/lib/map/palette";
 import { BUILDINGS_ZOOM, FONT_BOLD, buildMapStyle } from "@/lib/maplibre/style";
 import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
@@ -23,13 +23,13 @@ const TILT = 38;
 const MIN_ZOOM = 4.3;
 /** Повзунок «Місто» доходить до кварталів з будинками. */
 const CITY_ZOOM = BUILDINGS_ZOOM + 2;
-/** Розмір портрета на екрані за рівнем розміщення, CSS-пікселі (як на глобусі). */
+/** Розмір портрета на екрані за рівнем розміщення, CSS-пікселі. */
 const PLACEMENT_PX = { standard: 27, plus: 35, featured: 45 } as const;
 /** Полотно портрета 192px, малюємо з pixelRatio 4: логічний розмір 48px. */
 const PORTRAIT_RATIO = 4;
-const PORTRAIT_LOGICAL = 192 / PORTRAIT_RATIO;
+const PORTRAIT_LOGICAL = PORTRAIT_SIZE / PORTRAIT_RATIO;
 
-/** Ромб групи: той самий синій градієнт, що на глобусі, число кладе шар підпису. */
+/** Ромб групи: синій градієнт, число кладе шар підпису. */
 const createClusterImage = () => {
   const size = 112;
   const canvas = document.createElement("canvas");
@@ -78,7 +78,7 @@ export default function MapLibreScene() {
         geometry: { type: "Point", coordinates: [performer.lng, performer.lat] },
         properties: {
           id: performer.id,
-          avatar: `avatar-${performer.avatarIndex % 16}`,
+          avatar: `avatar-${performer.avatarIndex % AVATAR_COUNT}`,
           size: PLACEMENT_PX[performer.placement] / PORTRAIT_LOGICAL,
           rank: performer.placement === "featured" ? 3 : performer.placement === "plus" ? 2 : 1,
         },
@@ -108,9 +108,9 @@ export default function MapLibreScene() {
       farZoomRef.current = Math.max(MIN_ZOOM, map.getZoom());
 
       const source = new Image();
-      source.src = "/globe/mock-avatars.png";
+      source.src = AVATAR_ATLAS;
       await source.decode();
-      for (let index = 0; index < 16; index++) {
+      for (let index = 0; index < AVATAR_COUNT; index++) {
         const canvas = createPortraitCanvas(source, index);
         const context = canvas.getContext("2d");
         if (!context) continue;
@@ -136,7 +136,7 @@ export default function MapLibreScene() {
         type: "circle",
         source: "requests",
         paint: {
-          "circle-color": GLOBE_PALETTE.request,
+          "circle-color": MAP_PALETTE.request,
           "circle-radius": ["case", ["get", "live"], 6, 4.5],
           "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 2,
@@ -182,7 +182,7 @@ export default function MapLibreScene() {
       });
 
       // Підписи міст після людей: колізія сама ховає підпис, що наїхав би
-      // на фото чи ромб. Те, що на глобусі робили руками.
+      // на фото чи ромб.
       map.addSource("cities", {
         type: "geojson",
         data: {
@@ -310,7 +310,7 @@ export default function MapLibreScene() {
         </div>
       )}
 
-      <GlobeZoomControl
+      <MapZoomControl
         value={slider}
         onChange={(value) => mapRef.current?.jumpTo({ zoom: sliderToZoom(value, farZoomRef.current) })}
         onStep={(direction) =>

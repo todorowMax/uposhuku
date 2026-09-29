@@ -4,7 +4,7 @@
 // Чиста функція без браузера: рахується на сервері, і шлях приходить уже
 // в HTML-заставці, до завантаження будь-якого JS.
 
-import ukraine from "@/lib/globe/data/ukraine.geo.json";
+import ukraine from "@/lib/map/data/ukraine.geo.json";
 import { CITIES } from "@/lib/map/cities";
 
 type Ring = number[][];

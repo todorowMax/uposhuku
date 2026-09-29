@@ -1,22 +1,22 @@
 // lib/maplibre/style.ts
 //
-// Стиль MapLibre-варіанта карти в палітрі глобуса (DESIGN.md). Дані
+// Стиль карти MapLibre у палітрі з DESIGN.md. Дані
 // OpenStreetMap у схемі OpenMapTiles з OpenFreeMap: без ключів і лімітів,
 // комерційне використання дозволене. Згодом той самий стиль піде на власні
 // PMTiles у Cloudflare R2, тут зміниться лише адреса джерела.
 //
-// Перший кадр статичний і весь наш: текстури глобуса в Меркаторі
+// Перший кадр статичний і весь наш: власні текстури в Меркаторі
 // (public/map), шрифти, контур України, люди й запити. Дані OSM і рельєф
 // з мережі вмикаються лише з DETAIL_ZOOM, коли людина вже наближається,
 // а картинка плавно тане під ними.
 //
 // Рельєф: відкриті тайли висот AWS Terrain Tiles (terrarium), ті самі, з
-// яких зібрана текстура глобуса.
+// яких зібрані наші текстури.
 
 import type { StyleSpecification } from "maplibre-gl";
 import type { GeoJSON } from "geojson";
-import ukraine from "@/lib/globe/data/ukraine.geo.json";
-import { GLOBE_PALETTE as P } from "@/lib/globe/palette";
+import ukraine from "@/lib/map/data/ukraine.geo.json";
+import { MAP_PALETTE as P } from "@/lib/map/palette";
 import { DETAIL_ZOOM, STATIC_MAP, corners } from "@/lib/maplibre/static";
 import { ukraineRim } from "@/lib/maplibre/rim";
 
@@ -42,7 +42,7 @@ const PLATEAU_HEIGHT = [
 
 /**
  * Кольори України саме для MapLibre. Плато тут напівпрозоре, тож верх
- * блакитніший за глобусний, а кромка насиченіша: інакше Україна зливається
+ * блакитніший за палітру текстур, а кромка насиченіша: інакше Україна зливається
  * з сірим суходолом навколо.
  */
 const UKRAINE = { cap: "#dde8fd", rim: "#4a7ae3", outline: "#3f6fdc" } as const;
@@ -183,7 +183,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
         "line-width": ["interpolate", ["exponential", 1.6], ["zoom"], 9, 0.3, 14, 2.6, 17, 13],
       },
     },
-    // Україна: піднята плита, як на глобусі. Верх напівпрозорий і
+    // Україна: піднята плита. Верх напівпрозорий і
     // блакитний, щоб крізь нього було видно рельєф і річки з текстури.
     // Ближче до міста плита осідає й тане, щоб не накривати вулиці.
     {

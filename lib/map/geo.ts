@@ -1,5 +1,5 @@
 // lib/map/geo.ts
-import ukraine from "@/lib/globe/data/ukraine.geo.json";
+import ukraine from "@/lib/map/data/ukraine.geo.json";
 import type { GeoPoint } from "./types";
 
 type Ring = number[][];

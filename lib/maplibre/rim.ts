@@ -7,7 +7,7 @@
 // стінка — синя стінка плато, її верх — синій контур по краю.
 
 import type { Feature, MultiPolygon, Position } from "geojson";
-import ukraine from "@/lib/globe/data/ukraine.geo.json";
+import ukraine from "@/lib/map/data/ukraine.geo.json";
 
 type Ring = Position[];
 

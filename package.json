@@ -18,9 +18,8 @@
     "cf:preview": "opennextjs-cloudflare preview --env development",
     "cf:deploy:development": "opennextjs-cloudflare deploy --env development",
     "cf:deploy:production": "opennextjs-cloudflare deploy --env production",
-    "globe:assets": "tsx scripts/build-globe-assets.ts",
-    "clouds:assets": "tsx scripts/build-cloud-assets.ts",
-    "maplibre:assets": "tsx scripts/build-maplibre-assets.ts"
+    "map:textures": "tsx scripts/build-textures.ts",
+    "map:assets": "tsx scripts/build-maplibre-assets.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
@@ -32,10 +31,8 @@
     "postcss": "^8.5.28",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-globe.gl": "^2.38.0",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
-    "three": "^0.186.1",
     "typescript": "^5.9.3"
   },
   "devDependencies": {
@@ -44,7 +41,6 @@
     "@types/node": "^24.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/three": "^0.186.0",
     "tsx": "^4.23.15",
     "vitest": "^4.1.11",
     "wrangler": "^4.143.0"

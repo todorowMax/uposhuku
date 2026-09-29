@@ -4,12 +4,12 @@
 // скрипта, який їх перепроєктовує, і стилю, який їх кладе: розійдуться
 // числа, і картинка з'їде відносно контуру України.
 
-import { REGION } from "../globe/region";
+import { REGION } from "../map/region";
 
 export const STATIC_MAP = {
   /** Уся Земля в межах, які вміщає Web Mercator. */
   world: { lngMin: -180, lngMax: 180, latMin: -84, latMax: 84 },
-  /** Детальна латка навколо України, та сама, що на глобусі. */
+  /** Детальна латка навколо України, з детальнішим рельєфом. */
   region: { lngMin: REGION.lngMin, lngMax: REGION.lngMax, latMin: REGION.latMin, latMax: REGION.latMax },
 } as const;
 
