@@ -4,6 +4,7 @@ import { suggestTags } from "@/lib/tags/suggest";
 import { MATCH_THRESHOLD, matchProfiles, tagSimilarity } from "@/lib/tags/match";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { DEMO_PERFORMERS } from "@/lib/map/demo";
+import { SPECIALIST_GROUPS, countGroups, primaryGroup } from "@/lib/map/groups";
 
 describe("stemWord", () => {
   it("зводить відмінки до однієї основи", () => {
@@ -96,5 +97,35 @@ describe("фільтр карти за тегами запиту", () => {
     const matched = matchProfiles(detectTags("хочу створити апку планер розпорядку для своїх домашніх улюбленців"), DEMO_PERFORMERS);
     expect(matched?.size).toBeGreaterThan(0);
     expect(matched!.size).toBeLessThan(DEMO_PERFORMERS.length / 2);
+  });
+});
+
+describe("групи спеціалістів для фільтрів", () => {
+  it("теги груп є в словнику", () => {
+    const unknown = SPECIALIST_GROUPS.flatMap((group) => group.tags).filter((id) => !TAGS_BY_ID.has(id));
+    expect(unknown).toEqual([]);
+  });
+
+  it("кожен демо-виконавець має групу, найбільша — близько третини", () => {
+    expect(DEMO_PERFORMERS.every((performer) => primaryGroup(performer.tags))).toBe(true);
+    const groups = countGroups(DEMO_PERFORMERS);
+    expect(groups.map((group) => group.count)).toEqual([...groups.map((group) => group.count)].sort((a, b) => b - a));
+    const top = groups[0].count / DEMO_PERFORMERS.length;
+    expect(top).toBeGreaterThan(0.25);
+    expect(top).toBeLessThan(0.4);
+  });
+});
+
+describe("послуга без продукту", () => {
+  it("банери знаходять графічний дизайн, а галузь не тягне підказки для застосунку", () => {
+    const tags = detectTags("я хочу зоб мені зробили 3 банери для автомийки");
+    expect(tags).toEqual(expect.arrayContaining(["graphic-design", "auto"]));
+    const suggested = suggestTags(tags).map((suggestion) => suggestion.tagId);
+    expect(suggested).toContain("branding");
+    expect(suggested).not.toContain("inventory");
+  });
+
+  it("для сайту галузь підказує як завжди", () => {
+    expect(suggestTags(detectTags("сайт для стоматології")).map((suggestion) => suggestion.tagId)).toContain("online-booking");
   });
 });

@@ -19,7 +19,8 @@ const STEPS = 1000;
 export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps) {
   return (
     <div className="absolute right-4 bottom-4 z-[var(--z-controls)] flex items-stretch gap-3 sm:right-6 sm:bottom-6">
-      <label className="glass-panel flex h-12 items-center gap-3 rounded-2xl px-4 text-sm text-ink">
+      {/* На телефоні лише −/+: там зумлять двома пальцями, а повзунок забирав півряду. */}
+      <label className="glass-panel hidden h-12 items-center gap-3 rounded-2xl px-4 text-sm text-ink sm:flex">
         <span>Україна</span>
         <input
           type="range"
@@ -28,7 +29,7 @@ export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps)
           value={Math.round(value * STEPS)}
           onChange={(event) => onChange(Number(event.target.value) / STEPS)}
           aria-label="Масштаб карти від країни до міста"
-          className="map-zoom-range w-24 sm:w-28"
+          className="map-zoom-range w-28"
         />
         <span>Місто</span>
       </label>

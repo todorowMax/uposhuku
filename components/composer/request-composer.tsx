@@ -16,6 +16,14 @@ import { applyGlassPreference } from "@/lib/ui/glass";
 import { setRequestTags } from "@/lib/map/request-tags";
 import { Attachments, type Attachment } from "@/components/composer/attachments";
 import { TagRow } from "@/components/composer/tag-row";
+import { SpecialistFilters } from "@/components/composer/specialist-filters";
+import { AuthPanel } from "@/components/auth/auth-panel";
+import { RequestDock } from "@/components/requests/request-dock";
+import { authFlowStore, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
+import { offersCollapsedStore, useActiveRequest } from "@/lib/requests/offers";
+import { loadDraft, saveDraft } from "@/lib/requests/draft";
+import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
+import { useStore } from "@/lib/store";
 
 type TagEngine = typeof import("@/lib/tags/engine");
 
@@ -34,7 +42,9 @@ const MAX_ROWS = 5;
  * два поверхи: текст на всю ширину згори, дії знизу, і росте під текст
  * до п'яти рядків.
  *
- * Поки лише вигляд для прев'ю: відправка нікуди не йде.
+ * «Знайти виконавців» публікує запит: гість вводить пошту й код з листа
+ * (components/auth/auth-panel), хто увійшов — публікує одразу. Поки вхід
+ * і збереження — заглушки (lib/auth/config.ts).
  */
 export function RequestComposer() {
   const [text, setText] = useState("");
@@ -45,6 +55,18 @@ export function RequestComposer() {
   const [dismissed, setDismissed] = useState<string[]>([]);
   /** Теги, додані з пропозицій одним кліком. */
   const [added, setAdded] = useState<string[]>([]);
+  const authFlow = useStore(authFlowStore);
+  const session = useStore(sessionStore);
+  const requests = useStore(requestsStore);
+  /**
+   * Опублікований запит стоїть на місці поля, поки людина не натисне
+   * «Новий запит». Карта тоді показує кандидатів саме під нього, а праворуч
+   * відкрита панель пропозицій: поле й фільтри зсуваються від неї.
+   */
+  const activeRequest = useActiveRequest();
+  const offersCollapsed = useStore(offersCollapsedStore);
+  const offersOpen = activeRequest?.status === "open" && !offersCollapsed;
+  const requestCount = session.status === "user" ? (requests?.length ?? 0) : 0;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -91,10 +113,22 @@ export function RequestComposer() {
 
   // Карта відсіює виконавців за тегами запиту. Із затримкою: поки слово
   // недописане, тег може з'явитися й зникнути, а карта не має смикатися.
+  const activeTags = activeRequest?.status === "open" ? activeRequest.tags.map((tag) => tag.id).join(",") : "";
   useEffect(() => {
-    const timer = window.setTimeout(() => setRequestTags(selected), 350);
+    const tags = activeRequest ? (activeTags ? activeTags.split(",") : []) : selected;
+    const timer = window.setTimeout(() => setRequestTags(tags), activeRequest ? 0 : 350);
     return () => window.clearTimeout(timer);
-  }, [selected]);
+    // activeTags — рядок, щоб новий масив того самого запиту не перезапускав ефект.
+  }, [selected, activeTags, Boolean(activeRequest)]);
+
+  // Повернулися з Google з чернеткою: публікуємо її, як після коду з листа.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("auth") !== "google") return;
+    url.searchParams.delete("auth");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    if (loadDraft()?.pending) authFlowStore.set({ mode: "publish" });
+  }, []);
 
   const removeTag = (id: string) => {
     setDismissed((current) => [...current, id]);
@@ -172,9 +206,32 @@ export function RequestComposer() {
     };
   }, [menuOpen]);
 
+  /*
+   * Чернетку кладемо в браузер до входу: після Google сторінка
+   * перезавантажується, і без неї запит загубився б.
+   */
   const submit = (event?: FormEvent) => {
     event?.preventDefault();
-    inputRef.current?.focus();
+    if (text.trim().length < 3) {
+      inputRef.current?.focus();
+      return;
+    }
+    const draft: RequestDraft = {
+      text: text.trim(),
+      tags: selected.map((id) => ({ id, label: engine?.tagLabel(id) ?? id })),
+      files: files.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
+    };
+    saveDraft(draft, true);
+    setMenuOpen(false);
+    authFlowStore.set({ mode: "publish" });
+  };
+
+  const onPublished = (_request: PublishedRequest) => {
+    setText("");
+    setFiles((current) => {
+      current.forEach((item) => item.url && URL.revokeObjectURL(item.url));
+      return [];
+    });
   };
 
   // Enter шукає, Shift+Enter переносить рядок, як у чатах.
@@ -195,8 +252,15 @@ export function RequestComposer() {
   const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0;
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-[var(--z-controls)] flex flex-col items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] sm:pt-14">
+    <div
+      data-top-stack
+      className={`pointer-events-none absolute inset-x-0 top-0 z-[var(--z-controls)] flex flex-col items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] transition-[padding] duration-300 sm:pt-14 ${
+        offersOpen ? "lg:pr-[428px]" : ""
+      }`}
+    >
+      {activeRequest && requests && <RequestDock key={activeRequest.id} requests={requests} active={activeRequest} />}
       <form
+        hidden={Boolean(activeRequest)}
         ref={formRef}
         onSubmit={submit}
         data-expanded={expanded}
@@ -290,6 +354,14 @@ export function RequestComposer() {
         )}
       </form>
 
+      {authFlow ? (
+        <AuthPanel key={authFlow.mode} onPublished={onPublished} />
+      ) : (
+        <SpecialistFilters
+          expanded={expanded && !activeRequest}
+          myRequests={!activeRequest && requestCount > 0 ? { count: requestCount, onOpen: showMyRequests } : null}
+        />
+      )}
     </div>
   );
 }

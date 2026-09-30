@@ -1,0 +1,309 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { gsap } from "gsap";
+import { ArrowLeft, Loader2, Paperclip, X } from "lucide-react";
+import { CodeInput } from "@/components/auth/code-input";
+import { GoogleButton } from "@/components/auth/google-button";
+import {
+  ApiError,
+  addPublishedRequest,
+  authFlowStore,
+  publishRequest,
+  sessionStore,
+  startEmail,
+  verifyEmail,
+} from "@/lib/auth/client";
+import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
+import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
+import { useStore } from "@/lib/store";
+
+type Step = "email" | "code" | "publishing" | "failed";
+
+/** Повторний лист — не частіше разу на хвилину, як домовились у плані. */
+const RESEND_SECONDS = 60;
+const EMPTY_CODE = ["", "", "", "", "", ""];
+
+/**
+ * Вхід і публікація запиту в одній панелі під полем запиту. Паролів
+ * немає: пошта → 6 цифр з листа → готово; або Google. У режимі «publish»
+ * після входу одразу публікуємо чернетку, як домовились у плані: «одразу
+ * після коду запит публікується». Хто вже увійшов, код не вводить.
+ * Опублікований запит стає карткою на місці поля (components/requests/request-dock),
+ * тож окремого екрана «опубліковано» немає: панель просто закривається.
+ */
+export function AuthPanel({ onPublished }: { onPublished: (request: PublishedRequest) => void }) {
+  const flow = useStore(authFlowStore);
+  const session = useStore(sessionStore);
+  const mode = flow?.mode ?? "login";
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [digits, setDigits] = useState(EMPTY_CODE);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [mock, setMock] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+  const [draft] = useState<RequestDraft | null>(() => (mode === "publish" ? (loadDraft()?.draft ?? null) : null));
+  const panelRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const codeRef = useRef<{ focus: () => void }>(null);
+  const startedRef = useRef(false);
+
+  const close = () => {
+    if (step !== "publishing") authFlowStore.set(null);
+  };
+
+  const publish = async () => {
+    if (!draft) {
+      setError("Чернетка запиту загубилась. Напишіть його ще раз.");
+      setStep("failed");
+      return;
+    }
+    setStep("publishing");
+    setError(null);
+    try {
+      const request = await publishRequest(draft);
+      clearDraft();
+      onPublished(request);
+      addPublishedRequest(request);
+      authFlowStore.set(null);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Не вдалося опублікувати запит.");
+      setStep("failed");
+    }
+  };
+
+  // Хто вже увійшов, одразу публікує; просто «Увійти» для нього не має сенсу.
+  useEffect(() => {
+    if (startedRef.current || session.status === "loading") return;
+    startedRef.current = true;
+    if (session.status !== "user") return;
+    if (mode === "publish") void publish();
+    else authFlowStore.set(null);
+  }, [session.status]);
+
+  // Панель виїжджає з-під поля запиту, кроки змінюються з легким зсувом.
+  useLayoutEffect(() => {
+    if (!panelRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = gsap.fromTo(panelRef.current, { opacity: 0, y: -10, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" });
+    return () => {
+      tween.kill();
+    };
+  }, []);
+  useLayoutEffect(() => {
+    if (!bodyRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = gsap.fromTo(bodyRef.current, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" });
+    return () => {
+      tween.kill();
+    };
+  }, [step]);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
+
+  const sendCode = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await startEmail(email);
+      setMock(result.mock);
+      setDigits(EMPTY_CODE);
+      setCooldown(RESEND_SECONDS);
+      setStep("code");
+      window.setTimeout(() => codeRef.current?.focus(), 60);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Не вдалося надіслати код.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async (code: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await verifyEmail(email, code);
+      if (mode === "publish") await publish();
+      else authFlowStore.set(null);
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Не вдалося перевірити код.");
+      setDigits(EMPTY_CODE);
+      codeRef.current?.focus();
+      const group = bodyRef.current?.querySelector(".code-input");
+      if (group) gsap.fromTo(group, { x: -8 }, { x: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onDigits = (next: string[]) => {
+    setDigits(next);
+    if (error) setError(null);
+    // Усі шість цифр — перевіряємо одразу, без окремої кнопки.
+    if (next.every(Boolean) && !busy) void verify(next.join(""));
+  };
+
+  const googleHref = `/api/auth/google?next=${encodeURIComponent(mode === "publish" ? "/?auth=google" : "/")}`;
+  const title =
+    step === "code"
+      ? "Код з листа"
+      : step === "publishing"
+        ? "Публікуємо запит"
+        : step === "failed"
+            ? "Не вдалося опублікувати"
+            : mode === "publish"
+              ? "Куди надсилати відповіді?"
+              : "Вхід";
+
+  return (
+    <>
+      <div aria-hidden className="auth-scrim" onClick={close} />
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className="auth-panel glass-panel">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            {step === "code" && (
+              <button type="button" onClick={() => setStep("email")} aria-label="Змінити пошту" className="auth-icon-button -ml-1.5">
+                <ArrowLeft className="size-4" strokeWidth={2} />
+              </button>
+            )}
+            <h2 className="text-[17px] font-semibold leading-tight text-ink">{title}</h2>
+          </div>
+          {step !== "publishing" && (
+            <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button -mr-1.5 -mt-1">
+              <X className="size-4" strokeWidth={2} />
+            </button>
+          )}
+        </div>
+
+        <div ref={bodyRef}>
+          {step === "email" && (
+            <>
+              <p className="auth-lead">
+                {mode === "publish"
+                  ? "Вкажіть пошту: надішлемо код, і запит одразу побачать виконавці. Пароль не потрібен."
+                  : "Пошта й код з листа, без пароля. Нова адреса — новий акаунт."}
+              </p>
+              {draft && <DraftSummary draft={draft} />}
+              <GoogleButton href={googleHref} onClick={() => draft && saveDraft(draft, true)} />
+              <div className="auth-divider">
+                <span>або поштою</span>
+              </div>
+              <form onSubmit={sendCode} className="grid gap-2.5">
+                <label htmlFor="auth-email" className="sr-only">
+                  Пошта
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  required
+                  autoFocus
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="name@example.com"
+                  value={email}
+                  onChange={(event) => {
+                    setEmail(event.target.value);
+                    setError(null);
+                  }}
+                  className="auth-input"
+                  aria-invalid={Boolean(error) || undefined}
+                  aria-describedby={error ? "auth-error" : undefined}
+                />
+                {error && (
+                  <p id="auth-error" role="alert" className="auth-error">
+                    {error}
+                  </p>
+                )}
+                <button type="submit" disabled={busy || !email.includes("@")} className="auth-primary">
+                  {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                  Отримати код
+                </button>
+              </form>
+            </>
+          )}
+
+          {step === "code" && (
+            <>
+              <p className="auth-lead">
+                Надіслали 6 цифр на <strong className="font-semibold text-ink">{email}</strong>. Код діє 10 хвилин.
+              </p>
+              {mock && (
+                <p className="auth-mock">
+                  Тестовий режим: листи поки не надсилаються. Введіть код <strong>000000</strong>.
+                </p>
+              )}
+              <CodeInput ref={codeRef} digits={digits} onChange={onDigits} disabled={busy} invalid={Boolean(error)} />
+              <p role="alert" className="auth-error min-h-5 text-center">
+                {error ?? (busy ? "Перевіряємо…" : "")}
+              </p>
+              <div className="flex items-center justify-center gap-1 text-[13px] text-ink-muted">
+                Не прийшов лист?
+                <button type="button" disabled={cooldown > 0 || busy} onClick={() => void sendCode()} className="auth-link">
+                  {cooldown > 0 ? `Надіслати ще раз за ${cooldown} с` : "Надіслати ще раз"}
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === "publishing" && (
+            <div className="grid justify-items-center gap-3 py-6 text-[13px] text-ink-muted">
+              <Loader2 className="size-6 animate-spin text-[#b48264]" />
+              Показуємо запит виконавцям…
+            </div>
+          )}
+
+          {step === "failed" && (
+            <>
+              <p role="alert" className="auth-lead">
+                {error}
+              </p>
+              <button type="button" onClick={() => void publish()} className="auth-primary">
+                Спробувати ще раз
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Що саме публікуємо: початок тексту, теги й файли. */
+function DraftSummary({ draft }: { draft: RequestDraft }) {
+  const shownTags = draft.tags.slice(0, 4);
+  return (
+    <div className="auth-draft">
+      <p className="line-clamp-2 text-[13px] leading-snug text-ink">{draft.text}</p>
+      {(shownTags.length > 0 || draft.files.length > 0) && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {shownTags.map((tag) => (
+            <span key={tag.id} className="auth-draft-tag">
+              {tag.label}
+            </span>
+          ))}
+          {draft.tags.length > shownTags.length && (
+            <span className="text-[11px] text-ink-muted">ще +{draft.tags.length - shownTags.length}</span>
+          )}
+          {draft.files.length > 0 && (
+            <span className="inline-flex items-center gap-1 text-[11px] text-ink-muted">
+              <Paperclip className="size-3" strokeWidth={2} />
+              {draft.files.length}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

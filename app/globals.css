@@ -130,6 +130,10 @@ body {
 
 /* Те саме поле у двох станах; змінені лише матеріал і геометрія. */
 .composer {
+  /* Свій шар над фільтрами: «ще +N» і меню «+» відкриваються поверх чипів
+     під полем, а чипи зі склом інакше малюються вище. */
+  position: relative;
+  z-index: 2;
   background: rgb(255 255 255 / 92%);
   interpolate-size: allow-keywords;
   display: grid;
@@ -526,6 +530,1339 @@ html[data-glass] .composer {
 
 .map-lens[data-kind="person"] img {
   filter: drop-shadow(0 6px 10px rgb(172 103 57 / 28%));
+}
+
+/*
+  Фільтри під полем запиту (components/composer/specialist-filters), завширшки
+  як саме поле: 560px, розкрите — 720px, з тим самим переходом. Чипи
+  гортаються вбік, кнопка «Фільтри» праворуч стоїть на місці.
+*/
+.filter-bar {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+  margin-top: 10px;
+  pointer-events: auto;
+  transition: max-width 480ms cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+
+.filter-bar[data-expanded="true"] {
+  max-width: 720px;
+}
+
+.filter-strip {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Справа згасання: натяк, що чипів більше, і м'який край біля «Фільтрів». */
+  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent 100%);
+}
+
+.filter-strip[data-scrolled="true"] {
+  mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 24px), transparent 100%);
+}
+
+.filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-strip-inner {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+  padding: 2px 24px 6px 0;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 4px 14px rgb(54 65 73 / 8%);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink);
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+
+.filter-chip:hover {
+  background: #ffffff;
+  border-color: #b8c4c7;
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.filter-chip-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+
+.filter-chip[aria-pressed="true"] {
+  border-color: #303638;
+  background: #303638;
+  color: #ffffff;
+}
+
+.filter-chip[aria-pressed="true"] .filter-chip-count {
+  color: rgb(255 255 255 / 70%);
+}
+
+html[data-glass] .filter-chip {
+  background: rgb(255 255 255 / 70%);
+  backdrop-filter: blur(12px);
+}
+
+html[data-glass] .filter-chip[aria-pressed="true"] {
+  background: #303638;
+}
+
+.filter-all {
+  flex: none;
+  margin-top: 2px;
+}
+
+.filter-all[data-active="true"],
+.filter-all[aria-expanded="true"] {
+  border-color: #87999e;
+  background: #ffffff;
+}
+
+.filter-all-badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #303638;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: grid;
+  gap: 16px;
+  max-height: min(460px, calc(100dvh - 220px));
+  padding: 16px;
+  overflow-y: auto;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 18px 50px rgb(45 60 67 / 18%);
+}
+
+.filter-panel-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.filter-panel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-panel .filter-chip {
+  border-color: transparent;
+  background: rgb(48 54 58 / 7.5%);
+  box-shadow: none;
+}
+
+.filter-panel .filter-chip:hover {
+  border-color: transparent;
+  background: rgb(48 54 58 / 12%);
+}
+
+.filter-panel .filter-chip[aria-pressed="true"] {
+  background: #303638;
+}
+
+.filter-panel .filter-chip-more {
+  background: none;
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-decoration-color: #b8c4c7;
+  text-underline-offset: 4px;
+}
+
+.filter-switch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.filter-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.filter-switch-track {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: #c9d2d4;
+  transition: background-color 180ms;
+}
+
+.filter-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(48 54 58 / 25%);
+  transition: transform 180ms ease-out;
+}
+
+.filter-switch input:checked + .filter-switch-track {
+  background: #303638;
+}
+
+.filter-switch input:checked + .filter-switch-track::after {
+  transform: translateX(16px);
+}
+
+.filter-switch input:focus-visible + .filter-switch-track {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.filter-panel-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(184 196 199 / 45%);
+}
+
+.filter-reset {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: color 150ms, background-color 150ms;
+}
+
+.filter-reset:hover {
+  background: rgb(48 54 58 / 6%);
+  color: var(--ink);
+}
+
+.filter-apply {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: #303638;
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  transition: background-color 150ms;
+}
+
+.filter-apply:hover {
+  background: #4c5558;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-bar,
+  .filter-switch-track,
+  .filter-switch-track::after {
+    transition: none;
+  }
+}
+
+/*
+  Вхід і публікація запиту (components/auth). Панель під полем запиту,
+  під нею легке затемнення карти; скло — як у решти панелей.
+*/
+.auth-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: rgb(38 48 52 / 16%);
+  pointer-events: auto;
+}
+
+.auth-panel {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+  max-width: 440px;
+  margin-top: 12px;
+  padding: 20px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 22px 60px rgb(45 60 67 / 22%);
+  pointer-events: auto;
+}
+
+.auth-panel > div + div {
+  display: grid;
+  gap: 12px;
+}
+
+.auth-lead {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.auth-icon-button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.auth-icon-button:hover {
+  background: rgb(48 54 58 / 7%);
+  color: var(--ink);
+}
+
+.auth-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid #b8c4c7;
+  border-radius: 14px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.auth-google:hover {
+  border-color: #87999e;
+  background: #fbfcfc;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgb(184 196 199 / 60%);
+}
+
+.auth-input {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid #c9d2d4;
+  border-radius: 14px;
+  background: #ffffff;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.auth-input:focus {
+  border-color: #87999e;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+.auth-input[aria-invalid="true"] {
+  border-color: #c0705a;
+}
+
+.auth-error {
+  font-size: 12px;
+  color: #a4513c;
+}
+
+.auth-primary,
+.auth-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms, border-color 150ms, opacity 150ms;
+}
+
+.auth-primary {
+  background: #303638;
+  color: #ffffff;
+}
+
+.auth-primary:hover {
+  background: #4c5558;
+}
+
+.auth-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.auth-secondary {
+  border: 1px solid #b8c4c7;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.auth-secondary:hover {
+  border-color: #87999e;
+}
+
+.auth-link {
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: #b8c4c7;
+  text-underline-offset: 4px;
+}
+
+.auth-link:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.auth-mock {
+  padding: 10px 12px;
+  border: 1px dashed #d6b8a2;
+  border-radius: 12px;
+  background: #fbf5f0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #7a5a44;
+}
+
+.code-input {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.code-cell {
+  width: 46px;
+  height: 54px;
+  border: 1px solid #c9d2d4;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.code-cell[data-gap] {
+  margin-left: 8px;
+}
+
+.code-cell:focus {
+  border-color: #87999e;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+.code-input[data-invalid] .code-cell {
+  border-color: #c0705a;
+}
+
+.code-cell:disabled {
+  opacity: 0.6;
+}
+
+.auth-draft {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgb(48 54 58 / 5%);
+}
+
+.auth-draft-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(184 196 199 / 70%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.auth-success {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: #f4e9df;
+  box-shadow: 0 0 0 6px rgb(180 130 100 / 12%);
+  color: #8e5f40;
+}
+
+/* Акаунт у лівому нижньому куті, на рівні кнопок масштабу. */
+.account-slot {
+  position: absolute;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 16px;
+  z-index: var(--z-controls);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+/* Скільки виконавців під запит — у рядку з акаунтом. На телефоні немає місця:
+   число й так видно в чипі «Усі» під полем запиту. */
+.account-match {
+  display: none;
+  padding: 9px 16px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  pointer-events: none;
+  opacity: 0;
+  translate: -6px 0;
+  transition: opacity 300ms, translate 300ms;
+}
+
+@media (min-width: 640px) {
+  .account-match {
+    display: block;
+  }
+}
+
+.account-match[data-shown] {
+  opacity: 1;
+  translate: 0 0;
+}
+
+@media (min-width: 640px) {
+  .account-slot {
+    bottom: 24px;
+    left: 24px;
+  }
+}
+
+.account-login,
+.account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 10px 28px -14px rgb(47 60 68 / 30%);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background-color 150ms, border-color 150ms;
+}
+
+.account-login {
+  width: 48px;
+  padding: 0;
+}
+
+.account-login span {
+  display: none;
+}
+
+@media (min-width: 640px) {
+  .account-login {
+    width: auto;
+    padding: 0 16px 0 14px;
+  }
+
+  .account-login span {
+    display: inline;
+  }
+}
+
+.account-avatar {
+  width: 48px;
+  background: #303638;
+  border-color: #303638;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.account-login:hover {
+  background: #ffffff;
+  border-color: #b8c4c7;
+}
+
+.account-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  gap: 2px;
+  width: 240px;
+  padding: 8px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 18px 44px rgb(45 60 67 / 18%);
+}
+
+.account-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background-color 150ms;
+}
+
+.account-menu-item:hover:not(:disabled) {
+  background: rgb(48 54 58 / 6%);
+}
+
+.account-menu-item:disabled {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+.my-request-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4d7a5e;
+}
+
+.my-request-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+
+/*
+  Опублікований запит на місці поля запиту (components/requests/request-dock):
+  текст, теги, кроки виконання й що зараз відбувається.
+*/
+.request-dock {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 640px;
+  padding: 12px 16px 10px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 18px 44px -18px rgb(47 60 68 / 32%), inset 0 1px rgb(255 255 255 / 60%);
+  pointer-events: auto;
+}
+
+html[data-glass] .request-dock {
+  background: rgb(255 255 255 / 78%);
+  backdrop-filter: blur(14px);
+}
+
+.request-dock[data-closed] {
+  background: rgb(255 255 255 / 88%);
+}
+
+.request-dock[data-closed] .my-request-status {
+  color: var(--ink-muted);
+}
+
+.request-dock-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 5;
+  width: 180px;
+  padding: 6px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 14px 34px rgb(45 60 67 / 18%);
+}
+
+/* Згорнута картка запиту: смужка по центру завширшки як порожнє поле. */
+.request-pill {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 560px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 16px 38px -20px rgb(47 60 68 / 30%), inset 0 1px rgb(255 255 255 / 60%);
+  pointer-events: auto;
+}
+
+html[data-glass] .request-pill {
+  background: rgb(255 255 255 / 78%);
+  backdrop-filter: blur(14px);
+}
+
+.request-pill-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 50px;
+  padding: 0 14px 0 16px;
+  border-radius: inherit;
+}
+
+.request-pill[data-closed] .my-request-status {
+  color: var(--ink-muted);
+}
+
+/* Міні-кроки в смужці: п'ять крапок, пройдені й поточний — золоті. */
+.request-mini-steps {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 5px;
+}
+
+.request-mini-steps > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #d6dddf;
+}
+
+.request-mini-steps > span[data-state="done"] {
+  background: #b48264;
+}
+
+.request-mini-steps > span[data-state="current"] {
+  background: #ffffff;
+  box-shadow: inset 0 0 0 2px #b48264, 0 0 0 3px rgb(180 130 100 / 18%);
+}
+
+/* Кроки: смуга під кружечками, заповнення їде до поточного кроку (GSAP). */
+.request-steps {
+  position: relative;
+  margin-top: 12px;
+}
+
+.request-steps-list {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.request-steps-track {
+  position: absolute;
+  top: 7px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  border-radius: 2px;
+  background: #dde3e4;
+}
+
+.request-steps-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #b48264;
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+
+.request-step {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.request-step-dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cfd7d9;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #ffffff;
+}
+
+.request-step[data-state="done"] .request-step-dot {
+  border-color: #b48264;
+  background: #b48264;
+}
+
+.request-step[data-state="current"] .request-step-dot {
+  border-color: #b48264;
+  box-shadow: 0 0 0 4px rgb(180 130 100 / 16%);
+}
+
+/* Поточний крок «дихає»: запит живий, щось відбувається. */
+.request-step[data-state="current"] .request-step-dot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 1.5px solid rgb(180 130 100 / 45%);
+  animation: request-step-pulse 2.4s ease-out infinite;
+}
+
+@keyframes request-step-pulse {
+  from {
+    opacity: 1;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.5);
+  }
+}
+
+.request-step-label {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--ink-muted);
+}
+
+.request-step[data-state="done"] .request-step-label {
+  color: var(--ink);
+}
+
+.request-step[data-state="current"] .request-step-label {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.request-dock-now {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.request-live-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #4d7a5e;
+  box-shadow: 0 0 0 3px rgb(77 122 94 / 16%);
+  transform: translateY(-1px);
+}
+
+.request-dock-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgb(184 196 199 / 45%);
+}
+
+.request-dock-new,
+.request-dock-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 150ms, color 150ms;
+}
+
+.request-dock-new {
+  margin-left: -8px;
+  color: var(--ink);
+}
+
+.request-dock-new:hover,
+.request-dock-all:hover {
+  background: rgb(48 54 58 / 6%);
+}
+
+.request-dock-all {
+  margin-right: -8px;
+  color: var(--ink-muted);
+}
+
+.request-dock-list {
+  display: grid;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.request-dock-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  text-align: left;
+  transition: background-color 150ms;
+}
+
+.request-dock-row:hover {
+  background: rgb(48 54 58 / 5%);
+}
+
+.request-dock-row[data-closed] {
+  opacity: 0.6;
+}
+
+.request-dock-row[data-closed] .my-request-status {
+  color: var(--ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .request-step[data-state="current"] .request-step-dot::after {
+    animation: none;
+  }
+}
+
+/*
+  Пропозиції виконавців (components/requests/offers-panel). На широкому
+  екрані — колонка праворуч над кнопками масштабу, карта ліворуч вільна.
+  Вужче 1024px — шторка знизу; згорнута — язичок.
+*/
+.offers-panel {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: var(--z-controls);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: min(78dvh, 640px);
+  border-radius: 22px 22px 0 0;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 -18px 50px rgb(45 60 67 / 18%);
+}
+
+@media (min-width: 1024px) {
+  .offers-panel {
+    inset: 24px 24px 88px auto;
+    width: 392px;
+    height: auto;
+    border-radius: 22px;
+    box-shadow: 0 22px 60px rgb(45 60 67 / 18%);
+  }
+}
+
+html[data-glass] .offers-panel {
+  background: rgb(255 255 255 / 84%);
+  backdrop-filter: blur(16px);
+}
+
+.offers-tab {
+  position: absolute;
+  bottom: 76px;
+  left: 50%;
+  z-index: var(--z-controls);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 94%);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  translate: -50% 0;
+  box-shadow: 0 12px 30px -12px rgb(47 60 68 / 30%);
+}
+
+@media (min-width: 1024px) {
+  .offers-tab {
+    top: 24px;
+    right: 24px;
+    bottom: auto;
+    left: auto;
+    translate: none;
+  }
+}
+
+.offers-tab-new {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8e5f40;
+}
+
+.offers-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 10px;
+  border-bottom: 1px solid rgb(184 196 199 / 40%);
+}
+
+.offers-body {
+  min-height: 0;
+}
+
+.offers-list {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.offers-new {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #303638;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  box-shadow: 0 8px 20px -8px rgb(48 54 56 / 60%);
+}
+
+.offers-empty {
+  display: flex;
+  gap: 10px;
+  padding: 18px 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.offers-empty .request-live-dot {
+  margin-top: 6px;
+}
+
+.offer-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(184 196 199 / 45%), 0 4px 14px -8px rgb(48 68 64 / 18%);
+}
+
+.offer-avatar {
+  display: block;
+  flex: none;
+  border-radius: 999px;
+  background-color: #e6e9e7;
+  background-size: 400% 400%;
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 6px rgb(48 68 64 / 18%);
+}
+
+.offer-promoted {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #f4e9df;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #8e5f40;
+}
+
+.offer-primary,
+.offer-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 150ms, color 150ms, opacity 150ms;
+}
+
+.offer-primary {
+  background: #303638;
+  color: #ffffff;
+}
+
+.offer-primary:hover {
+  background: #4c5558;
+}
+
+.offer-secondary {
+  color: var(--ink);
+}
+
+.offer-secondary:hover:not(:disabled) {
+  background: rgb(48 54 58 / 6%);
+}
+
+.offer-secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.offers-declined-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.offers-declined-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+/* Чат у панелі пропозицій. */
+.chat {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  height: 100%;
+}
+
+.offers-panel:has(.chat) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px 10px;
+}
+
+.chat-offer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(48 54 58 / 5%);
+}
+
+.chat-messages {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  justify-self: center;
+  max-width: 300px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.chat-bubble {
+  display: grid;
+  gap: 2px;
+  max-width: 82%;
+  padding: 8px 12px 6px;
+  border-radius: 16px 16px 16px 5px;
+  background: rgb(48 54 58 / 6.5%);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.chat-bubble[data-from="me"] {
+  justify-self: end;
+  border-radius: 16px 16px 5px 16px;
+  background: #303638;
+  color: #ffffff;
+}
+
+.chat-bubble time {
+  justify-self: end;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.chat-typing {
+  display: flex;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.chat-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ink-muted);
+  animation: chat-typing 1.2s ease-in-out infinite;
+}
+
+.chat-typing span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.chat-typing span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes chat-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.chat-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid rgb(184 196 199 / 40%);
+}
+
+.chat-warn {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #fbf5f0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #7a5a44;
+}
+
+.chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat-input {
+  flex: 1;
+  min-height: 40px;
+  max-height: 112px;
+  padding: 9px 12px;
+  border: 1px solid #c9d2d4;
+  border-radius: 14px;
+  background: #ffffff;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  resize: none;
+  outline: none;
+}
+
+.chat-input:focus {
+  border-color: #87999e;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+.chat-send {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: #303638;
+  color: #ffffff;
+  transition: opacity 150ms;
+}
+
+.chat-send:disabled {
+  opacity: 0.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-typing span {
+    animation: none;
+  }
 }
 
 /*

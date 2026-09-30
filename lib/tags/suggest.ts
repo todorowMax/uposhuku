@@ -15,6 +15,10 @@ for (const tag of TAGS) {
 }
 /** Наскільки пропонуємо уточнення, коли людина назвала лише загальний тег. */
 const CHILD_WEIGHT = 0.7;
+/** У скільки разів слабше голосує галузь, коли людині потрібна послуга, а не продукт. */
+const INDUSTRY_DAMP = 0.5;
+/** Скільки різновидів загального тегу пропонуємо: «Сайт» → візитка, корпоративний, блог. */
+const MAX_CHILDREN = 3;
 
 const ancestors = (id: string): string[] => {
   const chain: string[] = [];
@@ -41,9 +45,19 @@ export const suggestTags = (
   // Ширший тег поруч із вужчим нічого не додає: є «Telegram-бот» — «Чат-бот» не пропонуємо.
   const skip = new Set([...selected, ...exclude, ...selected.flatMap(ancestors)]);
   const votes = new Map<string, { miss: number; because: string; best: number }>();
+  // Галузь підказує, що зазвичай будують для неї (автомийці — онлайн-запис).
+  // Коли людині потрібна послуга, а не продукт («банери», «SEO»), ці
+  // підказки повз, тож галузь голосує слабше. Для сайту чи застосунку — як є.
+  const groups = selected.map((id) => TAGS_BY_ID.get(id)?.group);
+  const serviceOnly =
+    groups.some((group) => group && group !== "industry") &&
+    !groups.some((group) => group === "product" || group === "feature");
   for (const source of selected) {
-    const children = Object.fromEntries((CHILDREN.get(source) ?? []).map((child) => [child, CHILD_WEIGHT]));
-    for (const [tagId, weight] of Object.entries({ ...children, ...COMPANIONS[source] })) {
+    const damp = serviceOnly && TAGS_BY_ID.get(source)?.group === "industry" ? INDUSTRY_DAMP : 1;
+    // Різновидів загального тегу — кілька, щоб не витіснили решту підказок.
+    const children = Object.fromEntries((CHILDREN.get(source) ?? []).slice(0, MAX_CHILDREN).map((child) => [child, CHILD_WEIGHT]));
+    for (const [tagId, rawWeight] of Object.entries({ ...children, ...COMPANIONS[source] })) {
+      const weight = rawWeight * damp;
       if (skip.has(tagId)) continue;
       const vote = votes.get(tagId) ?? { miss: 1, because: source, best: 0 };
       vote.miss *= 1 - weight;

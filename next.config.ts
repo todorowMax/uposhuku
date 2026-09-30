@@ -4,6 +4,8 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Значок dev-режиму Next лягає на кнопку акаунта або масштабу: вимикаємо.
+  devIndicators: false,
 };
 
 // Той самий шлях, що в mealcart: `next dev` бачить біндинги Cloudflare,

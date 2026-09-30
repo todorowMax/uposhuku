@@ -1,0 +1,128 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ListChecks, LogOut, UserRound } from "lucide-react";
+import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
+import { useStore } from "@/lib/store";
+import { matchInfoStore } from "@/lib/map/filters";
+
+/**
+ * Акаунт у лівому нижньому куті, щоб угорі лишалось лише поле запиту.
+ * Гість бачить «Увійти»; після входу — кружечок з першою літерою й меню
+ * вгору: мої запити, стати виконавцем, вийти. Поруч — скільки виконавців
+ * під запит; на телефоні цю плашку ховаємо: те саме число є в чипі «Усі».
+ */
+export function AccountButton() {
+  const session = useStore(sessionStore);
+  const requests = useStore(requestsStore);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void loadSession();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (session.status === "loading") {
+    return (
+      <div className="account-slot">
+        <span aria-hidden className="size-12" />
+        <MatchPill />
+      </div>
+    );
+  }
+
+  if (session.status === "guest") {
+    return (
+      <div className="account-slot">
+        <button type="button" onClick={() => authFlowStore.set({ mode: "login" })} className="account-login">
+          <UserRound className="size-4" strokeWidth={1.9} />
+          <span>Увійти</span>
+        </button>
+        <MatchPill />
+      </div>
+    );
+  }
+
+  const { user } = session;
+  const initial = (user.name ?? user.email).trim().charAt(0).toUpperCase();
+  return (
+    <div ref={rootRef} className="account-slot">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Акаунт ${user.email}`}
+        className="account-avatar"
+      >
+        {initial}
+      </button>
+      {open && (
+        <div role="menu" className="account-menu glass-panel">
+          <div className="px-3 pb-2 pt-1">
+            {user.name && <p className="truncate text-[13px] font-semibold text-ink">{user.name}</p>}
+            <p className="truncate text-[12px] text-ink-muted">{user.email}</p>
+          </div>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              showMyRequests();
+            }}
+            disabled={!requests?.length}
+            className="account-menu-item"
+          >
+            <ListChecks className="size-4" strokeWidth={1.9} />
+            Мої запити
+            {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
+          </button>
+          <button type="button" role="menuitem" disabled className="account-menu-item" title="Наступний крок: реєстрація виконавця">
+            <UserRound className="size-4" strokeWidth={1.9} />
+            Стати виконавцем
+            <span className="ml-auto text-[11px] text-ink-muted">скоро</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              void logout();
+            }}
+            className="account-menu-item"
+          >
+            <LogOut className="size-4" strokeWidth={1.9} />
+            Вийти
+          </button>
+        </div>
+      )}
+      <MatchPill />
+    </div>
+  );
+}
+
+/** «Під запит: 31 з 82 виконавців» поруч із кнопкою акаунта, лише на ширшому екрані. */
+function MatchPill() {
+  const info = useStore(matchInfoStore);
+  return (
+    <p aria-live="polite" className="account-match glass-panel" data-shown={Boolean(info) || undefined}>
+      {info && (info.shown ? `Під запит: ${info.shown} з ${info.total} виконавців` : "Під ці теги поки нікого, показуємо всіх")}
+    </p>
+  );
+}

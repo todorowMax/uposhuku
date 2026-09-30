@@ -19,6 +19,9 @@ import { DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer } from "@/lib/map/types";
+import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
+import { filterPerformers } from "@/lib/map/groups";
+import { focusPerformerStore } from "@/lib/requests/offers";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
@@ -320,7 +323,10 @@ export default function MapLibreScene() {
   const peekShownRef = useRef(false);
   /** Теги з поля запиту: карта лишає лише тих, хто під них підходить. */
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
-  const [matchInfo, setMatchInfo] = useState<{ shown: number; total: number } | null>(null);
+  const matches = useStore(tagMatches);
+  const groups = useStore(groupFilter);
+  const cities = useStore(cityFilter);
+  const online = useStore(onlineFilter);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -810,25 +816,33 @@ export default function MapLibreScene() {
 
   // Теги запиту відсіюють виконавців: на карті лишаються ті, у кого є
   // схожий тег. Якщо не підійшов ніхто, показуємо всіх, а не порожню країну.
+  // Підсумок кладемо в tagMatches: з нього чипи груп рахують лічильники.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
+    if (!ready) return;
     let cancelled = false;
     void (async () => {
       const matched = requestTags.length
         ? (await import("@/lib/tags/engine")).matchProfiles(requestTags, DEMO_PERFORMERS)
         : null;
       if (cancelled) return;
-      const visible = matched?.size ? DEMO_PERFORMERS.filter((performer) => matched.has(performer.id)) : DEMO_PERFORMERS;
-      lensControlRef.current.hide(true);
-      (map.getSource("people") as GeoJSONSource | undefined)?.setData(toPeople(visible));
-      setMatchInfo(matched ? { shown: matched.size, total: DEMO_PERFORMERS.length } : null);
-      if (matched?.size) setSelectedId((current) => (current && matched.has(current) ? current : null));
+      tagMatches.set(matched?.size ? matched : null);
+      matchInfoStore.set(matched ? { shown: matched.size, total: DEMO_PERFORMERS.length } : null);
     })();
     return () => {
       cancelled = true;
     };
   }, [ready, requestTags]);
+
+  // На карті — ті, хто під запит, з вибраних груп і міст, за потреби лише онлайн.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const visible = filterPerformers(DEMO_PERFORMERS, { matches, groups, cities, online });
+    lensControlRef.current.hide(true);
+    (map.getSource("people") as GeoJSONSource | undefined)?.setData(toPeople(visible));
+    const ids = new Set(visible.map((performer) => performer.id));
+    setSelectedId((current) => (current && ids.has(current) ? current : null));
+  }, [ready, matches, groups, cities, online]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -881,6 +895,7 @@ export default function MapLibreScene() {
       if (window.innerWidth < 640) {
         card.style.removeProperty("left");
         card.style.removeProperty("top");
+        card.style.removeProperty("max-height");
         return;
       }
       const point = map.project([performer.lng, performer.lat]);
@@ -890,11 +905,22 @@ export default function MapLibreScene() {
       const gap = markerSize / 2 + 18;
       const { width, height } = card.getBoundingClientRect();
       const bounds = map.getContainer().getBoundingClientRect();
-      const fitsRight = point.x + gap + width <= bounds.width - 16;
-      const left = fitsRight ? point.x + gap : point.x - gap - width;
-      // Зверху не заходимо під поле запиту.
-      const top = clamp(markerCenterY - height / 2, 104, bounds.height - height - 16);
-      card.style.left = `${Math.round(clamp(left, 16, bounds.width - width - 16))}px`;
+      // Праворуч не заходимо під панель пропозицій, якщо вона відкрита колонкою.
+      const offers = document.querySelector(".offers-panel")?.getBoundingClientRect();
+      const rightEdge = offers && offers.left > bounds.left + bounds.width / 2 ? offers.left - bounds.left - 16 : bounds.width - 16;
+      const fitsRight = point.x + gap + width <= rightEdge;
+      const left = clamp(fitsRight ? point.x + gap : point.x - gap - width, 16, rightEdge - width);
+      // Зверху не заходимо під поле запиту, картку запиту й фільтри, якщо картка під ними.
+      let topEdge = 104;
+      for (const item of document.querySelector("[data-top-stack]")?.children ?? []) {
+        const box = item.getBoundingClientRect();
+        if (box.height && box.right - bounds.left > left && box.left - bounds.left < left + width) {
+          topEdge = Math.max(topEdge, box.bottom - bounds.top + 12);
+        }
+      }
+      card.style.maxHeight = `${Math.max(260, bounds.height - topEdge - 16)}px`;
+      const top = clamp(markerCenterY - height / 2, topEdge, Math.max(topEdge, bounds.height - Math.min(height, bounds.height - topEdge - 16) - 16));
+      card.style.left = `${Math.round(left)}px`;
       card.style.top = `${Math.round(top)}px`;
       card.style.setProperty("--card-origin-x", fitsRight ? "0%" : "100%");
       card.style.setProperty("--card-origin-y", `${Math.round(clamp(markerCenterY - top, 0, height))}px`);
@@ -977,6 +1003,15 @@ export default function MapLibreScene() {
     setPeek({ performer, top: rowBox.top - panelBox.top + rowBox.height / 2, side });
   };
 
+  // «На карті» з панелі пропозицій: летимо до людини й відкриваємо її картку.
+  const focus = useStore(focusPerformerStore);
+  useEffect(() => {
+    if (!focus || !ready) return;
+    const performer = DEMO_PERFORMERS.find((person) => person.id === focus.id);
+    if (performer) openFromGroup(performer);
+    // openFromGroup — звичайна функція компонента, запит на фокус міняється лише з `at`.
+  }, [focus, ready]);
+
   /** З людини в списку групи — одразу до неї: наближаємо, поки група не розпадеться, і відкриваємо картку. */
   const openFromGroup = (performer: Performer) => {
     const map = mapRef.current;
@@ -1019,90 +1054,17 @@ export default function MapLibreScene() {
         <img alt="" draggable={false} />
       </div>
 
-      {/* На телефоні над кнопками масштабу, на ширшому екрані — зліва внизу, щоб не лізти під повзунок. */}
-      {groupPreview && (
-        <div
-          ref={groupRef}
-          role="dialog"
-          aria-label={`У групі ${peopleCount(groupPreview.members.length)}`}
-          className="group-preview glass-panel"
-          onPointerEnter={() => lensControlRef.current.enterPanel()}
-          onPointerLeave={() => lensControlRef.current.leavePanel()}
-        >
-          <p className="group-preview-title">У групі {peopleCount(groupPreview.members.length)}</p>
-          <ul className="group-preview-list" onPointerLeave={() => setPeek(null)}>
-            {groupPreview.members.map((performer) => {
-              const size = LIST_PX[performer.tier - 1];
-              const avatar = performer.avatarIndex % AVATAR_COUNT;
-              return (
-                <li key={performer.id}>
-                  <button
-                    type="button"
-                    className="group-preview-row"
-                    onClick={() => openFromGroup(performer)}
-                    onPointerEnter={(event) => peekAt(performer, event.currentTarget)}
-                    onFocus={(event) => peekAt(performer, event.currentTarget)}
-                    onBlur={() => setPeek(null)}
-                  >
-                    <span
-                      aria-hidden
-                      className="group-preview-avatar"
-                      style={{
-                        width: size,
-                        height: size,
-                        backgroundImage: `url(${AVATAR_ATLAS})`,
-                        backgroundPosition: `${(avatar % 4) * 100 / 3}% ${Math.floor(avatar / 4) * 100 / 3}%`,
-                      }}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold leading-tight text-ink">{performer.name}</span>
-                      <span className="block truncate text-[11px] leading-snug text-ink-muted">{performer.specialty}</span>
-                    </span>
-                    <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" strokeWidth={2} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="group-preview-hint">Клік по групі розкриє її на карті</p>
-
-          {peek && (
-            <div className="group-peek" data-side={peek.side} style={{ top: peek.top }} aria-hidden>
-              <div ref={peekRef} className="group-peek-card glass-panel">
-                <p className="truncate text-[14px] font-semibold leading-tight text-ink">{peek.performer.name}</p>
-                <p className="mt-0.5 truncate text-[11px] text-ink-muted">
-                  {peek.performer.specialty} · {CITIES.find((city) => city.id === peek.performer.cityId)?.name}
-                </p>
-                <div className="mt-2.5">
-                  <ProfileStats performer={peek.performer} compact />
-                </div>
-              </div>
-            </div>
-          )}
+      {/* Плашка догрузки по центру внизу, між акаунтом і масштабом. */}
+      <div
+        aria-live="polite"
+        className={`pointer-events-none absolute bottom-20 left-1/2 z-[var(--z-controls)] -translate-x-1/2 transition-[opacity,translate] duration-300 sm:bottom-7 ${
+          detailLoading ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+        }`}
+      >
+        <div className="glass-panel flex items-center gap-2.5 rounded-full px-4 py-2 text-[13px] font-medium text-ink-muted">
+          <span aria-hidden className="map-detail-spinner" />
+          {detailLoading ? "Підвантажуємо деталі…" : ""}
         </div>
-      )}
-
-      <div className="pointer-events-none absolute bottom-20 left-1/2 z-[var(--z-controls)] flex -translate-x-1/2 flex-col items-center gap-2 sm:bottom-7 sm:left-6 sm:translate-x-0 sm:items-start">
-        <div
-          aria-live="polite"
-          className={`transition-[opacity,translate] duration-300 ${detailLoading ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}
-        >
-          <div className="glass-panel flex items-center gap-2.5 rounded-full px-4 py-2 text-[13px] font-medium text-ink-muted">
-            <span aria-hidden className="map-detail-spinner" />
-            {detailLoading ? "Підвантажуємо деталі…" : ""}
-          </div>
-        </div>
-        <p
-          aria-live="polite"
-          className={`glass-panel whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-medium text-ink-muted transition-[opacity,translate] duration-300 ${
-            matchInfo ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-          }`}
-        >
-          {matchInfo &&
-            (matchInfo.shown
-              ? `Під запит: ${matchInfo.shown} з ${matchInfo.total} виконавців`
-              : "Під ці теги поки нікого, показуємо всіх")}
-        </p>
       </div>
 
       {selected && (

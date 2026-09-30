@@ -66,6 +66,7 @@ export const COMPANIONS: Record<string, Record<string, number>> = {
   "bolt-new": { "github": 0.55, "web-app": 0.55, "supabase": 0.5, "ui-ux-design": 0.45, "testing": 0.4, "vercel": 0.4 },
   "booking-platform": { "calendar": 0.8, "online-booking": 0.8, "notifications": 0.7, "online-payments": 0.7, "user-account": 0.6, "google-calendar": 0.5, "rental-management": 0.5, "waitlist": 0.5 },
   "bot-scenarios": { "chat-bot": 0.7, "telegram-bot": 0.6, "manychat": 0.5, "sendpulse-bots": 0.5, "telegram-api": 0.5, "ai-customer-support": 0.4, "copywriting": 0.4, "viber-api": 0.4, "whatsapp-api": 0.4 },
+  "graphic-design": { "branding": 0.6, "smm": 0.55, "ads": 0.55, "copywriting": 0.45, "product-photo": 0.4 },
   "branding": { "ui-ux-design": 0.7, "copywriting": 0.6, "landing": 0.5, "website": 0.5, "product-photo": 0.4, "smm": 0.4 },
   "browser-automation": { "testing": 0.7, "github-actions": 0.5, "web-app": 0.5, "bug-fixing": 0.4, "monitoring": 0.4, "performance": 0.4 },
   "browser-extension": { "auth": 0.5, "legal-docs": 0.5, "security-audit": 0.5, "testing": 0.5, "app-store-publishing": 0.4, "ui-ux-design": 0.4 },
