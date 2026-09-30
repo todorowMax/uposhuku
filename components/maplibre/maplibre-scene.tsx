@@ -254,6 +254,21 @@ const peopleCount = (count: number) => {
   return `${count} людей`;
 };
 
+/**
+ * Нижче чого панель над картою не заходить зверху: поле запиту, картка
+ * запиту й фільтри — лише якщо вона під ними по ширині.
+ */
+const topEdgeUnderStack = (bounds: DOMRect, left: number, width: number) => {
+  let edge = 104;
+  for (const item of document.querySelector("[data-top-stack]")?.children ?? []) {
+    const box = item.getBoundingClientRect();
+    if (box.height && box.right - bounds.left > left && box.left - bounds.left < left + width) {
+      edge = Math.max(edge, box.bottom - bounds.top + 12);
+    }
+  }
+  return edge;
+};
+
 const toPeople = (performers: Performer[]): FeatureCollection<Point> => ({
   type: "FeatureCollection",
   features: performers.map((performer) => ({
@@ -720,6 +735,8 @@ export default function MapLibreScene() {
         };
         void (map.getSource("people") as GeoJSONSource)
           .getClusterLeaves(feature.properties?.cluster_id as number, Infinity, 0)
+          // Групу вже перерахували (змінився фільтр) — просто без списку.
+          .catch(() => [])
           .then((leaves) => {
             if (lensKey !== key) return;
             const ids = new Set(leaves.map((leaf) => leaf.properties?.id as string));
@@ -910,14 +927,7 @@ export default function MapLibreScene() {
       const rightEdge = offers && offers.left > bounds.left + bounds.width / 2 ? offers.left - bounds.left - 16 : bounds.width - 16;
       const fitsRight = point.x + gap + width <= rightEdge;
       const left = clamp(fitsRight ? point.x + gap : point.x - gap - width, 16, rightEdge - width);
-      // Зверху не заходимо під поле запиту, картку запиту й фільтри, якщо картка під ними.
-      let topEdge = 104;
-      for (const item of document.querySelector("[data-top-stack]")?.children ?? []) {
-        const box = item.getBoundingClientRect();
-        if (box.height && box.right - bounds.left > left && box.left - bounds.left < left + width) {
-          topEdge = Math.max(topEdge, box.bottom - bounds.top + 12);
-        }
-      }
+      const topEdge = topEdgeUnderStack(bounds, left, width);
       card.style.maxHeight = `${Math.max(260, bounds.height - topEdge - 16)}px`;
       const top = clamp(markerCenterY - height / 2, topEdge, Math.max(topEdge, bounds.height - Math.min(height, bounds.height - topEdge - 16) - 16));
       card.style.left = `${Math.round(left)}px`;
@@ -952,9 +962,10 @@ export default function MapLibreScene() {
     const bounds = container.getBoundingClientRect();
     const gap = 8;
     const fitsRight = box.left + box.width + gap + width <= bounds.width - 16;
-    const left = fitsRight ? box.left + box.width + gap : box.left - gap - width;
-    const top = clamp(box.top + box.height / 2 - height / 2, 104, bounds.height - height - 16);
-    panel.style.left = `${Math.round(clamp(left, 16, bounds.width - width - 16))}px`;
+    const left = clamp(fitsRight ? box.left + box.width + gap : box.left - gap - width, 16, bounds.width - width - 16);
+    const topEdge = topEdgeUnderStack(bounds, left, width);
+    const top = clamp(box.top + box.height / 2 - height / 2, topEdge, Math.max(topEdge, bounds.height - height - 16));
+    panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(top)}px`;
     panel.style.transformOrigin = fitsRight ? "0% 50%" : "100% 50%";
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1053,6 +1064,68 @@ export default function MapLibreScene() {
       <div ref={lensRef} aria-hidden hidden className="map-lens">
         <img alt="" draggable={false} />
       </div>
+
+      {groupPreview && (
+        <div
+          ref={groupRef}
+          role="dialog"
+          aria-label={`У групі ${peopleCount(groupPreview.members.length)}`}
+          className="group-preview glass-panel"
+          onPointerEnter={() => lensControlRef.current.enterPanel()}
+          onPointerLeave={() => lensControlRef.current.leavePanel()}
+        >
+          <p className="group-preview-title">У групі {peopleCount(groupPreview.members.length)}</p>
+          <ul className="group-preview-list" onPointerLeave={() => setPeek(null)}>
+            {groupPreview.members.map((performer) => {
+              const size = LIST_PX[performer.tier - 1];
+              const avatar = performer.avatarIndex % AVATAR_COUNT;
+              return (
+                <li key={performer.id}>
+                  <button
+                    type="button"
+                    className="group-preview-row"
+                    onClick={() => openFromGroup(performer)}
+                    onPointerEnter={(event) => peekAt(performer, event.currentTarget)}
+                    onFocus={(event) => peekAt(performer, event.currentTarget)}
+                    onBlur={() => setPeek(null)}
+                  >
+                    <span
+                      aria-hidden
+                      className="group-preview-avatar"
+                      style={{
+                        width: size,
+                        height: size,
+                        backgroundImage: `url(${AVATAR_ATLAS})`,
+                        backgroundPosition: `${(avatar % 4) * 100 / 3}% ${Math.floor(avatar / 4) * 100 / 3}%`,
+                      }}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-semibold leading-tight text-ink">{performer.name}</span>
+                      <span className="block truncate text-[11px] leading-snug text-ink-muted">{performer.specialty}</span>
+                    </span>
+                    <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" strokeWidth={2} />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          <p className="group-preview-hint">Клік по групі розкриє її на карті</p>
+
+          {peek && (
+            <div className="group-peek" data-side={peek.side} style={{ top: peek.top }} aria-hidden>
+              <div ref={peekRef} className="group-peek-card glass-panel">
+                <p className="truncate text-[14px] font-semibold leading-tight text-ink">{peek.performer.name}</p>
+                <p className="mt-0.5 truncate text-[11px] text-ink-muted">
+                  {peek.performer.specialty} · {CITIES.find((city) => city.id === peek.performer.cityId)?.name}
+                </p>
+                <div className="mt-2.5">
+                  <ProfileStats performer={peek.performer} compact />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Плашка догрузки по центру внизу, між акаунтом і масштабом. */}
       <div
