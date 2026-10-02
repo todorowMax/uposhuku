@@ -5,6 +5,7 @@ import { ListChecks, LogOut, UserRound } from "lucide-react";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { matchInfoStore } from "@/lib/map/filters";
+import { profileEditorStore, profileStore } from "@/lib/profile/client";
 
 /**
  * Акаунт у лівому нижньому куті, щоб угорі лишалось лише поле запиту.
@@ -15,11 +16,22 @@ import { matchInfoStore } from "@/lib/map/filters";
 export function AccountButton() {
   const session = useStore(sessionStore);
   const requests = useStore(requestsStore);
+  const profileState = useStore(profileStore);
+  const profile = profileState.status === "ready" ? profileState.profile : null;
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void loadSession();
+  }, []);
+
+  // Повернулися з Google, куди йшли створювати профіль виконавця: відкриваємо редактор.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("auth") !== "performer") return;
+    url.searchParams.delete("auth");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    profileEditorStore.set(true);
   }, []);
 
   useEffect(() => {
@@ -53,6 +65,9 @@ export function AccountButton() {
         <button type="button" onClick={() => authFlowStore.set({ mode: "login" })} className="account-login">
           <UserRound className="size-4" strokeWidth={1.9} />
           <span>Увійти</span>
+        </button>
+        <button type="button" onClick={() => authFlowStore.set({ mode: "performer" })} className="account-login account-performer">
+          <span>Я виконавець</span>
         </button>
         <MatchPill />
       </div>
@@ -93,10 +108,18 @@ export function AccountButton() {
             Мої запити
             {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
           </button>
-          <button type="button" role="menuitem" disabled className="account-menu-item" title="Наступний крок: реєстрація виконавця">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              profileEditorStore.set(true);
+            }}
+            className="account-menu-item"
+          >
             <UserRound className="size-4" strokeWidth={1.9} />
-            Стати виконавцем
-            <span className="ml-auto text-[11px] text-ink-muted">скоро</span>
+            {profile ? "Мій профіль" : "Стати виконавцем"}
+            {profile && <span className="ml-auto text-[11px] text-ink-muted">{profile.published ? "на карті" : "чернетка"}</span>}
           </button>
           <button
             type="button"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { gsap } from "gsap";
 import type { Performer, PortfolioWork } from "@/lib/map/types";
 
@@ -14,6 +15,10 @@ export function PerformerAbout({ performer, onOpenWork }: { performer: Performer
   const textRef = useRef<HTMLParagraphElement>(null);
   const stripRef = useRef<HTMLUListElement>(null);
   const [expanded, setExpanded] = useState(false);
+  /** Відкрита робота: її опис і посилання під стрічкою. */
+  const [openId, setOpenId] = useState<string | null>(null);
+  const open = performer.works.find((work) => work.id === openId);
+  const [tagLabels, setTagLabels] = useState<Record<string, string>>({});
   /** Чи довший текст за три рядки: інакше кнопка не потрібна. */
   const [clamped, setClamped] = useState(false);
   const heightBefore = useRef<number | null>(null);
@@ -53,6 +58,23 @@ export function PerformerAbout({ performer, onOpenWork }: { performer: Performer
     return () => strip.removeEventListener("wheel", onWheel);
   }, []);
 
+  // Назви тегів роботи беремо зі словника, коли він підвантажився.
+  useEffect(() => {
+    if (!open?.tags?.length) return;
+    let cancelled = false;
+    void import("@/lib/tags/engine").then((engine) => {
+      if (!cancelled) setTagLabels(Object.fromEntries(open.tags!.map((id) => [id, engine.tagLabel(id)])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const pickWork = (work: PortfolioWork) => {
+    if (work.description || work.url) setOpenId((current) => (current === work.id ? null : work.id));
+    else onOpenWork(work);
+  };
+
   const toggle = () => {
     heightBefore.current = bioRef.current?.offsetHeight ?? null;
     setExpanded((value) => !value);
@@ -82,13 +104,34 @@ export function PerformerAbout({ performer, onOpenWork }: { performer: Performer
           <ul ref={stripRef} className="works-strip" aria-label={`Роботи: ${performer.works.length}`}>
             {performer.works.map((work) => (
               <li key={work.id}>
-                <button type="button" className="work-tile" onClick={() => onOpenWork(work)}>
+                <button type="button" className="work-tile" aria-pressed={work.id === openId} onClick={() => pickWork(work)}>
                   <WorkThumb work={work} />
                   <span className="mt-1.5 line-clamp-2 text-[11px] font-medium leading-snug text-ink">{work.title}</span>
                 </button>
               </li>
             ))}
           </ul>
+          {open && (
+            <div className="work-detail">
+              <p className="text-[13px] font-semibold text-ink">{open.title}</p>
+              {open.description && <p className="mt-1 text-[12px] leading-snug text-ink/85">{open.description}</p>}
+              {Boolean(open.tags?.length) && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {open.tags!.map((id) => (
+                    <span key={id} className="auth-draft-tag">
+                      {tagLabels[id] ?? id}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {open.url && (
+                <a href={open.url} target="_blank" rel="noopener noreferrer nofollow" className="auth-link mt-2 inline-flex items-center gap-1 text-[12px]">
+                  Відкрити проєкт
+                  <ArrowUpRight className="size-3.5" strokeWidth={2} />
+                </a>
+              )}
+            </div>
+          )}
         </div>
       )}
     </>

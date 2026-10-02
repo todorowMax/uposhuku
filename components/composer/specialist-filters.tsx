@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ListChecks, SlidersHorizontal } from "lucide-react";
 import { CITIES } from "@/lib/map/cities";
-import { DEMO_PERFORMERS } from "@/lib/map/demo";
+import { usePerformers } from "@/lib/map/performers";
+import type { Performer } from "@/lib/map/types";
 import { clearFilter, cityFilter, groupFilter, onlineFilter, tagMatches, toggleIn, useStore } from "@/lib/map/filters";
 import { countGroups, filterPerformers } from "@/lib/map/groups";
 
@@ -27,13 +28,14 @@ export function SpecialistFilters({
   const cities = useStore(cityFilter);
   const online = useStore(onlineFilter);
   const matches = useStore(tagMatches);
+  const performers = usePerformers();
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
 
   // Лічильники груп — без вибору груп: число каже, скільки людей у групі.
   const pool = useMemo(
-    () => filterPerformers(DEMO_PERFORMERS, { matches, groups: [], cities, online }),
-    [matches, cities, online]
+    () => filterPerformers(performers, { matches, groups: [], cities, online }),
+    [performers, matches, cities, online]
   );
   const groups = useMemo(() => countGroups(pool), [pool]);
   const shown = selectedGroups.length
@@ -144,7 +146,7 @@ function FilterPanel({
   onClose,
 }: {
   groupChips: React.ReactNode;
-  pool: typeof DEMO_PERFORMERS;
+  pool: Performer[];
   shown: number;
   onClose: () => void;
 }) {
@@ -152,17 +154,18 @@ function FilterPanel({
   const online = useStore(onlineFilter);
   const matches = useStore(tagMatches);
   const groups = useStore(groupFilter);
+  const performers = usePerformers();
 
   // Міста рахуємо без вибору міст і «онлайн» — так видно, де скільки людей узагалі.
   const cities = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const performer of filterPerformers(DEMO_PERFORMERS, { matches, groups, cities: [], online: false })) {
+    for (const performer of filterPerformers(performers, { matches, groups, cities: [], online: false })) {
       counts.set(performer.cityId, (counts.get(performer.cityId) ?? 0) + 1);
     }
     return CITIES.filter((item) => counts.has(item.id))
       .map((item) => ({ ...item, count: counts.get(item.id) ?? 0 }))
       .sort((a, b) => b.count - a.count);
-  }, [matches, groups]);
+  }, [performers, matches, groups]);
   const onlineCount = pool.filter((performer) => performer.online).length;
   // Спершу найбільші міста: решта за «ще N», щоб «Онлайн» і кнопки були під рукою.
   const [allCities, setAllCities] = useState(false);

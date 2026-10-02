@@ -14,6 +14,7 @@ import {
   startEmail,
   verifyEmail,
 } from "@/lib/auth/client";
+import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
@@ -79,7 +80,10 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
     startedRef.current = true;
     if (session.status !== "user") return;
     if (mode === "publish") void publish();
-    else authFlowStore.set(null);
+    else {
+      authFlowStore.set(null);
+      if (mode === "performer") profileEditorStore.set(true);
+    }
   }, [session.status]);
 
   // Панель виїжджає з-під поля запиту, кроки змінюються з легким зсувом.
@@ -136,7 +140,10 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
     try {
       await verifyEmail(email, code);
       if (mode === "publish") await publish();
-      else authFlowStore.set(null);
+      else {
+        authFlowStore.set(null);
+        if (mode === "performer") profileEditorStore.set(true);
+      }
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Не вдалося перевірити код.");
       setDigits(EMPTY_CODE);
@@ -155,7 +162,8 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
     if (next.every(Boolean) && !busy) void verify(next.join(""));
   };
 
-  const googleHref = `/api/auth/google?next=${encodeURIComponent(mode === "publish" ? "/?auth=google" : "/")}`;
+  const googleNext = mode === "publish" ? "/?auth=google" : mode === "performer" ? "/?auth=performer" : "/";
+  const googleHref = `/api/auth/google?next=${encodeURIComponent(googleNext)}`;
   const title =
     step === "code"
       ? "Код з листа"
@@ -165,7 +173,9 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
             ? "Не вдалося опублікувати"
             : mode === "publish"
               ? "Куди надсилати відповіді?"
-              : "Вхід";
+              : mode === "performer"
+                ? "Профіль виконавця"
+                : "Вхід";
 
   return (
     <>
@@ -193,7 +203,9 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
               <p className="auth-lead">
                 {mode === "publish"
                   ? "Вкажіть пошту: надішлемо код, і запит одразу побачать виконавці. Пароль не потрібен."
-                  : "Пошта й код з листа, без пароля. Нова адреса — новий акаунт."}
+                  : mode === "performer"
+                    ? "Створіть профіль, і замовники знайдуть вас на карті. Пошта й код з листа, без пароля."
+                    : "Пошта й код з листа, без пароля. Нова адреса — новий акаунт."}
               </p>
               {draft && <DraftSummary draft={draft} />}
               <GoogleButton href={googleHref} onClick={() => draft && saveDraft(draft, true)} />
@@ -231,6 +243,14 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                   Отримати код
                 </button>
               </form>
+              {mode === "login" && (
+                <p className="text-center text-[12px] text-ink-muted">
+                  Хочете, щоб вас знайшли замовники?{" "}
+                  <button type="button" onClick={() => authFlowStore.set({ mode: "performer" })} className="auth-link text-[12px]">
+                    Я виконавець
+                  </button>
+                </p>
+              )}
             </>
           )}
 

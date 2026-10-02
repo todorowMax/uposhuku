@@ -16,7 +16,7 @@ export const sessionStore = createStore<SessionState>({ status: "loading" });
  * Панель входу: «login» — просто увійти, «publish» — увійти й одразу
  * опублікувати чернетку запиту (lib/requests/draft.ts).
  */
-export type AuthFlow = { mode: "login" | "publish" } | null;
+export type AuthFlow = { mode: "login" | "publish" | "performer" } | null;
 export const authFlowStore = createStore<AuthFlow>(null);
 
 /** Мої запити, нові першими; null — ще не завантажені або гість. */
@@ -54,7 +54,10 @@ export const loadSession = (force = false) => {
   loading = call<{ user: SessionUser | null }>("/api/auth/me")
     .then(({ user }) => {
       sessionStore.set(user ? { status: "user", user } : { status: "guest" });
-      if (user) void loadMyRequests();
+      if (user) {
+        void loadMyRequests();
+        void import("@/lib/profile/client").then((module) => module.loadMyProfile());
+      }
     })
     .catch(() => sessionStore.set({ status: "guest" }));
   return loading;
@@ -70,6 +73,7 @@ export const verifyEmail = async (email: string, code: string) => {
   });
   sessionStore.set({ status: "user", user });
   void loadMyRequests();
+  void import("@/lib/profile/client").then((module) => module.loadMyProfile());
   return user;
 };
 
@@ -79,6 +83,7 @@ export const logout = async () => {
   requestsStore.set(null);
   activeRequestStore.set(null);
   composingStore.set(false);
+  void import("@/lib/profile/client").then((module) => module.forgetProfile());
 };
 
 export const publishRequest = async (draft: RequestDraft) =>

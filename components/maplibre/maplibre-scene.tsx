@@ -10,18 +10,20 @@ import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { ChevronRight } from "lucide-react";
 import { MapZoomControl } from "@/components/maplibre/zoom-control";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
-import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas } from "@/lib/map/portrait";
+import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas, drawPortrait } from "@/lib/map/portrait";
 import { MAP_PALETTE } from "@/lib/map/palette";
 import { BUILDINGS_ZOOM, FONT_BOLD, UKRAINE_TRACE_RING, buildMapStyle } from "@/lib/maplibre/style";
 import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
-import { DEMO_PERFORMERS, DEMO_REQUESTS } from "@/lib/map/demo";
+import { DEMO_REQUESTS } from "@/lib/map/demo";
+import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer } from "@/lib/map/types";
 import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore } from "@/lib/requests/offers";
+import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
@@ -117,12 +119,25 @@ const demoMetric = (id: string, salt: number) => {
   return value;
 };
 
+/** Фон-аватар: власне фото, якщо є, інакше комірка атласу. */
+const avatarBackground = (performer: Performer, size?: number) => {
+  const base = size ? { width: size, height: size } : {};
+  if (performer.photo) return { ...base, backgroundImage: `url(${performer.photo})`, backgroundSize: "cover", backgroundPosition: "center" };
+  const cell = performer.avatarIndex % AVATAR_COUNT;
+  return {
+    ...base,
+    backgroundImage: `url(${AVATAR_ATLAS})`,
+    backgroundSize: "400% 400%",
+    backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100 / 3}%`,
+  };
+};
+
 /** Демо-статистика профілю: стабільна для людини, поки немає бекенду. */
-const demoStats = (performer: Performer) => ({
+const demoStats = (performer: Performer) => performer.mine ? { months: 0, orders: 0, rating: "—" } : {
   months: 3 + demoMetric(performer.id, 17) % 23,
   orders: 4 + demoMetric(performer.id, 31) % 55,
   rating: (4.7 + (demoMetric(performer.id, 73) % 4) / 10).toFixed(1),
-});
+};
 
 /** Три цифри профілю з роздільниками: у картці виконавця й у списку групи. */
 function ProfileStats({ performer, compact = false }: { performer: Performer; compact?: boolean }) {
@@ -138,18 +153,18 @@ function ProfileStats({ performer, compact = false }: { performer: Performer; co
 }
 
 /**
- * Хто в групі, одним рядком: кожна людина — два символи, рівень і номер
- * обличчя в атласі («3a»). Рядок складає сама кластеризація MapLibre
+ * Хто в групі, одним рядком: кожна людина — три символи, рівень і номер
+ * обличчя («30a»; від 16 — власні фото профілів). Рядок складає сама кластеризація MapLibre
  * (clusterProperties), тож у групі видно саме тих, хто в ній є, а не
  * випадкові обличчя: розкрив групу — побачив тих самих людей.
  */
-const personFace = (performer: Performer) => `${performer.tier}${(performer.avatarIndex % AVATAR_COUNT).toString(16)}`;
+const personFace = (performer: Performer) => `${performer.tier}${performer.avatarIndex.toString(16).padStart(2, "0")}`;
 
 /** Обличчя для картинки групи: спершу вищий рівень розміщення, без повторів. */
 const clusterFaces = (faces: string) => {
   const people: { tier: number; avatar: number }[] = [];
-  for (let index = 0; index + 1 < faces.length; index += 2) {
-    people.push({ tier: Number(faces[index]), avatar: parseInt(faces[index + 1], 16) });
+  for (let index = 0; index + 2 < faces.length; index += 3) {
+    people.push({ tier: Number(faces[index]), avatar: parseInt(faces.slice(index + 1, index + 3), 16) });
   }
   const unique = [...new Set(people.sort((a, b) => b.tier - a.tier).map((person) => person.avatar))];
   return { count: people.length, avatars: unique.slice(0, 5) };
@@ -170,7 +185,6 @@ const createClusterImage = (source: HTMLImageElement, faces: string) => {
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas 2D is unavailable");
-  const cell = source.naturalWidth / 4;
 
   const face = (index: number, x: number, y: number, radius: number, ring: number) => {
     context.save();
@@ -182,12 +196,7 @@ const createClusterImage = (source: HTMLImageElement, faces: string) => {
     context.arc(x, y, radius + ring, 0, Math.PI * 2);
     context.fill();
     context.restore();
-    context.save();
-    context.beginPath();
-    context.arc(x, y, radius, 0, Math.PI * 2);
-    context.clip();
-    context.drawImage(source, (index % 4) * cell, Math.floor(index / 4) * cell, cell, cell, x - radius, y - radius, radius * 2, radius * 2);
-    context.restore();
+    drawPortrait(context, source, index, x, y, radius);
   };
   const dot = (x: number, y: number, radius: number) => {
     context.fillStyle = "rgba(255, 255, 255, .92)";
@@ -277,14 +286,14 @@ const toPeople = (performers: Performer[]): FeatureCollection<Point> => ({
     geometry: { type: "Point", coordinates: [performer.lng, performer.lat] },
     properties: {
       id: performer.id,
-      avatar: `avatar-${performer.avatarIndex % AVATAR_COUNT}`,
+      avatar: `avatar-${performer.avatarIndex}`,
       size: tierPx(performer) / PORTRAIT_LOGICAL,
       rank: performer.tier,
       face: personFace(performer),
     },
   })),
 });
-const ALL_PEOPLE = toPeople(DEMO_PERFORMERS);
+const initialPeople = () => toPeople(getPerformers());
 
 /**
  * Символи MapLibre далі від камери менші: розмір множиться на
@@ -316,6 +325,9 @@ export default function MapLibreScene() {
   /** Стартовий кадр: від нього рахуються межі руху. До завантаження — центр України. */
   const homeRef = useRef({ lng: 31.2, lat: 48.4, zoom: 5 });
   const cardRef = useRef<HTMLElement>(null);
+  /** Масштаб, до якого зараз летить камера: потрібен для меж панорами, див. transformConstrain. */
+  const flightZoomRef = useRef<number | null>(null);
+  const flyToRef = useRef<((map: MapLibreMap, center: [number, number], zoom: number, duration: number) => void) | null>(null);
   const [ready, setReady] = useState(false);
   const [slider, setSlider] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -339,6 +351,7 @@ export default function MapLibreScene() {
   /** Теги з поля запиту: карта лишає лише тих, хто під них підходить. */
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
   const matches = useStore(tagMatches);
+  const performers = usePerformers();
   const groups = useStore(groupFilter);
   const cities = useStore(cityFilter);
   const online = useStore(onlineFilter);
@@ -359,7 +372,9 @@ export default function MapLibreScene() {
       // У проєкції глобуса maxBounds не діє, тож межі задаємо самі.
       transformConstrain: (lngLat, zoom) => {
         const home = homeRef.current;
-        const t = clamp((zoom - home.zoom) / 2, 0, 1);
+        // Літаємо далеко з віддаленого масштабу: межі рахуємо за масштабом, куди летимо,
+        // інакше центр залипає на краю дозволеного для старого масштабу.
+        const t = clamp((Math.max(zoom, flightZoomRef.current ?? zoom) - home.zoom) / 2, 0, 1);
         const lngSlack = lerp(PAN_SLACK.far.lng, PAN_SLACK.near.lng, t);
         const latSlack = lerp(PAN_SLACK.far.lat, PAN_SLACK.near.lat, t);
         return {
@@ -440,9 +455,17 @@ export default function MapLibreScene() {
       activeCanvas.height = 256;
       const activeContext = activeCanvas.getContext("2d");
       if (activeContext) map.addImage("active-avatar", activeContext.getImageData(0, 0, 256, 256), { pixelRatio: PORTRAIT_RATIO });
-      // Картинка групи залежить від числа людей, тож малюємо її, коли MapLibre попросить.
+      // Картинка групи залежить від складу, а власні фото профілів з'являються
+      // вже після старту, тож малюємо їх, коли MapLibre попросить.
       map.setMissingStyleImageResolver((id) => {
-        const match = /^cluster-((?:[1-6][0-9a-f])+)$/.exec(id);
+        const portrait = /^avatar-(\d+)$/.exec(id);
+        if (portrait && !map.hasImage(id)) {
+          const canvas = createPortraitCanvas(source, Number(portrait[1]));
+          const context = canvas.getContext("2d");
+          if (context) map.addImage(id, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio: PORTRAIT_RATIO });
+          return;
+        }
+        const match = /^cluster-((?:[1-6][0-9a-f]{2})+)$/.exec(id);
         if (!match || map.hasImage(id)) return;
         const canvas = createClusterImage(source, match[1]);
         const context = canvas.getContext("2d");
@@ -476,7 +499,7 @@ export default function MapLibreScene() {
       // Групи — вбудована кластеризація: самі розкриваються при наближенні.
       map.addSource("people", {
         type: "geojson",
-        data: ALL_PEOPLE,
+        data: initialPeople(),
         cluster: true,
         clusterRadius: 46,
         clusterMaxZoom: 11,
@@ -554,15 +577,21 @@ export default function MapLibreScene() {
         },
       });
 
+      /** Політ камери до точки з урахуванням меж панорами. */
+      const flyTo = (target: MapLibreMap, center: [number, number], zoom: number, duration: number) => {
+        flightZoomRef.current = zoom;
+        target.once("moveend", () => {
+          flightZoomRef.current = null;
+        });
+        target.easeTo({ center, zoom, duration });
+      };
+      flyToRef.current = flyTo;
+
       const expandCluster = async (feature: MapGeoJSONFeature) => {
         setSelectedId(null);
         const clusterId = feature.properties?.cluster_id as number;
         const zoom = await (map.getSource("people") as GeoJSONSource).getClusterExpansionZoom(clusterId);
-        map.easeTo({
-          center: (feature.geometry as Point).coordinates as [number, number],
-          zoom: zoom + 0.3,
-          duration: 620,
-        });
+        flyTo(map, (feature.geometry as Point).coordinates as [number, number], zoom + 0.3, 620);
       };
       const selectPerson = (feature: MapGeoJSONFeature | undefined) => {
         setSelectedId((feature?.properties?.id as string) ?? null);
@@ -740,7 +769,7 @@ export default function MapLibreScene() {
           .then((leaves) => {
             if (lensKey !== key) return;
             const ids = new Set(leaves.map((leaf) => leaf.properties?.id as string));
-            const members = DEMO_PERFORMERS.filter((performer) => ids.has(performer.id)).sort((a, b) => b.tier - a.tier);
+            const members = getPerformers().filter((performer) => ids.has(performer.id)).sort((a, b) => b.tier - a.tier);
             groupOpen = true;
             setGroupPreview({ key, members, box });
           });
@@ -839,27 +868,27 @@ export default function MapLibreScene() {
     let cancelled = false;
     void (async () => {
       const matched = requestTags.length
-        ? (await import("@/lib/tags/engine")).matchProfiles(requestTags, DEMO_PERFORMERS)
+        ? (await import("@/lib/tags/engine")).matchProfiles(requestTags, performers)
         : null;
       if (cancelled) return;
       tagMatches.set(matched?.size ? matched : null);
-      matchInfoStore.set(matched ? { shown: matched.size, total: DEMO_PERFORMERS.length } : null);
+      matchInfoStore.set(matched ? { shown: matched.size, total: performers.length } : null);
     })();
     return () => {
       cancelled = true;
     };
-  }, [ready, requestTags]);
+  }, [ready, requestTags, performers]);
 
   // На карті — ті, хто під запит, з вибраних груп і міст, за потреби лише онлайн.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    const visible = filterPerformers(DEMO_PERFORMERS, { matches, groups, cities, online });
+    const visible = filterPerformers(performers, { matches, groups, cities, online });
     lensControlRef.current.hide(true);
     (map.getSource("people") as GeoJSONSource | undefined)?.setData(toPeople(visible));
     const ids = new Set(visible.map((performer) => performer.id));
     setSelectedId((current) => (current && ids.has(current) ? current : null));
-  }, [ready, matches, groups, cities, online]);
+  }, [ready, performers, matches, groups, cities, online]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -867,7 +896,7 @@ export default function MapLibreScene() {
     if (!ready || !map?.getLayer("people-selected") || !atlas) return;
     let frame = 0;
     if (selectedId) {
-      const performer = DEMO_PERFORMERS.find((person) => person.id === selectedId);
+      const performer = getPerformers().find((person) => person.id === selectedId);
       if (!performer) return;
       const base = createPortraitCanvas(atlas, performer.avatarIndex, true);
       const canvas = document.createElement("canvas");
@@ -906,7 +935,7 @@ export default function MapLibreScene() {
   useLayoutEffect(() => {
     const map = mapRef.current;
     const card = cardRef.current;
-    const performer = DEMO_PERFORMERS.find((person) => person.id === selectedId);
+    const performer = getPerformers().find((person) => person.id === selectedId);
     if (!ready || !map || !card || !performer) return;
     const place = () => {
       if (window.innerWidth < 640) {
@@ -1014,11 +1043,20 @@ export default function MapLibreScene() {
     setPeek({ performer, top: rowBox.top - panelBox.top + rowBox.height / 2, side });
   };
 
+  // Щойно опублікували профіль: летимо до себе й показуємо, як нас бачать.
+  const justPublished = useStore(justPublishedStore);
+  useEffect(() => {
+    if (!justPublished || !ready) return;
+    const me = getPerformers().find((person) => person.id === justPublished.id);
+    if (me) openFromGroup(me);
+    // openFromGroup — звичайна функція компонента; спрацьовуємо лише на нову публікацію.
+  }, [justPublished, ready]);
+
   // «На карті» з панелі пропозицій: летимо до людини й відкриваємо її картку.
   const focus = useStore(focusPerformerStore);
   useEffect(() => {
     if (!focus || !ready) return;
-    const performer = DEMO_PERFORMERS.find((person) => person.id === focus.id);
+    const performer = getPerformers().find((person) => person.id === focus.id);
     if (performer) openFromGroup(performer);
     // openFromGroup — звичайна функція компонента, запит на фокус міняється лише з `at`.
   }, [focus, ready]);
@@ -1028,7 +1066,7 @@ export default function MapLibreScene() {
     const map = mapRef.current;
     lensControlRef.current.hide(true);
     if (!map) return;
-    map.easeTo({ center: [performer.lng, performer.lat], zoom: Math.max(map.getZoom(), 12), duration: 700 });
+    if (flyToRef.current) flyToRef.current(map, [performer.lng, performer.lat], Math.max(map.getZoom(), 12), 700);
     setSelectedId(performer.id);
     setCardNotice(null);
   };
@@ -1042,10 +1080,8 @@ export default function MapLibreScene() {
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId]);
 
-  const selected = DEMO_PERFORMERS.find((performer) => performer.id === selectedId);
+  const selected = performers.find((performer) => performer.id === selectedId);
   const selectedCity = CITIES.find((city) => city.id === selected?.cityId);
-  const avatarColumn = selected ? selected.avatarIndex % 4 : 0;
-  const avatarRow = selected ? Math.floor(selected.avatarIndex / 4) : 0;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-bg">
@@ -1078,7 +1114,6 @@ export default function MapLibreScene() {
           <ul className="group-preview-list" onPointerLeave={() => setPeek(null)}>
             {groupPreview.members.map((performer) => {
               const size = LIST_PX[performer.tier - 1];
-              const avatar = performer.avatarIndex % AVATAR_COUNT;
               return (
                 <li key={performer.id}>
                   <button
@@ -1092,12 +1127,7 @@ export default function MapLibreScene() {
                     <span
                       aria-hidden
                       className="group-preview-avatar"
-                      style={{
-                        width: size,
-                        height: size,
-                        backgroundImage: `url(${AVATAR_ATLAS})`,
-                        backgroundPosition: `${(avatar % 4) * 100 / 3}% ${Math.floor(avatar / 4) * 100 / 3}%`,
-                      }}
+                      style={avatarBackground(performer, size)}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold leading-tight text-ink">{performer.name}</span>
@@ -1144,7 +1174,7 @@ export default function MapLibreScene() {
         <aside key={selected.id} ref={cardRef} className="performer-card glass-panel absolute inset-x-3 bottom-20 z-[var(--z-controls)] rounded-[22px] p-5 shadow-[0_18px_55px_rgba(45,60,67,.16)] max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain sm:inset-x-auto sm:bottom-auto sm:max-h-[calc(100%-120px)] sm:w-[360px]" aria-label={`Картка виконавця ${selected.name}`}>
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="size-16 shrink-0 rounded-2xl bg-[#e6e9e7] bg-no-repeat shadow-[inset_0_0_0_1px_rgba(255,255,255,.6)]" style={{ backgroundImage: `url(${AVATAR_ATLAS})`, backgroundSize: "400% 400%", backgroundPosition: `${avatarColumn * 100 / 3}% ${avatarRow * 100 / 3}%` }} role="img" aria-label={`Фото ${selected.name}`} />
+              <div className="size-16 shrink-0 rounded-2xl bg-[#e6e9e7] bg-no-repeat shadow-[inset_0_0_0_1px_rgba(255,255,255,.6)]" style={avatarBackground(selected)} role="img" aria-label={`Фото ${selected.name}`} />
               <div className="min-w-0">
                 <p className="truncate text-[16px] font-semibold leading-tight text-ink">{selected.name}</p>
                 <p className="mt-1 text-[12px] leading-snug text-ink-muted">{selected.specialty}</p>
@@ -1158,11 +1188,17 @@ export default function MapLibreScene() {
             performer={selected}
             onOpenWork={() => setCardNotice("Сторінки робіт з'являться після підключення профілів.")}
           />
-          <div className="mt-4 flex flex-col gap-2">
-            <button type="button" onClick={() => setCardNotice("Повний профіль з’явиться після підключення акаунтів.")} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
-            <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
-          </div>
-          <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? "Демонстраційні дані профілю"}</p>
+          {selected.mine ? (
+            <div className="mt-4 flex flex-col gap-2">
+              <button type="button" onClick={() => profileEditorStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Редагувати профіль</button>
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-2">
+              <button type="button" onClick={() => setCardNotice("Повний профіль з’явиться після підключення акаунтів.")} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
+              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
+            </div>
+          )}
+          <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "Демонстраційні дані профілю")}</p>
         </aside>
       )}
 

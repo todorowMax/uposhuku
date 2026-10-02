@@ -11,7 +11,24 @@ export const PORTRAIT_SIZE = 192;
 export const AVATAR_ATLAS = "/map/mock-avatars.png";
 export const AVATAR_COUNT = 16;
 
-const drawPortrait = (
+/**
+ * Власні фото (профіль виконавця) живуть поруч з атласом: індекс від
+ * AVATAR_COUNT і далі. Усюди, де малюється обличчя за індексом, воно бере
+ * або комірку атласу, або зареєстроване фото.
+ */
+const customAvatars = new Map<number, HTMLImageElement>();
+let nextCustomIndex = AVATAR_COUNT;
+
+export const registerCustomAvatar = async (dataUrl: string): Promise<number> => {
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+  const index = nextCustomIndex++;
+  customAvatars.set(index, image);
+  return index;
+};
+
+export const drawPortrait = (
   context: CanvasRenderingContext2D,
   source: HTMLImageElement,
   index: number,
@@ -19,14 +36,19 @@ const drawPortrait = (
   y: number,
   radius: number
 ) => {
-  const cell = source.naturalWidth / 4;
-  const column = index % 4;
-  const row = Math.floor(index / 4) % 4;
   context.save();
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
   context.clip();
-  context.drawImage(source, column * cell, row * cell, cell, cell, x - radius, y - radius, radius * 2, radius * 2);
+  const custom = customAvatars.get(index);
+  if (custom) {
+    // Фото квадратне, але про всяк випадок беремо середину.
+    const side = Math.min(custom.naturalWidth, custom.naturalHeight);
+    context.drawImage(custom, (custom.naturalWidth - side) / 2, (custom.naturalHeight - side) / 2, side, side, x - radius, y - radius, radius * 2, radius * 2);
+  } else {
+    const cell = source.naturalWidth / 4;
+    context.drawImage(source, (index % 4) * cell, (Math.floor(index / 4) % 4) * cell, cell, cell, x - radius, y - radius, radius * 2, radius * 2);
+  }
   context.restore();
 };
 
