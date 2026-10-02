@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
 import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, MessageCircle, ShieldCheck, Star, X } from "lucide-react";
+import { getPerformers } from "@/lib/map/performers";
 import { AVATAR_ATLAS } from "@/lib/map/portrait";
 import { mentionsContacts, useMockChat } from "@/lib/requests/mock-chat";
 import {
@@ -13,6 +14,9 @@ import {
   useOffers,
 } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
+import { feedCountStore } from "@/lib/feed/client";
+import { SidePanelSwitch } from "@/components/requests/side-switch";
+import { useSidePanel } from "@/lib/requests/side-panel";
 import { useStore } from "@/lib/store";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -41,10 +45,14 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
  */
 export function OffersPanel() {
   const request = useActiveRequest();
-  const open = request?.status === "open";
+  const { kind } = useSidePanel();
+  const feedCount = useStore(feedCountStore);
+  const requestOpen = request?.status === "open";
+  /** Панель видно, лише коли вона вибрана: пропозиції живуть і тоді, коли праворуч стрічка запитів. */
+  const open = requestOpen && kind === "offers";
   const view = useStore(offersViewStore);
   const collapsed = useStore(offersCollapsedStore);
-  const { loading, offers, declinedOffers, pending, all, revealPending, decline, restore } = useOffers(open ? request : null);
+  const { loading, offers, declinedOffers, pending, all, revealPending, decline, restore } = useOffers(requestOpen ? request : null);
   const [showDeclined, setShowDeclined] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -125,6 +133,7 @@ export function OffersPanel() {
                 {total > 0 && <span className="filter-all-badge">{total}</span>}
               </h2>
               <p className="mt-0.5 truncate text-[11px] text-ink-muted">Вище ті, хто оплатив розміщення</p>
+              <SidePanelSwitch offers={total} feed={feedCount} />
             </div>
             <button type="button" onClick={() => offersCollapsedStore.set(true)} aria-label="Згорнути пропозиції" className="auth-icon-button -mr-1.5">
               <ChevronsRight className="hidden size-4 lg:block" strokeWidth={2} />
@@ -189,18 +198,22 @@ export function OffersPanel() {
   );
 }
 
-function Avatar({ index, size }: { index: number; size: number }) {
+function Avatar({ index, size, photo }: { index: number; size: number; photo?: string }) {
   const cell = index % 16;
   return (
     <span
       aria-hidden
       className="offer-avatar"
-      style={{
-        width: size,
-        height: size,
-        backgroundImage: `url(${AVATAR_ATLAS})`,
-        backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100 / 3}%`,
-      }}
+      style={
+        photo
+          ? { width: size, height: size, backgroundImage: `url(${photo})`, backgroundSize: "cover", backgroundPosition: "center" }
+          : {
+              width: size,
+              height: size,
+              backgroundImage: `url(${AVATAR_ATLAS})`,
+              backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100 / 3}%`,
+            }
+      }
     />
   );
 }
@@ -214,15 +227,17 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
     <article data-offer={offer.id} className="offer-card" aria-label={`Пропозиція: ${offer.name}`}>
       <div className="flex items-start gap-3">
         <button type="button" onClick={showOnMap} aria-label={`Показати ${offer.name} на карті`} className="shrink-0 rounded-full">
-          <Avatar index={offer.avatarIndex} size={42} />
+          <Avatar index={offer.avatarIndex} size={42} photo={offer.photo} />
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <p className="truncate text-[14px] font-semibold text-ink">{offer.name}</p>
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] text-ink-muted">
-              <Star className="size-3 fill-current" strokeWidth={0} />
-              {offer.rating}
-            </span>
+            {offer.rating !== "—" && (
+              <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] text-ink-muted">
+                <Star className="size-3 fill-current" strokeWidth={0} />
+                {offer.rating}
+              </span>
+            )}
             {offer.promoted && <span className="offer-promoted">Просування</span>}
           </div>
           <p className="truncate text-[12px] text-ink-muted">
@@ -244,10 +259,12 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
           <MessageCircle className="size-4" strokeWidth={1.9} />
           Написати
         </button>
-        <button type="button" onClick={showOnMap} className="offer-secondary">
-          <MapPin className="size-4" strokeWidth={1.9} />
-          На карті
-        </button>
+        {getPerformers().some((person) => person.id === offer.performerId) && (
+          <button type="button" onClick={showOnMap} className="offer-secondary">
+            <MapPin className="size-4" strokeWidth={1.9} />
+            На карті
+          </button>
+        )}
         <button type="button" onClick={onDecline} aria-label={`Відхилити пропозицію ${offer.name}`} className="offer-secondary ml-auto">
           <X className="size-4" strokeWidth={1.9} />
           <span className="sr-only sm:not-sr-only">Відхилити</span>
@@ -293,7 +310,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
         <button type="button" onClick={onBack} aria-label="До пропозицій" className="auth-icon-button -ml-1.5">
           <ArrowLeft className="size-4" strokeWidth={2} />
         </button>
-        <Avatar index={response.avatarIndex} size={34} />
+        <Avatar index={response.avatarIndex} size={34} photo={response.photo} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[14px] font-semibold text-ink">{response.name}</p>
           <p className="truncate text-[11px] text-ink-muted">{typing ? "друкує…" : response.specialty}</p>

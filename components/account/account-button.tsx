@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ListChecks, LogOut, UserRound } from "lucide-react";
+import { Inbox, ListChecks, LogOut, UserRound } from "lucide-react";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { matchInfoStore } from "@/lib/map/filters";
+import { feedCountStore } from "@/lib/feed/client";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
+import { feedCollapsedStore, sidePanelChoice, useIsPerformer } from "@/lib/requests/side-panel";
 
 /**
  * Акаунт у лівому нижньому куті, щоб угорі лишалось лише поле запиту.
@@ -18,6 +20,8 @@ export function AccountButton() {
   const requests = useStore(requestsStore);
   const profileState = useStore(profileStore);
   const profile = profileState.status === "ready" ? profileState.profile : null;
+  const performer = useIsPerformer();
+  const feedCount = useStore(feedCountStore);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -108,6 +112,22 @@ export function AccountButton() {
             Мої запити
             {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
           </button>
+          {performer && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                sidePanelChoice.set("feed");
+                feedCollapsedStore.set(false);
+              }}
+              className="account-menu-item"
+            >
+              <Inbox className="size-4" strokeWidth={1.9} />
+              Запити для вас
+              {feedCount > 0 && <span className="ml-auto text-[11px] text-ink-muted">{feedCount}</span>}
+            </button>
+          )}
           <button
             type="button"
             role="menuitem"

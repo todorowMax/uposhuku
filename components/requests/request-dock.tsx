@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 import { Check, ChevronDown, ChevronUp, MoreHorizontal, Paperclip, Plus } from "lucide-react";
 import { ApiError, activeRequestStore, closeActiveRequest, composingStore } from "@/lib/auth/client";
 import { tagMatches, useStore } from "@/lib/map/filters";
+import { sidePanelChoice } from "@/lib/requests/side-panel";
 import { dockCompactStore, loadDockCompact, offersCollapsedStore, offersCountStore, setDockCompact } from "@/lib/requests/offers";
 import type { PublishedRequest } from "@/lib/requests/types";
 
@@ -221,7 +222,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
             {offers > 0 ? (
               <>
                 {offersCount(offers)} від виконавців.{" "}
-                <button type="button" onClick={() => offersCollapsedStore.set(false)} className="auth-link">
+                <button type="button" onClick={() => { sidePanelChoice.set("offers"); offersCollapsedStore.set(false); }} className="auth-link">
                   Порівняйте й напишіть
                 </button>{" "}
                 тому, хто підходить.

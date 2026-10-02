@@ -3,6 +3,7 @@ import { AccountButton } from "@/components/account/account-button";
 import { RequestComposer } from "@/components/composer/request-composer";
 import { ProfileEditorHost } from "@/components/profile/profile-editor";
 import { MapSkeleton } from "@/components/map-skeleton";
+import { FeedPanel } from "@/components/requests/feed-panel";
 import { OffersPanel } from "@/components/requests/offers-panel";
 import { VibeMap } from "@/components/maplibre/vibe-map";
 
@@ -16,6 +17,7 @@ export default function HomePage() {
       <RequestComposer />
       <AccountButton />
       <OffersPanel />
+      <FeedPanel />
       <ProfileEditorHost />
     </main>
   );

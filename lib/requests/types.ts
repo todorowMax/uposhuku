@@ -49,6 +49,8 @@ export interface OfferResponse {
   /** Позначка «Просування» (закон «Про рекламу»): платне місце вище в списку. */
   promoted: boolean;
   rating: string;
+  /** Власне фото виконавця (data URL); без нього — обличчя з атласу за avatarIndex. */
+  photo?: string;
   /** Ціна в гривнях; null — «після обговорення». */
   price: number | null;
   /** За скільки днів готовий зробити. */

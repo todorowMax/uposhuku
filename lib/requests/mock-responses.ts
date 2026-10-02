@@ -10,6 +10,8 @@
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_PERFORMERS } from "@/lib/map/demo";
 import { primaryGroup } from "@/lib/map/groups";
+import { responsesTo } from "@/lib/feed/mock-feed";
+import { getProfile } from "@/lib/profile/mock-store";
 import { matchProfiles } from "@/lib/tags/match";
 import type { OfferResponse, PublishedRequest } from "./types";
 
@@ -97,7 +99,33 @@ const plannedResponses = (request: PublishedRequest): OfferResponse[] => {
  */
 export const responsesFor = (request: PublishedRequest, now = Date.now()): OfferResponse[] =>
   request.status === "open"
-    ? plannedResponses(request)
-        .filter((response) => Date.parse(response.createdAt) <= now)
-        .sort((a, b) => b.tier - a.tier || a.createdAt.localeCompare(b.createdAt))
+    ? [...plannedResponses(request).filter((response) => Date.parse(response.createdAt) <= now), ...realResponses(request)].sort(
+        (a, b) => b.tier - a.tier || a.createdAt.localeCompare(b.createdAt)
+      )
     : [];
+
+/** Відгуки справжніх виконавців (інших акаунтів) на запит. Розміщення в них поки базове. */
+const realResponses = (request: PublishedRequest): OfferResponse[] =>
+  responsesTo(request.id).flatMap(({ userId, response }) => {
+    const profile = getProfile(userId);
+    if (!profile?.published) return [];
+    return [
+      {
+        id: `resp_${request.id}_${userId}`,
+        requestId: request.id,
+        performerId: `me-${userId}`,
+        name: profile.name,
+        specialty: profile.specialty,
+        cityName: CITIES.find((city) => city.id === profile.cityId)?.name ?? "",
+        avatarIndex: 0,
+        photo: profile.photo || undefined,
+        tier: 1,
+        promoted: false,
+        rating: "—",
+        price: response.price,
+        days: response.days,
+        message: response.message,
+        createdAt: response.createdAt,
+      },
+    ];
+  });

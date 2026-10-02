@@ -43,3 +43,7 @@ export const findRequest = (userId: string, id: string): PublishedRequest | null
   const request = all().find((item) => item.id === id && item.userId === userId);
   return request ? strip(request) : null;
 };
+
+/** Відкриті запити інших людей: з них складається стрічка виконавця. */
+export const listOthersOpen = (exceptUserId: string): PublishedRequest[] =>
+  all().filter((request) => request.userId !== exceptUserId && request.status === "open").map(strip);

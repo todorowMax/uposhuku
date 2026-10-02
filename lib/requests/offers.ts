@@ -81,6 +81,13 @@ export const useOffers = (request: PublishedRequest | null) => {
           setShown(responses);
           return;
         }
+        // Список ще порожній: нічого зсувати, перші одразу на екран.
+        if (shownIds.current.size === 0 && responses.length > 0) {
+          shownIds.current = new Set(responses.map((item) => item.id));
+          setShown(responses);
+          setPending([]);
+          return;
+        }
         setPending(responses.filter((item) => !shownIds.current.has(item.id)));
       } catch {
         // Мережа моргнула — спробуємо наступного разу.
