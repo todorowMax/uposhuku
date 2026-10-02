@@ -16,6 +16,7 @@ import {
 } from "@/lib/auth/client";
 import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
+import { requestFacts } from "@/lib/requests/format";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 
@@ -303,9 +304,11 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
 /** Що саме публікуємо: початок тексту, теги й файли. */
 function DraftSummary({ draft }: { draft: RequestDraft }) {
   const shownTags = draft.tags.slice(0, 4);
+  const facts = requestFacts(draft);
   return (
     <div className="auth-draft">
       <p className="line-clamp-2 text-[13px] leading-snug text-ink">{draft.text}</p>
+      {facts.length > 0 && <p className="mt-2 text-[12px] font-medium text-ink">{facts.join(" · ")}</p>}
       {(shownTags.length > 0 || draft.files.length > 0) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {shownTags.map((tag) => (

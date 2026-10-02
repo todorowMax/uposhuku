@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Inbox, ListChecks, LogOut, MapPinned, UserRound } from "lucide-react";
+import { Bell, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "lucide-react";
+import { notificationSettingsStore } from "@/components/account/notification-settings";
+import { LegendButton } from "@/components/map/legend";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { matchInfoStore } from "@/lib/map/filters";
@@ -61,6 +63,7 @@ export function AccountButton() {
     return (
       <div className="account-slot">
         <span aria-hidden className="size-12" />
+        <LegendButton />
         <MatchPill />
       </div>
     );
@@ -76,6 +79,7 @@ export function AccountButton() {
         <button type="button" onClick={() => authFlowStore.set({ mode: "performer" })} className="account-login account-performer">
           <span>Я виконавець</span>
         </button>
+        <LegendButton />
         <MatchPill />
       </div>
     );
@@ -164,6 +168,18 @@ export function AccountButton() {
             role="menuitem"
             onClick={() => {
               setOpen(false);
+              notificationSettingsStore.set(true);
+            }}
+            className="account-menu-item"
+          >
+            <Bell className="size-4" strokeWidth={1.9} />
+            Сповіщення
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
               void logout();
             }}
             className="account-menu-item"
@@ -173,7 +189,8 @@ export function AccountButton() {
           </button>
         </div>
       )}
-      <MatchPill />
+      <LegendButton />
+        <MatchPill />
     </div>
   );
 }

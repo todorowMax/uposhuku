@@ -28,6 +28,8 @@ export const offersViewStore = createStore<OffersView>({ kind: "list" });
 export const offersCollapsedStore = createStore(false);
 /** Скільки пропозицій уже прийшло на активний запит: для кроків у картці запиту. */
 export const offersCountStore = createStore(0);
+/** Скільки нових пропозицій чекає за «+N нових»: для сповіщень і лічильника у вкладці. */
+export const offersPendingStore = createStore(0);
 /** Попросити карту показати виконавця: камера летить до нього й відкриває картку. */
 export const focusPerformerStore = createStore<{ id: string; at: number } | null>(null);
 
@@ -103,6 +105,7 @@ export const useOffers = (request: PublishedRequest | null) => {
 
   const all = useMemo(() => [...(shown ?? []), ...pending], [shown, pending]);
   useEffect(() => offersCountStore.set(all.length), [all.length]);
+  useEffect(() => offersPendingStore.set(pending.length), [pending.length]);
 
   /** Нові стають на свої місця: за оплатою, як і решта. */
   const revealPending = () => {
@@ -137,9 +140,11 @@ const COMPACT_KEY = "vm:dock-compact";
 
 export const loadDockCompact = () => {
   try {
-    dockCompactStore.set(window.localStorage.getItem(COMPACT_KEY) === "1");
+    const saved = window.localStorage.getItem(COMPACT_KEY);
+    // Вибору ще не було: на телефоні карта важливіша за картку, тож починаємо зі смужки.
+    dockCompactStore.set(saved === null ? window.innerWidth < 640 : saved === "1");
   } catch {
-    // Без сховища — розгорнута.
+    dockCompactStore.set(window.innerWidth < 640);
   }
 };
 

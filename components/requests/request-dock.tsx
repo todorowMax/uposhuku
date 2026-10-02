@@ -6,6 +6,7 @@ import { Check, ChevronDown, ChevronUp, MoreHorizontal, Paperclip, Plus } from "
 import { ApiError, activeRequestStore, closeActiveRequest, composingStore } from "@/lib/auth/client";
 import { tagMatches, useStore } from "@/lib/map/filters";
 import { sidePanelChoice } from "@/lib/requests/side-panel";
+import { requestFacts } from "@/lib/requests/format";
 import { useDeals } from "@/lib/deals/client";
 import { dealPhase, type DealPhase } from "@/lib/deals/machine";
 import { dockCompactStore, loadDockCompact, offersCollapsedStore, offersCountStore, setDockCompact } from "@/lib/requests/offers";
@@ -182,6 +183,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       </header>
 
       <p className="mt-2 line-clamp-2 text-[15px] leading-snug text-ink">{active.text}</p>
+      {requestFacts(active).length > 0 && <p className="mt-1.5 text-[12px] font-medium text-ink-muted">{requestFacts(active).join(" · ")}</p>}
       {(shownTags.length > 0 || active.files.length > 0) && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {shownTags.map((tag) => (

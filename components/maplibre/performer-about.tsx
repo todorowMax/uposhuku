@@ -10,7 +10,7 @@ import type { Performer, PortfolioWork } from "@/lib/map/types";
  * «Розгорнути»; роботи — горизонтальна стрічка. Картка перемонтовується
  * для кожної людини (key), тож і розгорнутість скидається сама.
  */
-export function PerformerAbout({ performer, onOpenWork }: { performer: Performer; onOpenWork: (work: PortfolioWork) => void }) {
+export function PerformerAbout({ performer, onOpenWork, full = false }: { performer: Performer; onOpenWork: (work: PortfolioWork) => void; full?: boolean }) {
   const bioRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLParagraphElement>(null);
   const stripRef = useRef<HTMLUListElement>(null);
@@ -85,11 +85,11 @@ export function PerformerAbout({ performer, onOpenWork }: { performer: Performer
       <div className="mt-4">
         <p className="text-[12px] font-semibold text-ink">Про себе</p>
         <div ref={bioRef} className="overflow-hidden">
-          <p ref={textRef} className={`mt-1 text-[13px] leading-[1.5] text-ink/85 ${expanded ? "" : "line-clamp-3"}`}>
+          <p ref={textRef} className={`mt-1 text-[13px] leading-[1.5] text-ink/85 ${expanded || full ? "" : "line-clamp-3"}`}>
             {performer.bio}
           </p>
         </div>
-        {clamped && (
+        {clamped && !full && (
           <button type="button" onClick={toggle} aria-expanded={expanded} className="mt-1 text-[12px] font-medium text-ink-muted underline decoration-[#b8c4c7] underline-offset-4 transition-colors hover:text-ink hover:decoration-ink-muted">
             {expanded ? "Згорнути" : "Розгорнути"}
           </button>
@@ -101,7 +101,7 @@ export function PerformerAbout({ performer, onOpenWork }: { performer: Performer
           <p className="text-[12px] font-semibold text-ink">
             Роботи <span className="font-normal text-ink-muted">· {performer.works.length}</span>
           </p>
-          <ul ref={stripRef} className="works-strip" aria-label={`Роботи: ${performer.works.length}`}>
+          <ul ref={stripRef} className={full ? "works-grid" : "works-strip"} aria-label={`Роботи: ${performer.works.length}`}>
             {performer.works.map((work) => (
               <li key={work.id}>
                 <button type="button" className="work-tile" aria-pressed={work.id === openId} onClick={() => pickWork(work)}>

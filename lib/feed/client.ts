@@ -15,6 +15,8 @@ const POLL_MS = 5000;
 
 /** Скільки запитів у стрічці: для кнопки в меню й язичка. */
 export const feedCountStore = createStore(0);
+/** Нові запити, що чекають за «+N нових». */
+export const feedPendingStore = createStore(0);
 
 const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   let response: Response;
@@ -89,6 +91,7 @@ export const useFeed = (enabled: boolean) => {
 
   const items = useMemo(() => shown ?? [], [shown]);
   useEffect(() => feedCountStore.set(items.length + pending.length), [items.length, pending.length]);
+  useEffect(() => feedPendingStore.set(pending.length), [pending.length]);
 
   const reveal = () => {
     for (const item of pending) shownIds.current.add(item.id);

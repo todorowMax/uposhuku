@@ -74,3 +74,12 @@ describe("відгук виконавця доходить до замовник
     expect(real?.photo).toBe("data:image/jpeg;base64,AAAA");
   });
 });
+
+describe("умови запиту словами", () => {
+  it("бюджет, термін і місто чипами; порожнє не показуємо", async () => {
+    const { requestFacts } = await import("@/lib/requests/format");
+    expect(requestFacts({ budget: 15000, deadline: "week", cityId: "lviv" })).toEqual([expect.stringMatching(/^до 15\D000 ₴$/), "Протягом тижня", "Львів"]);
+    expect(requestFacts({ budget: null, deadline: null, cityId: null })).toEqual([]);
+    expect(requestFacts({})).toEqual([]);
+  });
+});

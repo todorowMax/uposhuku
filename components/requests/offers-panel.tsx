@@ -20,6 +20,7 @@ import { needsAction } from "@/lib/deals/machine";
 import { feedCountStore } from "@/lib/feed/client";
 import { SidePanelSwitch } from "@/components/requests/side-switch";
 import { useSidePanel } from "@/lib/requests/side-panel";
+import { profileViewStore } from "@/lib/profile/client";
 import { useStore } from "@/lib/store";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -234,7 +235,9 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <p className="truncate text-[14px] font-semibold text-ink">{offer.name}</p>
+            <button type="button" onClick={() => profileViewStore.set(offer.performerId)} className="truncate text-left text-[14px] font-semibold text-ink underline-offset-4 hover:underline" aria-label={`Профіль: ${offer.name}`}>
+              {offer.name}
+            </button>
             {offer.rating !== "—" && (
               <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] text-ink-muted">
                 <Star className="size-3 fill-current" strokeWidth={0} />

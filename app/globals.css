@@ -178,7 +178,7 @@ html[data-glass] .composer {
   height: auto;
   grid-template-areas:
     "input input input"
-    "plus . send";
+    "plus params send";
   row-gap: 6px;
   max-width: 720px;
   padding: 12px 12px 10px;
@@ -190,7 +190,7 @@ html[data-glass] .composer {
   grid-template-areas:
     "tray tray tray"
     "input input input"
-    "plus . send";
+    "plus params send";
 }
 
 .composer-tray {
@@ -1384,6 +1384,27 @@ html[data-glass] .request-pill {
   color: var(--ink-muted);
 }
 
+/* На телефоні підписи не влазять в п'ять колонок: лишаємо лише поточний. */
+@media (max-width: 639px) {
+  .request-step:not([data-state="current"]) .request-step-label {
+    display: none;
+  }
+
+  .request-step[data-state="current"] .request-step-label {
+    position: absolute;
+    top: 22px;
+    white-space: nowrap;
+  }
+
+  .request-step {
+    position: relative;
+  }
+
+  .request-steps {
+    margin-bottom: 14px;
+  }
+}
+
 .request-step[data-state="done"] .request-step-label {
   color: var(--ink);
 }
@@ -1549,6 +1570,7 @@ html[data-glass] .offers-panel {
 }
 
 .offers-tab-new {
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 600;
   color: #8e5f40;
@@ -2155,6 +2177,315 @@ html[data-glass] .offers-panel {
 
 .deal-star:hover {
   transform: scale(1.1);
+}
+
+/* Повний профіль виконавця (components/profile/profile-view). */
+.pv-layout {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 16px 110px;
+}
+
+.pv-head {
+  grid-auto-flow: column;
+  align-items: center;
+  justify-content: start;
+  gap: 18px;
+}
+
+.pv-photo {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: 24px;
+  background-color: #e6e9e7;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 60%), 0 10px 24px -10px rgb(48 68 64 / 30%);
+}
+
+.pv-review {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgb(48 54 58 / 4.5%);
+}
+
+.pv-footer {
+  position: absolute;
+  inset: auto 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 16px max(14px, env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, #eef1f1 35%);
+}
+
+.pv-footer > button {
+  min-width: 200px;
+  padding: 0 22px;
+}
+
+/* Умови запиту чипами (components/composer/request-params). */
+.composer-params {
+  grid-area: params;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+/* На телефоні чипи отримують свій рядок: біля кнопки «Знайти» їм тісно. */
+@media (max-width: 639px) {
+  .composer[data-expanded="true"] {
+    grid-template-areas:
+      "input input input"
+      "params params params"
+      "plus . send";
+  }
+
+  .composer[data-expanded="true"][data-tray="true"] {
+    grid-template-areas:
+      "tray tray tray"
+      "input input input"
+      "params params params"
+      "plus . send";
+  }
+}
+
+.param-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 32px;
+  border-radius: 999px;
+  background: rgb(48 54 58 / 6%);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.param-chip:hover,
+.param-chip[data-open] {
+  background: rgb(48 54 58 / 11%);
+  color: var(--ink);
+}
+
+.param-chip[data-filled] {
+  background: #f4e9df;
+  color: #6f4a33;
+}
+
+.param-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.param-chip[data-filled] .param-chip-main {
+  padding-right: 4px;
+}
+
+.param-chip-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.param-chip-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+  border-radius: 999px;
+}
+
+.param-chip-clear:hover {
+  background: rgb(111 74 51 / 14%);
+}
+
+@media (max-width: 639px) {
+  .param-chip-main .param-chip-label {
+    max-width: 90px;
+  }
+}
+
+.param-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  width: min(300px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 16px 44px rgb(45 60 67 / 22%), inset 0 0 0 1px rgb(184 196 199 / 50%);
+}
+
+.param-pop-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.param-pop-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.param-option,
+.param-row {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgb(48 54 58 / 5%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background-color 150ms;
+}
+
+.param-row {
+  width: 100%;
+}
+
+.param-option:hover,
+.param-row:hover {
+  background: rgb(48 54 58 / 10%);
+}
+
+.param-option[data-on],
+.param-row[data-on] {
+  background: #f4e9df;
+  color: #6f4a33;
+}
+
+/* Легенда карти рядом з акаунтом. */
+.legend {
+  position: relative;
+}
+
+.legend-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 48px;
+  min-width: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 10px 28px -14px rgb(47 60 68 / 30%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background-color 150ms;
+}
+
+.legend-button:hover,
+.legend-button[aria-expanded="true"] {
+  background: #ffffff;
+}
+
+.legend-panel {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  display: grid;
+  gap: 12px;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 18px 44px rgb(45 60 67 / 20%);
+}
+
+.legend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.legend-list li {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.legend-list b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.legend-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 52px;
+  min-height: 34px;
+}
+
+.legend-photo {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #aab9c3, #d9a07a);
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-group {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #91a99d;
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.notif-row {
+  min-height: 56px;
+  padding: 6px 4px;
+  align-items: flex-start;
+  border-radius: 12px;
+}
+
+.notif-row[data-disabled] {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* Перемикач «Пропозиції | Запити» і стрічка запитів виконавця. */
@@ -2834,6 +3165,14 @@ select.auth-input[data-empty] {
 .works-strip > li {
   flex: none;
   scroll-snap-align: start;
+}
+
+/* Повний профіль: роботи сіткою замість стрічки. */
+.works-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 10px;
+  margin-top: 8px;
 }
 
 .work-detail {

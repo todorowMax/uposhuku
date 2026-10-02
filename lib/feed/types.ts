@@ -27,6 +27,8 @@ export interface FeedItem {
   place: string;
   /** Бюджет, якщо замовник його вказав. */
   budget: string | null;
+  /** Коли потрібен результат: «Терміново, до 3 днів». */
+  deadline: string | null;
   createdAt: string;
   /** Скільки виконавців уже відгукнулось. */
   responses: number;

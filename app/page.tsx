@@ -1,9 +1,12 @@
 // app/page.tsx
 import { AccountButton } from "@/components/account/account-button";
+import { NotificationSettings } from "@/components/account/notification-settings";
+import { TabBadge } from "@/components/account/tab-badge";
 import { DealSync } from "@/lib/deals/client";
 import { RequestComposer } from "@/components/composer/request-composer";
 import { PlacementPanel } from "@/components/placement/placement-panel";
 import { ProfileEditorHost } from "@/components/profile/profile-editor";
+import { ProfileViewHost } from "@/components/profile/profile-view";
 import { MapSkeleton } from "@/components/map-skeleton";
 import { FeedPanel } from "@/components/requests/feed-panel";
 import { OffersPanel } from "@/components/requests/offers-panel";
@@ -19,9 +22,12 @@ export default function HomePage() {
       <RequestComposer />
       <AccountButton />
       <DealSync />
+      <TabBadge />
+      <NotificationSettings />
       <OffersPanel />
       <FeedPanel />
       <ProfileEditorHost />
+      <ProfileViewHost />
       <PlacementPanel />
     </main>
   );

@@ -17,6 +17,8 @@ import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_REQUESTS } from "@/lib/map/demo";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
+import { avatarBackground } from "@/lib/map/avatar-style";
+import { performerStats } from "@/lib/map/stats";
 import { TIER_PX } from "@/lib/placement/tiers";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
@@ -24,7 +26,7 @@ import type { Performer } from "@/lib/map/types";
 import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore } from "@/lib/requests/offers";
-import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
+import { justPublishedStore, profileEditorStore, profileViewStore } from "@/lib/profile/client";
 import { placementOpenStore } from "@/lib/placement/client";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -33,7 +35,7 @@ maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 const UKRAINE_BOUNDS: [[number, number], [number, number]] = [[22.1, 44.3], [40.3, 52.4]];
 const TILT = 38;
 /** Далі країни не відпускаємо: карта про Україну. */
-const MIN_ZOOM = 4.3;
+const MIN_ZOOM = 3.3;
 const MAX_ZOOM = 17.5;
 /** Наскільки можна відсунутися від стартового кадру «вся Україна». */
 const ZOOM_OUT_SLACK = 0.35;
@@ -114,35 +116,9 @@ const traceGradient = (progress: number, glow: boolean) => {
   ] as ExpressionSpecification;
 };
 
-const demoMetric = (id: string, salt: number) => {
-  let value = salt;
-  for (const character of id) value = (value * 31 + character.charCodeAt(0)) >>> 0;
-  return value;
-};
-
-/** Фон-аватар: власне фото, якщо є, інакше комірка атласу. */
-const avatarBackground = (performer: Performer, size?: number) => {
-  const base = size ? { width: size, height: size } : {};
-  if (performer.photo) return { ...base, backgroundImage: `url(${performer.photo})`, backgroundSize: "cover", backgroundPosition: "center" };
-  const cell = performer.avatarIndex % AVATAR_COUNT;
-  return {
-    ...base,
-    backgroundImage: `url(${AVATAR_ATLAS})`,
-    backgroundSize: "400% 400%",
-    backgroundPosition: `${(cell % 4) * 100 / 3}% ${Math.floor(cell / 4) * 100 / 3}%`,
-  };
-};
-
-/** Демо-статистика профілю: стабільна для людини, поки немає бекенду. */
-const demoStats = (performer: Performer) => performer.mine ? { months: 0, orders: 0, rating: "—" } : {
-  months: 3 + demoMetric(performer.id, 17) % 23,
-  orders: 4 + demoMetric(performer.id, 31) % 55,
-  rating: (4.7 + (demoMetric(performer.id, 73) % 4) / 10).toFixed(1),
-};
-
 /** Три цифри профілю з роздільниками: у картці виконавця й у списку групи. */
 function ProfileStats({ performer, compact = false }: { performer: Performer; compact?: boolean }) {
-  const { months, orders, rating } = demoStats(performer);
+  const { months, orders, rating } = performerStats(performer);
   const value = compact ? "text-[14px] font-semibold text-ink" : "text-[16px] font-semibold text-ink";
   return (
     <div className={`grid grid-cols-3 divide-x divide-[#b8c4c7]/55 rounded-2xl bg-white/45 text-center ${compact ? "py-2" : "py-3"}`}>
@@ -364,7 +340,8 @@ export default function MapLibreScene() {
       container,
       style: buildMapStyle(window.location.origin),
       bounds: UKRAINE_BOUNDS,
-      fitBoundsOptions: { padding: { top: 190, bottom: 60, left: 40, right: 40 } },
+      // На телефоні поле запиту вужче й нижче, а боків майже немає: країна має влізти ціла.
+      fitBoundsOptions: { padding: window.innerWidth < 640 ? { top: 135, bottom: 75, left: 6, right: 6 } : { top: 190, bottom: 60, left: 40, right: 40 } },
       pitch: TILT,
       minZoom: MIN_ZOOM,
       maxZoom: MAX_ZOOM,
@@ -1196,7 +1173,7 @@ export default function MapLibreScene() {
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => setCardNotice("Повний профіль з’явиться після підключення акаунтів.")} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
+              <button type="button" onClick={() => profileViewStore.set(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
               <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
             </div>
           )}

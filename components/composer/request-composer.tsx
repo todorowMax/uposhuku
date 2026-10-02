@@ -17,6 +17,7 @@ import { setRequestTags } from "@/lib/map/request-tags";
 import { Attachments, type Attachment } from "@/components/composer/attachments";
 import { TagRow } from "@/components/composer/tag-row";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
+import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/components/composer/request-params";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { RequestDock } from "@/components/requests/request-dock";
 import { authFlowStore, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
@@ -56,6 +57,7 @@ export function RequestComposer() {
   const [dismissed, setDismissed] = useState<string[]>([]);
   /** Теги, додані з пропозицій одним кліком. */
   const [added, setAdded] = useState<string[]>([]);
+  const [params, setParams] = useState<RequestParamsValue>(EMPTY_PARAMS);
   const authFlow = useStore(authFlowStore);
   const session = useStore(sessionStore);
   const requests = useStore(requestsStore);
@@ -220,6 +222,9 @@ export function RequestComposer() {
       text: text.trim(),
       tags: selected.map((id) => ({ id, label: engine?.tagLabel(id) ?? id })),
       files: files.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
+      budget: params.budget,
+      deadline: params.deadline,
+      cityId: params.cityId,
     };
     saveDraft(draft, true);
     setMenuOpen(false);
@@ -228,6 +233,7 @@ export function RequestComposer() {
 
   const onPublished = (_request: PublishedRequest) => {
     setText("");
+    setParams(EMPTY_PARAMS);
     setFiles((current) => {
       current.forEach((item) => item.url && URL.revokeObjectURL(item.url));
       return [];
@@ -319,6 +325,8 @@ export function RequestComposer() {
             strokeWidth={2.1}
           />
         </button>
+
+        {expanded && <RequestParams value={params} onChange={setParams} />}
 
         <button
           type="submit"

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
-import { Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "lucide-react";
 import { SidePanelSwitch } from "@/components/requests/side-switch";
 import { ApiError } from "@/lib/auth/client";
 import { sendResponse, useFeed, withdrawResponse } from "@/lib/feed/client";
@@ -226,6 +226,12 @@ function FeedCard({ item, onChange }: { item: FeedItem; onChange: (change: (item
           <span className="inline-flex items-center gap-1 font-medium text-ink">
             <Wallet className="size-3.5" strokeWidth={1.9} />
             {item.budget}
+          </span>
+        )}
+        {item.deadline && (
+          <span className="inline-flex items-center gap-1 font-medium text-ink">
+            <CalendarClock className="size-3.5" strokeWidth={1.9} />
+            {item.deadline}
           </span>
         )}
         <span>

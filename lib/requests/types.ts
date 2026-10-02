@@ -15,11 +15,27 @@ export interface RequestFile {
   type: string;
 }
 
-/** Що людина відправляє: текст, теги й файли з поля запиту. */
+/** Коли потрібен результат. Пресети, а не дата: так швидше обрати, і виконавець бачить масштаб. */
+export const DEADLINES = {
+  asap: "Терміново, до 3 днів",
+  week: "Протягом тижня",
+  two_weeks: "За 2 тижні",
+  month: "За місяць",
+  flexible: "Не горить",
+} as const;
+export type Deadline = keyof typeof DEADLINES;
+export const isDeadline = (value: unknown): value is Deadline => typeof value === "string" && value in DEADLINES;
+
+/** Що людина відправляє: текст, теги, файли й необов'язкові умови з поля запиту. */
 export interface RequestDraft {
   text: string;
   tags: RequestTag[];
   files: RequestFile[];
+  /** Бюджет «до N ₴»; null — не вказано або «за домовленістю». */
+  budget?: number | null;
+  deadline?: Deadline | null;
+  /** Місто замовника; null — «Віддалено» або не вказано. */
+  cityId?: string | null;
 }
 
 export interface PublishedRequest extends RequestDraft {
