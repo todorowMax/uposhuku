@@ -1,6 +1,8 @@
 // app/page.tsx
 import { AccountButton } from "@/components/account/account-button";
+import { DealSync } from "@/lib/deals/client";
 import { RequestComposer } from "@/components/composer/request-composer";
+import { PlacementPanel } from "@/components/placement/placement-panel";
 import { ProfileEditorHost } from "@/components/profile/profile-editor";
 import { MapSkeleton } from "@/components/map-skeleton";
 import { FeedPanel } from "@/components/requests/feed-panel";
@@ -16,9 +18,11 @@ export default function HomePage() {
       <VibeMap />
       <RequestComposer />
       <AccountButton />
+      <DealSync />
       <OffersPanel />
       <FeedPanel />
       <ProfileEditorHost />
+      <PlacementPanel />
     </main>
   );
 }

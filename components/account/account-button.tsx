@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Inbox, ListChecks, LogOut, UserRound } from "lucide-react";
+import { Inbox, ListChecks, LogOut, MapPinned, UserRound } from "lucide-react";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { matchInfoStore } from "@/lib/map/filters";
 import { feedCountStore } from "@/lib/feed/client";
+import { placementOpenStore, placementStore } from "@/lib/placement/client";
+import { TIER_NAMES } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { feedCollapsedStore, sidePanelChoice, useIsPerformer } from "@/lib/requests/side-panel";
 
@@ -22,6 +24,7 @@ export function AccountButton() {
   const profile = profileState.status === "ready" ? profileState.profile : null;
   const performer = useIsPerformer();
   const feedCount = useStore(feedCountStore);
+  const placement = useStore(placementStore);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +129,21 @@ export function AccountButton() {
               <Inbox className="size-4" strokeWidth={1.9} />
               Запити для вас
               {feedCount > 0 && <span className="ml-auto text-[11px] text-ink-muted">{feedCount}</span>}
+            </button>
+          )}
+          {performer && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                placementOpenStore.set(true);
+              }}
+              className="account-menu-item"
+            >
+              <MapPinned className="size-4" strokeWidth={1.9} />
+              Стати на карту
+              <span className="ml-auto text-[11px] text-ink-muted">{TIER_NAMES[placement?.tier ?? 1]}</span>
             </button>
           )}
           <button

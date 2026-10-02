@@ -17,6 +17,7 @@ import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_REQUESTS } from "@/lib/map/demo";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
+import { TIER_PX } from "@/lib/placement/tiers";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer } from "@/lib/map/types";
@@ -24,6 +25,7 @@ import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useS
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
+import { placementOpenStore } from "@/lib/placement/client";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
@@ -49,7 +51,6 @@ const CITY_ZOOM = BUILDINGS_ZOOM + 2;
  * Розмір портрета на екрані за рівнем розміщення 1–6, CSS-пікселі.
  * Кроки ростуть разом із розміром, щоб сусідні рівні розрізнялися на око.
  */
-const TIER_PX = [25, 29, 33, 37, 42, 48] as const;
 const tierPx = (performer: Performer) => TIER_PX[performer.tier - 1];
 /** Наскільки портрет виростає під курсором. */
 const HOVER_SCALE = 1.25;
@@ -1190,7 +1191,8 @@ export default function MapLibreScene() {
           />
           {selected.mine ? (
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => profileEditorStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Редагувати профіль</button>
+              <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
+              <button type="button" onClick={() => profileEditorStore.set(true)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Редагувати профіль</button>
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2">

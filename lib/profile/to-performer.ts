@@ -4,7 +4,7 @@
 // (lib/map/types), тож карта, фільтри й підбір працюють без змін.
 
 import { CITIES } from "@/lib/map/cities";
-import type { Performer, PortfolioWork, WorkKind } from "@/lib/map/types";
+import type { Performer, PlacementTier, PortfolioWork, WorkKind } from "@/lib/map/types";
 import { profileTags, type Profile, type ProfileWork } from "./types";
 
 /** Який умовний екран малювати на мініатюрі, поки немає скриншота. */
@@ -38,10 +38,9 @@ const toWork = (work: ProfileWork): PortfolioWork => ({
 
 /**
  * Власний профіль на карті. Точка — у межах свого міста з невеликим
- * зсувом, щоб не стояти точно на підписі міста. Розміщення поки базове:
- * платне з'явиться з оплатою.
+ * зсувом, щоб не стояти точно на підписі міста. Рівень — за оплатою розміщення.
  */
-export const profileToPerformer = (profile: Profile, userId: string, avatarIndex: number): Performer | null => {
+export const profileToPerformer = (profile: Profile, userId: string, avatarIndex: number, tier: PlacementTier = 1): Performer | null => {
   const city = CITIES.find((item) => item.id === profile.cityId);
   if (!city) return null;
   return {
@@ -50,7 +49,7 @@ export const profileToPerformer = (profile: Profile, userId: string, avatarIndex
     lat: city.lat + 0.045,
     lng: city.lng - 0.07,
     online: true,
-    tier: 1,
+    tier,
     avatarIndex,
     name: profile.name.trim(),
     specialty: profile.specialty.trim(),

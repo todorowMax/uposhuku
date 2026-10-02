@@ -10,6 +10,7 @@ import { TaggedField } from "@/components/profile/tagged-field";
 import { WorkEditor } from "@/components/profile/work-editor";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { CITIES } from "@/lib/map/cities";
+import { placementOpenStore } from "@/lib/placement/client";
 import { profileEditorStore, profileStore, saveMyProfile } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import { PROFILE_LIMITS, emptyProfile, missingForPublish, profileTags, provenTags, type Profile, type ProfileWork } from "@/lib/profile/types";
@@ -403,7 +404,14 @@ export function ProfileEditor() {
                 </div>
               )}
             </div>
-            <p className="pe-preview-note">Розмір вашого маркера на карті залежить від платного розміщення. Поки у вас базовий.</p>
+            <p className="pe-preview-note">
+              Розмір вашого маркера на карті залежить від платного розміщення.{" "}
+              {isPublished && (
+                <button type="button" onClick={() => placementOpenStore.set(true)} className="auth-link text-[11px]">
+                  Стати на карту
+                </button>
+              )}
+            </p>
           </aside>
         </div>
       </div>

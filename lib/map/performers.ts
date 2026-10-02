@@ -18,3 +18,7 @@ export const usePerformers = () => useStore(performersStore);
 export const setMyPerformer = (mine: Performer | null) => {
   performersStore.set(mine ? [...DEMO_PERFORMERS, mine] : DEMO_PERFORMERS);
 };
+
+/** Змінити свого виконавця на місці, напр. рівень після оплати. */
+export const updateMyPerformer = (patch: Partial<Performer>) =>
+  performersStore.set(performersStore.get().map((performer) => (performer.mine ? { ...performer, ...patch } : performer)));

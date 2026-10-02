@@ -6,6 +6,8 @@ import { Check, ChevronDown, ChevronUp, MoreHorizontal, Paperclip, Plus } from "
 import { ApiError, activeRequestStore, closeActiveRequest, composingStore } from "@/lib/auth/client";
 import { tagMatches, useStore } from "@/lib/map/filters";
 import { sidePanelChoice } from "@/lib/requests/side-panel";
+import { useDeals } from "@/lib/deals/client";
+import { dealPhase, type DealPhase } from "@/lib/deals/machine";
 import { dockCompactStore, loadDockCompact, offersCollapsedStore, offersCountStore, setDockCompact } from "@/lib/requests/offers";
 import type { PublishedRequest } from "@/lib/requests/types";
 
@@ -27,7 +29,8 @@ const performersCount = (count: number) => {
 };
 
 /** На якому кроці запит: без відгуків чекаємо їх, з відгуками — вибір виконавця. */
-const stepOf = (request: PublishedRequest, offers: number) => (request.status === "closed" ? -1 : offers > 0 ? 2 : 1);
+const stepOf = (request: PublishedRequest, offers: number, deal: DealPhase) =>
+  request.status === "closed" ? -1 : deal === "done" ? 5 : deal === "working" ? 3 : offers > 0 ? 2 : 1;
 
 /** «1 пропозиція», «3 пропозиції», «7 пропозицій». */
 const offersCount = (count: number) => {
@@ -55,7 +58,9 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const fillRef = useRef<HTMLSpanElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const current = stepOf(active, offers);
+  const deals = useDeals(active.id);
+  const phase = dealPhase(deals);
+  const current = stepOf(active, offers, phase);
   const closed = active.status === "closed";
   const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -74,7 +79,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   useLayoutEffect(() => {
     const fill = fillRef.current;
     if (!fill) return;
-    const progress = current <= 0 ? 0 : current / (STEPS.length - 1);
+    const progress = current <= 0 ? 0 : Math.min(1, current / (STEPS.length - 1));
     if (reduced()) {
       gsap.set(fill, { scaleX: progress });
       return;
@@ -126,7 +131,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
               <span key={label} data-state={closed ? "idle" : index < current ? "done" : index === current ? "current" : "idle"} />
             ))}
           </span>
-          <span className="hidden shrink-0 text-[12px] font-medium text-ink sm:inline">{closed ? "Закрито" : STEPS[Math.max(0, current)]}</span>
+          <span className="hidden shrink-0 text-[12px] font-medium text-ink sm:inline">{closed ? "Закрито" : STEPS[Math.min(STEPS.length - 1, Math.max(0, current))]}</span>
           {offers > 0 && <span className="filter-all-badge shrink-0">{offers}</span>}
           <ChevronDown className="size-4 shrink-0 text-ink-muted" strokeWidth={2} />
           <span className="sr-only">Розгорнути запит</span>
@@ -219,7 +224,13 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
         ) : (
           <>
             <span aria-hidden className="request-live-dot" />
-            {offers > 0 ? (
+            {phase === "done" ? (
+              <>Угоду завершено. Дякуємо, що користуєтесь Vibe Map!</>
+            ) : phase === "working" ? (
+              <>Угода в роботі. Деталі й оплата — у чаті з виконавцем.</>
+            ) : phase === "negotiating" ? (
+              <>Пропозицію угоди надіслано, чекаємо на відповідь виконавця.</>
+            ) : offers > 0 ? (
               <>
                 {offersCount(offers)} від виконавців.{" "}
                 <button type="button" onClick={() => { sidePanelChoice.set("offers"); offersCollapsedStore.set(false); }} className="auth-link">

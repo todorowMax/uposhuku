@@ -6,6 +6,7 @@
 
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { setMyPerformer } from "@/lib/map/performers";
+import { forgetPlacement, loadPlacement } from "@/lib/placement/client";
 import { registerCustomAvatar } from "@/lib/map/portrait";
 import { createStore } from "@/lib/store";
 import { profileToPerformer } from "./to-performer";
@@ -43,7 +44,9 @@ const putOnMap = async (profile: Profile | null) => {
     return null;
   }
   const avatarIndex = profile.photo ? await registerCustomAvatar(profile.photo) : 0;
-  const performer = profileToPerformer(profile, session.user.id, avatarIndex);
+  // Рівень — за оплатою розміщення; завантажуємо, щоб маркер одразу був правильного розміру.
+  const placement = (await loadPlacement()) ?? null;
+  const performer = profileToPerformer(profile, session.user.id, avatarIndex, placement?.tier ?? 1);
   setMyPerformer(performer);
   return performer;
 };
@@ -75,6 +78,7 @@ export const removeMyProfile = async () => {
 
 /** Вихід з акаунта: профіль з карти зникає. */
 export const forgetProfile = () => {
+  forgetPlacement();
   profileStore.set({ status: "loading" });
   setMyPerformer(null);
   profileEditorStore.set(false);

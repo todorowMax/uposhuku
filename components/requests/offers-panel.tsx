@@ -14,6 +14,9 @@ import {
   useOffers,
 } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
+import { DealTab, liveDeal } from "@/components/deals/deal-tab";
+import { useDeals } from "@/lib/deals/client";
+import { needsAction } from "@/lib/deals/machine";
 import { feedCountStore } from "@/lib/feed/client";
 import { SidePanelSwitch } from "@/components/requests/side-switch";
 import { useSidePanel } from "@/lib/requests/side-panel";
@@ -284,6 +287,15 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const warn = mentionsContacts(draft);
+  const deals = useDeals(response.requestId);
+  const live = liveDeal(deals, response.id);
+  const todo = live ? needsAction(live) : null;
+  const [tab, setTab] = useState<"chat" | "deal">("chat");
+  // Пропозицію щойно надіслано (або виконавець відповів): показуємо угоду.
+  const liveId = live?.id;
+  useEffect(() => {
+    if (liveId) setTab("deal");
+  }, [liveId]);
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: reduced() ? "auto" : "smooth" });
@@ -322,10 +334,27 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
           <p className="text-[14px] font-semibold tabular-nums text-ink">{priceLabel(response.price)}</p>
           <p className="text-[11px] text-ink-muted">{daysLabel(response.days)}</p>
         </div>
-        <button type="button" disabled title="Наступний крок: угода з оплатою" className="offer-secondary">
-          Запропонувати угоду
+        <button type="button" onClick={() => setTab("deal")} className="offer-secondary">
+          {live ? `Угода ${live.number}` : "Запропонувати угоду"}
         </button>
       </div>
+
+      <div className="side-switch chat-tabs" role="tablist" aria-label="Чат і угода">
+        <button type="button" role="tab" aria-selected={tab === "chat"} onClick={() => setTab("chat")}>
+          Чат
+        </button>
+        <button type="button" role="tab" aria-selected={tab === "deal"} onClick={() => setTab("deal")}>
+          Угода
+          {todo && <span aria-label="Потрібна ваша дія" className="chat-tab-dot" />}
+        </button>
+      </div>
+
+      {tab === "deal" ? (
+        <div className="chat-deal">
+          <DealTab response={response} />
+        </div>
+      ) : (
+        <>
 
       <div ref={listRef} className="chat-messages" aria-live="polite">
         <p className="chat-notice">
@@ -377,6 +406,8 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
           </button>
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 }

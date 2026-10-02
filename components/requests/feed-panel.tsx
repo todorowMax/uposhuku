@@ -10,6 +10,9 @@ import { RESPONSE_LIMITS, type FeedItem, type MyResponse } from "@/lib/feed/type
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { offersCountStore } from "@/lib/requests/offers";
 import { feedCollapsedStore, useSidePanel } from "@/lib/requests/side-panel";
+import { placementOpenStore, placementStore } from "@/lib/placement/client";
+import { TIER_NAMES } from "@/lib/placement/tiers";
+import type { PlacementTier } from "@/lib/map/types";
 import { useStore } from "@/lib/store";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -306,6 +309,7 @@ function ResponseForm({
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const id = useId();
+  const tier = useStore(placementStore)?.tier ?? 1;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -366,7 +370,18 @@ function ResponseForm({
         rows={4}
         className="auth-input w-full resize-none py-2.5 leading-snug"
       />
-      <p className="pe-hint">Вище в списку замовника стоять ті, хто оплатив розміщення. Ваш рівень поки базовий.</p>
+      <p className="pe-hint">
+        {tier <= 1 ? (
+          <>
+            Вище в списку замовника стоять ті, хто оплатив розміщення. Ваш рівень базовий.{" "}
+            <button type="button" onClick={() => placementOpenStore.set(true)} className="auth-link text-[12px]">
+              Підняти
+            </button>
+          </>
+        ) : (
+          <>Ваш рівень «{TIER_NAMES[tier as PlacementTier]}»: ваш відгук вище, ніж у тих, хто платив менше, і з позначкою «Просування».</>
+        )}
+      </p>
 
       {shown && (
         <p role="alert" className="auth-error">

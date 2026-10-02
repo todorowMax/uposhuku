@@ -11,6 +11,8 @@ import { CITIES } from "@/lib/map/cities";
 import { DEMO_PERFORMERS } from "@/lib/map/demo";
 import { primaryGroup } from "@/lib/map/groups";
 import { responsesTo } from "@/lib/feed/mock-feed";
+import { getPlacement } from "@/lib/placement/mock-store";
+import { isPromoted } from "@/lib/placement/tiers";
 import { getProfile } from "@/lib/profile/mock-store";
 import { matchProfiles } from "@/lib/tags/match";
 import type { OfferResponse, PublishedRequest } from "./types";
@@ -83,7 +85,7 @@ const plannedResponses = (request: PublishedRequest): OfferResponse[] => {
       cityName: CITIES.find((city) => city.id === performer.cityId)?.name ?? "",
       avatarIndex: performer.avatarIndex,
       tier: performer.tier,
-      promoted: performer.tier >= 3,
+      promoted: isPromoted(performer.tier),
       rating: (4.6 + hash(`${salt}:rating`) * 0.4).toFixed(1),
       price,
       days: 3 + Math.floor(hash(`${salt}:days`) * 25),
@@ -104,11 +106,12 @@ export const responsesFor = (request: PublishedRequest, now = Date.now()): Offer
       )
     : [];
 
-/** Відгуки справжніх виконавців (інших акаунтів) на запит. Розміщення в них поки базове. */
+/** Відгуки справжніх виконавців (інших акаунтів) на запит; рівень — за їхньою оплатою розміщення. */
 const realResponses = (request: PublishedRequest): OfferResponse[] =>
   responsesTo(request.id).flatMap(({ userId, response }) => {
     const profile = getProfile(userId);
     if (!profile?.published) return [];
+    const placement = getPlacement(userId);
     return [
       {
         id: `resp_${request.id}_${userId}`,
@@ -119,8 +122,8 @@ const realResponses = (request: PublishedRequest): OfferResponse[] =>
         cityName: CITIES.find((city) => city.id === profile.cityId)?.name ?? "",
         avatarIndex: 0,
         photo: profile.photo || undefined,
-        tier: 1,
-        promoted: false,
+        tier: placement.tier,
+        promoted: isPromoted(placement.tier),
         rating: "—",
         price: response.price,
         days: response.days,
