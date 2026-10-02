@@ -83,3 +83,39 @@ describe("умови запиту словами", () => {
     expect(requestFacts({})).toEqual([]);
   });
 });
+
+describe("запити на карті", () => {
+  const NOW2 = Date.parse("2026-10-03T12:00:00Z");
+
+  it("гостю видно запити лише з містом і текстом: без акаунта, збігів і відгуків", async () => {
+    const { mapRequests } = await import("@/lib/feed/mock-feed");
+    const items = mapRequests(null, [], NOW2 + 600_000);
+    expect(items.length).toBeGreaterThan(3);
+    expect(items.every((item) => item.matchedTags === 0 && item.response === null && !item.own)).toBe(true);
+    // Є і з точкою в місті, і віддалені без точки.
+    expect(items.some((item) => item.point)).toBe(true);
+    expect(items.some((item) => item.place === "Віддалено" && item.point === null)).toBe(true);
+  });
+
+  it("точка поруч із центром міста, стабільна й різна для різних запитів", async () => {
+    const { mapRequests } = await import("@/lib/feed/mock-feed");
+    const { CITIES } = await import("@/lib/map/cities");
+    const items = mapRequests(null, [], NOW2 + 600_000);
+    const lviv = CITIES.find((city) => city.id === "lviv")!;
+    const placed = items.find((item) => item.place === "Львів")!;
+    expect(Math.hypot(placed.point!.lat - lviv.lat, (placed.point!.lng - lviv.lng) * 0.65)).toBeLessThan(0.1);
+    expect(mapRequests(null, [], NOW2 + 600_000).find((item) => item.id === placed.id)!.point).toEqual(placed.point);
+  });
+
+  it("виконавцю додаємо збіг і його відгук, а власний запит позначено own", async () => {
+    const { mapRequests } = await import("@/lib/feed/mock-feed");
+    const { createRequest } = await import("@/lib/requests/mock-store");
+    createRequest("map-owner", { text: "Потрібен лендинг", tags: [{ id: "landing", label: "Лендинг" }], files: [], cityId: "kyiv" });
+    saveResponse("map-perf", "demo-1", { price: 1000, days: 3, message: "Добрий день, зроблю." });
+    const items = mapRequests("map-perf", ["online-store", "catalog"], NOW2 + 600_000);
+    expect(items.find((item) => item.id === "demo-1")).toMatchObject({ matchedTags: 2, response: { price: 1000 } });
+    const own = mapRequests("map-owner", [], NOW2 + 600_000).find((item) => item.own);
+    expect(own).toMatchObject({ own: true, place: "Київ" });
+    expect(mapRequests("map-perf", [], NOW2 + 600_000).some((item) => item.own)).toBe(false);
+  });
+});

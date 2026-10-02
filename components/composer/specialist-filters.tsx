@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ListChecks, SlidersHorizontal } from "lucide-react";
+import { MapModeSwitch } from "@/components/map/mode-switch";
+import { applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
+import { feedCollapsedStore, sidePanelChoice } from "@/lib/requests/side-panel";
 import { CITIES } from "@/lib/map/cities";
 import { usePerformers } from "@/lib/map/performers";
 import type { Performer } from "@/lib/map/types";
@@ -31,6 +34,7 @@ export function SpecialistFilters({
   const performers = usePerformers();
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
+  const mode = useStore(mapModeStore);
 
   // Лічильники груп — без вибору груп: число каже, скільки людей у групі.
   const pool = useMemo(
@@ -95,6 +99,8 @@ export function SpecialistFilters({
   );
 
   return (
+    <>
+    <MapModeSwitch variant="float" />
     <div ref={barRef} className="filter-bar" data-expanded={expanded}>
       {myRequests && (
         <button type="button" onClick={myRequests.onOpen} className="filter-chip filter-all">
@@ -103,17 +109,19 @@ export function SpecialistFilters({
           <span className="filter-all-badge">{myRequests.count}</span>
         </button>
       )}
+      <MapModeSwitch variant="inline" />
       <div
         className="filter-strip"
         role="toolbar"
-        aria-label="Групи спеціалістів"
+        aria-label={mode === "requests" ? "Фільтри запитів" : "Групи спеціалістів"}
         // Згасання зліва лише тоді, коли стрічку вже прогорнули.
         onScroll={(event) => {
           event.currentTarget.dataset.scrolled = String(event.currentTarget.scrollLeft > 2);
         }}
       >
-        <div className="filter-strip-inner">{groupChips}</div>
+        <div className="filter-strip-inner">{mode === "requests" ? <RequestChips /> : groupChips}</div>
       </div>
+      {mode === "performers" && (
       <button
         type="button"
         aria-expanded={open}
@@ -126,8 +134,9 @@ export function SpecialistFilters({
         Фільтри
         {active > 0 && <span className="filter-all-badge">{active}</span>}
       </button>
+      )}
 
-      {open && (
+      {open && mode === "performers" && (
         <FilterPanel
           groupChips={groupChips}
           pool={pool}
@@ -136,6 +145,7 @@ export function SpecialistFilters({
         />
       )}
     </div>
+    </>
   );
 }
 
@@ -237,5 +247,43 @@ function FilterPanel({
         </button>
       </div>
     </div>
+  );
+}
+
+/** Фільтри запитів: чипи замість груп спеціалістів. */
+function RequestChips() {
+  const { items, performer } = useStore(mapRequestsStore);
+  const filter = useStore(requestFilterStore);
+  const onMap = items.filter((item) => item.point);
+  const remote = items.length - onMap.length;
+
+  const chip = (id: RequestFilter, label: string) => (
+    <button key={id} type="button" aria-pressed={filter === id} onClick={() => requestFilterStore.set(id)} className="filter-chip">
+      {label}
+      <span className="filter-chip-count">{applyRequestFilter(onMap, id).length}</span>
+    </button>
+  );
+
+  return (
+    <>
+      {chip("all", "Усі")}
+      {performer && chip("matched", "Під мої теги")}
+      {chip("urgent", "Терміново")}
+      {chip("budget", "З бюджетом")}
+      {performer && remote > 0 && (
+        <button
+          type="button"
+          className="filter-chip"
+          onClick={() => {
+            sidePanelChoice.set("feed");
+            feedCollapsedStore.set(false);
+          }}
+          title="Віддалені запити без точки на карті: вони в списку «Запити для вас»"
+        >
+          Віддалено
+          <span className="filter-chip-count">{remote}</span>
+        </button>
+      )}
+    </>
   );
 }

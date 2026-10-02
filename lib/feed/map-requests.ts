@@ -1,0 +1,117 @@
+"use client";
+
+// lib/feed/map-requests.ts
+//
+// Режим карти «Запити»: що на карті (виконавці чи запити), які запити, який
+// вибрано. Дані — з /api/map/requests, опитування лише коли режим увімкнено.
+
+import { useEffect } from "react";
+import { createStore, useStore } from "@/lib/store";
+import { profileStore } from "@/lib/profile/client";
+import { requestsStore, sessionStore } from "@/lib/auth/client";
+import type { FeedItem, MapRequest } from "./types";
+
+export type MapMode = "performers" | "requests";
+export const mapModeStore = createStore<MapMode>("performers");
+
+const MODE_KEY = "vm:map-mode";
+let modeChosen = false;
+
+export const setMapMode = (mode: MapMode) => {
+  modeChosen = true;
+  mapModeStore.set(mode);
+  mapSelectedRequest.set(null);
+  try {
+    window.localStorage.setItem(MODE_KEY, mode);
+  } catch {
+    // Без сховища вибір живе до перезавантаження.
+  }
+};
+
+/** Запити на карті й чи є в людини опублікований профіль виконавця. */
+export const mapRequestsStore = createStore<{ items: MapRequest[]; performer: boolean; loaded: boolean }>({ items: [], performer: false, loaded: false });
+/** Вибраний на карті запит (id) — відкриває картку. */
+export const mapSelectedRequest = createStore<string | null>(null);
+
+export type RequestFilter = "all" | "matched" | "urgent" | "budget";
+export const requestFilterStore = createStore<RequestFilter>("all");
+
+const POLL_MS = 6000;
+
+export const loadMapRequests = async () => {
+  try {
+    const response = await fetch("/api/map/requests", { cache: "no-store" });
+    if (!response.ok) return;
+    const { items, performer } = (await response.json()) as { items: MapRequest[]; performer: boolean };
+    mapRequestsStore.set({ items, performer, loaded: true });
+  } catch {
+    // Мережа моргнула: лишаємо, що було.
+  }
+};
+
+/** Оновити один запит після відгуку, не чекаючи опитування. */
+export const patchMapRequest = (id: string, change: (item: FeedItem) => FeedItem) => {
+  const current = mapRequestsStore.get();
+  mapRequestsStore.set({ ...current, items: current.items.map((item) => (item.id === id ? { ...item, ...change(item) } : item)) });
+};
+
+/** Які запити лишити під вибраний фільтр. */
+export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter): MapRequest[] => {
+  if (filter === "matched") return items.filter((item) => item.matchedTags > 0 && !item.own);
+  if (filter === "urgent") return items.filter((item) => item.deadline === "Терміново, до 3 днів" || item.deadline === "Протягом тижня");
+  if (filter === "budget") return items.filter((item) => item.budget);
+  return items;
+};
+
+/**
+ * Тримає запити на карті свіжими, поки увімкнено режим «Запити», і вибирає
+ * режим за замовчуванням: виконавцю без свого запиту — «Запити» (він шукає
+ * роботу), решті — «Виконавці». Монтується один раз.
+ */
+export function MapRequestsSync() {
+  const mode = useStore(mapModeStore);
+  const session = useStore(sessionStore);
+  const profile = useStore(profileStore);
+  const requests = useStore(requestsStore);
+
+  // Збережений вибір, інакше за роллю.
+  useEffect(() => {
+    if (modeChosen) return;
+    try {
+      const saved = window.localStorage.getItem(MODE_KEY);
+      if (saved === "performers" || saved === "requests") {
+        modeChosen = true;
+        mapModeStore.set(saved);
+        return;
+      }
+    } catch {
+      // Без сховища вирішуємо за роллю.
+    }
+    if (session.status !== "user" || profile.status !== "ready" || requests === null) return;
+    modeChosen = true;
+    const performer = Boolean(profile.profile?.published);
+    const hasOpenRequest = requests.some((request) => request.status === "open");
+    if (performer && !hasOpenRequest) mapModeStore.set("requests");
+  }, [session.status, profile, requests]);
+
+  // Один раз завантажуємо завжди: лічильник на перемикачі показує, скільки запитів є.
+  useEffect(() => {
+    void loadMapRequests();
+  }, [session.status]);
+
+  useEffect(() => {
+    if (mode !== "requests") return;
+    void loadMapRequests();
+    const timer = window.setInterval(() => void loadMapRequests(), POLL_MS);
+    return () => window.clearInterval(timer);
+  }, [mode]);
+
+  // Вийшли з акаунта: вибір «виконавці» повертаємо, дані скидаємо.
+  useEffect(() => {
+    if (session.status === "guest") mapRequestsStore.set({ items: [], performer: false, loaded: false });
+  }, [session.status]);
+
+  return null;
+}
+
+export const useMapMode = () => useStore(mapModeStore);

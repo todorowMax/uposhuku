@@ -153,7 +153,29 @@ export function FeedPanel() {
   );
 }
 
-function FeedCard({ item, onChange }: { item: FeedItem; onChange: (change: (item: FeedItem) => FeedItem) => void }) {
+/** Що показати замість «Відгукнутися», коли відгукнутися ще не можна. */
+export interface RespondGate {
+  label: string;
+  note: string;
+  onClick: () => void;
+}
+
+/**
+ * Картка запиту: у правій колонці виконавця й на карті біля маркера. Якщо
+ * людина ще не виконавець (або це її власний запит), замість форми — gate.
+ */
+export function FeedCard({
+  item,
+  onChange,
+  gate,
+  bare = false,
+}: {
+  item: FeedItem;
+  onChange: (change: (item: FeedItem) => FeedItem) => void;
+  gate?: RespondGate;
+  /** Без власної рамки: усередині картки на карті. */
+  bare?: boolean;
+}) {
   const [formOpen, setFormOpen] = useState(false);
   const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -196,7 +218,7 @@ function FeedCard({ item, onChange }: { item: FeedItem; onChange: (change: (item
   };
 
   return (
-    <article data-feed={item.id} className="offer-card" aria-label="Запит замовника">
+    <article data-feed={item.id} className={bare ? "feed-bare" : "offer-card"} aria-label="Запит замовника">
       <div className="flex items-center justify-between gap-2 text-[11px] text-ink-muted">
         <span className="inline-flex items-center gap-1">
           <MapPin className="size-3" strokeWidth={2} />
@@ -240,7 +262,14 @@ function FeedCard({ item, onChange }: { item: FeedItem; onChange: (change: (item
         <span>{item.responses > 0 ? `Відгукнулись: ${item.responses}` : "Ще без відгуків"}</span>
       </p>
 
-      {item.response ? (
+      {gate ? (
+        <div className="mt-3">
+          <button type="button" onClick={gate.onClick} className="offer-primary w-full">
+            {gate.label}
+          </button>
+          <p className="pe-hint mt-1.5 text-center">{gate.note}</p>
+        </div>
+      ) : item.response ? (
         <div className="feed-sent">
           <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4d7a5e]">
             <Check className="size-3.5" strokeWidth={3} />

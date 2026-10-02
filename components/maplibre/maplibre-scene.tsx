@@ -11,12 +11,13 @@ import { ChevronRight } from "lucide-react";
 import { MapZoomControl } from "@/components/maplibre/zoom-control";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas, drawPortrait } from "@/lib/map/portrait";
-import { MAP_PALETTE } from "@/lib/map/palette";
 import { BUILDINGS_ZOOM, FONT_BOLD, UKRAINE_TRACE_RING, buildMapStyle } from "@/lib/maplibre/style";
 import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
-import { DEMO_REQUESTS } from "@/lib/map/demo";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
+import { RequestMapCard } from "@/components/requests/request-map-card";
+import { applyRequestFilter, mapModeStore, mapRequestsStore, mapSelectedRequest, requestFilterStore } from "@/lib/feed/map-requests";
+import type { MapRequest } from "@/lib/feed/types";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import { performerStats } from "@/lib/map/stats";
 import { TIER_PX } from "@/lib/placement/tiers";
@@ -255,6 +256,125 @@ const topEdgeUnderStack = (bounds: DOMRect, left: number, width: number) => {
   return edge;
 };
 
+/** Скільки в бюджеті словами для піна: «до 15 тис ₴», «20–40 тис ₴», без суми — «Запит». */
+const shortBudget = (budget: string | null) => {
+  const numbers = [...(budget ?? "").matchAll(/\d[\d\s\u00a0]*/g)].map((match) => Number(match[0].replace(/\D/g, "")));
+  if (numbers.length === 0) return "Запит";
+  const part = (value: number) => (value >= 1000 ? `${Math.round(value / 1000)}` : String(value));
+  const unit = numbers.every((value) => value >= 1000) ? " тис" : "";
+  const range = numbers.slice(0, 2).map(part).join("–");
+  return `${/^до/.test(budget ?? "") ? "до " : ""}${range}${unit} ₴`;
+};
+
+type PinVariant = "plain" | "match" | "own" | "sent";
+
+const pinLabel = (item: MapRequest): { variant: PinVariant; label: string } => {
+  if (item.own) return { variant: "own", label: "Ваш запит" };
+  if (item.response) return { variant: "sent", label: "Ви відгукнулись" };
+  if (item.matchedTags > 0) return { variant: "match", label: shortBudget(item.budget) };
+  return { variant: "plain", label: shortBudget(item.budget) };
+};
+
+const PIN_STYLE: Record<PinVariant, { fill: string; text: string; badge: string; glyph: string }> = {
+  plain: { fill: "#ffffff", text: "#2f3a3e", badge: "#91a99d", glyph: "#ffffff" },
+  match: { fill: "#b48264", text: "#ffffff", badge: "#ffffff", glyph: "#b48264" },
+  own: { fill: "#303638", text: "#ffffff", badge: "#ffffff", glyph: "#303638" },
+  sent: { fill: "#e5efe8", text: "#3d6a4f", badge: "#4d7a5e", glyph: "#ffffff" },
+};
+
+const PIN_RATIO = 3;
+
+/**
+ * Пін запиту: «бульбашка» з іконкою документа й сумою. Не схожий на фото
+ * виконавця, тож на карті видно різницю з першого погляду; золотий — запит
+ * під ваші теги, темний — ваш власний, зелений — ви вже відгукнулись.
+ */
+const createRequestPin = (variant: PinVariant, label: string) => {
+  const style = PIN_STYLE[variant];
+  const font = "600 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+  const probe = document.createElement("canvas").getContext("2d");
+  if (!probe) throw new Error("Canvas 2D is unavailable");
+  probe.font = font;
+  const textWidth = Math.ceil(probe.measureText(label).width);
+  const pad = 6;
+  const body = { w: 8 + 18 + 6 + textWidth + 12, h: 28 };
+  const tip = 7;
+  const width = body.w + pad * 2;
+  const height = body.h + tip + pad * 2;
+  const canvas = document.createElement("canvas");
+  canvas.width = width * PIN_RATIO;
+  canvas.height = height * PIN_RATIO;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas 2D is unavailable");
+  context.scale(PIN_RATIO, PIN_RATIO);
+
+  const x = pad;
+  const y = pad;
+  const radius = body.h / 2;
+  // Тіло з хвостиком одним контуром: тінь лягає цілою фігурою.
+  context.save();
+  context.shadowColor = "rgba(48, 68, 64, .3)";
+  context.shadowBlur = 7;
+  context.shadowOffsetY = 3;
+  context.fillStyle = style.fill;
+  context.beginPath();
+  context.moveTo(x + radius, y);
+  context.lineTo(x + body.w - radius, y);
+  context.arc(x + body.w - radius, y + radius, radius, -Math.PI / 2, Math.PI / 2);
+  context.lineTo(x + body.w / 2 + 6, y + body.h);
+  context.lineTo(x + body.w / 2, y + body.h + tip);
+  context.lineTo(x + body.w / 2 - 6, y + body.h);
+  context.lineTo(x + radius, y + body.h);
+  context.arc(x + radius, y + radius, radius, Math.PI / 2, -Math.PI / 2);
+  context.closePath();
+  context.fill();
+  context.restore();
+  if (variant === "plain" || variant === "sent") {
+    context.strokeStyle = "rgba(145, 169, 157, .55)";
+    context.lineWidth = 1;
+    context.stroke();
+  }
+
+  // Значок-документ у кружечку.
+  const bx = x + 5 + 9;
+  const by = y + body.h / 2;
+  context.fillStyle = style.badge;
+  context.beginPath();
+  context.arc(bx, by, 9, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = style.glyph;
+  context.lineWidth = 1.5;
+  context.lineCap = "round";
+  context.beginPath();
+  context.moveTo(bx - 3.5, by - 2.5);
+  context.lineTo(bx + 3.5, by - 2.5);
+  context.moveTo(bx - 3.5, by + 0.2);
+  context.lineTo(bx + 3.5, by + 0.2);
+  context.moveTo(bx - 3.5, by + 2.9);
+  context.lineTo(bx + 1, by + 2.9);
+  context.stroke();
+
+  context.fillStyle = style.text;
+  context.font = font;
+  context.textBaseline = "middle";
+  context.fillText(label, x + 8 + 18 + 6, y + body.h / 2 + 0.5);
+  return canvas;
+};
+
+const requestFeatures = (items: MapRequest[]): FeatureCollection<Point> => ({
+  type: "FeatureCollection",
+  features: items
+    .filter((item) => item.point)
+    .map((item) => {
+      const { variant, label } = pinLabel(item);
+      return {
+        type: "Feature" as const,
+        geometry: { type: "Point" as const, coordinates: [item.point!.lng, item.point!.lat] },
+        properties: { rid: item.id, icon: `req|${variant}|${label}`, prio: variant === "match" ? 3 : variant === "own" ? 4 : variant === "plain" ? 1 : 2 },
+      };
+    }),
+});
+
 const toPeople = (performers: Performer[]): FeatureCollection<Point> => ({
   type: "FeatureCollection",
   features: performers.map((performer) => ({
@@ -304,6 +424,7 @@ export default function MapLibreScene() {
   const cardRef = useRef<HTMLElement>(null);
   /** Масштаб, до якого зараз летить камера: потрібен для меж панорами, див. transformConstrain. */
   const flightZoomRef = useRef<number | null>(null);
+  const reqActiveRef = useRef<(() => void) | null>(null);
   const flyToRef = useRef<((map: MapLibreMap, center: [number, number], zoom: number, duration: number) => void) | null>(null);
   const [ready, setReady] = useState(false);
   const [slider, setSlider] = useState(0);
@@ -329,6 +450,11 @@ export default function MapLibreScene() {
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
   const matches = useStore(tagMatches);
   const performers = usePerformers();
+  const mode = useStore(mapModeStore);
+  const requestFilter = useStore(requestFilterStore);
+  const requestState = useStore(mapRequestsStore);
+  const selectedRequestId = useStore(mapSelectedRequest);
+  const selectedRequest = mode === "requests" ? requestState.items.find((item) => item.id === selectedRequestId && item.point) : undefined;
   const groups = useStore(groupFilter);
   const cities = useStore(cityFilter);
   const online = useStore(onlineFilter);
@@ -443,35 +569,19 @@ export default function MapLibreScene() {
           if (context) map.addImage(id, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio: PORTRAIT_RATIO });
           return;
         }
+        if (id.startsWith("req|")) {
+          const [, variant, ...rest] = id.split("|");
+          if (map.hasImage(id) || !(variant in PIN_STYLE)) return;
+          const canvas = createRequestPin(variant as PinVariant, rest.join("|"));
+          const context = canvas.getContext("2d");
+          if (context) map.addImage(id, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio: PIN_RATIO });
+          return;
+        }
         const match = /^cluster-((?:[1-6][0-9a-f]{2})+)$/.exec(id);
         if (!match || map.hasImage(id)) return;
         const canvas = createClusterImage(source, match[1]);
         const context = canvas.getContext("2d");
         if (context) map.addImage(id, context.getImageData(0, 0, CLUSTER_W, CLUSTER_H), { pixelRatio: CLUSTER_RATIO });
-      });
-
-      map.addSource("requests", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: DEMO_REQUESTS.map((request) => ({
-            type: "Feature",
-            geometry: { type: "Point", coordinates: [request.lng, request.lat] },
-            properties: { live: request.live },
-          })),
-        },
-      });
-      map.addLayer({
-        id: "requests",
-        type: "circle",
-        source: "requests",
-        paint: {
-          "circle-color": MAP_PALETTE.request,
-          "circle-radius": ["case", ["get", "live"], 6, 4.5],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2,
-          "circle-pitch-alignment": "viewport",
-        },
       });
 
       // Групи — вбудована кластеризація: самі розкриваються при наближенні.
@@ -519,6 +629,52 @@ export default function MapLibreScene() {
           "icon-allow-overlap": true,
         },
         paint: { "icon-opacity": 1 },
+      });
+
+      // Запити замовників: свої кластери й піни, видимі лише в режимі «Запити».
+      map.addSource("requests-map", {
+        type: "geojson",
+        data: requestFeatures([]),
+        cluster: true,
+        clusterRadius: 42,
+        clusterMaxZoom: 10,
+      });
+      const hidden = { visibility: "none" } as const;
+      map.addLayer({
+        id: "req-clusters",
+        type: "circle",
+        source: "requests-map",
+        filter: ["has", "point_count"],
+        layout: hidden,
+        paint: {
+          "circle-color": "#7e9d90",
+          "circle-radius": ["step", ["get", "point_count"], 15, 5, 19, 15, 24],
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 3,
+          "circle-pitch-alignment": "viewport",
+        },
+      });
+      map.addLayer({
+        id: "req-cluster-count",
+        type: "symbol",
+        source: "requests-map",
+        filter: ["has", "point_count"],
+        layout: { ...hidden, "text-field": ["get", "point_count_abbreviated"], "text-font": FONT_BOLD, "text-size": 13, "text-allow-overlap": true },
+        paint: { "text-color": "#ffffff" },
+      });
+      map.addLayer({
+        id: "req-pins",
+        type: "symbol",
+        source: "requests-map",
+        filter: ["!", ["has", "point_count"]],
+        layout: { ...hidden, "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true, "symbol-sort-key": ["get", "prio"] },
+      });
+      map.addLayer({
+        id: "req-active",
+        type: "symbol",
+        source: "requests-map",
+        filter: ["==", ["get", "rid"], "__none__"],
+        layout: { ...hidden, "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true, "icon-size": 1.16 },
       });
 
       // Підписи міст після людей: колізія сама ховає підпис, що наїхав би
@@ -575,10 +731,48 @@ export default function MapLibreScene() {
         setSelectedId((feature?.properties?.id as string) ?? null);
         setCardNotice(null);
       };
-      for (const layer of ["people", "people-selected", "people-clusters"]) {
+      for (const layer of ["people", "people-selected", "people-clusters", "req-pins", "req-clusters"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
+
+      // Запити: наведення збільшує пін, клік відкриває картку, кластер розкривається.
+      let hoveredRequest: string | null = null;
+      const updateActive = () => {
+        const ids = [hoveredRequest, mapSelectedRequest.get()].filter((id): id is string => Boolean(id));
+        map.setFilter("req-active", ["in", ["get", "rid"], ["literal", ids.length ? ids : ["__none__"]]]);
+      };
+      reqActiveRef.current = updateActive;
+      map.on("mousemove", "req-pins", (event) => {
+        const rid = event.features?.[0]?.properties?.rid as string | undefined;
+        if (rid && rid !== hoveredRequest) {
+          hoveredRequest = rid;
+          updateActive();
+        }
+      });
+      map.on("mouseleave", "req-pins", () => {
+        hoveredRequest = null;
+        updateActive();
+      });
+      map.on("click", "req-pins", (event) => {
+        const rid = event.features?.[0]?.properties?.rid as string | undefined;
+        if (!rid) return;
+        setSelectedId(null);
+        mapSelectedRequest.set(rid);
+      });
+      map.on("click", "req-clusters", async (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        mapSelectedRequest.set(null);
+        const zoom = await (map.getSource("requests-map") as GeoJSONSource).getClusterExpansionZoom(feature.properties?.cluster_id as number);
+        flyTo(map, (feature.geometry as Point).coordinates as [number, number], zoom + 0.3, 620);
+      });
+      // Клік повз запити знімає вибір.
+      map.on("click", (event) => {
+        if (!mapSelectedRequest.get()) return;
+        const { x, y } = event.point;
+        if (map.queryRenderedFeatures([[x - 4, y - 4], [x + 4, y + 4]], { layers: ["req-pins", "req-clusters"] }).length === 0) mapSelectedRequest.set(null);
+      });
 
       /*
        * Під курсором портрет виростає й стає поверх усього, навіть підписів
@@ -857,6 +1051,28 @@ export default function MapLibreScene() {
     };
   }, [ready, requestTags, performers]);
 
+  // Режим карти: або виконавці, або запити. Другого не показуємо взагалі, щоб не плутати.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const requestLayers = ["req-clusters", "req-cluster-count", "req-pins", "req-active"];
+    const peopleLayers = ["people", "people-clusters", "people-selected"];
+    for (const id of requestLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "visible" : "none");
+    for (const id of peopleLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "none" : "visible");
+    lensControlRef.current.hide(true);
+    if (mode === "requests") setSelectedId(null);
+  }, [ready, mode]);
+
+  // Запити на карті: усі або відфільтровані, без віддалених (їм нема де стати).
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    (map.getSource("requests-map") as GeoJSONSource | undefined)?.setData(requestFeatures(applyRequestFilter(requestState.items, requestFilter)));
+    reqActiveRef.current?.();
+  }, [ready, requestState.items, requestFilter]);
+
+  useEffect(() => reqActiveRef.current?.(), [ready, selectedRequestId]);
+
   // На карті — ті, хто під запит, з вибраних груп і міст, за потреби лише онлайн.
   useEffect(() => {
     const map = mapRef.current;
@@ -914,7 +1130,14 @@ export default function MapLibreScene() {
     const map = mapRef.current;
     const card = cardRef.current;
     const performer = getPerformers().find((person) => person.id === selectedId);
-    if (!ready || !map || !card || !performer) return;
+    const request = mapRequestsStore.get().items.find((item) => item.id === mapSelectedRequest.get() && item.point);
+    // Маркер, біля якого стоїть картка: фото виконавця або пін запиту.
+    const anchor = performer
+      ? { lng: performer.lng, lat: performer.lat, centerDy: tierPx(performer) * 1.3 * 0.6, half: (tierPx(performer) * 1.3) / 2 }
+      : request?.point
+        ? { lng: request.point.lng, lat: request.point.lat, centerDy: 18, half: 56 }
+        : null;
+    if (!ready || !map || !card || !anchor) return;
     const place = () => {
       if (window.innerWidth < 640) {
         card.style.removeProperty("left");
@@ -922,11 +1145,10 @@ export default function MapLibreScene() {
         card.style.removeProperty("max-height");
         return;
       }
-      const point = map.project([performer.lng, performer.lat]);
-      // Маркер стоїть на точці нижнім краєм; вибраний — на 30% більший.
-      const markerSize = tierPx(performer) * 1.3;
-      const markerCenterY = point.y - markerSize * 0.6;
-      const gap = markerSize / 2 + 18;
+      const point = map.project([anchor.lng, anchor.lat]);
+      // Маркер стоїть на точці нижнім краєм.
+      const markerCenterY = point.y - anchor.centerDy;
+      const gap = anchor.half + 18;
       const { width, height } = card.getBoundingClientRect();
       const bounds = map.getContainer().getBoundingClientRect();
       // Праворуч не заходимо під панель пропозицій, якщо вона відкрита колонкою.
@@ -953,7 +1175,7 @@ export default function MapLibreScene() {
       map.off("resize", place);
       observer.disconnect();
     };
-  }, [ready, selectedId]);
+  }, [ready, selectedId, selectedRequestId]);
 
   /*
    * Список групи стоїть поруч із нею: праворуч, якщо влазить, інакше
@@ -1050,13 +1272,15 @@ export default function MapLibreScene() {
   };
 
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId && !selectedRequestId) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setSelectedId(null);
+      if (event.key !== "Escape") return;
+      setSelectedId(null);
+      mapSelectedRequest.set(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedId]);
+  }, [selectedId, selectedRequestId]);
 
   const selected = performers.find((performer) => performer.id === selectedId);
   const selectedCity = CITIES.find((city) => city.id === selected?.cityId);
@@ -1147,6 +1371,8 @@ export default function MapLibreScene() {
           {detailLoading ? "Підвантажуємо деталі…" : ""}
         </div>
       </div>
+
+      {selectedRequest && <RequestMapCard ref={cardRef} item={selectedRequest} />}
 
       {selected && (
         <aside key={selected.id} ref={cardRef} className="performer-card glass-panel absolute inset-x-3 bottom-20 z-[var(--z-controls)] rounded-[22px] p-5 shadow-[0_18px_55px_rgba(45,60,67,.16)] max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain sm:inset-x-auto sm:bottom-auto sm:max-h-[calc(100%-120px)] sm:w-[360px]" aria-label={`Картка виконавця ${selected.name}`}>

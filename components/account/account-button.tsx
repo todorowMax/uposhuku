@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bell, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "lucide-react";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
 import { LegendButton } from "@/components/map/legend";
+import { mapModeStore, mapRequestsStore } from "@/lib/feed/map-requests";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { matchInfoStore } from "@/lib/map/filters";
@@ -198,9 +199,17 @@ export function AccountButton() {
 /** «Під запит: 31 з 82 виконавців» поруч із кнопкою акаунта, лише на ширшому екрані. */
 function MatchPill() {
   const info = useStore(matchInfoStore);
+  const mode = useStore(mapModeStore);
+  const { items, performer } = useStore(mapRequestsStore);
+  const onMap = items.filter((item) => item.point);
+  const matched = onMap.filter((item) => item.matchedTags > 0 && !item.own).length;
+  const text =
+    mode === "requests"
+      ? `Запитів на карті: ${onMap.length}${performer ? `, під ваші теги: ${matched}` : ""}`
+      : info && (info.shown ? `Під запит: ${info.shown} з ${info.total} виконавців` : "Під ці теги поки нікого, показуємо всіх");
   return (
-    <p aria-live="polite" className="account-match glass-panel" data-shown={Boolean(info) || undefined}>
-      {info && (info.shown ? `Під запит: ${info.shown} з ${info.total} виконавців` : "Під ці теги поки нікого, показуємо всіх")}
+    <p aria-live="polite" className="account-match glass-panel" data-shown={Boolean(text) || undefined}>
+      {text}
     </p>
   );
 }
