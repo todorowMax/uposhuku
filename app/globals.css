@@ -3820,3 +3820,165 @@ html[data-map-ready] .map-skeleton {
     transition: opacity 200ms linear, visibility 0s linear 200ms;
   }
 }
+
+/* Правові сторінки: оферта, умови, конфіденційність, контакти (components/legal). */
+.legal-page {
+  min-height: 100dvh;
+  padding: max(20px, env(safe-area-inset-top)) 16px 64px;
+  background: #eef1f1;
+}
+
+.legal-sheet {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.legal-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  transition: color 150ms;
+}
+
+.legal-back:hover {
+  color: var(--ink);
+}
+
+.legal-brand {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.legal-title {
+  font-size: clamp(26px, 6vw, 36px);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.legal-body {
+  display: grid;
+  gap: 22px;
+  max-width: 64ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+.legal-section {
+  display: grid;
+  gap: 8px;
+  scroll-margin-top: 20px;
+}
+
+.legal-section h2 {
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+.legal-link {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.legal-details {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid rgb(184 196 199 / 55%);
+}
+
+.legal-details dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.legal-details dd {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.legal-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding-top: 20px;
+  border-top: 1px solid rgb(184 196 199 / 55%);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.legal-nav a {
+  color: var(--ink-muted);
+  transition: color 150ms;
+}
+
+.legal-nav a:hover {
+  color: var(--ink);
+}
+
+/* Рядок «Оферта · Умови · …» у легенді та формі оплати. */
+.doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.doc-links a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 150ms;
+}
+
+.doc-links a:hover {
+  color: var(--ink);
+}
+
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.consent input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.consent a {
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

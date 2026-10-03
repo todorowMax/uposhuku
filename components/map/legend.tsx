@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Info, X } from "lucide-react";
+import { DocLinks } from "@/components/legal/doc-links";
 import { mapModeStore } from "@/lib/feed/map-requests";
 import { TIER_PX } from "@/lib/placement/tiers";
 import { useStore } from "@/lib/store";
@@ -124,6 +125,7 @@ export function LegendButton() {
             </ul>
           )}
           <p className="legend-switch-note">Перемикач внизу: на карті або виконавці, або запити замовників.</p>
+          <DocLinks />
         </div>
       )}
     </div>

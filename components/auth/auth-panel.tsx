@@ -244,6 +244,10 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                   Отримати код
                 </button>
               </form>
+              <p className="text-center text-[11px] leading-snug text-ink-muted">
+                Продовжуючи, ви погоджуєтесь з <a href="/legal/terms" target="_blank" rel="noreferrer" className="auth-link text-[11px]">умовами</a> і{" "}
+                <a href="/legal/privacy" target="_blank" rel="noreferrer" className="auth-link text-[11px]">політикою конфіденційності</a>.
+              </p>
               {mode === "login" && (
                 <p className="text-center text-[12px] text-ink-muted">
                   Хочете, щоб вас знайшли замовники?{" "}

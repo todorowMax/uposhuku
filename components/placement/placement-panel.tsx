@@ -106,6 +106,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   const [step, setStep] = useState<Step>("choose");
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
+  const [agreed, setAgreed] = useState(false);
 
   const others = useMemo(() => performers.filter((person) => !person.mine), [performers]);
   const amount = Math.min(MAX_PAYMENT, Math.max(MIN_PAYMENT, TIER_FROM[selected] - total));
@@ -153,13 +154,19 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
           <p className="mt-2 text-[28px] font-semibold tabular-nums text-ink">{PRICE.format(amount)} ₴</p>
           <p className="text-[12px] text-ink-muted">Розміщення на карті, рівень {tierAfter}: {TIER_NAMES[tierAfter]}</p>
         </div>
+        <label className="consent">
+          <input type="checkbox" checked={agreed} disabled={step === "processing"} onChange={(event) => setAgreed(event.target.checked)} />
+          <span>
+            Погоджуюсь з <a href="/offer" target="_blank" rel="noreferrer">договором публічної оферти</a> і прошу змінити рівень розміщення одразу після оплати. Розумію, що протягом 14 днів можу попросити повернення коштів.
+          </span>
+        </label>
         <p className="auth-mock">Справжня оплата ще не підключена. У бойовому режимі тут відкриється сторінка Monobank, а рівень зміниться після підтвердження банку.</p>
         <div className="grid gap-2">
-          <button type="button" disabled={step === "processing"} onClick={() => void pay("success")} className="auth-primary">
+          <button type="button" disabled={step === "processing" || !agreed} onClick={() => void pay("success")} className="auth-primary">
             {step === "processing" && <Loader2 className="size-4 animate-spin" />}
             {step === "processing" ? "Проводимо платіж…" : "Оплатити (тест)"}
           </button>
-          <button type="button" disabled={step === "processing"} onClick={() => void pay("declined")} className="auth-secondary">
+          <button type="button" disabled={step === "processing" || !agreed} onClick={() => void pay("declined")} className="auth-secondary">
             Імітувати відмову банку
           </button>
         </div>
