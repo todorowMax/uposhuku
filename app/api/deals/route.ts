@@ -4,7 +4,7 @@
 // події в Durable Object чату.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { isFop } from "@/lib/deals/fop";
 import { listDeals, proposeDeal } from "@/lib/deals/mock-store";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
@@ -13,14 +13,14 @@ import { findRequest } from "@/lib/requests/mock-store";
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 export async function GET(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
   return Response.json({ deals: listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   const requestId = text(body?.requestId, 40);

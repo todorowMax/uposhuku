@@ -4,9 +4,25 @@
     {
       "name": "uposhuku",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3031,
       "autoPort": false
+    },
+    {
+      "name": "uposhuku-api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3032,
+      "autoPort": false,
+      "env": {
+        "PORT": "3032"
+      }
     }
   ]
 }

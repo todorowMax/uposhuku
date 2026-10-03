@@ -15,6 +15,10 @@
     "development": {
       "name": "uposhuku-development",
       "vars": { "DEPLOY_ENV": "development" },
+      // Привʼязки не успадковуються між середовищами, тож у кожного свої.
+      "d1_databases": [
+        { "binding": "DB", "database_name": "uposhuku-development", "database_id": "6770bc21-d5a1-4829-ab92-ff465831d4b6", "migrations_dir": "db/migrations" }
+      ],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
@@ -23,6 +27,8 @@
     "production": {
       "name": "uposhuku",
       "vars": { "DEPLOY_ENV": "production" },
+      // Прод-базу створимо разом з доменом: `wrangler d1 create uposhuku-production`,
+      // тоді сюди ляже її id. Поки без неї вхід на проді вимкнений.
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"

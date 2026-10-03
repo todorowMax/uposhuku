@@ -20,14 +20,19 @@
     "cf:deploy:production": "opennextjs-cloudflare deploy --env production",
     "map:textures": "tsx scripts/build-textures.ts",
     "map:assets": "tsx scripts/build-maplibre-assets.ts",
-    "map:space": "tsx scripts/build-space.ts"
+    "map:space": "tsx scripts/build-space.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local --env development",
+    "db:migrate:development": "wrangler d1 migrations apply DB --remote --env development"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",
     "@tailwindcss/postcss": "^4.3.3",
     "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.3",
     "gsap": "^3.15.0",
     "heic-to": "^1.6.5",
+    "jose": "^6.2.12",
     "lucide-react": "^1.48.0",
     "maplibre-gl": "6.11.2",
     "next": "^15.5.26",
@@ -37,7 +42,8 @@
     "react-dom": "^19.3.0",
     "tailwind-merge": "^3.7.0",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260928.1",
@@ -45,6 +51,7 @@
     "@types/node": "^24.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "drizzle-kit": "^0.31.11",
     "tsx": "^4.23.15",
     "vitest": "^4.1.11",
     "wrangler": "^4.143.0"

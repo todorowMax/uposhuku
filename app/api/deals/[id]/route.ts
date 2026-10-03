@@ -3,14 +3,14 @@
 // роботу й виплатити), dispute (спір), cancel (скасувати пропозицію).
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { actOnDeal } from "@/lib/deals/mock-store";
 import type { DealAction } from "@/lib/deals/types";
 
 const ACTIONS: DealAction[] = ["fund", "claim_paid", "release", "dispute", "cancel"];
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   const action = ACTIONS.find((item) => item === body?.action);

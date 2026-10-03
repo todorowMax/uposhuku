@@ -4,18 +4,18 @@
 // Справжня версія: D1 (profiles, projects, profile_tags), фото в R2.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { deleteProfile, getProfile, saveProfile } from "@/lib/profile/mock-store";
 import { parseProfile } from "@/lib/profile/validate";
 
 export async function GET() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   return Response.json({ profile: getProfile(user.id) }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function PUT(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const profile = parseProfile(await readJson(request));
   if (typeof profile === "string") return problem(400, "Профіль не збережено", profile);
@@ -23,7 +23,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   deleteProfile(user.id);
   return new Response(null, { status: 204 });

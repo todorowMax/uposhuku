@@ -1,8 +1,8 @@
-// POST /api/auth/logout — закрити сесію.
+// POST /api/auth/logout — закрити сесію: рядок у `sessions` зникає, токен мертвий одразу.
 
-import { clearMockSession } from "@/lib/auth/mock-session";
+import { closeSession } from "@/lib/server/auth";
 
 export async function POST() {
-  await clearMockSession();
+  await closeSession();
   return new Response(null, { status: 204 });
 }

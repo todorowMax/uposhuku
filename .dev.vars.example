@@ -1,0 +1,9 @@
+# Скопіюйте в .dev.vars (в git не потрапляє). У проді те саме через `wrangler secret put`.
+# Від 32 символів: `openssl rand -base64 48`
+AUTH_SECRET=
+# Без ключа локально вхід працює з кодом 000000, лист не надсилається.
+RESEND_API_KEY=
+MAIL_FROM=Vibe Map <hello@uposhuku.com>
+# Google OAuth; кнопку показуємо, лише коли обидва заповнені.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=

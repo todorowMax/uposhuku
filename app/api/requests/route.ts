@@ -3,7 +3,7 @@
 // GET — мої запити, нові першими.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { createRequest, listRequests } from "@/lib/requests/mock-store";
 import { CITIES } from "@/lib/map/cities";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type RequestDraft } from "@/lib/requests/types";
@@ -37,7 +37,7 @@ const parseDraft = (body: Record<string, unknown> | null): RequestDraft | string
 };
 
 export async function POST(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   return Response.json({ requests: listRequests(user.id) }, { headers: { "cache-control": "no-store" } });
 }

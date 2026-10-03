@@ -4,18 +4,18 @@
 // оплату, а рівень змінює лише вебхук з підписом ECDSA.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { addPayment, getPlacement } from "@/lib/placement/mock-store";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/tiers";
 
 export async function GET() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   return Response.json({ placement: getPlacement(user.id) }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   const amount = typeof body?.amount === "number" ? Math.round(body.amount) : NaN;

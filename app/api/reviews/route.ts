@@ -4,7 +4,7 @@
 // завершеної угоди, один на угоду.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { listDeals } from "@/lib/deals/mock-store";
 import { addReview, reviewOfDeal, reviewsFor } from "@/lib/reviews/mock-store";
 import { REVIEW_TEXT_MAX, averageStars } from "@/lib/reviews/types";
@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const dealId = params.get("dealId");
   if (dealId) {
-    const user = await readMockSession();
+    const user = await getSessionUser();
     if (!user) return problem(401, "Потрібен вхід");
     return Response.json({ review: reviewOfDeal(dealId) ?? null }, { headers: { "cache-control": "no-store" } });
   }
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   const dealId = typeof body?.dealId === "string" ? body.dealId : "";

@@ -3,13 +3,13 @@
 // (точка зсунута), текст, теги, бюджет і термін, без пошти й імені.
 // Для виконавця з опублікованим профілем додаємо збіг з тегами й його відгук.
 
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { mapRequests } from "@/lib/feed/mock-feed";
 import { getProfile } from "@/lib/profile/mock-store";
 import { profileTags } from "@/lib/profile/types";
 
 export async function GET() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   const profile = user ? getProfile(user.id) : null;
   const tags = profile?.published ? profileTags(profile) : [];
   const items = mapRequests(user?.id ?? null, tags);

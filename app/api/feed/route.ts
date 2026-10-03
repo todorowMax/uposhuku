@@ -3,13 +3,13 @@
 // раз на кілька секунд; потім — WebSocket, цей маршрут лишиться запасним.
 
 import { problem } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { feedFor } from "@/lib/feed/mock-feed";
 import { getProfile } from "@/lib/profile/mock-store";
 import { profileTags } from "@/lib/profile/types";
 
 export async function GET() {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const profile = getProfile(user.id);
   if (!profile?.published) return problem(403, "Стрічка з'явиться після публікації профілю", "Опублікуйте профіль виконавця, і ми покажемо запити під ваші теги.");

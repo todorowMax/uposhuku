@@ -1,11 +1,11 @@
 // PATCH /api/requests/:id {status: "closed"} — закрити свій запит.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { closeRequest } from "@/lib/requests/mock-store";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   if (body?.status !== "closed") return problem(400, "Можна лише закрити запит");

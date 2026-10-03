@@ -4,13 +4,13 @@
 // замовник побачив пропозицію одразу.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { readMockSession } from "@/lib/auth/mock-session";
+import { getSessionUser } from "@/lib/server/auth";
 import { feedHas, parseResponse, removeResponse, saveResponse } from "@/lib/feed/mock-feed";
 import { getProfile } from "@/lib/profile/mock-store";
 import { profileTags } from "@/lib/profile/types";
 
 const authorize = async (id: string) => {
-  const user = await readMockSession();
+  const user = await getSessionUser();
   if (!user) return { error: problem(401, "Потрібен вхід") };
   const profile = getProfile(user.id);
   if (!profile?.published) return { error: problem(403, "Спершу опублікуйте профіль виконавця") };
