@@ -2,6 +2,8 @@
 interface CloudflareEnv {
   ASSETS: Fetcher;
   DB: D1Database;
+  /** R2: фото профілів (photos/…); потім файли запитів і чату. */
+  UPLOADS: R2Bucket;
   DEPLOY_ENV: string;
   /** Секрет підпису сесій, від 32 символів. */
   AUTH_SECRET?: string;

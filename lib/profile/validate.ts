@@ -49,8 +49,9 @@ export const parseProfile = (body: Record<string, unknown> | null): Profile | st
   const point = location(body.location);
   if (point === undefined) return "Точка має бути в межах України.";
   const photo = typeof body.photo === "string" ? body.photo : "";
-  if (photo && !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo)) return "Фото має бути у форматі JPEG.";
-  if (photo.length > PROFILE_LIMITS.photoBytes * 1.4) return "Фото завелике.";
+  // Або нове фото data URL (сервер покладе його в R2), або вже завантажена адреса /api/uploads/…
+  if (photo && !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo) && !/^\/api\/uploads\/photos\/[\w-]+\/[\w-]+\.(jpg|png|webp)$/.test(photo)) return "Фото має бути у форматі JPEG.";
+  if (photo.startsWith("data:") && photo.length > PROFILE_LIMITS.photoBytes * 1.4) return "Фото завелике.";
   const rawWorks = Array.isArray(body.works) ? body.works.slice(0, PROFILE_LIMITS.works) : [];
   const works = rawWorks.map(work);
   if (works.includes(null)) return "Посилання на роботу має починатися з http:// або https://.";

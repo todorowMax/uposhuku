@@ -7,6 +7,7 @@
 
 import { createStore, useStore } from "@/lib/store";
 import { DEMO_PERFORMERS } from "./demo";
+import { registerCustomAvatar } from "./portrait";
 import type { Performer } from "./types";
 
 let real: Performer[] = [];
@@ -42,12 +43,23 @@ export const updateMyPerformer = (patch: Partial<Performer>) => {
   performersStore.set(merged());
 };
 
+/** Фото → індекс портрета на карті. Адреси стабільні (UUID у ключі), тож кожне фото реєструємо раз. */
+const photoIndexes = new Map<string, Promise<number>>();
+const portraitFor = (photo: string) => {
+  let index = photoIndexes.get(photo);
+  if (!index) {
+    index = registerCustomAvatar(photo).catch(() => 0);
+    photoIndexes.set(photo, index);
+  }
+  return index;
+};
+
 export const loadRealPerformers = async () => {
   try {
     const response = await fetch("/api/map/performers", { cache: "no-store" });
     if (!response.ok) return;
     const { performers } = (await response.json()) as { performers: Performer[] };
-    setRealPerformers(performers);
+    setRealPerformers(await Promise.all(performers.map(async (person) => (person.photo ? { ...person, avatarIndex: await portraitFor(person.photo) } : person))));
   } catch {
     // Без мережі лишаються демо.
   }

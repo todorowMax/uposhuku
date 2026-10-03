@@ -1,6 +1,6 @@
 // tests/helpers/d1.ts
 //
-// Справжня D1 у пам'яті для тестів репозиторіїв: wrangler піднімає miniflare,
+// Справжні D1 і R2 у пам'яті для тестів репозиторіїв: wrangler піднімає miniflare,
 // ми накочуємо міграції з db/migrations. Кожен тестовий файл викликає
 // `useTestD1()` один раз у beforeAll і `close()` в afterAll.
 
@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { getPlatformProxy } from "wrangler";
 
 export const useTestD1 = async () => {
-  const proxy = await getPlatformProxy<{ DB: D1Database }>({ environment: "development", persist: false });
+  const proxy = await getPlatformProxy<{ DB: D1Database; UPLOADS: R2Bucket }>({ environment: "development", persist: false });
   const db = proxy.env.DB;
   const dir = join(process.cwd(), "db/migrations");
   for (const file of readdirSync(dir).filter((name) => name.endsWith(".sql")).sort()) {
@@ -18,6 +18,7 @@ export const useTestD1 = async () => {
     }
   }
   (globalThis as { __TEST_D1?: D1Database }).__TEST_D1 = db;
+  (globalThis as { __TEST_R2?: R2Bucket }).__TEST_R2 = proxy.env.UPLOADS;
   return { db, close: () => proxy.dispose() };
 };
 
