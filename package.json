@@ -19,7 +19,8 @@
     "cf:deploy:development": "opennextjs-cloudflare deploy --env development",
     "cf:deploy:production": "opennextjs-cloudflare deploy --env production",
     "map:textures": "tsx scripts/build-textures.ts",
-    "map:assets": "tsx scripts/build-maplibre-assets.ts"
+    "map:assets": "tsx scripts/build-maplibre-assets.ts",
+    "map:space": "tsx scripts/build-space.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "^1.20.6",

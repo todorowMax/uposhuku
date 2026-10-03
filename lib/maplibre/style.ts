@@ -53,10 +53,12 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
   projection: { type: "globe" },
   glyphs: `${origin}/map/fonts/{fontstack}/{range}.pbf`,
   sky: {
-    "sky-color": P.sky,
-    "horizon-color": P.haze,
+    // Над планетою космос (.space-bg), тож небо напівпрозоре: тонкий блакитний
+    // ореол атмосфери по краю глобуса, а далі видно зорі.
+    "sky-color": "rgba(70,130,220,0.5)",
+    "horizon-color": "rgba(160,210,255,0.9)",
     "fog-color": P.haze,
-    "sky-horizon-blend": 0.7,
+    "sky-horizon-blend": 0.45,
     "horizon-fog-blend": 0.8,
     "fog-ground-blend": 0.35,
     "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 6, 0.6, 9, 0],

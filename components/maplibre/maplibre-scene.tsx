@@ -25,6 +25,8 @@ import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer } from "@/lib/map/types";
 import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
+import { createStore } from "@/lib/store";
+import { isChromium } from "@/lib/ui/glass";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useOpenProfile } from "@/lib/profile/navigation";
@@ -36,6 +38,8 @@ maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 /** Межі України з полями: під них підганяємо камеру на старті. */
 const UKRAINE_BOUNDS: [[number, number], [number, number]] = [[22.1, 44.3], [40.3, 52.4]];
 const TILT = 38;
+/** Стеля щільності пікселів поза Chromium: див. де використано. */
+const SAFARI_MAX_PIXEL_RATIO = 1.5;
 /** Далі країни не відпускаємо: карта про Україну. */
 const MIN_ZOOM = 3.3;
 const MAX_ZOOM = 17.5;
@@ -414,6 +418,24 @@ const perspectiveAt = (map: MapLibreMap, [lng, lat]: [number, number]) => {
 const zoomToSlider = (zoom: number, far: number) => Math.min(1, Math.max(0, (zoom - far) / (CITY_ZOOM - far)));
 const sliderToZoom = (value: number, far: number) => far + value * (CITY_ZOOM - far);
 
+/**
+ * Положення повзунка масштабу лежить у сховищі, а не в стані сцени: під час
+ * зуму воно змінюється щокадру, і перемальовувати через нього всю сцену
+ * (1400 рядків) було б марною роботою, особливо в Safari.
+ */
+const zoomSliderStore = createStore(0);
+
+function ConnectedZoomControl({ mapRef, farZoomRef }: { mapRef: React.RefObject<MapLibreMap | null>; farZoomRef: React.RefObject<number> }) {
+  const value = useStore(zoomSliderStore);
+  return (
+    <MapZoomControl
+      value={value}
+      onChange={(next) => mapRef.current?.jumpTo({ zoom: sliderToZoom(next, farZoomRef.current) })}
+      onStep={(direction) => mapRef.current?.easeTo({ zoom: (mapRef.current?.getZoom() ?? 0) + direction * 1.2, duration: 320 })}
+    />
+  );
+}
+
 export default function MapLibreScene() {
   const openProfile = useOpenProfile();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -429,7 +451,6 @@ export default function MapLibreScene() {
   const reqActiveRef = useRef<(() => void) | null>(null);
   const flyToRef = useRef<((map: MapLibreMap, center: [number, number], zoom: number, duration: number) => void) | null>(null);
   const [ready, setReady] = useState(false);
-  const [slider, setSlider] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [cardNotice, setCardNotice] = useState<string | null>(null);
   /** Під час наближення догружаються вулиці й будинки з мережі. */
@@ -493,6 +514,9 @@ export default function MapLibreScene() {
       },
     });
     mapRef.current = map;
+    // Safari на ретині малює глобус у повному 2–3× і гальмує на зумі та перетягуванні.
+    // Знижуємо щільність до 1.5: пікселів майже вдвічі менше, на око різниця невелика.
+    if (!isChromium() && window.devicePixelRatio > SAFARI_MAX_PIXEL_RATIO) map.setPixelRatio(SAFARI_MAX_PIXEL_RATIO);
     // Нахил і поворот фіксовані: карта про Україну, крутити її нема сенсу.
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
@@ -503,8 +527,28 @@ export default function MapLibreScene() {
     let lastTraceFrame = 0;
     /** У паузі між обльотами все вже згасло: перемальовувати карту нема чого. */
     let traceResting = false;
+    /**
+     * Поки людина рухає карту, стежку не перемальовуємо: кожен кадр анімації
+     * це setPaintProperty з новим градієнтом і setData, а разом із зумом чи
+     * перетягуванням це зайве навантаження (Safari відчуває його першим).
+     * Після зупинки вона продовжує, а далеко від країни й так не видна.
+     */
+    let traceBusy = false;
+    let traceWanted = false;
+    const stopTrace = () => {
+      cancelAnimationFrame(traceFrame);
+      traceFrame = 0;
+    };
+    const startTrace = () => {
+      if (!traceWanted || traceBusy || traceFrame || document.hidden) return;
+      traceFrame = requestAnimationFrame(animateTrace);
+    };
 
-    const animateTrace = (timestamp: number) => {
+    function animateTrace(timestamp: number) {
+      if (traceBusy || document.hidden) {
+        traceFrame = 0;
+        return;
+      }
       if (!traceStart) traceStart = timestamp;
       if (timestamp - lastTraceFrame >= 32) {
         lastTraceFrame = timestamp;
@@ -531,11 +575,23 @@ export default function MapLibreScene() {
         });
       }
       traceFrame = requestAnimationFrame(animateTrace);
-    };
+    }
+
+    map.on("movestart", () => {
+      traceBusy = true;
+      stopTrace();
+    });
+    map.on("moveend", () => {
+      traceBusy = false;
+      startTrace();
+    });
+    const onVisibility = () => (document.hidden ? stopTrace() : startTrace());
+    document.addEventListener("visibilitychange", onVisibility);
 
     map.on("load", async () => {
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        traceFrame = requestAnimationFrame(animateTrace);
+        traceWanted = true;
+        startTrace();
       }
       // Точка старту — це й «Україна» на повзунку.
       farZoomRef.current = Math.max(MIN_ZOOM, map.getZoom());
@@ -1015,7 +1071,7 @@ export default function MapLibreScene() {
       setMapReady(true);
     });
 
-    const syncSlider = () => setSlider(zoomToSlider(map.getZoom(), farZoomRef.current));
+    const syncSlider = () => zoomSliderStore.set(zoomToSlider(map.getZoom(), farZoomRef.current));
     map.on("zoom", syncSlider);
 
     // Плашка «Підвантажуємо деталі» лише там, де справді йдемо в мережу:
@@ -1027,6 +1083,7 @@ export default function MapLibreScene() {
 
     return () => {
       cancelAnimationFrame(traceFrame);
+      document.removeEventListener("visibilitychange", onVisibility);
       setMapReady(false);
       map.remove();
       mapRef.current = null;
@@ -1289,6 +1346,7 @@ export default function MapLibreScene() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-bg">
+      <div aria-hidden className="space-bg" data-ready={ready || undefined} />
       {/* Обгортка тримає розмір: стилі MapLibre ставлять самій карті
           position: relative і перебивають absolute. */}
       <div className="absolute inset-0 transition-opacity duration-700" style={{ opacity: ready ? 1 : 0 }}>
@@ -1409,13 +1467,7 @@ export default function MapLibreScene() {
         </aside>
       )}
 
-      <MapZoomControl
-        value={slider}
-        onChange={(value) => mapRef.current?.jumpTo({ zoom: sliderToZoom(value, farZoomRef.current) })}
-        onStep={(direction) =>
-          mapRef.current?.easeTo({ zoom: (mapRef.current?.getZoom() ?? 0) + direction * 1.2, duration: 320 })
-        }
-      />
+      <ConnectedZoomControl mapRef={mapRef} farZoomRef={farZoomRef} />
     </div>
   );
 }

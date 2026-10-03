@@ -11,9 +11,11 @@ type NavigatorHints = Navigator & {
   connection?: { saveData?: boolean };
 };
 
+export const isChromium = (nav: NavigatorHints = navigator): boolean =>
+  nav.userAgentData?.brands?.some(({ brand }) => brand === "Chromium") ?? false;
+
 export const shouldUseGlass = (nav: NavigatorHints = navigator): boolean => {
-  const chromium = nav.userAgentData?.brands?.some(({ brand }) => brand === "Chromium") ?? false;
-  if (!chromium) return false;
+  if (!isChromium(nav)) return false;
   if (nav.connection?.saveData) return false;
   // deviceMemory округлений браузером (0.25…8 ГБ); невідомо — вважаємо нормальним.
   if ((nav.deviceMemory ?? 8) < 4) return false;
