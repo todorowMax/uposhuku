@@ -6,17 +6,18 @@
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import { listPublishedProfiles } from "@/lib/server/profile-repo";
 import { tiersByUser } from "@/lib/server/placement-repo";
+import { allPerformerStats } from "@/lib/server/stats-repo";
 import { failure } from "@/lib/server/route";
 
 export async function GET() {
   try {
-    const [profiles, tiers] = await Promise.all([listPublishedProfiles(), tiersByUser()]);
+    const [profiles, tiers, stats] = await Promise.all([listPublishedProfiles(), tiersByUser(), allPerformerStats()]);
     const performers = [...profiles]
       .flatMap(([userId, profile]) => {
         const tier = tiers.get(userId) ?? 1;
         if (tier < 2) return [];
         const performer = profileToPerformer(profile, userId, 0, tier);
-        return performer ? [{ ...performer, mine: false }] : [];
+        return performer ? [{ ...performer, mine: false, stats: stats.get(performer.id) }] : [];
       })
       .slice(0, 500);
     return Response.json({ performers }, { headers: { "cache-control": "public, max-age=15" } });

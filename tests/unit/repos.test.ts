@@ -7,6 +7,7 @@ import { actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDea
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
 import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
+import { allPerformerStats, performerStatsOf } from "@/lib/server/stats-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
@@ -200,4 +201,28 @@ describe("великі обсяги: у D1 не більше 100 парамет�
     expect(others.filter((request) => request.text.startsWith("Запит від bulk-"))).toHaveLength(120);
     expect(others.every((request) => request.tags.length >= 0)).toBe(true);
   }, 60_000);
+});
+
+describe("цифри виконавця з бази", () => {
+  it("місяці з реєстрації, завершені угоди й середня оцінка рахуються, а не вигадуються", async () => {
+    await makeUser(ctx.db, "stat-perf");
+    await makeUser(ctx.db, "stat-cust");
+    await ctx.db.prepare("update users set created_at = ? where id = ?").bind(Date.now() - 95 * 24 * 60 * 60 * 1000, "stat-perf").run();
+    expect(await performerStatsOf("stat-perf")).toEqual({ months: 3, orders: 0, rating: null, reviews: 0 });
+
+    const performer = { id: "me-stat-perf", name: "Стат", avatarIndex: 0, specialty: "Розробник", fop: false };
+    const created = (await proposeDeal("stat-cust", draft({ responseId: "resp_stat", performer }), 20_000_000)) as { id: string };
+    await actAsPerformer("stat-perf", created.id, "accept", undefined, 20_000_001);
+    await actOnDeal("stat-cust", created.id, "claim_paid", undefined, 20_000_002);
+    await actAsPerformer("stat-perf", created.id, "confirm_paid", undefined, 20_000_003);
+    await actAsPerformer("stat-perf", created.id, "deliver", undefined, 20_000_004);
+    const done = await actOnDeal("stat-cust", created.id, "release", undefined, 20_000_005);
+    expect(done).toMatchObject({ status: "completed" });
+    await addReview("stat-cust", { performerId: "me-stat-perf", dealId: created.id, stars: 4, text: "", author: "Олена" });
+    await addReview("stat-cust", { performerId: "me-stat-perf", dealId: "deal_other", stars: 5, text: "", author: "Іван" });
+
+    expect(await performerStatsOf("stat-perf")).toEqual({ months: 3, orders: 1, rating: 4.5, reviews: 2 });
+    expect((await allPerformerStats()).get("me-stat-perf")).toMatchObject({ orders: 1 });
+    expect(await performerStatsOf("nobody-here")).toEqual({ months: 0, orders: 0, rating: null, reviews: 0 });
+  });
 });

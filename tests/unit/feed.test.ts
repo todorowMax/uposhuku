@@ -92,6 +92,17 @@ describe("відгук виконавця доходить до замовник
   });
 });
 
+describe("теги запиту без поля запиту", () => {
+  it("надіслані теги лишаються, а порожні добираються з тексту", async () => {
+    const { withTags } = await import("@/lib/requests/derive-tags");
+    expect(withTags("будь-що", [{ id: "landing", label: "Лендинг" }])).toEqual([{ id: "landing", label: "Лендинг" }]);
+    const derived = withTags("Потрібен Telegram-бот для запису клієнтів у барбершоп з оплатою через Monobank", []);
+    expect(derived.map((tag) => tag.id)).toEqual(expect.arrayContaining(["telegram-bot", "monobank"]));
+    expect(derived.every((tag) => TAGS_BY_ID.has(tag.id) && tag.label.length > 0)).toBe(true);
+    expect(withTags("привіт", [])).toEqual([]);
+  });
+});
+
 describe("умови запиту словами", () => {
   it("бюджет, термін і місто чипами; порожнє не показуємо", async () => {
     const { requestFacts } = await import("@/lib/requests/format");

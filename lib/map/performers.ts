@@ -12,8 +12,8 @@ let real: Performer[] = [];
 let mine: Performer | null = null;
 
 const merged = () => {
-  const own = mine;
-  // Себе не дублюємо: сервер віддає й мій профіль, а «mine» у мене свій.
+  // Себе не дублюємо: сервер віддає й мій профіль, а «mine» у мене свій, але цифри беремо серверні.
+  const own = mine ? { ...mine, stats: real.find((person) => person.id === mine?.id)?.stats ?? mine.stats } : null;
   const others = own ? real.filter((person) => person.id !== own.id) : real;
   return [...others, ...(own ? [own] : [])];
 };

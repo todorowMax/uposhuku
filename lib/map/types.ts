@@ -34,6 +34,17 @@ export interface PortfolioWork {
 }
 
 /** Виконавець стоїть у своєму місті, а не за точною адресою. */
+/** Цифри виконавця: рахує сервер із бази, а не вигадуємо. */
+export interface PerformerStats {
+  /** Повних місяців від реєстрації. */
+  months: number;
+  /** Завершених угод. */
+  orders: number;
+  /** Середня оцінка з відгуків; null, поки відгуків немає. */
+  rating: number | null;
+  reviews: number;
+}
+
 export interface Performer extends GeoPoint {
   id: string;
   cityId: string;
@@ -53,6 +64,8 @@ export interface Performer extends GeoPoint {
   photo?: string;
   /** Профіль поточної людини: картка показує «Редагувати» замість «Запропонувати роботу». */
   mine?: boolean;
+  /** Цифри профілю з сервера; без них (власний профіль до завантаження) показуємо нулі. */
+  stats?: PerformerStats;
   /** Позиція портрета в локальному атласі 4×4. */
   avatarIndex: number;
   name: string;

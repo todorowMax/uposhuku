@@ -49,12 +49,12 @@ const useViewedPerformer = (id: string | null, initial: Performer | null) => {
     void fetch(`/api/performers/${encodeURIComponent(id)}`, { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error("not found");
-        return (await response.json()) as { profile: Profile; tier: number; userId: string };
+        return (await response.json()) as { profile: Profile; tier: number; userId: string; stats?: Performer["stats"] };
       })
-      .then(({ profile, tier, userId }) => {
+      .then(({ profile, tier, userId, stats }) => {
         if (cancelled) return;
         const performer = profileToPerformer({ ...profile, published: true, updatedAt: "" }, userId, 0, tier as Performer["tier"]);
-        if (performer) setRemote(performer);
+        if (performer) setRemote({ ...performer, stats });
         else setFailed(true);
       })
       .catch(() => !cancelled && setFailed(true));
