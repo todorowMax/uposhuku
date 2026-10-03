@@ -14,7 +14,12 @@
   "env": {
     "development": {
       "name": "uposhuku-development",
-      "vars": { "DEPLOY_ENV": "development" },
+      // Домену для листів ще немає, тому на dev-воркері тестовий вхід: будь-яка пошта, код 000000.
+      // Коли купимо домен і підтвердимо його в Resend, прибрати MAIL_MODE і додати MAIL_FROM.
+      "vars": { "DEPLOY_ENV": "development", "MAIL_MODE": "dev" },
+      // Явно, щоб wrangler не попереджав: dev-воркер живе на workers.dev, прев'ю-адреси не потрібні.
+      "workers_dev": true,
+      "preview_urls": false,
       // Привʼязки не успадковуються між середовищами, тож у кожного свої.
       "d1_databases": [
         { "binding": "DB", "database_name": "uposhuku-development", "database_id": "6770bc21-d5a1-4829-ab92-ff465831d4b6", "migrations_dir": "db/migrations" }

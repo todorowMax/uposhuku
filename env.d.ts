@@ -9,6 +9,8 @@ interface CloudflareEnv {
   RESEND_API_KEY?: string;
   /** Адреса відправника, напр. "Vibe Map <hello@uposhuku.com>". */
   MAIL_FROM?: string;
+  /** "dev": тестовий вхід (код 000000) навіть із ключем Resend. Не діє на проді. */
+  MAIL_MODE?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
 }

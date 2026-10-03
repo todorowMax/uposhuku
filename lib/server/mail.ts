@@ -7,15 +7,17 @@ import { readVar } from "./env";
 
 export type MailMode = "resend" | "dev" | "off";
 
-/** resend — справжні листи; dev — без ключа поза продом; off — прод без ключа, вхід вимкнений. */
+/** resend — справжні листи; dev — тестовий вхід, код 000000 (без ключа або з MAIL_MODE=dev, лише поза продом); off — прод без ключа, вхід вимкнений. */
 export const mailMode = (): MailMode => {
-  if (readVar("RESEND_API_KEY")) return "resend";
-  return readVar("DEPLOY_ENV") === "production" ? "off" : "dev";
+  if (readVar("DEPLOY_ENV") === "production") return readVar("RESEND_API_KEY") ? "resend" : "off";
+  // Тестовий вхід без пошти: MAIL_MODE=dev у dev-воркері, доки немає свого домену для листів.
+  if (readVar("MAIL_MODE") === "dev") return "dev";
+  return readVar("RESEND_API_KEY") ? "resend" : "dev";
 };
 
 export const sendLoginCode = async (email: string, code: string) => {
   const key = readVar("RESEND_API_KEY");
-  if (!key) {
+  if (mailMode() === "dev" || !key) {
     console.log(`[mail:dev] код для ${email}: ${code}`);
     return;
   }
@@ -29,5 +31,5 @@ export const sendLoginCode = async (email: string, code: string) => {
       text: `Ваш код для входу у Vibe Map: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
     }),
   });
-  if (!response.ok) throw new Error(`Resend відповів ${response.status}`);
+  if (!response.ok) throw new Error(`Resend відповів ${response.status}: ${(await response.text()).slice(0, 300)}`);
 };
