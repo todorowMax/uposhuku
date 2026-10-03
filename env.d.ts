@@ -4,6 +4,8 @@ interface CloudflareEnv {
   DB: D1Database;
   /** R2: фото профілів (photos/…); потім файли запитів і чату. */
   UPLOADS: R2Bucket;
+  /** Durable Object «кімната» для WebSocket (worker/realtime.ts). Немає в локальному next dev. */
+  REALTIME: DurableObjectNamespace;
   DEPLOY_ENV: string;
   /** Секрет підпису сесій, від 32 символів. */
   AUTH_SECRET?: string;

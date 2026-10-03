@@ -7,6 +7,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { createRequest, listRequests } from "@/lib/server/request-repo";
 import { CITIES } from "@/lib/map/cities";
 import { withTags } from "@/lib/requests/derive-tags";
+import { pushGlobal } from "@/lib/server/realtime";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type RequestDraft } from "@/lib/requests/types";
 
 const MAX_TAGS = 30;
@@ -45,7 +46,9 @@ export async function POST(request: Request) {
   if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
-  return Response.json({ request: await createRequest(user.id, draft) }, { status: 201 });
+  const created = await createRequest(user.id, draft);
+  pushGlobal({ t: "feed" });
+  return Response.json({ request: created }, { status: 201 });
 }
 
 export async function GET() {

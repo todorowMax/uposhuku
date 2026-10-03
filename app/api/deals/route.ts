@@ -6,6 +6,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { isFop } from "@/lib/deals/fop";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
+import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
 import { findRequest } from "@/lib/server/request-repo";
 
@@ -57,5 +58,7 @@ export async function POST(request: Request) {
   };
   if (!draft.performer.id || !draft.responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
   const result = await proposeDeal(user.id, draft);
-  return typeof result === "string" ? problem(400, "Угоду не створено", result) : Response.json({ deal: result }, { status: 201 });
+  if (typeof result === "string") return problem(400, "Угоду не створено", result);
+  pushUser(userOfPerformer(result.performer.id), { t: "deal", requestId: result.requestId });
+  return Response.json({ deal: result }, { status: 201 });
 }

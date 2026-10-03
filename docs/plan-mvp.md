@@ -48,7 +48,8 @@ Sep 29, 2026 · @Max
 | Розміщення | `payments` | Рівень рахуємо щоразу; платіж поки тестовий, Monobank і вебхук ще немає |
 | Угоди | `deals` (документ з етапами) | Машина станів `lib/deals/machine.ts`; дії виконавця поки симулює таймер |
 | Відгуки про роботу | `reviews` | Один на угоду (унікальний індекс) |
-| Чат | `conversations`, `messages` | `/api/conversations`, опитування `?since=`; демо-виконавці лишаються із заглушкою; вхідні виконавця в `components/chat/inbox-panel` |
+| Чат | `conversations`, `messages` | `/api/conversations`; вхідні виконавця в `components/chat/inbox-panel` |
+| Реальний час | Durable Object `Realtime` | WebSocket `/api/realtime/me` (особисті події) і `/api/realtime/global` (публічні): `worker/index.ts` пускає й перевіряє сесію та Origin, `worker/realtime.ts` розсилає (hibernation). API штовхає події через `lib/server/realtime.ts`, клієнт — `lib/realtime/client.tsx`. Опитування лишилось запасним і рідшим, поки сокети живі. У локальному `next dev` сокетів немає (працює опитування) |
 | Карта | читає профілі й платежі | `/api/map/performers`: профіль опубліковано й розміщення оплачено |
 
 Dev-воркер: `https://uposhuku-development.uposhuku.workers.dev`, вхід тестовий (`MAIL_MODE=dev`, код 000000), доки немає домену для листів.
@@ -57,7 +58,7 @@ Dev-воркер: `https://uposhuku-development.uposhuku.workers.dev`, вхід 
 
 - Справжні Monobank (розміщення, холд, виплата, вебхук), Telegram-бот, адмінка спорів (окремий репозиторій), ручний кроп фото, реквізити виконавця для QR.
 - Дії виконавця в угоді (прийняти, підтвердити оплату, здати роботу): зараз їх імітує таймер, потрібні екран і API для виконавця.
-- Файли й фото в R2 (потрібне право R2 у токені), WebSocket на Durable Objects (опитування працює), сповіщення поштою й веб-пуш.
+- Приватні файли запитів і чату в R2 (фото профілів уже там), сповіщення поштою й веб-пуш.
 - Прод: база `uposhuku-production`, домен, Resend із підтвердженим доменом, `AUTH_SECRET` і ключі Google для прода.
 
 Анімації лише на GSAP, Framer Motion у проєкт не додаємо.

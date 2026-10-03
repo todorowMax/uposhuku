@@ -9,6 +9,7 @@ import { MapModeSwitch } from "@/components/map/mode-switch";
 import { DealSync } from "@/lib/deals/client";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
 import { RealPerformersSync } from "@/lib/map/performers-sync";
+import { RealtimeSync } from "@/lib/realtime/client";
 import { RequestComposer } from "@/components/composer/request-composer";
 import { PlacementPanel } from "@/components/placement/placement-panel";
 import { InboxPanel } from "@/components/chat/inbox-panel";
@@ -32,6 +33,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <DealSync />
       <MapRequestsSync />
       <RealPerformersSync />
+      <RealtimeSync />
       <TabBadge />
       <NotificationSettings />
       <OffersPanel />

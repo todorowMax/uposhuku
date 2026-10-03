@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowUp, MessageCircle, X } from "lucide-react";
 import { fetchConversations, useRemoteChat } from "@/lib/chat/client";
+import { startPolling } from "@/lib/realtime/client";
 import { CHAT_TEXT_MAX, type ConversationDto } from "@/lib/chat/types";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { currentStage, dealTotal, payoutOf, performerNeeds } from "@/lib/deals/machine";
@@ -39,10 +40,10 @@ export function InboxPanel() {
         .catch(() => {});
     };
     load();
-    const timer = window.setInterval(load, POLL_MS);
+    const stop = startPolling(load, POLL_MS, ["message"]);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      stop();
     };
   }, [signedIn, open]);
 
@@ -183,10 +184,10 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
         .catch(() => {});
     };
     load();
-    const timer = window.setInterval(load, 4000);
+    const stop = startPolling(load, 4000, ["deal"]);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      stop();
     };
   }, [conversationId]);
 

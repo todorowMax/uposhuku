@@ -6,6 +6,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { deleteProfile, getProfile, saveProfile } from "@/lib/server/profile-repo";
+import { pushGlobal } from "@/lib/server/realtime";
 import { deleteByUrl, keyFromUrl, putPhotoFromDataUrl } from "@/lib/server/uploads";
 import { parseProfile } from "@/lib/profile/validate";
 
@@ -33,6 +34,7 @@ export async function PUT(request: Request) {
   const saved = await saveProfile(user.id, profile);
   // Попереднє фото більше не потрібне: прибираємо з R2, щоб не копити сміття.
   if (previous?.photo && previous.photo !== saved.photo) await deleteByUrl(previous.photo, user.id);
+  pushGlobal({ t: "map" });
   return Response.json({ profile: saved });
 }
 
@@ -40,5 +42,6 @@ export async function DELETE() {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   await deleteProfile(user.id);
+  pushGlobal({ t: "map" });
   return new Response(null, { status: 204 });
 }

@@ -7,7 +7,15 @@ import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { feedHas, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
+import { pushGlobal, pushUser } from "@/lib/server/realtime";
+import { requestOwner } from "@/lib/server/request-repo";
 import { profileTags } from "@/lib/profile/types";
+
+/** Замовник бачить відгук одразу, а всі — лічильник відгуків у стрічці. */
+const notifyOffer = async (requestId: string) => {
+  pushUser((await requestOwner(requestId))?.userId, { t: "offer", requestId });
+  pushGlobal({ t: "feed" });
+};
 
 const authorize = async (id: string) => {
   const user = await getSessionUser();
@@ -24,7 +32,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (auth.error) return auth.error;
   const value = parseResponse(await readJson(request));
   if (typeof value === "string") return problem(400, "Відгук не надіслано", value);
-  return Response.json({ response: await saveResponse(auth.user.id, id, value) });
+  const saved = await saveResponse(auth.user.id, id, value);
+  await notifyOffer(id);
+  return Response.json({ response: saved });
 }
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,5 +42,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const auth = await authorize(id);
   if (auth.error) return auth.error;
   await removeResponse(auth.user.id, id);
+  await notifyOffer(id);
   return new Response(null, { status: 204 });
 }

@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { ApiError } from "@/lib/auth/client";
 import { createStore, useStore } from "@/lib/store";
+import { startPolling } from "@/lib/realtime/client";
 import { useActiveRequest } from "@/lib/requests/offers";
 import type { Deal, DealAction, DealDraft } from "./types";
 
@@ -75,8 +76,7 @@ export function DealSync() {
   useEffect(() => {
     if (!id) return;
     void loadDeals(id);
-    const timer = window.setInterval(() => void loadDeals(id), POLL_MS);
-    return () => window.clearInterval(timer);
+    return startPolling(() => void loadDeals(id), POLL_MS, ["deal"]);
   }, [id]);
   return null;
 }

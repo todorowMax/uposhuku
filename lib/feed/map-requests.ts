@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { createStore, useStore } from "@/lib/store";
 import { profileStore } from "@/lib/profile/client";
 import { requestsStore, sessionStore } from "@/lib/auth/client";
+import { onRealtime, startPolling } from "@/lib/realtime/client";
 import type { FeedItem, MapRequest } from "./types";
 
 export type MapMode = "performers" | "requests";
@@ -97,13 +98,15 @@ export function MapRequestsSync() {
   // Один раз завантажуємо завжди: лічильник на перемикачі показує, скільки запитів є.
   useEffect(() => {
     void loadMapRequests();
+    // Новий чи закритий запит оновлює лічильник на перемикачі одразу, у будь-якому режимі.
+    return onRealtime((event) => event.t === "feed" && void loadMapRequests());
   }, [session.status]);
 
   useEffect(() => {
     if (mode !== "requests") return;
     void loadMapRequests();
-    const timer = window.setInterval(() => void loadMapRequests(), POLL_MS);
-    return () => window.clearInterval(timer);
+    // Запасне опитування лише в режимі запитів; події «feed» обробляє ефект вище.
+    return startPolling(() => void loadMapRequests(), POLL_MS, []);
   }, [mode]);
 
   // Вийшли з акаунта: вибір «виконавці» повертаємо, дані скидаємо.

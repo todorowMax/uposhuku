@@ -6,6 +6,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { addPayment, getPlacement } from "@/lib/server/placement-repo";
+import { pushGlobal } from "@/lib/server/realtime";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/tiers";
 
 export async function GET() {
@@ -24,5 +25,7 @@ export async function POST(request: Request) {
   }
   // Тестова відмова, щоб побачити, як виглядає невдала оплата.
   if (body?.simulate === "declined") return problem(402, "Оплату відхилено", "Банк відхилив платіж. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
-  return Response.json({ placement: await addPayment(user.id, amount) }, { status: 201 });
+  const placement = await addPayment(user.id, amount);
+  pushGlobal({ t: "map" });
+  return Response.json({ placement }, { status: 201 });
 }

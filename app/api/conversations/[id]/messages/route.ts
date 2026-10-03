@@ -6,6 +6,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { CHAT_TEXT_MAX } from "@/lib/chat/types";
 import { getSessionUser } from "@/lib/server/auth";
 import { accessibleConversation, addMessage, listMessages } from "@/lib/server/chat-repo";
+import { pushUser } from "@/lib/server/realtime";
 import { failure } from "@/lib/server/route";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -32,7 +33,12 @@ export async function POST(request: Request, { params }: Ctx) {
   try {
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
-    return Response.json({ message: await addMessage(access.conversation.id, access.role, text) }, { status: 201 });
+    const message = await addMessage(access.conversation.id, access.role, text);
+    // Обидві сторони (і всі їхні вкладки) дізнаються одразу.
+    const event = { t: "message", conversationId: access.conversation.id } as const;
+    pushUser(access.conversation.customerUserId, event);
+    pushUser(access.conversation.performerUserId, event);
+    return Response.json({ message }, { status: 201 });
   } catch (error) {
     return failure(error);
   }

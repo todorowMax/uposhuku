@@ -7,6 +7,7 @@
 // лишиться запасним.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { startPolling } from "@/lib/realtime/client";
 import type { ChatMessageDto, ConversationDto } from "./types";
 
 const POLL_MS = 3500;
@@ -74,7 +75,6 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    let timer = 0;
     const tick = async () => {
       try {
         if (!conversationRef.current) conversationRef.current = await openConversation(performerId);
@@ -83,12 +83,13 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
       } catch {
         if (!cancelled) setError(true);
       }
-      if (!cancelled) timer = window.setTimeout(tick, POLL_MS);
     };
     void tick();
+    // Подія «message» перечитує одразу, опитування лишається запасним.
+    const stop = startPolling(() => void tick(), POLL_MS, ["message"]);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      stop();
     };
   }, [enabled, performerId, pull]);
 

@@ -4,7 +4,8 @@
   // їде через ASSETS. Акаунт, домени й бази допишемо, коли буде куди
   // деплоїти; зараз тут лише мінімум, з яким працює `cf:preview`.
   "name": "uposhuku",
-  "main": ".open-next/worker.js",
+  // Свій вхід (worker/index.ts): обгортає воркер OpenNext і додає WebSocket на Durable Objects.
+  "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -25,6 +26,8 @@
         { "binding": "DB", "database_name": "uposhuku-development", "database_id": "6770bc21-d5a1-4829-ab92-ff465831d4b6", "migrations_dir": "db/migrations" }
       ],
       "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "uposhuku-uploads" }],
+      "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "Realtime" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Realtime"] }],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"
@@ -40,6 +43,8 @@
         { "binding": "DB", "database_name": "uposhuku-production", "database_id": "2b92cc09-29cc-4ae1-86c6-01f6223bb706", "migrations_dir": "db/migrations" }
       ],
       "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "uposhuku-uploads-production" }],
+      "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "Realtime" }] },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Realtime"] }],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"

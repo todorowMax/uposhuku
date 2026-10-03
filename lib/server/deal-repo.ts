@@ -55,6 +55,10 @@ export const actOnDeal = async (userId: string, id: string, action: DealAction, 
   return result;
 };
 
+/** Замовник угоди: потрібно, щоб сповістити його про дію виконавця. */
+export const ownerOfDeal = async (id: string): Promise<string | null> =>
+  (await getDb().select({ ownerUserId: deals.ownerUserId }).from(deals).where(eq(deals.id, id)).limit(1))[0]?.ownerUserId ?? null;
+
 // ───────────── сторона виконавця ─────────────
 
 /** Угоди, запропоновані цьому виконавцю-акаунту; можна звузити до розмови з одним замовником. */

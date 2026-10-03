@@ -13,6 +13,7 @@ import { MOCK_CODE } from "@/lib/auth/config";
 import { authAttempts, emailCodes, sessions, users } from "@/db/schema";
 import { getDb, type Db } from "./db";
 import { isProduction, readVar } from "./env";
+import { sessionSecret } from "./session-secret";
 import { mailMode, sendLoginCode } from "./mail";
 
 const COOKIE = "vm_session";
@@ -38,11 +39,9 @@ export class AuthError extends Error {
 }
 
 const secret = () => {
-  const value = readVar("AUTH_SECRET");
-  if (value && value.length >= 32) return new TextEncoder().encode(value);
-  // Локально без секрету підписуємо ключем розробки; на проді без секрету входу немає.
-  if (!isProduction()) return new TextEncoder().encode("dev-only-secret-dev-only-secret-dev-only");
-  throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
+  const key = sessionSecret({ AUTH_SECRET: readVar("AUTH_SECRET"), DEPLOY_ENV: readVar("DEPLOY_ENV") });
+  if (!key) throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
+  return key;
 };
 
 const sha256 = async (value: string) => {

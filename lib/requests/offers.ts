@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { activeRequestStore, authFlowStore, composingStore, requestsStore, sessionStore } from "@/lib/auth/client";
+import { startPolling } from "@/lib/realtime/client";
 import { createStore, useStore } from "@/lib/store";
 import type { OfferResponse, PublishedRequest } from "./types";
 
@@ -98,10 +99,10 @@ export const useOffers = (request: PublishedRequest | null) => {
       }
     };
     void load();
-    const timer = window.setInterval(load, POLL_MS);
+    const stop = startPolling(() => void load(), POLL_MS, ["offer"]);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      stop();
     };
   }, [requestId]);
 

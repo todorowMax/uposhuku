@@ -5,6 +5,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { getOrCreateConversation, listConversations, performerKnown } from "@/lib/server/chat-repo";
+import { pushUser } from "@/lib/server/realtime";
 import { failure } from "@/lib/server/route";
 
 export async function GET() {
@@ -26,6 +27,8 @@ export async function POST(request: Request) {
     const known = await performerKnown(performerId, user.id);
     if (!known) return problem(404, "Виконавця не знайдено", "Профіль не опубліковано або це ваш власний профіль.");
     const conversation = await getOrCreateConversation(user.id, performerId, known.userId);
+    // Нова розмова з'являється в списку другої сторони одразу.
+    pushUser(known.userId, { t: "message", conversationId: conversation.id });
     return Response.json({ conversation: { id: conversation.id, performerId, role: "customer" as const } }, { status: 201 });
   } catch (error) {
     return failure(error);

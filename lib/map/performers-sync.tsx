@@ -1,23 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import { startPolling } from "@/lib/realtime/client";
 import { loadRealPerformers } from "./performers";
 
 const POLL_MS = 30_000;
 
-/** Підтягує справжніх виконавців на карту: при відкритті, раз на пів хвилини й коли вкладка знову видима. */
+/** Підтягує справжніх виконавців на карту: при відкритті, за подією «map», а запасом раз на пів хвилини. */
 export function RealPerformersSync() {
   useEffect(() => {
     void loadRealPerformers();
-    const timer = window.setInterval(() => {
-      if (!document.hidden) void loadRealPerformers();
-    }, POLL_MS);
+    const stop = startPolling(() => !document.hidden && void loadRealPerformers(), POLL_MS, ["map"]);
     const onVisible = () => {
       if (!document.hidden) void loadRealPerformers();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
-      window.clearInterval(timer);
+      stop();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);

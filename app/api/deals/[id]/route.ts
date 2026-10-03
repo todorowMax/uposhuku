@@ -4,7 +4,8 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { actAsPerformer, actOnDeal } from "@/lib/server/deal-repo";
+import { actAsPerformer, actOnDeal, ownerOfDeal } from "@/lib/server/deal-repo";
+import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealAction, PerformerAction } from "@/lib/deals/types";
 
 const ACTIONS: DealAction[] = ["fund", "claim_paid", "release", "dispute", "cancel"];
@@ -20,7 +21,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!performerAction) return problem(400, "Невідома дія");
     const done = await actAsPerformer(user.id, (await params).id, performerAction, typeof body?.stageId === "string" ? body.stageId : undefined);
     if (done === null) return problem(404, "Угоду не знайдено");
-    return typeof done === "string" ? problem(409, "Дію не виконано", done) : Response.json({ deal: done });
+    if (typeof done === "string") return problem(409, "Дію не виконано", done);
+    pushUser(await ownerOfDeal(done.id), { t: "deal", requestId: done.requestId });
+    return Response.json({ deal: done });
   }
   const action = ACTIONS.find((item) => item === body?.action);
   if (!action) return problem(400, "Невідома дія");
@@ -31,5 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
   const result = await actOnDeal(user.id, (await params).id, action, stageId);
   if (result === null) return problem(404, "Угоду не знайдено");
-  return typeof result === "string" ? problem(409, "Дію не виконано", result) : Response.json({ deal: result });
+  if (typeof result === "string") return problem(409, "Дію не виконано", result);
+  pushUser(userOfPerformer(result.performer.id), { t: "deal", requestId: result.requestId });
+  return Response.json({ deal: result });
 }

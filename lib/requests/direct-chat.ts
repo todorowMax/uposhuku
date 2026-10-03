@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { fetchConversations, fetchMessages, openConversation, postMessage, toLines } from "@/lib/chat/client";
+import { startPolling } from "@/lib/realtime/client";
 import { createStore, useStore } from "@/lib/store";
 
 export interface ChatMessage {
@@ -75,8 +76,7 @@ export const useDialogSync = (performerId: string, active: boolean) => {
   useEffect(() => {
     if (!active || !signedIn) return;
     void syncDialog(performerId);
-    const timer = window.setInterval(() => void syncDialog(performerId), 3500);
-    return () => window.clearInterval(timer);
+    return startPolling(() => void syncDialog(performerId), 3500, ["message"]);
   }, [active, signedIn, performerId]);
 };
 

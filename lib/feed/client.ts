@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/lib/auth/client";
+import { startPolling } from "@/lib/realtime/client";
 import { createStore } from "@/lib/store";
 import type { FeedItem, MyResponse } from "./types";
 
@@ -82,10 +83,10 @@ export const useFeed = (enabled: boolean) => {
       }
     };
     void load();
-    const timer = window.setInterval(load, POLL_MS);
+    const stop = startPolling(() => void load(), POLL_MS, ["feed"]);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      stop();
     };
   }, [enabled]);
 
