@@ -17,8 +17,6 @@ export const profileStore = createStore<ProfileState>({ status: "loading" });
 
 /** Редактор профілю відкритий. */
 export const profileEditorStore = createStore(false);
-/** Чий профіль відкритий для перегляду (id виконавця), або null. */
-export const profileViewStore = createStore<string | null>(null);
 /** Просять карту показати щойно опублікованого виконавця. */
 export const justPublishedStore = createStore<{ id: string; at: number } | null>(null);
 

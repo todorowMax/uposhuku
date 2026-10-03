@@ -27,7 +27,8 @@ import type { Performer } from "@/lib/map/types";
 import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore } from "@/lib/requests/offers";
-import { justPublishedStore, profileEditorStore, profileViewStore } from "@/lib/profile/client";
+import { useOpenProfile } from "@/lib/profile/navigation";
+import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
 import { placementOpenStore } from "@/lib/placement/client";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
@@ -414,6 +415,7 @@ const zoomToSlider = (zoom: number, far: number) => Math.min(1, Math.max(0, (zoo
 const sliderToZoom = (value: number, far: number) => far + value * (CITY_ZOOM - far);
 
 export default function MapLibreScene() {
+  const openProfile = useOpenProfile();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const avatarAtlasRef = useRef<HTMLImageElement | null>(null);
@@ -1399,7 +1401,7 @@ export default function MapLibreScene() {
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => profileViewStore.set(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
+              <button type="button" onClick={() => openProfile(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
               <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
             </div>
           )}

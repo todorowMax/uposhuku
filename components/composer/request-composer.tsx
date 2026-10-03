@@ -22,7 +22,7 @@ import { AuthPanel } from "@/components/auth/auth-panel";
 import { RequestDock } from "@/components/requests/request-dock";
 import { authFlowStore, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useActiveRequest } from "@/lib/requests/offers";
-import { useSidePanelOpen } from "@/lib/requests/side-panel";
+import { useSidePanelOpen, useSidePanelWide } from "@/lib/requests/side-panel";
 import { loadDraft, saveDraft } from "@/lib/requests/draft";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
@@ -68,6 +68,7 @@ export function RequestComposer() {
    */
   const activeRequest = useActiveRequest();
   const sidePanelOpen = useSidePanelOpen();
+  const sidePanelWide = useSidePanelWide();
   const requestCount = session.status === "user" ? (requests?.length ?? 0) : 0;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
@@ -261,7 +262,7 @@ export function RequestComposer() {
     <div
       data-top-stack
       className={`pointer-events-none absolute inset-x-0 top-0 z-[var(--z-controls)] flex flex-col items-center px-4 pt-[max(1.5rem,env(safe-area-inset-top))] transition-[padding] duration-300 sm:pt-14 ${
-        sidePanelOpen ? "lg:pr-[428px]" : ""
+        sidePanelOpen ? (sidePanelWide ? "lg:pr-[calc(min(50vw,760px)+36px)]" : "lg:pr-[428px]") : ""
       }`}
     >
       {activeRequest && requests && <RequestDock key={activeRequest.id} requests={requests} active={activeRequest} />}

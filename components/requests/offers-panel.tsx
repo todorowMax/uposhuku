@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
-import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, MessageCircle, ShieldCheck, Star, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, Maximize2, MessageCircle, Minimize2, ShieldCheck, Star, X } from "lucide-react";
 import { getPerformers } from "@/lib/map/performers";
 import { AVATAR_ATLAS } from "@/lib/map/portrait";
 import { mentionsContacts, useMockChat } from "@/lib/requests/mock-chat";
@@ -10,6 +10,7 @@ import {
   focusPerformerStore,
   offersCollapsedStore,
   offersViewStore,
+  offersWideStore,
   useActiveRequest,
   useOffers,
 } from "@/lib/requests/offers";
@@ -20,7 +21,7 @@ import { needsAction } from "@/lib/deals/machine";
 import { feedCountStore } from "@/lib/feed/client";
 import { SidePanelSwitch } from "@/components/requests/side-switch";
 import { useSidePanel } from "@/lib/requests/side-panel";
-import { profileViewStore } from "@/lib/profile/client";
+import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -56,6 +57,7 @@ export function OffersPanel() {
   const open = requestOpen && kind === "offers";
   const view = useStore(offersViewStore);
   const collapsed = useStore(offersCollapsedStore);
+  const wide = useStore(offersWideStore);
   const { loading, offers, declinedOffers, pending, all, revealPending, decline, restore } = useOffers(requestOpen ? request : null);
   const [showDeclined, setShowDeclined] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
@@ -123,10 +125,16 @@ export function OffersPanel() {
   }
 
   return (
-    <aside ref={panelRef} aria-label="Пропозиції виконавців" className="offers-panel glass-panel">
+    <aside ref={panelRef} aria-label="Пропозиції виконавців" className="offers-panel glass-panel" data-wide={(chatWith && wide) || undefined}>
       {chatWith ? (
         <div ref={bodyRef} className="offers-body">
-          <ChatView response={chatWith} onBack={() => offersViewStore.set({ kind: "list" })} />
+          <ChatView
+            response={chatWith}
+            onBack={() => {
+              offersWideStore.set(false);
+              offersViewStore.set({ kind: "list" });
+            }}
+          />
         </div>
       ) : (
         <>
@@ -223,6 +231,7 @@ function Avatar({ index, size, photo }: { index: number; size: number; photo?: s
 }
 
 function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat: () => void; onDecline: () => void }) {
+  const openProfile = useOpenProfile();
   const showOnMap = () => {
     focusPerformerStore.set({ id: offer.performerId, at: Date.now() });
     if (isPhone()) offersCollapsedStore.set(true);
@@ -235,7 +244,7 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => profileViewStore.set(offer.performerId)} className="truncate text-left text-[14px] font-semibold text-ink underline-offset-4 hover:underline" aria-label={`Профіль: ${offer.name}`}>
+            <button type="button" onClick={() => openProfile(offer.performerId)} className="truncate text-left text-[14px] font-semibold text-ink underline-offset-4 hover:underline" aria-label={`Профіль: ${offer.name}`}>
               {offer.name}
             </button>
             {offer.rating !== "—" && (
@@ -286,6 +295,7 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
  */
 function ChatView({ response, onBack }: { response: OfferResponse; onBack: () => void }) {
   const { messages, typing, send } = useMockChat(response);
+  const wide = useStore(offersWideStore);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -330,6 +340,15 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
           <p className="truncate text-[14px] font-semibold text-ink">{response.name}</p>
           <p className="truncate text-[11px] text-ink-muted">{typing ? "друкує…" : response.specialty}</p>
         </div>
+        <button
+          type="button"
+          onClick={() => offersWideStore.set(!wide)}
+          aria-label={wide ? "Згорнути чат" : "Розгорнути чат вліво"}
+          aria-pressed={wide}
+          className="auth-icon-button hidden shrink-0 lg:grid"
+        >
+          {wide ? <Minimize2 className="size-4" strokeWidth={2} /> : <Maximize2 className="size-4" strokeWidth={2} />}
+        </button>
       </header>
 
       <div className="chat-offer">

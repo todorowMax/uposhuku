@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { Check, Loader2, MapPin, MessageSquareText, X } from "lucide-react";
+import { DirectChatPanel } from "@/components/profile/direct-chat";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { Stars } from "@/components/deals/deal-tab";
 import { avatarBackground } from "@/lib/map/avatar-style";
@@ -12,7 +13,10 @@ import { performerStats } from "@/lib/map/stats";
 import type { Performer } from "@/lib/map/types";
 import { placementOpenStore } from "@/lib/placement/client";
 import { TIER_NAMES, isPromoted } from "@/lib/placement/tiers";
-import { profileEditorStore, profileViewStore } from "@/lib/profile/client";
+import { sessionStore } from "@/lib/auth/client";
+import { useCloseProfile } from "@/lib/profile/navigation";
+import { directChatOpenStore, hydrateDialogs, useDialog } from "@/lib/requests/direct-chat";
+import { profileEditorStore } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import type { Profile } from "@/lib/profile/types";
 import { fetchReviews } from "@/lib/reviews/client";
@@ -31,7 +35,7 @@ const reviewsWord = (count: number) => {
 };
 
 /** Виконавець за id: з карти, а для акаунтів, яких на карті ще немає, з /api/performers. */
-const useViewedPerformer = (id: string | null) => {
+const useViewedPerformer = (id: string | null, initial: Performer | null) => {
   const performers = usePerformers();
   const onMap = id ? performers.find((person) => person.id === id) : undefined;
   const [remote, setRemote] = useState<Performer | null>(null);
@@ -40,7 +44,7 @@ const useViewedPerformer = (id: string | null) => {
   useEffect(() => {
     setRemote(null);
     setFailed(false);
-    if (!id || onMap) return;
+    if (!id || onMap || initial) return;
     let cancelled = false;
     void fetch(`/api/performers/${encodeURIComponent(id)}`, { cache: "no-store" })
       .then(async (response) => {
@@ -57,28 +61,32 @@ const useViewedPerformer = (id: string | null) => {
     return () => {
       cancelled = true;
     };
-  }, [id, onMap]);
+  }, [id, onMap, initial]);
 
-  return { performer: onMap ?? remote, failed };
+  return { performer: onMap ?? initial ?? remote, failed };
 };
 
 /**
  * Повний профіль виконавця: фото, цифри, «Про себе» без обрізання, роботи
  * сіткою (клік — опис, теги, посилання), теги й відгуки про роботу. Той
  * самий екран бачить сам виконавець у «Мій профіль → Як мене бачать».
+ * Малює сторінка /p/[id]; `initial` і `initialLabels` приходять із сервера,
+ * щоб у першому HTML уже був текст профілю.
  */
-export function ProfileViewHost() {
-  const id = useStore(profileViewStore);
-  if (!id) return null;
-  return <ProfileView key={id} id={id} />;
-}
-
-const close = () => profileViewStore.set(null);
-
-function ProfileView({ id }: { id: string }) {
-  const { performer, failed } = useViewedPerformer(id);
+export function ProfileView({ id, initial, initialLabels = {} }: { id: string; initial: Performer | null; initialLabels?: Record<string, string> }) {
+  const close = useCloseProfile();
+  const session = useStore(sessionStore);
+  const { performer: found, failed } = useViewedPerformer(id, initial);
+  const mineId = session.status === "user" ? `me-${session.user.id}` : null;
+  const mine = Boolean(found && (found.mine || found.id === mineId));
+  const performer = useMemo(() => (found ? { ...found, mine } : null), [found, mine]);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const [labels, setLabels] = useState<Record<string, string>>({});
+  const composeButtonRef = useRef<HTMLButtonElement>(null);
+  /** Панель «Описати задачу» / чат відкрита. */
+  const [composing, setComposing] = useState(false);
+  const dialog = useDialog(id);
+  const openRequest = useStore(directChatOpenStore);
+  const [labels, setLabels] = useState<Record<string, string>>(initialLabels);
   const [reviews, setReviews] = useState<{ list: Review[]; average: number | null } | null>(null);
 
   useLayoutEffect(() => {
@@ -90,12 +98,23 @@ function ProfileView({ id }: { id: string }) {
   }, []);
 
   useEffect(() => {
+    hydrateDialogs();
+  }, []);
+
+  // Гість увійшов, і його чат створено: відкриваємо його без кнопки.
+  useEffect(() => {
+    if (openRequest !== id || !performer || performer.mine) return;
+    directChatOpenStore.set(null);
+    setComposing(true);
+  }, [openRequest, id, performer]);
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key === "Escape" && !composing) close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [close, composing]);
 
   useEffect(() => {
     let cancelled = false;
@@ -262,18 +281,33 @@ function ProfileView({ id }: { id: string }) {
             </>
           ) : (
             <button
+              ref={composeButtonRef}
               type="button"
               className="auth-primary"
-              onClick={() => {
-                close();
-                document.getElementById("request")?.focus();
-              }}
+              style={composing ? { visibility: "hidden" } : undefined}
+              aria-haspopup="dialog"
+              onClick={() => setComposing(true)}
             >
               <MessageSquareText className="size-4" strokeWidth={1.9} />
-              Описати задачу для {performer.name.split(" ")[0]}
+              {dialog ? "Відкрити чат" : `Описати задачу для ${performer.name.split(" ")[0]}`}
             </button>
           )}
         </footer>
+      )}
+
+      {performer && composing && (
+        <DirectChatPanel
+          performer={performer}
+          getOrigin={() => composeButtonRef.current?.getBoundingClientRect() ?? null}
+          onClose={() => {
+            setComposing(false);
+            composeButtonRef.current?.focus();
+          }}
+          onLeaveToAuth={() => {
+            setComposing(false);
+            close();
+          }}
+        />
       )}
     </div>
   );

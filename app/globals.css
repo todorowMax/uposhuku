@@ -1536,6 +1536,23 @@ html[data-glass] .request-pill {
   }
 }
 
+/* Чат у правій колонці розтягується вліво до половини екрана. */
+@media (min-width: 1024px) {
+  .offers-panel {
+    transition: width 340ms var(--ease-out-quint);
+  }
+
+  .offers-panel[data-wide] {
+    width: min(50vw, 760px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offers-panel {
+    transition: none;
+  }
+}
+
 html[data-glass] .offers-panel {
   background: rgb(255 255 255 / 84%);
   backdrop-filter: blur(16px);
@@ -4284,4 +4301,327 @@ html[data-map-ready] .map-skeleton {
 .loc-map .maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer,
 .loc-map .maplibregl-marker {
   cursor: grab;
+}
+
+/* Тёмне поле «Описати задачу» у профілі (components/profile/direct-request) */
+.dr-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  background: rgb(28 33 36 / 38%);
+}
+
+.dr-panel {
+  position: fixed;
+  z-index: 6;
+  overflow: hidden;
+  background: #262c2f;
+  color: #f2f4f4;
+  box-shadow: 0 24px 60px -12px rgb(20 26 29 / 55%), 0 2px 8px rgb(20 26 29 / 25%);
+}
+
+.dr-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 16px 18px 14px;
+}
+
+.dr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dr-title {
+  font-size: 14px;
+  color: #aab5b8;
+}
+
+.dr-title span {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.dr-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: #aab5b8;
+  transition: background-color 150ms, color 150ms;
+}
+
+.dr-close:hover {
+  background: rgb(255 255 255 / 10%);
+  color: #ffffff;
+}
+
+.dr-input {
+  flex: 1;
+  min-height: 0;
+  margin: 10px 0 12px;
+  padding: 0;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #f2f4f4;
+}
+
+.dr-input::placeholder {
+  color: #7d898d;
+}
+
+.dr-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dr-hint {
+  font-size: 12px;
+  color: #7d898d;
+}
+
+@media (max-width: 639px) {
+  .dr-hint {
+    display: none;
+  }
+}
+
+.dr-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: #f4f7f5;
+  color: #262c2f;
+  font-size: 15px;
+  font-weight: 600;
+  transition: transform 150ms, opacity 150ms, background-color 150ms;
+}
+
+.dr-send:hover:not(:disabled) {
+  background: #ffffff;
+}
+
+.dr-send:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.dr-send:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dr-backdrop:not([data-active]) {
+  pointer-events: none;
+}
+
+.dr-avatar {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background-color: #3a4347;
+}
+
+.dr-header {
+  gap: 10px;
+}
+
+.dr-sub {
+  font-size: 11px;
+  color: #8e9a9e;
+  line-height: 1.3;
+}
+
+.dm-scroll {
+  flex: 1;
+  min-height: 0;
+  margin: 12px -6px 8px;
+  padding: 0 6px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #4a5459 transparent;
+}
+
+/* Задача замовника: висить угорі, поки виконавець не відповів. */
+.dm-task {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #313a3e;
+  border: 1px solid rgb(255 255 255 / 8%);
+}
+
+.dm-task-label {
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #8e9a9e;
+}
+
+.dm-task-text {
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #f2f4f4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.dm-task-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #aab5b8;
+}
+
+.dm-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #7ea08c;
+}
+
+.dm-task-status[data-waiting] .dm-dot {
+  background: #d99c70;
+  animation: dm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes dm-pulse {
+  50% { opacity: 0.35; }
+}
+
+.dm-notice {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 2px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #7d898d;
+}
+
+.dm-bubble {
+  max-width: 82%;
+  padding: 8px 12px 6px;
+  border-radius: 16px;
+  font-size: 15px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.dm-bubble p {
+  white-space: pre-wrap;
+}
+
+.dm-bubble time {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  opacity: 0.55;
+  text-align: right;
+}
+
+.dm-bubble[data-from="me"] {
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+  background: #f4f7f5;
+  color: #262c2f;
+}
+
+.dm-bubble[data-from="them"] {
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+  background: #3a4448;
+  color: #f2f4f4;
+}
+
+.dm-typing {
+  display: flex;
+  gap: 4px;
+  padding: 12px 14px;
+}
+
+.dm-typing span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #aab5b8;
+  animation: dm-pulse 1.1s ease-in-out infinite;
+}
+
+.dm-typing span:nth-child(2) { animation-delay: 0.15s; }
+.dm-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+.dm-warn {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgb(217 156 112 / 14%);
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e8c3a6;
+}
+
+.dm-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 14px;
+  border-radius: 18px;
+  background: #313a3e;
+}
+
+.dm-input {
+  flex: 1;
+  min-width: 0;
+  max-height: 140px;
+  padding: 8px 0;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #f2f4f4;
+  field-sizing: content;
+}
+
+.dm-input::placeholder {
+  color: #7d898d;
+}
+
+.dm-send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #f4f7f5;
+  color: #262c2f;
+  transition: transform 150ms, opacity 150ms;
+}
+
+.dm-send:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.dm-send:disabled {
+  opacity: 0.35;
+  cursor: default;
 }

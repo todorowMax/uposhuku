@@ -26,6 +26,8 @@ export type OffersView = { kind: "list" } | { kind: "chat"; responseId: string }
 export const offersViewStore = createStore<OffersView>({ kind: "list" });
 /** Панель згорнута в язичок (на телефоні — шторка опущена). */
 export const offersCollapsedStore = createStore(false);
+/** Чат у правій колонці розтягнуто вліво (лише на широкому екрані). */
+export const offersWideStore = createStore(false);
 /** Скільки пропозицій уже прийшло на активний запит: для кроків у картці запиту. */
 export const offersCountStore = createStore(0);
 /** Скільки нових пропозицій чекає за «+N нових»: для сповіщень і лічильника у вкладці. */

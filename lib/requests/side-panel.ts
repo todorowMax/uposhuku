@@ -7,7 +7,7 @@
 // замовчуванням: є відкритий запит — пропозиції, інакше стрічка виконавця.
 
 import { profileStore } from "@/lib/profile/client";
-import { offersCollapsedStore, useActiveRequest } from "@/lib/requests/offers";
+import { offersCollapsedStore, offersViewStore, offersWideStore, useActiveRequest } from "@/lib/requests/offers";
 import { createStore, useStore } from "@/lib/store";
 
 export type SidePanelKind = "offers" | "feed";
@@ -39,4 +39,12 @@ export const useSidePanelOpen = () => {
   const offersCollapsed = useStore(offersCollapsedStore);
   const feedCollapsed = useStore(feedCollapsedStore);
   return kind === "offers" ? !offersCollapsed : kind === "feed" ? !feedCollapsed : false;
+};
+
+/** Права колонка розтягнута (чат на пів екрана): поле запиту зсувається далі. */
+export const useSidePanelWide = () => {
+  const { kind } = useSidePanel();
+  const wide = useStore(offersWideStore);
+  const view = useStore(offersViewStore);
+  return kind === "offers" && wide && view.kind === "chat";
 };
