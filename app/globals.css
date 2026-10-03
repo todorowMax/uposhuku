@@ -2470,12 +2470,80 @@ html[data-glass] .offers-panel {
   color: var(--ink);
 }
 
-.legend-dot {
-  width: 12px;
-  height: 12px;
+/* Піни запитів у легенді повторюють справжні з карти (components/maplibre). */
+.legend-icon-wide {
+  width: 96px;
+}
+
+.legend-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(145 169 157 / 55%), 0 2px 6px rgb(48 68 64 / 20%);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #2f3a3e;
+}
+
+.legend-pin::before {
+  content: "";
+  width: 14px;
+  height: 14px;
   border-radius: 999px;
   background: #91a99d;
+}
+
+.legend-pin[data-variant="match"] {
+  background: #b48264;
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-pin[data-variant="match"]::before {
+  background: #ffffff;
+}
+
+.legend-pin[data-variant="own"] {
+  background: #303638;
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-pin[data-variant="own"]::before {
+  background: #ffffff;
+}
+
+.legend-pin[data-variant="sent"] {
+  background: #e5efe8;
+  box-shadow: 0 0 0 1px rgb(145 169 157 / 55%), 0 2px 6px rgb(48 68 64 / 15%);
+}
+
+.legend-pin[data-variant="sent"]::before {
+  background: #4d7a5e;
+}
+
+.legend-pin-sm {
+  padding: 4px 11px 4px 4px;
+}
+
+.legend-pins {
+  gap: 4px;
+}
+
+.legend-group-req {
+  background: #7e9d90;
   box-shadow: 0 0 0 2px #ffffff;
+  color: #ffffff;
+}
+
+.legend-switch-note {
+  padding-top: 10px;
+  border-top: 1px solid rgb(184 196 199 / 45%);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
 }
 
 .notif-row {

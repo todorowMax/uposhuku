@@ -2,7 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Info, X } from "lucide-react";
+import { mapModeStore } from "@/lib/feed/map-requests";
 import { TIER_PX } from "@/lib/placement/tiers";
+import { useStore } from "@/lib/store";
 
 const KEY = "vm:legend-seen";
 let decided = false;
@@ -14,6 +16,7 @@ let openFirst = false;
  */
 export function LegendButton() {
   const [open, setOpen] = useState(false);
+  const mode = useStore(mapModeStore);
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Кнопка перемонтовується, коли акаунт переходить зі «завантаження» у «гість» чи «увійшов»:
@@ -61,42 +64,66 @@ export function LegendButton() {
               <X className="size-4" strokeWidth={2} />
             </button>
           </div>
-          <ul className="legend-list">
-            <li>
-              <span className="legend-icon">
-                <span className="legend-photo" />
-              </span>
-              <span>
-                <b>Фото — виконавець.</b> Клік відкриває картку, наведення збільшує.
-              </span>
-            </li>
-            <li>
-              <span className="legend-icon legend-sizes" aria-hidden>
-                {[0, 2, 5].map((tier) => (
-                  <span key={tier} className="legend-photo" style={{ width: TIER_PX[tier] * 0.6, height: TIER_PX[tier] * 0.6 }} />
-                ))}
-              </span>
-              <span>
-                <b>Чим більше фото, тим вище розміщення.</b> Платні виконавці з позначкою «Просування» вищі й у списку пропозицій.
-              </span>
-            </li>
-            <li>
-              <span className="legend-icon">
-                <span className="legend-group">12</span>
-              </span>
-              <span>
-                <b>Число — група людей поруч.</b> Наведіть, щоб побачити список, клік наближає.
-              </span>
-            </li>
-            <li>
-              <span className="legend-icon">
-                <span className="legend-dot" />
-              </span>
-              <span>
-                <b>Крапка — запит замовника.</b> Показуємо лише місто, без адреси.
-              </span>
-            </li>
-          </ul>
+          {mode === "requests" ? (
+            <ul className="legend-list">
+              <li>
+                <span className="legend-icon legend-icon-wide">
+                  <span className="legend-pin" data-variant="plain">до 15 тис ₴</span>
+                </span>
+                <span>
+                  <b>Бульбашка із сумою — запит замовника.</b> Клік відкриває запит і форму відгуку. Показуємо лише місто, без адреси.
+                </span>
+              </li>
+              <li>
+                <span className="legend-icon legend-icon-wide legend-pins">
+                  <span className="legend-pin legend-pin-sm" data-variant="match" aria-hidden />
+                  <span className="legend-pin legend-pin-sm" data-variant="own" aria-hidden />
+                  <span className="legend-pin legend-pin-sm" data-variant="sent" aria-hidden />
+                </span>
+                <span>
+                  <b>Колір каже стан:</b> золотий — під ваші теги, темний — ваш запит, зелений — ви вже відгукнулись.
+                </span>
+              </li>
+              <li>
+                <span className="legend-icon">
+                  <span className="legend-group legend-group-req">5</span>
+                </span>
+                <span>
+                  <b>Число — кілька запитів поруч.</b> Клік наближає, і вони розсипаються.
+                </span>
+              </li>
+            </ul>
+          ) : (
+            <ul className="legend-list">
+              <li>
+                <span className="legend-icon">
+                  <span className="legend-photo" />
+                </span>
+                <span>
+                  <b>Фото — виконавець.</b> Клік відкриває картку, наведення збільшує.
+                </span>
+              </li>
+              <li>
+                <span className="legend-icon legend-sizes" aria-hidden>
+                  {[0, 2, 5].map((tier) => (
+                    <span key={tier} className="legend-photo" style={{ width: TIER_PX[tier] * 0.6, height: TIER_PX[tier] * 0.6 }} />
+                  ))}
+                </span>
+                <span>
+                  <b>Чим більше фото, тим вище розміщення.</b> Платні виконавці з позначкою «Просування» вищі й у списку пропозицій.
+                </span>
+              </li>
+              <li>
+                <span className="legend-icon">
+                  <span className="legend-group">12</span>
+                </span>
+                <span>
+                  <b>Число — група людей поруч.</b> Наведіть, щоб побачити список, клік наближає.
+                </span>
+              </li>
+            </ul>
+          )}
+          <p className="legend-switch-note">Перемикач внизу: на карті або виконавці, або запити замовників.</p>
         </div>
       )}
     </div>
