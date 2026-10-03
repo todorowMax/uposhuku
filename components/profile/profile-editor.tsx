@@ -10,6 +10,7 @@ import { TagChips } from "@/components/profile/tag-chips";
 import { TaggedField } from "@/components/profile/tagged-field";
 import { WorkEditor } from "@/components/profile/work-editor";
 import { ApiError, sessionStore } from "@/lib/auth/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CITIES } from "@/lib/map/cities";
 import { SAME_CITY_KM, distanceKm, nearestCity } from "@/lib/map/nearest-city";
 import { loadPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
@@ -232,14 +233,18 @@ export function ProfileEditor() {
                     Місто
                   </label>
                   <div className="loc-field">
-                    <select id="pe-city" value={cityId} onChange={(event) => setCityId(event.target.value)} className="auth-input w-full" data-empty={!cityId || undefined}>
-                      <option value="">Оберіть місто</option>
-                      {CITY_OPTIONS.map((city) => (
-                        <option key={city.id} value={city.id}>
-                          {city.name}
-                        </option>
-                      ))}
-                    </select>
+                    <Select value={cityId} onValueChange={setCityId}>
+                      <SelectTrigger id="pe-city" className="w-full" data-empty={!cityId || undefined}>
+                        <SelectValue placeholder="Оберіть місто" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CITY_OPTIONS.map((city) => (
+                          <SelectItem key={city.id} value={city.id}>
+                            {city.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <button
                       type="button"
                       onClick={() => setPicking(true)}

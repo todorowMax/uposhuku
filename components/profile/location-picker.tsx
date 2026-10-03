@@ -7,12 +7,24 @@ import { Check, Eraser, MapPin, X } from "lucide-react";
 import { CITIES } from "@/lib/map/cities";
 import { nearestCity } from "@/lib/map/nearest-city";
 import type { GeoPoint } from "@/lib/map/types";
-import { buildPickStyle } from "@/lib/maplibre/pick-style";
+import { PLACE_LABEL_LAYERS } from "@/lib/maplibre/place-labels";
+import { buildMapStyle } from "@/lib/maplibre/style";
 
 type Point = { lat: number; lng: number };
 
 const UKRAINE_VIEW = { center: [31.2, 48.9] as [number, number], zoom: 5.2 };
 const BOUNDS: [[number, number], [number, number]] = [[21.5, 43.8], [41.2, 53]];
+
+const pickStyle = () => {
+  const style = buildMapStyle(window.location.origin);
+  return { ...style, projection: { type: "mercator" as const }, sky: undefined,
+    layers: [
+      // Назви вулиць тут потрібні раніше, ніж на головній.
+      ...style.layers.map((layer) => (layer.id === "street-names" ? { ...layer, minzoom: 13 } : layer)),
+      ...PLACE_LABEL_LAYERS,
+    ],
+  };
+};
 
 const marker = () => {
   const element = document.createElement("div");
@@ -53,7 +65,11 @@ export function LocationPicker({
     try {
       map = new maplibregl.Map({
         container,
-        style: buildPickStyle(window.location.origin),
+        // Той самий стиль, що на головній (наші текстури, вулиці, будинки), але плоский:
+        // без глобуса й неба, щоб точку було легко поставити.
+        style: pickStyle(),
+        pitch: 0,
+        maxPitch: 0,
         center: start ? [start.lng, start.lat] : UKRAINE_VIEW.center,
         zoom: initial ? 13 : city ? 10.5 : UKRAINE_VIEW.zoom,
         minZoom: 5,

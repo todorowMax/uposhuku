@@ -3989,7 +3989,7 @@ html[data-map-ready] .map-skeleton {
   gap: 8px;
 }
 
-.loc-field select {
+.loc-field > [data-slot="select-trigger"] {
   min-width: 0;
   flex: 1;
 }
@@ -4127,4 +4127,161 @@ html[data-map-ready] .map-skeleton {
 
 .place-warn svg {
   margin-top: 1px;
+}
+
+/* shadcn Select, закастомлений під наш дизайн (components/ui/select.tsx) */
+.ui-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ui-select-trigger > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-select-trigger[data-placeholder],
+.ui-select-trigger[data-empty] {
+  color: var(--ink-muted);
+}
+
+.ui-select-trigger[data-state="open"] {
+  border-color: #87999e;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+.ui-select-chevron {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+  transition: transform 180ms var(--ease-out-quint);
+}
+
+.ui-select-trigger[data-state="open"] .ui-select-chevron {
+  transform: rotate(180deg);
+}
+
+.ui-select-content {
+  z-index: 90;
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(var(--radix-select-content-available-height), 320px);
+  overflow: hidden;
+  border: 1px solid rgb(184 196 199 / 70%);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px -8px rgb(48 54 58 / 28%), 0 2px 6px rgb(48 54 58 / 8%);
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+
+.ui-select-content[data-state="open"] {
+  animation: ui-select-in 160ms var(--ease-out-quint);
+}
+
+.ui-select-content[data-state="closed"] {
+  animation: ui-select-out 110ms ease-in;
+}
+
+@keyframes ui-select-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+}
+
+@keyframes ui-select-out {
+  to { opacity: 0; transform: scale(0.97); }
+}
+
+.ui-select-viewport {
+  padding: 5px;
+}
+
+.ui-select-label {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.ui-select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 34px 0 10px;
+  border-radius: 10px;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  outline: none;
+  user-select: none;
+}
+
+.ui-select-item[data-highlighted] {
+  background: #eef1f1;
+}
+
+.ui-select-item[data-state="checked"] {
+  font-weight: 600;
+}
+
+.ui-select-check {
+  position: absolute;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  color: #4e6262;
+}
+
+.ui-select-scroll {
+  display: grid;
+  place-items: center;
+  height: 24px;
+  color: var(--ink-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-select-content[data-state] {
+    animation: none;
+  }
+}
+
+/* Подяка авторам даних (вимога ліцензій OSM/OpenMapTiles): лишається, але тихо. */
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  min-height: 24px;
+  margin: 8px;
+  border-radius: 12px;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background-size: 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+
+/* Курсор-піна над картою вибору точки; вістря піна (14, 27) — місце кліку. */
+.loc-map .maplibregl-canvas-container.maplibregl-interactive,
+.loc-map .maplibregl-canvas-container.maplibregl-interactive:active {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23ffffff' stroke-width='5'%3E%3Cpath d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/g%3E%3Cg stroke='%2330363a' stroke-width='2'%3E%3Cpath d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/g%3E%3C/svg%3E") 14 26, crosshair;
+}
+
+.loc-map .maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer,
+.loc-map .maplibregl-marker {
+  cursor: grab;
 }
