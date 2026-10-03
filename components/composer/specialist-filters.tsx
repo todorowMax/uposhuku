@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ListChecks, SlidersHorizontal } from "lucide-react";
-import { MapModeSwitch } from "@/components/map/mode-switch";
 import { applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
 import { feedCollapsedStore, sidePanelChoice } from "@/lib/requests/side-panel";
 import { CITIES } from "@/lib/map/cities";
@@ -99,8 +98,6 @@ export function SpecialistFilters({
   );
 
   return (
-    <>
-    <MapModeSwitch variant="float" />
     <div ref={barRef} className="filter-bar" data-expanded={expanded}>
       {myRequests && (
         <button type="button" onClick={myRequests.onOpen} className="filter-chip filter-all">
@@ -109,7 +106,6 @@ export function SpecialistFilters({
           <span className="filter-all-badge">{myRequests.count}</span>
         </button>
       )}
-      <MapModeSwitch variant="inline" />
       <div
         className="filter-strip"
         role="toolbar"
@@ -145,7 +141,6 @@ export function SpecialistFilters({
         />
       )}
     </div>
-    </>
   );
 }
 

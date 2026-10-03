@@ -2,6 +2,7 @@
 import { AccountButton } from "@/components/account/account-button";
 import { NotificationSettings } from "@/components/account/notification-settings";
 import { TabBadge } from "@/components/account/tab-badge";
+import { MapModeSwitch } from "@/components/map/mode-switch";
 import { DealSync } from "@/lib/deals/client";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
 import { RequestComposer } from "@/components/composer/request-composer";
@@ -22,6 +23,7 @@ export default function HomePage() {
       <VibeMap />
       <RequestComposer />
       <AccountButton />
+      <MapModeSwitch />
       <DealSync />
       <MapRequestsSync />
       <TabBadge />

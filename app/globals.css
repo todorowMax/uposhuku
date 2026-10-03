@@ -1078,7 +1078,8 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   transition: opacity 300ms, translate 300ms;
 }
 
-@media (min-width: 640px) {
+/* Лічильник «Під запит» лише там, де є місце: інакше те саме число видно в чипах. */
+@media (min-width: 1250px) {
   .account-match {
     display: block;
   }
@@ -2536,26 +2537,36 @@ html[data-glass] .offers-panel {
   background: rgb(48 54 58 / 8%);
 }
 
-/* Широкий екран: перемикач у лівому верхньому куті, вільному від панелей. */
-.mode-float {
+/* Унизу по центру: під великим пальцем і вільно на будь-якій ширині. */
+.mode-dock {
   position: absolute;
-  top: 56px;
-  left: 24px;
-  display: none;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 50%;
+  z-index: var(--z-controls);
+  translate: -50% 0;
 }
 
-.mode-inline {
-  margin-top: 2px;
+@media (min-width: 640px) {
+  .mode-dock {
+    bottom: 24px;
+  }
 }
 
-/* Від 1400px і поле запиту, і права панель лишають зліва місце. Вужче — перемикач у рядку фільтрів. */
-@media (min-width: 1400px) {
-  .mode-float {
-    display: inline-flex;
+.mode-dock button {
+  height: 42px;
+  padding: 0 16px;
+}
+
+/* Нижній рядок ділять акаунт, перемикач і масштаб: вужче 1150px підписи не влазять. */
+@media (max-width: 1149px) {
+  .mode-label {
+    display: none;
   }
 
-  .mode-inline {
-    display: none;
+  .mode-dock button {
+    min-width: 46px;
+    justify-content: center;
+    padding: 0 12px;
   }
 }
 

@@ -1359,10 +1359,10 @@ export default function MapLibreScene() {
         </div>
       )}
 
-      {/* Плашка догрузки по центру внизу, між акаунтом і масштабом. */}
+      {/* Плашка догрузки по центру внизу, над перемикачем режиму карти. */}
       <div
         aria-live="polite"
-        className={`pointer-events-none absolute bottom-20 left-1/2 z-[var(--z-controls)] -translate-x-1/2 transition-[opacity,translate] duration-300 sm:bottom-7 ${
+        className={`pointer-events-none absolute bottom-[132px] left-1/2 z-[var(--z-controls)] -translate-x-1/2 transition-[opacity,translate] duration-300 sm:bottom-[84px] ${
           detailLoading ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
         }`}
       >

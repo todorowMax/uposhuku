@@ -19,8 +19,8 @@ const STEPS = 1000;
 export function MapZoomControl({ value, onChange, onStep }: MapZoomControlProps) {
   return (
     <div className="absolute right-4 bottom-4 z-[var(--z-controls)] flex items-stretch gap-3 sm:right-6 sm:bottom-6">
-      {/* На телефоні лише −/+: там зумлять двома пальцями, а повзунок забирав півряду. */}
-      <label className="glass-panel hidden h-12 items-center gap-3 rounded-2xl px-4 text-sm text-ink sm:flex">
+      {/* Вужче 1150px лише −/+: повзунок не влазить між перемикачем режиму й краєм, а на телефоні зумлять пальцями. */}
+      <label className="glass-panel hidden h-12 items-center gap-3 rounded-2xl px-4 text-sm text-ink min-[1150px]:flex">
         <span>Україна</span>
         <input
           type="range"
