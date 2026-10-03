@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SIM, applyAction, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, simulate, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { SIM, applyAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, simulate, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
@@ -117,5 +117,45 @@ describe("шлях прямого переказу за QR", () => {
     deal = applyAction(deal, "claim_paid", undefined, T0 + 5000) as Deal;
     deal = simulate(deal, T0 + 5000 + SIM.confirmPayment);
     expect(applyAction(deal, "dispute", undefined, T0 + 20_000)).toMatch(/прямому переказі/);
+  });
+});
+
+describe("угода з виконавцем-акаунтом", () => {
+  const real: DealDraft = { requestId: "r", responseId: "x", method: "direct", performer: { id: "me-u1", name: "Іван", avatarIndex: 0, specialty: "Розробник", fop: false }, stages: [{ title: "Робота", amount: 5000, days: 7 }] };
+  const NOW = 10_000_000;
+
+  it("таймер за нього нічого не робить", () => {
+    const deal = createDeal("d1", real, NOW);
+    expect(simulate(deal, NOW + 100 * SIM.deliver)).toBe(deal);
+  });
+
+  it("виконавець приймає, замовник позначає оплату, виконавець підтверджує і здає, замовник приймає", () => {
+    let deal = createDeal("d2", real, NOW);
+    expect(performerNeeds(deal)).toBe("answer");
+    deal = applyPerformerAction(deal, "accept", undefined, NOW + 1) as Deal;
+    expect(deal.status).toBe("accepted");
+    // До оплати здати нічого.
+    expect(applyPerformerAction(deal, "deliver", undefined, NOW + 2)).toMatch(/оплату підтверджено/);
+    deal = applyAction(deal, "claim_paid", undefined, NOW + 3) as Deal;
+    expect(performerNeeds(deal)).toBe("confirm");
+    deal = applyPerformerAction(deal, "confirm_paid", undefined, NOW + 4) as Deal;
+    expect(performerNeeds(deal)).toBe("deliver");
+    deal = applyPerformerAction(deal, "deliver", undefined, NOW + 5) as Deal;
+    expect(deal.stages[0].status).toBe("delivered");
+    expect(performerNeeds(deal)).toBeNull();
+    deal = applyAction(deal, "release", undefined, NOW + 6) as Deal;
+    expect(deal.status).toBe("completed");
+  });
+
+  it("відхилена пропозиція закривається, повторно відповісти не можна", () => {
+    const deal = createDeal("d3", real, NOW);
+    const declined = applyPerformerAction(deal, "decline", undefined, NOW + 1) as Deal;
+    expect(declined.status).toBe("declined");
+    expect(applyPerformerAction(declined, "accept", undefined, NOW + 2)).toMatch(/вже не чекає/);
+  });
+
+  it("не можна підтвердити оплату, якої замовник не позначав", () => {
+    const deal = applyPerformerAction(createDeal("d4", real, NOW), "accept", undefined, NOW + 1) as Deal;
+    expect(applyPerformerAction(deal, "confirm_paid", undefined, NOW + 2)).toMatch(/ще не позначив/);
   });
 });

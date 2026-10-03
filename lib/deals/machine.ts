@@ -5,7 +5,7 @@
 // перевіряється тестами. Виконавець у заглушці «відповідає» за таймером
 // (SIM); справжні події прийдуть від нього самого й від вебхуків банку.
 
-import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage } from "./types";
+import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage, type PerformerAction } from "./types";
 
 /** Через скільки мс заглушка «виконавця» реагує. У бойовому режимі цих таймерів немає. */
 export const SIM = { accept: 3000, confirmPayment: 4000, deliver: 10_000 } as const;
@@ -73,6 +73,8 @@ export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.f
 /** Що виконавець у заглушці встигає зробити за час: приймає, підтверджує оплату, здає етап. */
 export const simulate = (deal: Deal, now: number): Deal => {
   if (deal.status === "declined" || deal.status === "cancelled") return deal;
+  // Виконавець-акаунт відповідає сам, за нього таймер не діє.
+  if (deal.performer.id.startsWith("me-")) return deal;
   let next = deal;
   if (next.status === "proposed" && now >= Date.parse(next.createdAt) + SIM.accept) {
     next = { ...next, status: "accepted", acceptedAt: iso(Date.parse(next.createdAt) + SIM.accept) };
@@ -128,6 +130,41 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
   const stages = deal.stages.map((item) => (item.id === updated.id ? updated : item));
   const completed = stages.every((item) => item.status === "released");
   return { ...deal, stages, disputed: stages.some((item) => item.status === "disputed"), status: completed ? "completed" : deal.status };
+};
+
+/** Виконавець щось робить з угодою. Повертає нову угоду або текст помилки. */
+export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageId: string | undefined, now: number): Deal | string => {
+  if (action === "accept" || action === "decline") {
+    if (deal.status !== "proposed") return "Ця пропозиція вже не чекає на відповідь.";
+    return action === "accept" ? { ...deal, status: "accepted", acceptedAt: iso(now) } : { ...deal, status: "declined" };
+  }
+  if (deal.status !== "accepted") return "Угода ще не прийнята.";
+  const stage = deal.stages.find((item) => item.id === (stageId ?? currentStage(deal)?.id));
+  if (!stage) return "Етапу не знайдено.";
+  const before = deal.stages.slice(0, deal.stages.indexOf(stage));
+  if (before.some((item) => item.status !== "released")) return "Спершу завершіть попередній етап.";
+  let updated: DealStage;
+  if (action === "confirm_paid") {
+    if (deal.method !== "direct" || stage.status !== "claimed") return "Замовник ще не позначив оплату.";
+    updated = { ...stage, status: "funded", fundedAt: iso(now) };
+  } else if (action === "deliver") {
+    if (stage.status !== "funded") return "Здати етап можна, коли оплату підтверджено.";
+    updated = { ...stage, status: "delivered", deliveredAt: iso(now) };
+  } else {
+    return "Невідома дія.";
+  }
+  return { ...deal, stages: deal.stages.map((item) => (item.id === updated.id ? updated : item)) };
+};
+
+/** Чого від виконавця чекає угода зараз: для підказки й кнопок у його вхідних. */
+export const performerNeeds = (deal: Deal): "answer" | "confirm" | "deliver" | null => {
+  if (deal.status === "proposed") return "answer";
+  if (deal.status !== "accepted") return null;
+  const stage = currentStage(deal);
+  if (!stage) return null;
+  if (stage.status === "claimed") return "confirm";
+  if (stage.status === "funded") return "deliver";
+  return null;
 };
 
 /** Для кроків у картці запиту: на якому етапі шляху угода. */

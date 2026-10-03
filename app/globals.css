@@ -4791,3 +4791,54 @@ html[data-map-ready] .map-skeleton {
 .inbox-thread {
   margin-top: 0;
 }
+
+.inbox-deals {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inbox-deal {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #313a3e;
+  border: 1px solid rgb(255 255 255 / 8%);
+}
+
+.inbox-deal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.inbox-deal-head span {
+  color: #aab5b8;
+}
+
+.inbox-deal-state {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #8e9a9e;
+}
+
+.inbox-deal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.inbox-deal-main {
+  width: auto;
+  height: 34px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inbox-deal-alt {
+  width: auto;
+  padding: 0 12px;
+  font-size: 13px;
+}

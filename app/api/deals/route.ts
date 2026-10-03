@@ -1,11 +1,11 @@
 // /api/deals — угоди замовника.
 // GET ?requestId= — угоди за запитом; POST — запропонувати угоду виконавцю.
-// D1: угода документом (етапи всередині). Холд і фіналізація через Monobank — пізніше.
+// GET ?as=performer[&conversation=] — угоди виконавця. D1: угода документом (етапи всередині). Холд і фіналізація через Monobank — пізніше.
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { isFop } from "@/lib/deals/fop";
-import { listDeals, proposeDeal } from "@/lib/server/deal-repo";
+import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
 import { findRequest } from "@/lib/server/request-repo";
 
@@ -14,7 +14,12 @@ const text = (value: unknown, max: number) => (typeof value === "string" ? value
 export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
+  const params = new URL(request.url).searchParams;
+  // ?as=performer — угоди, запропоновані мені як виконавцю (за розмовою з замовником).
+  if (params.get("as") === "performer") {
+    return Response.json({ deals: await listDealsForPerformer(user.id, params.get("conversation") ?? undefined) }, { headers: { "cache-control": "no-store" } });
+  }
+  const requestId = params.get("requestId") ?? undefined;
   return Response.json({ deals: await listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
 }
 

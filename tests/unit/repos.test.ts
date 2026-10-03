@@ -3,7 +3,7 @@ import { createDeal, SIM } from "@/lib/deals/machine";
 import type { DealDraft } from "@/lib/deals/types";
 import { emptyProfile } from "@/lib/profile/types";
 import { accessibleConversation, addMessage, getOrCreateConversation, listConversations, listMessages, performerKnown } from "@/lib/server/chat-repo";
-import { actOnDeal, listDeals, proposeDeal } from "@/lib/server/deal-repo";
+import { actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
 import { addReview, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
@@ -122,6 +122,26 @@ describe("угоди на D1", () => {
     expect(typeof acted).toBe("object");
     expect(await actOnDeal("c1", created.id, "cancel", undefined)).toBeNull();
     expect(createDeal("t", draft(), 0).status).toBe("proposed");
+  });
+});
+
+describe("угоди з боку виконавця на D1", () => {
+  it("виконавець бачить свої угоди, відповідає, і замовник бачить результат", async () => {
+    const created = (await proposeDeal("c1", draft({ responseId: "resp_real", performer: { id: "me-perf", name: "Максим", avatarIndex: 0, specialty: "Розробник", fop: false } }), 9_000_000)) as { id: string };
+    // Таймер за виконавця-акаунт не спрацьовує: через годину угода все ще чекає відповіді.
+    expect((await listDeals("c1", undefined, 9_000_000 + 3_600_000)).find((deal) => deal.id === created.id)?.status).toBe("proposed");
+    expect((await listDealsForPerformer("perf")).map((deal) => deal.id)).toContain(created.id);
+    expect(await listDealsForPerformer("p2")).toEqual([]);
+
+    const conv = await getOrCreateConversation("c1", "me-perf", "perf");
+    expect((await listDealsForPerformer("perf", conv.id)).map((deal) => deal.id)).toContain(created.id);
+    expect(await listDealsForPerformer("perf", "nonexistent")).toEqual([]);
+
+    expect(await actAsPerformer("p2", created.id, "accept", undefined)).toBeNull();
+    const accepted = await actAsPerformer("perf", created.id, "accept", undefined);
+    expect(accepted).toMatchObject({ status: "accepted" });
+    expect((await listDeals("c1", undefined, 9_100_000)).find((deal) => deal.id === created.id)?.status).toBe("accepted");
+    expect(await actAsPerformer("perf", created.id, "deliver", undefined)).toMatch(/оплату підтверджено/);
   });
 });
 

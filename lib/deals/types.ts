@@ -61,6 +61,9 @@ export interface Deal {
 
 export type DealAction = "fund" | "claim_paid" | "release" | "dispute" | "cancel";
 
+/** Дії виконавця: прийняти чи відхилити пропозицію, підтвердити, що гроші отримано, здати етап. */
+export type PerformerAction = "accept" | "decline" | "confirm_paid" | "deliver";
+
 export const HOLD_DAYS = 9;
 /** Комісія платформи з безпечної угоди, частка. Прямий переказ — без комісії. */
 export const SAFE_FEE = 0.05;

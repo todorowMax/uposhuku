@@ -7,8 +7,9 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { deals } from "@/db/schema";
-import { applyAction, createDeal, simulate, validateDraft } from "@/lib/deals/machine";
-import type { Deal, DealAction, DealDraft } from "@/lib/deals/types";
+import { applyAction, applyPerformerAction, createDeal, simulate, validateDraft } from "@/lib/deals/machine";
+import type { Deal, DealAction, DealDraft, PerformerAction } from "@/lib/deals/types";
+import { conversations } from "@/db/schema";
 import { getDb } from "./db";
 
 const parse = (row: typeof deals.$inferSelect) => JSON.parse(row.data) as Deal;
@@ -62,5 +63,33 @@ export const actOnDeal = async (userId: string, id: string, action: DealAction, 
   const result = applyAction(deal, action, stageId, now);
   if (typeof result === "string") return result;
   await write(userId, result, now);
+  return result;
+};
+
+// ───────────── сторона виконавця ─────────────
+
+/** Угоди, запропоновані цьому виконавцю-акаунту; можна звузити до розмови з одним замовником. */
+export const listDealsForPerformer = async (performerUserId: string, conversationId?: string): Promise<Deal[]> => {
+  const db = getDb();
+  let owner: string | undefined;
+  if (conversationId) {
+    const [conversation] = await db.select().from(conversations).where(and(eq(conversations.id, conversationId), eq(conversations.performerUserId, performerUserId))).limit(1);
+    if (!conversation) return [];
+    owner = conversation.customerUserId;
+  }
+  const rows = await db
+    .select()
+    .from(deals)
+    .where(and(eq(deals.performerId, `me-${performerUserId}`), ...(owner ? [eq(deals.ownerUserId, owner)] : [])))
+    .orderBy(desc(deals.createdAt));
+  return rows.map(parse);
+};
+
+export const actAsPerformer = async (performerUserId: string, id: string, action: PerformerAction, stageId: string | undefined, now = Date.now()): Promise<Deal | string | null> => {
+  const [row] = await getDb().select().from(deals).where(and(eq(deals.id, id), eq(deals.performerId, `me-${performerUserId}`))).limit(1);
+  if (!row) return null;
+  const result = applyPerformerAction(parse(row), action, stageId, now);
+  if (typeof result === "string") return result;
+  await write(row.ownerUserId, result, now);
   return result;
 };
