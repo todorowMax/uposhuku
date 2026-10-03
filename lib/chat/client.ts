@@ -4,12 +4,10 @@
 //
 // Живий чат із виконавцем-акаунтом через /api/conversations. Реальний час —
 // опитування `?since=`; потім WebSocket з Durable Object, а цей клієнт
-// лишиться запасним. Для демо-виконавців чат — заглушка (lib/requests/mock-chat).
+// лишиться запасним.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessageDto, ConversationDto } from "./types";
-
-export const isRemotePerformer = (performerId: string) => performerId.startsWith("me-");
 
 const POLL_MS = 3500;
 

@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createDeal, SIM } from "@/lib/deals/machine";
+import { createDeal } from "@/lib/deals/machine";
 import type { DealDraft } from "@/lib/deals/types";
 import { emptyProfile } from "@/lib/profile/types";
 import { accessibleConversation, addMessage, getOrCreateConversation, listConversations, listMessages, performerKnown } from "@/lib/server/chat-repo";
 import { actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
-import { addReview, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
+import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
@@ -107,20 +107,19 @@ describe("угоди на D1", () => {
   it("пропонується, зберігається й не дублюється на один відгук", async () => {
     const deal = await proposeDeal("c1", draft(), 1_000_000);
     expect(typeof deal).toBe("object");
-    expect((await listDeals("c1", undefined, 1_000_000)).map((item) => item.id)).toContain((deal as { id: string }).id);
+    expect((await listDeals("c1")).map((item) => item.id)).toContain((deal as { id: string }).id);
     expect(await proposeDeal("c1", draft(), 1_000_000)).toMatch(/уже є угода/);
     expect(await listDeals("c2")).toEqual([]);
   });
 
-  it("стан доходить до «зараз» і зберігається, дії змінюють угоду", async () => {
+  it("дії замовника змінюють угоду, чужа не доступна", async () => {
     const created = (await proposeDeal("c2", draft({ responseId: "resp_y" }), 5_000_000)) as { id: string };
-    const accepted = (await listDeals("c2", undefined, 5_000_000 + SIM.accept + 100)).find((item) => item.id === created.id)!;
-    expect(accepted.status).toBe("accepted");
-    // Той самий результат при повторному читанні: стан збережено, а не вигадано щоразу.
-    expect((await listDeals("c2", undefined, 5_000_000 + SIM.accept + 100)).find((item) => item.id === created.id)!.status).toBe("accepted");
-    const acted = await actOnDeal("c2", created.id, "claim_paid", accepted.stages[0].id, 5_000_000 + SIM.accept + 200);
-    expect(typeof acted).toBe("object");
+    // Поки виконавець не прийняв, платити рано.
+    expect(await actOnDeal("c2", created.id, "claim_paid", undefined, 5_000_100)).toMatch(/погодитися/);
     expect(await actOnDeal("c1", created.id, "cancel", undefined)).toBeNull();
+    const cancelled = await actOnDeal("c2", created.id, "cancel", undefined, 5_000_200);
+    expect(cancelled).toMatchObject({ status: "cancelled" });
+    expect((await listDeals("c2")).find((item) => item.id === created.id)?.status).toBe("cancelled");
     expect(createDeal("t", draft(), 0).status).toBe("proposed");
   });
 });
@@ -128,8 +127,8 @@ describe("угоди на D1", () => {
 describe("угоди з боку виконавця на D1", () => {
   it("виконавець бачить свої угоди, відповідає, і замовник бачить результат", async () => {
     const created = (await proposeDeal("c1", draft({ responseId: "resp_real", performer: { id: "me-perf", name: "Максим", avatarIndex: 0, specialty: "Розробник", fop: false } }), 9_000_000)) as { id: string };
-    // Таймер за виконавця-акаунт не спрацьовує: через годину угода все ще чекає відповіді.
-    expect((await listDeals("c1", undefined, 9_000_000 + 3_600_000)).find((deal) => deal.id === created.id)?.status).toBe("proposed");
+    // Само по собі нічого не відбувається: угода чекає відповіді виконавця.
+    expect((await listDeals("c1")).find((deal) => deal.id === created.id)?.status).toBe("proposed");
     expect((await listDealsForPerformer("perf")).map((deal) => deal.id)).toContain(created.id);
     expect(await listDealsForPerformer("p2")).toEqual([]);
 
@@ -140,19 +139,20 @@ describe("угоди з боку виконавця на D1", () => {
     expect(await actAsPerformer("p2", created.id, "accept", undefined)).toBeNull();
     const accepted = await actAsPerformer("perf", created.id, "accept", undefined);
     expect(accepted).toMatchObject({ status: "accepted" });
-    expect((await listDeals("c1", undefined, 9_100_000)).find((deal) => deal.id === created.id)?.status).toBe("accepted");
+    expect((await listDeals("c1")).find((deal) => deal.id === created.id)?.status).toBe("accepted");
     expect(await actAsPerformer("perf", created.id, "deliver", undefined)).toMatch(/оплату підтверджено/);
   });
 });
 
 describe("відгуки про роботу на D1", () => {
-  it("один на угоду; для справжніх виконавців демо-відгуків немає", async () => {
+  it("один на угоду, рахується середня", async () => {
     const review = await addReview("c1", { performerId: "me-perf", dealId: "deal_1", stars: 5, text: "Чудово", author: "Анна" });
     expect(await reviewOfDeal("deal_1")).toMatchObject({ id: review.id, stars: 5 });
     await expect(addReview("c1", { performerId: "me-perf", dealId: "deal_1", stars: 4, text: "", author: "Анна" })).rejects.toThrow();
     const list = await reviewsFor("me-perf");
     expect(list).toHaveLength(1);
-    expect((await reviewsFor("kyiv-0")).some((item) => item.demo)).toBe(true);
+    expect(await getReviewStats("me-perf")).toEqual({ count: 1, average: 5 });
+    expect(await getReviewStats("me-nobody")).toEqual({ count: 0, average: null });
   });
 });
 
@@ -162,7 +162,7 @@ describe("чат на D1", () => {
     expect(await performerKnown("me-perf", "c1")).toEqual({ userId: "perf" });
     expect(await performerKnown("me-perf", "perf")).toBeNull();
     expect(await performerKnown("me-nobody", "c1")).toBeNull();
-    expect(await performerKnown("kyiv-0", "c1")).toEqual({ userId: null });
+    expect(await performerKnown("kyiv-0", "c1")).toBeNull();
     expect(await performerKnown("nonsense", "c1")).toBeNull();
 
     const conv = await getOrCreateConversation("c1", "me-perf", "perf");
@@ -182,9 +182,22 @@ describe("чат на D1", () => {
     expect((await listConversations("perf"))[0]).toMatchObject({ role: "performer", other: { name: "c1" } });
     expect(await listConversations("c2")).toEqual([]);
   });
+});
 
-  it("демо-виконавець: розмова без користувача-виконавця", async () => {
-    const conv = await getOrCreateConversation("c2", "kyiv-0", null);
-    expect(await accessibleConversation(conv.id, "c2")).toMatchObject({ role: "customer" });
-  });
+describe("великі обсяги: у D1 не більше 100 параметрів у запиті", () => {
+  it("профілі, проєкти й запити читаються пачками", async () => {
+    const ids = Array.from({ length: 160 }, (_, index) => `bulk-${index}`);
+    for (const id of ids) await makeUser(ctx.db, id);
+    for (const id of ids) await saveProfile(id, profile(`Людина ${id}`));
+    const published = await listPublishedProfiles();
+    const bulk = [...published.keys()].filter((id) => id.startsWith("bulk-"));
+    expect(bulk).toHaveLength(160);
+    expect(published.get("bulk-100")?.works.map((work) => work.id)).toEqual(["w1", "w2"]);
+    expect(published.get("bulk-159")?.tags.sort()).toEqual(["landing", "website"]);
+
+    for (const id of ids.slice(0, 120)) await createRequest(id, { text: `Запит від ${id}`, tags: [{ id: "website", label: "Сайт" }], files: [] });
+    const others = await listOthersOpen("c2");
+    expect(others.filter((request) => request.text.startsWith("Запит від bulk-"))).toHaveLength(120);
+    expect(others.every((request) => request.tags.length >= 0)).toBe(true);
+  }, 60_000);
 });

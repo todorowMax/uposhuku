@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { useOpenProfile } from "@/lib/profile/navigation";
-import { directChatOpenStore, hydrateDialogs, startDialog, takePending } from "@/lib/requests/direct-chat";
+import { directChatOpenStore, startDialog, takePending } from "@/lib/requests/direct-chat";
 import { useStore } from "@/lib/store";
 
 /**
@@ -13,10 +13,6 @@ import { useStore } from "@/lib/store";
 export function DirectChatSync() {
   const session = useStore(sessionStore);
   const openProfile = useOpenProfile();
-
-  useEffect(() => {
-    hydrateDialogs();
-  }, []);
 
   useEffect(() => {
     if (session.status !== "user") return;

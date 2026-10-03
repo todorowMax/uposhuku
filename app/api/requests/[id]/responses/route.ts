@@ -4,7 +4,7 @@
 
 import { problem } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { responsesFor } from "@/lib/requests/mock-responses";
+import { responsesFor } from "@/lib/requests/responses";
 import { findRequest } from "@/lib/server/request-repo";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {

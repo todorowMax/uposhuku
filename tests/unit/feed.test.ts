@@ -1,51 +1,51 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { feedFor, parseResponse, removeResponse, saveResponse } from "@/lib/feed/mock-feed";
-import { makeUser, useTestD1 } from "../helpers/d1";
+import { feedFor, mapRequests, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
+import { responsesFor } from "@/lib/requests/responses";
+import { emptyProfile } from "@/lib/profile/types";
+import { addPayment } from "@/lib/server/placement-repo";
+import { saveProfile } from "@/lib/server/profile-repo";
+import { createRequest } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
-
-const NOW = Date.parse("2026-10-03T10:00:00Z");
+import { makeUser, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
   ctx = await useTestD1();
-  for (const id of ["feed-a", "feed-b", "feed-c", "feed-d", "customer-1", "performer-1", "map-owner", "map-perf"]) await makeUser(ctx.db, id);
+  for (const id of ["cust-a", "cust-b", "perf-a", "perf-b", "nobody"]) await makeUser(ctx.db, id);
 });
 afterAll(async () => {
   await ctx.close();
 });
 
+const bot = { text: "Потрібен Telegram-бот для запису клієнтів", tags: [{ id: "telegram-bot", label: "Telegram-бот" }, { id: "online-booking", label: "Онлайн-запис" }], files: [], cityId: "lviv" as const };
+const store = { text: "Хочемо інтернет-магазин кераміки", tags: [{ id: "online-store", label: "Інтернет-магазин" }, { id: "cart-checkout", label: "Кошик" }], files: [], cityId: "kyiv" as const };
+
 describe("стрічка запитів виконавця", () => {
-  it("показує лише запити, що закривають хоч один тег профілю", async () => {
-    const items = await feedFor("feed-a", ["telegram-bot", "n8n"], NOW);
-    expect(items.length).toBeGreaterThan(0);
+  it("показує лише запити, що закривають хоч один тег профілю, чужі, найвідповідніші першими", async () => {
+    const a = await createRequest("cust-a", bot);
+    const b = await createRequest("cust-b", store);
+    const items = await feedFor("perf-a", ["telegram-bot", "online-booking", "online-store"]);
+    expect(items.map((item) => item.id)).toEqual(expect.arrayContaining([a.id, b.id]));
     expect(items.every((item) => item.matchedTags > 0)).toBe(true);
     expect(items.flatMap((item) => item.tags).every((tag) => TAGS_BY_ID.has(tag.id))).toBe(true);
-    expect(items[0].tags.some((tag) => tag.matched)).toBe(true);
-  });
-
-  it("запити «приходять» з часом, а не всі одразу", async () => {
-    const profile = ["mobile-app", "planner-app"];
-    const first = await feedFor("feed-b", profile, NOW);
-    expect(first.some((item) => item.id === "demo-3")).toBe(false);
-    const later = await feedFor("feed-b", profile, NOW + 40_000);
-    expect(later.some((item) => item.id === "demo-3")).toBe(true);
-  });
-
-  it("найвідповідніші першими, серед рівних свіжіші", async () => {
-    const items = await feedFor("feed-c", ["telegram-bot", "online-booking", "monobank", "notifications", "automation", "google-sheets"], NOW + 600_000);
     const counts = items.map((item) => item.matchedTags);
-    expect(counts).toEqual([...counts].sort((a, b) => b - a));
+    expect(counts).toEqual([...counts].sort((x, y) => y - x));
+    // Без збігу запит не показуємо; свої запити виконавець у стрічці не бачить.
+    expect((await feedFor("perf-a", ["branding"])).some((item) => item.id === a.id)).toBe(false);
+    expect((await feedFor("cust-a", ["telegram-bot"])).some((item) => item.id === a.id)).toBe(false);
   });
 
   it("відгук лишається в запиті, рахується й знімається", async () => {
+    const request = await createRequest("cust-a", { ...bot, text: "Ще один бот для барбершопу" });
     const tags = ["telegram-bot"];
-    const before = (await feedFor("feed-d", tags, NOW))[0];
-    await saveResponse("feed-d", before.id, { price: 9000, days: 7, message: "Добрий день, зроблю." });
-    const after = (await feedFor("feed-d", tags, NOW))[0];
+    const before = (await feedFor("perf-b", tags)).find((item) => item.id === request.id)!;
+    expect(before).toMatchObject({ response: null, responses: 0 });
+    await saveResponse("perf-b", request.id, { price: 9000, days: 7, message: "Добрий день, зроблю." });
+    const after = (await feedFor("perf-b", tags)).find((item) => item.id === request.id)!;
     expect(after.response).toMatchObject({ price: 9000, days: 7 });
-    expect(after.responses).toBe(before.responses + 1);
-    await removeResponse("feed-d", before.id);
-    expect((await feedFor("feed-d", tags, NOW))[0].response).toBeNull();
+    expect(after.responses).toBe(1);
+    await removeResponse("perf-b", request.id);
+    expect((await feedFor("perf-b", tags)).find((item) => item.id === request.id)!.response).toBeNull();
   });
 });
 
@@ -68,20 +68,27 @@ describe("відгук виконавця: перевірка тіла", () => {
 });
 
 describe("відгук виконавця доходить до замовника", () => {
-  it("справжній відгук з'являється в пропозиціях на запит, з даними профілю", async () => {
-    const { createRequest } = await import("@/lib/server/request-repo");
-    const { saveProfile } = await import("@/lib/server/profile-repo");
-    const { responsesFor } = await import("@/lib/requests/mock-responses");
-    const { emptyProfile } = await import("@/lib/profile/types");
+  it("з'являється в пропозиціях на запит з даними профілю, оплатою й рейтингом; непубліковані не показуємо", async () => {
+    const request = await createRequest("cust-a", { text: "Потрібен лендинг", tags: [{ id: "landing", label: "Лендинг" }], files: [] });
+    await saveProfile("perf-a", { ...emptyProfile("Іван"), cityId: "kyiv", specialty: "Розробник сайтів", tags: ["landing", "website"], photo: "/api/uploads/photos/perf-a/x.jpg", published: true });
+    await saveProfile("perf-b", { ...emptyProfile("Прихований"), cityId: "kyiv", specialty: "Розробник", tags: ["landing"], photo: "", published: false });
+    expect((await feedFor("perf-a", ["landing", "website"])).some((item) => item.id === request.id)).toBe(true);
 
-    const request = await createRequest("customer-1", { text: "Потрібен лендинг", tags: [{ id: "landing", label: "Лендинг" }], files: [] });
-    await saveProfile("performer-1", { ...emptyProfile("Іван"), cityId: "kyiv", specialty: "Розробник сайтів", tags: ["landing", "website"], photo: "data:image/jpeg;base64,AAAA", published: true });
-    expect((await feedFor("performer-1", ["landing", "website"], NOW)).some((item) => item.id === request.id)).toBe(true);
+    await saveResponse("perf-a", request.id, { price: 9000, days: 5, message: "Добрий день, зроблю." });
+    await saveResponse("perf-b", request.id, { price: 1000, days: 2, message: "Добрий день, теж зроблю." });
+    await addPayment("perf-a", 300);
+    const offers = await responsesFor(request);
+    expect(offers).toHaveLength(1);
+    expect(offers[0]).toMatchObject({ name: "Іван", price: 9000, days: 5, cityName: "Київ", performerId: "me-perf-a", promoted: true, rating: "—" });
+    expect(offers[0].tier).toBeGreaterThanOrEqual(2);
+    expect(offers[0].photo).toBe("/api/uploads/photos/perf-a/x.jpg");
+  });
 
-    await saveResponse("performer-1", request.id, { price: 9000, days: 5, message: "Добрий день, зроблю." });
-    const real = (await responsesFor(request)).find((response) => response.performerId === "me-performer-1");
-    expect(real).toMatchObject({ name: "Іван", price: 9000, days: 5, cityName: "Київ", tier: 1, promoted: false });
-    expect(real?.photo).toBe("data:image/jpeg;base64,AAAA");
+  it("закритий запит пропозицій не віддає", async () => {
+    const { closeRequest } = await import("@/lib/server/request-repo");
+    const request = await createRequest("cust-b", { text: "Зробити сайт", tags: [], files: [] });
+    await closeRequest("cust-b", request.id);
+    expect(await responsesFor({ ...request, status: "closed" })).toEqual([]);
   });
 });
 
@@ -95,37 +102,30 @@ describe("умови запиту словами", () => {
 });
 
 describe("запити на карті", () => {
-  const NOW2 = Date.parse("2026-10-03T12:00:00Z");
-
   it("гостю видно запити лише з містом і текстом: без акаунта, збігів і відгуків", async () => {
-    const { mapRequests } = await import("@/lib/feed/mock-feed");
-    const items = await mapRequests(null, [], NOW2 + 600_000);
+    await createRequest("cust-a", { text: "Потрібна допомога з дизайном", tags: [], files: [] });
+    const items = await mapRequests(null, []);
     expect(items.length).toBeGreaterThan(3);
     expect(items.every((item) => item.matchedTags === 0 && item.response === null && !item.own)).toBe(true);
-    // Є і з точкою в місті, і віддалені без точки.
     expect(items.some((item) => item.point)).toBe(true);
     expect(items.some((item) => item.place === "Віддалено" && item.point === null)).toBe(true);
   });
 
-  it("точка поруч із центром міста, стабільна й різна для різних запитів", async () => {
-    const { mapRequests } = await import("@/lib/feed/mock-feed");
+  it("точка поруч із центром міста й стабільна", async () => {
     const { CITIES } = await import("@/lib/map/cities");
-    const items = await mapRequests(null, [], NOW2 + 600_000);
+    const items = await mapRequests(null, []);
     const lviv = CITIES.find((city) => city.id === "lviv")!;
     const placed = items.find((item) => item.place === "Львів")!;
     expect(Math.hypot(placed.point!.lat - lviv.lat, (placed.point!.lng - lviv.lng) * 0.65)).toBeLessThan(0.1);
-    expect((await mapRequests(null, [], NOW2 + 600_000)).find((item) => item.id === placed.id)!.point).toEqual(placed.point);
+    expect((await mapRequests(null, [])).find((item) => item.id === placed.id)!.point).toEqual(placed.point);
   });
 
   it("виконавцю додаємо збіг і його відгук, а власний запит позначено own", async () => {
-    const { mapRequests } = await import("@/lib/feed/mock-feed");
-    const { createRequest } = await import("@/lib/server/request-repo");
-    await createRequest("map-owner", { text: "Потрібен лендинг", tags: [{ id: "landing", label: "Лендинг" }], files: [], cityId: "kyiv" });
-    await saveResponse("map-perf", "demo-1", { price: 1000, days: 3, message: "Добрий день, зроблю." });
-    const items = await mapRequests("map-perf", ["online-store", "cart-checkout"], NOW2 + 600_000);
-    expect(items.find((item) => item.id === "demo-1")).toMatchObject({ matchedTags: 2, response: { price: 1000 } });
-    const own = (await mapRequests("map-owner", [], NOW2 + 600_000)).find((item) => item.own);
-    expect(own).toMatchObject({ own: true, place: "Київ" });
-    expect((await mapRequests("map-perf", [], NOW2 + 600_000)).some((item) => item.own)).toBe(false);
+    const request = await createRequest("cust-b", { text: "Потрібен інтернет-магазин", tags: [{ id: "online-store", label: "Інтернет-магазин" }, { id: "cart-checkout", label: "Кошик" }], files: [], cityId: "kyiv" });
+    await saveResponse("perf-b", request.id, { price: 1000, days: 3, message: "Добрий день, зроблю." });
+    const items = await mapRequests("perf-b", ["online-store", "cart-checkout"]);
+    expect(items.find((item) => item.id === request.id)).toMatchObject({ matchedTags: 2, response: { price: 1000 }, responses: 1 });
+    expect((await mapRequests("cust-b", [])).find((item) => item.id === request.id)).toMatchObject({ own: true, place: "Київ" });
+    expect((await mapRequests("perf-b", [])).some((item) => item.own)).toBe(false);
   });
 });

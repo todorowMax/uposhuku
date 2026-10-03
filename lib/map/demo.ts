@@ -152,7 +152,7 @@ const GROUP_SHARE: [string, number][] = [
  * Роботи в портфоліо за тегами профілю: кожна людина показує 3–6 проєктів
  * зі своєї спеціальності. Лише демо, справжні підуть із профілів.
  */
-const WORKS_BY_TAG: Record<string, [string, WorkKind][]> = {
+export const WORKS_BY_TAG: Record<string, [string, WorkKind][]> = {
   "ui-ux-design": [["Кабінет пацієнта клініки", "design"], ["Дизайн-система для SaaS", "design"]],
   redesign: [["Редизайн онлайн-школи", "design"]],
   "ux-research": [["UX-аудит застосунку доставки", "design"]],

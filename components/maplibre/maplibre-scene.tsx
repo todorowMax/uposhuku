@@ -1463,7 +1463,7 @@ export default function MapLibreScene() {
               <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
             </div>
           )}
-          <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "Демонстраційні дані профілю")}</p>
+          <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>
         </aside>
       )}
 

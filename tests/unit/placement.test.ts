@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { demoTotals } from "@/lib/placement/market";
 import { addPayment, getPlacement, tiersByUser } from "@/lib/server/placement-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 import { MIN_PAYMENT, TIER_FLOOR, quote, tierFor, toNextTier } from "@/lib/placement/pricing";
@@ -22,7 +21,7 @@ describe("ціни рівнів", () => {
   });
 
   it("ціни зростають із рівнем і більшу суму треба для кращого місця", () => {
-    const prices = quote(demoTotals());
+    const prices = quote(Array.from({ length: 60 }, (_, index) => 120 + index * 90));
     const list = PAID_TIERS.map((tier) => prices[tier as 2]);
     expect(list).toEqual([...list].sort((a, b) => a - b));
     expect(new Set(list).size).toBe(list.length);

@@ -12,8 +12,6 @@ export interface Review {
   /** Ім'я автора: перше слово імені або початок пошти. */
   author: string;
   createdAt: string;
-  /** Демо-відгук, не від справжньої угоди. */
-  demo?: boolean;
 }
 
 export const REVIEW_TEXT_MAX = 600;

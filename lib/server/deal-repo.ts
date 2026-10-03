@@ -1,13 +1,11 @@
 // lib/server/deal-repo.ts
 //
 // Угоди на D1. Угода — документ (JSON з етапами), бо машина станів
-// (lib/deals/machine.ts) працює з усім об'єктом. Виконавець у заглушці
-// «відповідає» за таймером: стан доводимо до «зараз» при кожному читанні й
-// зберігаємо, якщо він змінився.
+// (lib/deals/machine.ts) працює з усім об'єктом.
 
 import { and, desc, eq } from "drizzle-orm";
 import { deals } from "@/db/schema";
-import { applyAction, applyPerformerAction, createDeal, simulate, validateDraft } from "@/lib/deals/machine";
+import { applyAction, applyPerformerAction, createDeal, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealAction, DealDraft, PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
 import { getDb } from "./db";
@@ -21,25 +19,16 @@ const write = async (ownerUserId: string, deal: Deal, now: number) => {
     .where(and(eq(deals.id, deal.id), eq(deals.ownerUserId, ownerUserId)));
 };
 
-const readAll = async (userId: string, now: number): Promise<Deal[]> => {
-  const rows = await getDb().select().from(deals).where(eq(deals.ownerUserId, userId)).orderBy(desc(deals.createdAt));
-  const result: Deal[] = [];
-  for (const row of rows) {
-    const before = parse(row);
-    const after = simulate(before, now);
-    if (JSON.stringify(after) !== row.data) await write(userId, after, now);
-    result.push(after);
-  }
-  return result;
-};
+const readAll = async (userId: string): Promise<Deal[]> =>
+  (await getDb().select().from(deals).where(eq(deals.ownerUserId, userId)).orderBy(desc(deals.createdAt))).map(parse);
 
-export const listDeals = async (userId: string, requestId?: string, now = Date.now()): Promise<Deal[]> =>
-  (await readAll(userId, now)).filter((deal) => !requestId || deal.requestId === requestId);
+export const listDeals = async (userId: string, requestId?: string): Promise<Deal[]> =>
+  (await readAll(userId)).filter((deal) => !requestId || deal.requestId === requestId);
 
 export const proposeDeal = async (userId: string, draft: DealDraft, now = Date.now()): Promise<Deal | string> => {
   const error = validateDraft(draft);
   if (error) return error;
-  const existing = await readAll(userId, now);
+  const existing = await readAll(userId);
   // На один відгук одна жива угода: нову можна після відмови чи скасування.
   if (existing.some((deal) => deal.responseId === draft.responseId && deal.status !== "declined" && deal.status !== "cancelled")) return "З цим виконавцем уже є угода.";
   const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, draft, now);
@@ -58,7 +47,7 @@ export const proposeDeal = async (userId: string, draft: DealDraft, now = Date.n
 };
 
 export const actOnDeal = async (userId: string, id: string, action: DealAction, stageId: string | undefined, now = Date.now()): Promise<Deal | string | null> => {
-  const deal = (await readAll(userId, now)).find((item) => item.id === id);
+  const deal = (await readAll(userId)).find((item) => item.id === id);
   if (!deal) return null;
   const result = applyAction(deal, action, stageId, now);
   if (typeof result === "string") return result;

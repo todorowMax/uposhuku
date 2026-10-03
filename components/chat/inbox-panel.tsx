@@ -7,7 +7,7 @@ import { CHAT_TEXT_MAX, type ConversationDto } from "@/lib/chat/types";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { currentStage, dealTotal, payoutOf, performerNeeds } from "@/lib/deals/machine";
 import type { Deal, PerformerAction } from "@/lib/deals/types";
-import { mentionsContacts } from "@/lib/requests/mock-chat";
+import { mentionsContacts } from "@/lib/chat/contacts";
 import { useStore } from "@/lib/store";
 
 const TIME = new Intl.DateTimeFormat("uk-UA", { hour: "2-digit", minute: "2-digit" });

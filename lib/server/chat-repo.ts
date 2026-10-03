@@ -7,26 +7,23 @@
 import { and, asc, desc, eq, gt, inArray, or } from "drizzle-orm";
 import { conversations, messages, users } from "@/db/schema";
 import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
-import { DEMO_PERFORMERS } from "@/lib/map/demo";
-import { getDb } from "./db";
+import { getDb, inChunks } from "./db";
 import { getProfile } from "./profile-repo";
 
 type Conversation = typeof conversations.$inferSelect;
 
 const toMessage = (row: typeof messages.$inferSelect): ChatMessageDto => ({ id: row.id, from: row.from, text: row.text, at: new Date(row.createdAt).toISOString() });
 
-/** З ким можна говорити: демо-виконавець або опублікований профіль іншого акаунта. */
-export const performerKnown = async (performerId: string, selfUserId: string): Promise<{ userId: string | null } | null> => {
-  if (performerId.startsWith("me-")) {
-    const userId = performerId.slice(3);
-    if (!userId || userId === selfUserId) return null;
-    const profile = await getProfile(userId);
-    return profile?.published ? { userId } : null;
-  }
-  return DEMO_PERFORMERS.some((person) => person.id === performerId) ? { userId: null } : null;
+/** З ким можна говорити: опублікований профіль іншого акаунта (id виду me-<userId>). */
+export const performerKnown = async (performerId: string, selfUserId: string): Promise<{ userId: string } | null> => {
+  if (!performerId.startsWith("me-")) return null;
+  const userId = performerId.slice(3);
+  if (!userId || userId === selfUserId) return null;
+  const profile = await getProfile(userId);
+  return profile?.published ? { userId } : null;
 };
 
-export const getOrCreateConversation = async (customerUserId: string, performerId: string, performerUserId: string | null): Promise<Conversation> => {
+export const getOrCreateConversation = async (customerUserId: string, performerId: string, performerUserId: string): Promise<Conversation> => {
   const db = getDb();
   const find = async () => (await db.select().from(conversations).where(and(eq(conversations.customerUserId, customerUserId), eq(conversations.performerId, performerId))).limit(1))[0];
   const existing = await find();
@@ -62,18 +59,17 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   const rows = await db.select().from(conversations).where(or(eq(conversations.customerUserId, userId), eq(conversations.performerUserId, userId))).orderBy(desc(conversations.updatedAt)).limit(100);
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
-  const allMessages = await db.select().from(messages).where(inArray(messages.conversationId, ids)).orderBy(desc(messages.createdAt));
+  const allMessages = (await inChunks(ids, (chunk) => db.select().from(messages).where(inArray(messages.conversationId, chunk)))).sort((a, b) => b.createdAt - a.createdAt);
   const customerIds = [...new Set(rows.filter((row) => row.performerUserId === userId).map((row) => row.customerUserId))];
-  const customers = customerIds.length ? await db.select().from(users).where(inArray(users.id, customerIds)) : [];
+  const customers = await inChunks(customerIds, (chunk) => db.select().from(users).where(inArray(users.id, chunk)));
   const result: ConversationDto[] = [];
   for (const row of rows) {
     const role = row.customerUserId === userId ? "customer" : "performer";
     const last = allMessages.find((message) => message.conversationId === row.id);
     let other: ConversationDto["other"];
     if (role === "customer") {
-      const demo = DEMO_PERFORMERS.find((person) => person.id === row.performerId);
       const profile = row.performerUserId ? await getProfile(row.performerUserId) : null;
-      other = { name: demo?.name ?? profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: demo?.specialty ?? profile?.specialty };
+      other = { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
     } else {
       const customer = customers.find((user) => user.id === row.customerUserId);
       other = { name: customer?.displayName ?? customer?.email.split("@")[0] ?? "Замовник" };

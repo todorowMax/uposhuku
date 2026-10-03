@@ -6,7 +6,6 @@
 
 import { eq, sql } from "drizzle-orm";
 import { payments } from "@/db/schema";
-import { demoTotals } from "@/lib/placement/market";
 import { quote, tierFor } from "@/lib/placement/pricing";
 import type { Payment, Placement } from "@/lib/placement/types";
 import { getDb } from "./db";
@@ -17,7 +16,7 @@ export const totalsByUser = async (): Promise<Map<string, number>> => {
   return new Map(rows.map((row) => [row.userId, Number(row.total)]));
 };
 
-const othersOf = (all: Map<string, number>, userId: string) => [...demoTotals(), ...[...all].filter(([id]) => id !== userId).map(([, total]) => total)];
+const othersOf = (all: Map<string, number>, userId: string) => [...all].filter(([id]) => id !== userId).map(([, total]) => total);
 
 export const getPlacement = async (userId: string): Promise<Placement> => {
   const [all, rows] = await Promise.all([totalsByUser(), getDb().select().from(payments).where(eq(payments.userId, userId))]);

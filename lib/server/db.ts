@@ -14,3 +14,13 @@ export const getDb = () => {
 
 export type Db = ReturnType<typeof getDb>;
 export { schema };
+
+/**
+ * D1 принимає не більше 100 параметрів в одному запиті, тож `IN (...)` по довгому
+ * списку id виконуємо порціями й склеюємо результат.
+ */
+export const inChunks = async <T>(ids: string[], run: (chunk: string[]) => Promise<T[]>, size = 90): Promise<T[]> => {
+  const result: T[] = [];
+  for (let start = 0; start < ids.length; start += size) result.push(...(await run(ids.slice(start, start + size))));
+  return result;
+};

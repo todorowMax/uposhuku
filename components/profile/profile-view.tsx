@@ -15,7 +15,7 @@ import { placementOpenStore } from "@/lib/placement/client";
 import { TIER_NAMES, isPromoted } from "@/lib/placement/tiers";
 import { sessionStore } from "@/lib/auth/client";
 import { useCloseProfile } from "@/lib/profile/navigation";
-import { directChatOpenStore, hydrateDialogs, useDialog, useRemoteDialogSync } from "@/lib/requests/direct-chat";
+import { directChatOpenStore, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
 import { profileEditorStore } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import type { Profile } from "@/lib/profile/types";
@@ -86,7 +86,7 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
   const [composing, setComposing] = useState(false);
   const dialog = useDialog(id);
   // Чи є вже розмова з цим виконавцем-акаунтом: від цього залежить напис кнопки.
-  useRemoteDialogSync(id, true);
+  useDialogSync(id, true);
   const openRequest = useStore(directChatOpenStore);
   const [labels, setLabels] = useState<Record<string, string>>(initialLabels);
   const [reviews, setReviews] = useState<{ list: Review[]; average: number | null } | null>(null);
@@ -97,10 +97,6 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
     return () => {
       tween.kill();
     };
-  }, []);
-
-  useEffect(() => {
-    hydrateDialogs();
   }, []);
 
   // Гість увійшов, і його чат створено: відкриваємо його без кнопки.
@@ -250,7 +246,6 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
                   </li>
                 ))}
               </ul>
-              {reviews?.list.some((review) => review.demo) && <p className="pe-hint">Відгуки демонстраційні, поки немає справжніх угод.</p>}
             </section>
           </div>
         )}

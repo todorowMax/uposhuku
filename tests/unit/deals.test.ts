@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SIM, applyAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, simulate, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { applyAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
@@ -13,7 +13,8 @@ const draft = (over: Partial<DealDraft> = {}): DealDraft => ({
   ...over,
 });
 
-const accepted = (d = draft()): Deal => simulate(createDeal("deal-abcd", d, T0), T0 + SIM.accept);
+const act = (deal: Deal, action: Parameters<typeof applyPerformerAction>[1], at: number): Deal => applyPerformerAction(deal, action, undefined, at) as Deal;
+const accepted = (d = draft()): Deal => act(createDeal("deal-abcd", d, T0), "accept", T0 + 3000);
 
 describe("правила угоди", () => {
   it("комісія лише в безпечній угоді, 5%", () => {
@@ -44,10 +45,10 @@ describe("правила угоди", () => {
 });
 
 describe("шлях безпечної угоди", () => {
-  it("виконавець погоджується за таймером, не раніше", () => {
+  it("поки виконавець не відповів, угода лише запропонована", () => {
     const deal = createDeal("deal-abcd", draft(), T0);
-    expect(simulate(deal, T0 + SIM.accept - 1).status).toBe("proposed");
-    expect(simulate(deal, T0 + SIM.accept).status).toBe("accepted");
+    expect(deal.status).toBe("proposed");
+    expect(act(deal, "accept", T0 + 3000).status).toBe("accepted");
   });
 
   it("заморожування → здано → виплата → угода завершена; холд на 9 днів", () => {
@@ -58,7 +59,7 @@ describe("шлях безпечної угоди", () => {
     expect(stage.status).toBe("funded");
     expect(Date.parse(stage.holdUntil!) - Date.parse(stage.fundedAt!)).toBe(9 * 86_400_000);
     expect(needsAction(deal)).toBeNull();
-    deal = simulate(deal, T0 + 5000 + SIM.deliver);
+    deal = act(deal, "deliver", T0 + 15_000);
     expect(currentStage(deal)!.status).toBe("delivered");
     expect(needsAction(deal)).toBe("confirm");
     deal = applyAction(deal, "release", undefined, T0 + 20_000) as Deal;
@@ -70,7 +71,7 @@ describe("шлях безпечної угоди", () => {
     let deal = accepted(draft({ stages: [{ title: "А", amount: 5000, days: 5 }, { title: "Б", amount: 5000, days: 5 }] }));
     expect(applyAction(deal, "fund", deal.stages[1].id, T0)).toMatch(/попередній/);
     deal = applyAction(deal, "fund", deal.stages[0].id, T0 + 4000) as Deal;
-    deal = simulate(deal, T0 + 4000 + SIM.deliver);
+    deal = act(deal, "deliver", T0 + 14_000);
     deal = applyAction(deal, "release", deal.stages[0].id, T0 + 20_000) as Deal;
     expect(deal.status).toBe("accepted");
     expect(currentStage(deal)!.id).toBe(deal.stages[1].id);
@@ -102,10 +103,10 @@ describe("шлях прямого переказу за QR", () => {
     expect(needsAction(deal)).toBe("pay");
     deal = applyAction(deal, "claim_paid", undefined, T0 + 5000) as Deal;
     expect(currentStage(deal)!.status).toBe("claimed");
-    expect(simulate(deal, T0 + 5000 + SIM.confirmPayment - 1).stages[0].status).toBe("claimed");
-    deal = simulate(deal, T0 + 5000 + SIM.confirmPayment);
+    expect(applyPerformerAction(deal, "deliver", undefined, T0 + 6000)).toMatch(/оплату підтверджено/);
+    deal = act(deal, "confirm_paid", T0 + 9000);
     expect(currentStage(deal)!.status).toBe("funded");
-    deal = simulate(deal, T0 + 5000 + SIM.confirmPayment + SIM.deliver);
+    deal = act(deal, "deliver", T0 + 19_000);
     expect(needsAction(deal)).toBe("confirm");
     deal = applyAction(deal, "release", undefined, T0 + 60_000) as Deal;
     expect(deal.status).toBe("completed");
@@ -115,7 +116,7 @@ describe("шлях прямого переказу за QR", () => {
     let deal = direct();
     expect(applyAction(deal, "fund", undefined, T0)).toMatch(/Заморозити/);
     deal = applyAction(deal, "claim_paid", undefined, T0 + 5000) as Deal;
-    deal = simulate(deal, T0 + 5000 + SIM.confirmPayment);
+    deal = act(deal, "confirm_paid", T0 + 9000);
     expect(applyAction(deal, "dispute", undefined, T0 + 20_000)).toMatch(/прямому переказі/);
   });
 });
@@ -123,11 +124,6 @@ describe("шлях прямого переказу за QR", () => {
 describe("угода з виконавцем-акаунтом", () => {
   const real: DealDraft = { requestId: "r", responseId: "x", method: "direct", performer: { id: "me-u1", name: "Іван", avatarIndex: 0, specialty: "Розробник", fop: false }, stages: [{ title: "Робота", amount: 5000, days: 7 }] };
   const NOW = 10_000_000;
-
-  it("таймер за нього нічого не робить", () => {
-    const deal = createDeal("d1", real, NOW);
-    expect(simulate(deal, NOW + 100 * SIM.deliver)).toBe(deal);
-  });
 
   it("виконавець приймає, замовник позначає оплату, виконавець підтверджує і здає, замовник приймає", () => {
     let deal = createDeal("d2", real, NOW);

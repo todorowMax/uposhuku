@@ -6,8 +6,8 @@ import { ArrowUp, Maximize2, Minimize2, ShieldCheck, X } from "lucide-react";
 import { authFlowStore, sessionStore } from "@/lib/auth/client";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import type { Performer } from "@/lib/map/types";
-import { savePending, sendDirect, startDialog, useDialog, useRemoteDialogSync, useTyping } from "@/lib/requests/direct-chat";
-import { mentionsContacts } from "@/lib/requests/mock-chat";
+import { mentionsContacts } from "@/lib/chat/contacts";
+import { savePending, sendDirect, startDialog, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 
@@ -55,8 +55,8 @@ export function DirectChatPanel({
   onLeaveToAuth: () => void;
 }) {
   const dialog = useDialog(performer.id);
-  useRemoteDialogSync(performer.id, true);
-  const typing = useTyping(performer.id);
+  useDialogSync(performer.id, true);
+  const typing = false;
   const session = useStore(sessionStore);
   const view: View = dialog ? "chat" : "compose";
   const [expanded, setExpanded] = useState(false);

@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, Maximi
 import { getPerformers } from "@/lib/map/performers";
 import { AVATAR_ATLAS } from "@/lib/map/portrait";
 import { useChat } from "@/lib/requests/chat";
-import { mentionsContacts } from "@/lib/requests/mock-chat";
+import { mentionsContacts } from "@/lib/chat/contacts";
 import {
   focusPerformerStore,
   offersCollapsedStore,

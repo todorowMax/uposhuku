@@ -4,7 +4,7 @@
 // Для виконавця з опублікованим профілем додаємо збіг з тегами й його відгук.
 
 import { getSessionUser } from "@/lib/server/auth";
-import { mapRequests } from "@/lib/feed/mock-feed";
+import { mapRequests } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
 import { profileTags } from "@/lib/profile/types";
 

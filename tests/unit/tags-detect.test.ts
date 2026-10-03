@@ -161,7 +161,7 @@ describe("слово продукту не губиться всередині �
 
 describe("заготовки запитів у стрічці", () => {
   it("кожен тег заготовки розпізнається з її тексту, як у справжнього запиту", async () => {
-    const { TEMPLATES } = await import("@/lib/feed/mock-feed");
+    const { TEMPLATES } = await import("@/lib/feed/seed-requests");
     const gaps = TEMPLATES.map((template) => ({ text: template.text.slice(0, 40), missing: template.tags.filter((tag) => !detectTags(template.text).includes(tag)) })).filter((item) => item.missing.length);
     expect(gaps).toEqual([]);
   });

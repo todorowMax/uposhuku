@@ -4,7 +4,7 @@
 
 import { problem } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { feedFor } from "@/lib/feed/mock-feed";
+import { feedFor } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
 import { profileTags } from "@/lib/profile/types";
 

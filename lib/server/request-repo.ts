@@ -7,7 +7,7 @@ import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { isDeadline } from "@/lib/requests/types";
-import { getDb } from "./db";
+import { getDb, inChunks } from "./db";
 
 type Row = typeof requests.$inferSelect;
 
@@ -16,8 +16,8 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
   const db = getDb();
   const ids = rows.map((row) => row.id);
   const [tagRows, fileRows] = await Promise.all([
-    db.select().from(requestTags).where(inArray(requestTags.requestId, ids)),
-    db.select().from(requestFiles).where(inArray(requestFiles.requestId, ids)),
+    inChunks(ids, (chunk) => db.select().from(requestTags).where(inArray(requestTags.requestId, chunk))),
+    inChunks(ids, (chunk) => db.select().from(requestFiles).where(inArray(requestFiles.requestId, chunk))),
   ]);
   return rows.map((row) => ({
     id: row.id,
@@ -102,7 +102,7 @@ export const responsesTo = async (requestId: string): Promise<{ userId: string; 
 /** Скільки справжніх відгуків на кожен із запитів. */
 export const responseCounts = async (requestIds: string[]): Promise<Map<string, number>> => {
   if (requestIds.length === 0) return new Map();
-  const rows = await getDb().select({ requestId: responses.requestId }).from(responses).where(inArray(responses.requestId, requestIds));
+  const rows = await inChunks(requestIds, (chunk) => getDb().select({ requestId: responses.requestId }).from(responses).where(inArray(responses.requestId, chunk)));
   const counts = new Map<string, number>();
   for (const row of rows) counts.set(row.requestId, (counts.get(row.requestId) ?? 0) + 1);
   return counts;

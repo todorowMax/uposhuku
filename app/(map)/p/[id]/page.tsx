@@ -15,6 +15,9 @@ type Props = { params: Promise<{ id: string }> };
 
 const SITE = "https://uposhuku.com";
 
+/** Виконавець із сіда dev-бази: id виду me-demo-…, вигаданий. */
+const isDemo = (id: string) => id.startsWith("me-demo-");
+
 const load = async (params: Props["params"]) => {
   const { id } = await params;
   const decoded = decodeURIComponent(id);
@@ -32,8 +35,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     alternates: { canonical: `${SITE}/p/${encodeURIComponent(id)}` },
     openGraph: { title, description, type: "profile", locale: "uk_UA" },
-    // Демо-виконавці вигадані: в індекс їх не пускаємо.
-    robots: id.startsWith("me-") ? undefined : { index: false, follow: true },
+    // Демо-виконавців з сіда (me-demo-…) вигадані: в індекс їх не пускаємо.
+    robots: isDemo(id) ? { index: false, follow: true } : undefined,
   };
 }
 
@@ -53,7 +56,7 @@ export default async function PerformerPage({ params }: Props) {
   };
   return (
     <>
-      {id.startsWith("me-") && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />}
+      {!isDemo(id) && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />}
       <ProfileView id={id} initial={performer} initialLabels={labels} />
     </>
   );

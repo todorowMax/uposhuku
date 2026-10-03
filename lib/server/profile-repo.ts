@@ -7,7 +7,7 @@
 import { asc, eq, inArray } from "drizzle-orm";
 import { profileTags, profiles, projectTags, projects } from "@/db/schema";
 import { emptyProfile, type Profile, type ProfileWork } from "@/lib/profile/types";
-import { getDb } from "./db";
+import { getDb, inChunks } from "./db";
 
 const iso = (value: number) => new Date(value).toISOString();
 
@@ -36,10 +36,13 @@ const load = async (rows: (typeof profiles.$inferSelect)[]): Promise<Map<string,
   const db = getDb();
   const ids = rows.map((row) => row.userId);
   const [tagRows, projectRows] = await Promise.all([
-    db.select().from(profileTags).where(inArray(profileTags.userId, ids)),
-    db.select().from(projects).where(inArray(projects.userId, ids)).orderBy(asc(projects.position)),
+    inChunks(ids, (chunk) => db.select().from(profileTags).where(inArray(profileTags.userId, chunk))),
+    inChunks(ids, (chunk) => db.select().from(projects).where(inArray(projects.userId, chunk)).orderBy(asc(projects.position))),
   ]);
-  const workTagRows = projectRows.length ? await db.select().from(projectTags).where(inArray(projectTags.projectId, projectRows.map((project) => project.id))) : [];
+  const workTagRows = await inChunks(
+    projectRows.map((project) => project.id),
+    (chunk) => db.select().from(projectTags).where(inArray(projectTags.projectId, chunk)),
+  );
   for (const row of rows) {
     result.set(
       row.userId,

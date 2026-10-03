@@ -1,12 +1,10 @@
 // lib/map/performers.ts
 //
-// Хто зараз на карті: демо-виконавці, справжні виконавці з акаунтів
-// (/api/map/performers) і, якщо людина опублікувала профіль, вона сама. Карта, фільтри й картки читають звідси, а не з DEMO_PERFORMERS
-// напряму: профіль з'являється без перезавантаження. Коли буде база,
-// сюди прийдуть справжні профілі, а демо зникнуть.
+// Хто зараз на карті: виконавці з /api/map/performers (профіль опубліковано й
+// розміщення оплачено) і, якщо людина опублікувала профіль, вона сама. Карта,
+// фільтри й картки читають звідси: свій профіль з'являється без перезавантаження.
 
 import { createStore, useStore } from "@/lib/store";
-import { DEMO_PERFORMERS } from "./demo";
 import { registerCustomAvatar } from "./portrait";
 import type { Performer } from "./types";
 
@@ -17,10 +15,10 @@ const merged = () => {
   const own = mine;
   // Себе не дублюємо: сервер віддає й мій профіль, а «mine» у мене свій.
   const others = own ? real.filter((person) => person.id !== own.id) : real;
-  return [...DEMO_PERFORMERS, ...others, ...(own ? [own] : [])];
+  return [...others, ...(own ? [own] : [])];
 };
 
-export const performersStore = createStore<Performer[]>(DEMO_PERFORMERS);
+export const performersStore = createStore<Performer[]>([]);
 
 export const getPerformers = () => performersStore.get();
 export const usePerformers = () => useStore(performersStore);

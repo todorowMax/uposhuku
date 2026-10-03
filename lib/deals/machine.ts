@@ -1,14 +1,10 @@
 // lib/deals/machine.ts
 //
-// Правила угоди: що можна з нею робити й що відбувається саме. Чисті
-// функції без часу всередині: «зараз» передаємо ззовні, тож усе
-// перевіряється тестами. Виконавець у заглушці «відповідає» за таймером
-// (SIM); справжні події прийдуть від нього самого й від вебхуків банку.
+// Правила угоди: що можна з нею робити. Чисті функції без часу всередині:
+// «зараз» передаємо ззовні, тож усе перевіряється тестами. Дії замовника й
+// виконавця; гроші підтверджуватиме вебхук банку.
 
 import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage, type PerformerAction } from "./types";
-
-/** Через скільки мс заглушка «виконавця» реагує. У бойовому режимі цих таймерів немає. */
-export const SIM = { accept: 3000, confirmPayment: 4000, deliver: 10_000 } as const;
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -69,29 +65,6 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
 
 /** Етап, на якому зараз угода: перший не виплачений. */
 export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status !== "released");
-
-/** Що виконавець у заглушці встигає зробити за час: приймає, підтверджує оплату, здає етап. */
-export const simulate = (deal: Deal, now: number): Deal => {
-  if (deal.status === "declined" || deal.status === "cancelled") return deal;
-  // Виконавець-акаунт відповідає сам, за нього таймер не діє.
-  if (deal.performer.id.startsWith("me-")) return deal;
-  let next = deal;
-  if (next.status === "proposed" && now >= Date.parse(next.createdAt) + SIM.accept) {
-    next = { ...next, status: "accepted", acceptedAt: iso(Date.parse(next.createdAt) + SIM.accept) };
-  }
-  if (next.status !== "accepted") return next;
-  const stages = next.stages.map((stage) => {
-    let current = stage;
-    if (current.status === "claimed" && current.claimedAt && now >= Date.parse(current.claimedAt) + SIM.confirmPayment) {
-      current = { ...current, status: "funded", fundedAt: iso(Date.parse(current.claimedAt) + SIM.confirmPayment) };
-    }
-    if (current.status === "funded" && current.fundedAt && now >= Date.parse(current.fundedAt) + SIM.deliver) {
-      current = { ...current, status: "delivered", deliveredAt: iso(Date.parse(current.fundedAt) + SIM.deliver) };
-    }
-    return current;
-  });
-  return stages.every((stage, index) => stage === next.stages[index]) ? next : { ...next, stages };
-};
 
 /** Замовник щось робить з угодою. Повертає нову угоду або текст помилки. */
 export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number): Deal | string => {

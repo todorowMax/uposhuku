@@ -1,8 +1,7 @@
 // lib/server/review-repo.ts
 import { desc, eq } from "drizzle-orm";
 import { reviews } from "@/db/schema";
-import { demoReviewsFor } from "@/lib/reviews/demo";
-import type { Review } from "@/lib/reviews/types";
+import { averageStars, type Review } from "@/lib/reviews/types";
 import { getDb } from "./db";
 
 const toReview = (row: typeof reviews.$inferSelect): Review => ({
@@ -15,10 +14,13 @@ const toReview = (row: typeof reviews.$inferSelect): Review => ({
   createdAt: new Date(row.createdAt).toISOString(),
 });
 
-/** Справжні відгуки; для демо-виконавців додаємо вигадані, щоб профіль не був порожнім. */
-export const reviewsFor = async (performerId: string): Promise<Review[]> => {
-  const real = (await getDb().select().from(reviews).where(eq(reviews.performerId, performerId)).orderBy(desc(reviews.createdAt))).map(toReview);
-  return [...real, ...(performerId.startsWith("me-") ? [] : demoReviewsFor(performerId))].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+export const reviewsFor = async (performerId: string): Promise<Review[]> =>
+  (await getDb().select().from(reviews).where(eq(reviews.performerId, performerId)).orderBy(desc(reviews.createdAt))).map(toReview);
+
+/** Середня оцінка й кількість відгуків виконавця. */
+export const getReviewStats = async (performerId: string) => {
+  const list = await reviewsFor(performerId);
+  return { count: list.length, average: averageStars(list) };
 };
 
 export const reviewOfDeal = async (dealId: string): Promise<Review | undefined> => {
