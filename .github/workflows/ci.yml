@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [development, main]
+  push:
+    branches: [development]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Типи: `next-env.d.ts` і `cloudflare-env.d.ts` у репозиторії або генеруються збіркою.
+      - run: npm run typecheck
+      # Тести репозиторіїв піднімають справжні D1 і R2 у пам'яті (wrangler getPlatformProxy).
+      - run: npm test

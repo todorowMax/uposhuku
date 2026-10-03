@@ -33,8 +33,13 @@
     "production": {
       "name": "uposhuku",
       "vars": { "DEPLOY_ENV": "production" },
-      // Прод-базу створимо разом з доменом: `wrangler d1 create uposhuku-production`,
-      // тоді сюди ляже її id. Поки без неї вхід на проді вимкнений.
+      // Прод: окрема база й бакет. На проді вхід вимкнений, доки немає RESEND_API_KEY
+      // (див. lib/server/mail.ts), а MAIL_MODE=dev тут не діє. Перед першим деплоєм:
+      //   npm run db:migrate:production, secret put AUTH_SECRET, RESEND_API_KEY, GOOGLE_*.
+      "d1_databases": [
+        { "binding": "DB", "database_name": "uposhuku-production", "database_id": "2b92cc09-29cc-4ae1-86c6-01f6223bb706", "migrations_dir": "db/migrations" }
+      ],
+      "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "uposhuku-uploads-production" }],
       "assets": {
         "directory": ".open-next/assets",
         "binding": "ASSETS"

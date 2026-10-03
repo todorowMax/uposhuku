@@ -1,0 +1,9 @@
+# Власники модулів: GitHub сам кличе їх на рев'ю (docs/plan-mvp.md, «Як не конфліктувати»).
+# Поки в репозиторії один власник, усе веде він; коли Богдан отримає свої модулі,
+# додайте його рядками нижче, напр.  /lib/server/chat-repo.ts @<github-нік>
+
+*                      @todorowMax
+/db/                   @todorowMax
+/wrangler.jsonc        @todorowMax
+/app/globals.css       @todorowMax
+/package.json          @todorowMax
