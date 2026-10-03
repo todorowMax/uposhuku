@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { demoTotals } from "@/lib/placement/market";
-import { addPayment, getPlacement } from "@/lib/placement/mock-store";
+import { addPayment, getPlacement, tiersByUser } from "@/lib/server/placement-repo";
+import { makeUser, useTestD1 } from "../helpers/d1";
 import { MIN_PAYMENT, TIER_FLOOR, quote, tierFor, toNextTier } from "@/lib/placement/pricing";
 import { PAID_TIERS, TIER_PX, isPromoted, outrank } from "@/lib/placement/tiers";
 
@@ -59,31 +60,47 @@ describe("ціни рівнів", () => {
   });
 });
 
-describe("платежі розміщення (заглушка)", () => {
-  it("сума накопичується, рівень росте, історія — нові першими", () => {
-    const first = getPlacement("pay-a");
+describe("платежі розміщення на D1", () => {
+  let ctx: Awaited<ReturnType<typeof useTestD1>>;
+  beforeAll(async () => {
+    ctx = await useTestD1();
+    for (const id of ["pay-a", "pay-b", "pay-c", "pay-d", ...Array.from({ length: 8 }, (_, index) => `whale-${index}`)]) await makeUser(ctx.db, id);
+  });
+  afterAll(async () => {
+    await ctx.close();
+  });
+
+  it("сума накопичується, рівень росте, історія — нові першими", async () => {
+    const first = await getPlacement("pay-a");
     expect(first).toMatchObject({ total: 0, tier: 1, payments: [] });
     expect(first.prices[2]).toBe(MIN_PAYMENT);
-    expect(addPayment("pay-a", 100)).toMatchObject({ total: 100, tier: 2 });
-    const placement = addPayment("pay-a", 400);
+    expect(await addPayment("pay-a", 100)).toMatchObject({ total: 100, tier: 2 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const placement = await addPayment("pay-a", 400);
     expect(placement.total).toBe(500);
     expect(placement.tier).toBeGreaterThanOrEqual(3);
     expect(placement.payments.map((payment) => payment.amount)).toEqual([400, 100]);
   });
 
-  it("у різних людей окремі рахунки, а велика оплата дає найвищий рівень", () => {
-    addPayment("pay-b", 10_000);
-    addPayment("pay-b", 10_000);
-    expect(getPlacement("pay-b").tier).toBe(6);
-    expect(getPlacement("pay-c").tier).toBe(1);
+  it("у різних людей окремі рахунки, а велика оплата дає найвищий рівень", async () => {
+    await addPayment("pay-b", 10_000);
+    await addPayment("pay-b", 10_000);
+    expect((await getPlacement("pay-b")).tier).toBe(6);
+    expect((await getPlacement("pay-c")).tier).toBe(1);
   });
 
-  it("чужа оплата піднімає ціни для інших", () => {
-    const before = getPlacement("pay-d").prices[6];
+  it("чужа оплата піднімає ціни для інших", async () => {
+    const before = (await getPlacement("pay-d")).prices[6];
     for (let index = 0; index < 8; index += 1) {
-      addPayment(`whale-${index}`, 10_000);
-      addPayment(`whale-${index}`, 10_000);
+      await addPayment(`whale-${index}`, 10_000);
+      await addPayment(`whale-${index}`, 10_000);
     }
-    expect(getPlacement("pay-d").prices[6]).toBeGreaterThan(before);
+    expect((await getPlacement("pay-d")).prices[6]).toBeGreaterThan(before);
+  });
+
+  it("рівні всіх платників для карти збігаються з рівнем окремо", async () => {
+    const tiers = await tiersByUser();
+    expect(tiers.get("pay-b")).toBe((await getPlacement("pay-b")).tier);
+    expect(tiers.has("pay-c")).toBe(false);
   });
 });

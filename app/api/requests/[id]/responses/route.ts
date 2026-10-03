@@ -5,12 +5,12 @@
 import { problem } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { responsesFor } from "@/lib/requests/mock-responses";
-import { findRequest } from "@/lib/requests/mock-store";
+import { findRequest } from "@/lib/server/request-repo";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  const request = findRequest(user.id, (await params).id);
+  const request = await findRequest(user.id, (await params).id);
   if (!request) return problem(404, "Запит не знайдено");
-  return Response.json({ responses: responsesFor(request) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ responses: await responsesFor(request) }, { headers: { "cache-control": "no-store" } });
 }

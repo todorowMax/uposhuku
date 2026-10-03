@@ -1,13 +1,13 @@
 // lib/feed/mock-feed.ts
 //
-// Запити для стрічки виконавця. Поки на платформі немає інших замовників,
+// Запити для стрічки виконавця. Поки на платформі мало справжніх замовників,
 // частина запитів — заготовки, які «приходять» по одному з моменту, коли
 // виконавець уперше відкрив стрічку: так видно живу стрічку й «+N нових».
-// Запити інших акаунтів (якщо є) додаються до заготовок. Справжня версія:
-// запити з D1 + підбір /api/matches, відгуки в таблиці responses.
+// Справжні запити й відгуки беремо з D1 (lib/server/request-repo), заготовки
+// (id demo-N) і відгуки на них живуть у пам'яті воркера й зникнуть із демо.
 
 import { CITIES } from "@/lib/map/cities";
-import { listOthersOpen, listRequests } from "@/lib/requests/mock-store";
+import { listOthersOpen, listRequests, myResponses, removeResponse as removeRealResponse, responseCounts, saveResponse as saveRealResponse } from "@/lib/server/request-repo";
 import { DEADLINES } from "@/lib/requests/types";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { MATCH_THRESHOLD, tagSimilarity } from "@/lib/tags/match";
@@ -46,7 +46,8 @@ const g = globalThis as typeof globalThis & {
   __vmFeedResponses?: Map<string, MyResponse>;
 };
 const starts = () => (g.__vmFeedStart ??= new Map());
-const responses = () => (g.__vmFeedResponses ??= new Map());
+/** Відгуки на заготовки (demo-N): у D1 їм нікуди прив'язатись, бо самих запитів там немає. */
+const demoResponses = () => (g.__vmFeedResponses ??= new Map());
 const key = (userId: string, requestId: string) => `${userId}|${requestId}`;
 
 const label = (id: string) => TAGS_BY_ID.get(id)?.label ?? id;
@@ -80,7 +81,7 @@ interface Raw {
 const money = (value: number) => `до ${new Intl.NumberFormat("uk-UA").format(value)} ₴`;
 
 /** Усі відкриті запити, які бачить ця людина: заготовки, що вже «прийшли», чужі й свої. */
-const collect = (userId: string, now: number): Raw[] => {
+const collect = async (userId: string, now: number): Promise<{ raw: Raw[]; real: Map<string, number> }> => {
   const first = starts().get(userId) ?? now;
   starts().set(userId, first);
 
@@ -98,7 +99,7 @@ const collect = (userId: string, now: number): Raw[] => {
       responses: template.responses,
       own: false,
     }));
-  const toRaw = (request: ReturnType<typeof listOthersOpen>[number], own: boolean): Raw => ({
+  const toRaw = (request: Awaited<ReturnType<typeof listOthersOpen>>[number], own: boolean, count: number): Raw => ({
     id: request.id,
     text: request.text,
     tags: request.tags.map((tag) => tag.id),
@@ -107,17 +108,19 @@ const collect = (userId: string, now: number): Raw[] => {
     budget: request.budget ? money(request.budget) : null,
     deadline: request.deadline ? DEADLINES[request.deadline] : null,
     createdAt: request.createdAt,
-    responses: 0,
+    responses: count,
     own,
   });
-  const others = listOthersOpen(userId).map((request) => toRaw(request, false));
-  const mine = listRequests(userId).filter((request) => request.status === "open").map((request) => toRaw(request, true));
-  return [...demo, ...others, ...mine];
+  const [othersList, mineList] = await Promise.all([listOthersOpen(userId), listRequests(userId)]);
+  const counts = await responseCounts([...othersList, ...mineList].map((request) => request.id));
+  const others = othersList.map((request) => toRaw(request, false, counts.get(request.id) ?? 0));
+  const mine = mineList.filter((request) => request.status === "open").map((request) => toRaw(request, true, counts.get(request.id) ?? 0));
+  return { raw: [...demo, ...others, ...mine], real: counts };
 };
 
-const toItem = (userId: string | null, raw: Raw, profileTags: string[]): FeedItem => {
+const toItem = (userId: string | null, raw: Raw, profileTags: string[], mineReal: Map<string, MyResponse>): FeedItem => {
   const matched = coverage(raw.tags, profileTags);
-  const mine = userId ? (responses().get(key(userId, raw.id)) ?? null) : null;
+  const mine = userId ? (raw.id.startsWith("demo-") ? (demoResponses().get(key(userId, raw.id)) ?? null) : (mineReal.get(raw.id) ?? null)) : null;
   return {
     id: raw.id,
     text: raw.text,
@@ -136,12 +139,14 @@ const toItem = (userId: string | null, raw: Raw, profileTags: string[]): FeedIte
  * Запити під теги профілю: спершу ті, що закривають більше тегів, потім
  * свіжіші. Без жодного збігу запит виконавцю не показуємо. Свої не бачимо.
  */
-export const feedFor = (userId: string, profileTags: string[], now = Date.now()): FeedItem[] =>
-  collect(userId, now)
-    .filter((raw) => !raw.own)
-    .map((raw) => toItem(userId, raw, profileTags))
+export const feedFor = async (userId: string, profileTags: string[], now = Date.now()): Promise<FeedItem[]> => {
+  const [{ raw }, mineReal] = await Promise.all([collect(userId, now), myResponses(userId)]);
+  return raw
+    .filter((item) => !item.own)
+    .map((item) => toItem(userId, item, profileTags, mineReal))
     .filter((item) => item.matchedTags > 0)
     .sort((a, b) => b.matchedTags - a.matchedTags || b.createdAt.localeCompare(a.createdAt));
+};
 
 /** Точка запиту: у межах міста з невеликим стабільним зсувом, щоб запити одного міста не злипались. */
 const pointOf = (raw: Raw): MapRequest["point"] => {
@@ -162,22 +167,26 @@ const pointOf = (raw: Raw): MapRequest["point"] => {
  * зсунута), без особистих даних. Виконавцю додатково видно, що з тегів
  * збігається і чи він уже відгукнувся. Свій запит позначено own.
  */
-export const mapRequests = (userId: string | null, profileTags: string[], now = Date.now()): MapRequest[] =>
-  collect(userId ?? "guest", now)
-    .map((raw) => ({ ...toItem(userId, raw, profileTags), point: pointOf(raw), own: raw.own }))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+export const mapRequests = async (userId: string | null, profileTags: string[], now = Date.now()): Promise<MapRequest[]> => {
+  const [{ raw }, mineReal] = await Promise.all([collect(userId ?? "guest", now), userId ? myResponses(userId) : Promise.resolve(new Map<string, MyResponse>())]);
+  return raw.map((item) => ({ ...toItem(userId, item, profileTags, mineReal), point: pointOf(item), own: item.own })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+};
 
 /** Чи є такий запит у стрічці цієї людини: відповісти можна лише на показане. */
-export const feedHas = (userId: string, requestId: string, profileTags: string[]) =>
-  feedFor(userId, profileTags).some((item) => item.id === requestId);
+export const feedHas = async (userId: string, requestId: string, profileTags: string[]) =>
+  (await feedFor(userId, profileTags)).some((item) => item.id === requestId);
 
-export const saveResponse = (userId: string, requestId: string, value: Omit<MyResponse, "createdAt">): MyResponse => {
+export const saveResponse = async (userId: string, requestId: string, value: Omit<MyResponse, "createdAt">): Promise<MyResponse> => {
+  if (!requestId.startsWith("demo-")) return saveRealResponse(userId, requestId, value);
   const saved = { ...value, createdAt: new Date().toISOString() };
-  responses().set(key(userId, requestId), saved);
+  demoResponses().set(key(userId, requestId), saved);
   return saved;
 };
 
-export const removeResponse = (userId: string, requestId: string) => responses().delete(key(userId, requestId));
+export const removeResponse = async (userId: string, requestId: string) => {
+  if (!requestId.startsWith("demo-")) return removeRealResponse(userId, requestId);
+  demoResponses().delete(key(userId, requestId));
+};
 
 /** Тіло відгуку від клієнта: ціна, термін, повідомлення в розумних межах. */
 export const parseResponse = (body: Record<string, unknown> | null): Omit<MyResponse, "createdAt"> | string => {
@@ -193,12 +202,4 @@ export const parseResponse = (body: Record<string, unknown> | null): Omit<MyResp
   const message = typeof body.message === "string" ? body.message.trim().slice(0, RESPONSE_LIMITS.message) : "";
   if (message.length < 10) return "Напишіть кілька слів замовнику: що зробите й коли почнете.";
   return { price, days, message };
-};
-
-/** Справжні відгуки виконавців на запит: хто відповів і що. Для пропозицій замовника. */
-export const responsesTo = (requestId: string): { userId: string; response: MyResponse }[] => {
-  const suffix = `|${requestId}`;
-  return [...responses().entries()]
-    .filter(([entryKey]) => entryKey.endsWith(suffix))
-    .map(([entryKey, response]) => ({ userId: entryKey.slice(0, -suffix.length), response }));
 };

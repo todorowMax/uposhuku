@@ -36,10 +36,29 @@ Sep 29, 2026 · @Max
 
 Контракти вже такі, як у розділі «Фундамент» і «Модулі й межі»: `POST /api/auth/email/start`, `POST /api/auth/email/verify`, `GET /api/auth/google`, `GET /api/auth/me`, `POST /api/auth/logout`, `GET|POST /api/requests`, `PATCH /api/requests/:id`, `GET /api/requests/:id/responses`; помилки — `application/problem+json`. Підключення бази й сервісів міняє начинку роутів, інтерфейс лишається.
 
+### Бекенд: стан на 03.10.2026
+
+Усе, що раніше лежало в пам'яті сервера, тепер у **D1** (`db/schema.ts`, міграції `db/migrations`, запити в `lib/server/*-repo.ts`, тести на справжній D1 у `tests/helpers/d1.ts`):
+
+| Що | Таблиці | Примітка |
+| --- | --- | --- |
+| Вхід, сесії | `users`, `sessions`, `email_codes`, `auth_attempts` | Код із пошти (SHA-256, 10 хв, 5 спроб), ліміти в базі, JWT з `jti`, Google OAuth зі `state` |
+| Профілі, проєкти | `profiles`, `profile_tags`, `projects`, `project_tags` | Фото поки data URL у базі, потім R2 |
+| Запити, відгуки виконавців | `requests`, `request_tags`, `request_files`, `responses` | Заготовки стрічки (`demo-N`) і демо-виконавці лишаються в коді, доки не буде справжніх |
+| Розміщення | `payments` | Рівень рахуємо щоразу; платіж поки тестовий, Monobank і вебхук ще немає |
+| Угоди | `deals` (документ з етапами) | Машина станів `lib/deals/machine.ts`; дії виконавця поки симулює таймер |
+| Відгуки про роботу | `reviews` | Один на угоду (унікальний індекс) |
+| Чат | `conversations`, `messages` | `/api/conversations`, опитування `?since=`; демо-виконавці лишаються із заглушкою; вхідні виконавця в `components/chat/inbox-panel` |
+| Карта | читає профілі й платежі | `/api/map/performers`: профіль опубліковано й розміщення оплачено |
+
+Dev-воркер: `https://uposhuku-development.uposhuku.workers.dev`, вхід тестовий (`MAIL_MODE=dev`, код 000000), доки немає домену для листів.
+
 ### Ще немає
 
-- Справжні Monobank (розміщення, холд, виплата), пошта й Telegram-бот, адмінка спорів (окремий репозиторій), сторінка профілю за посиланням, ручний кроп фото, реквізити виконавця для QR.
-- Схема D1, Drizzle, R2, Resend, Google OAuth — чекають акаунта Cloudflare.
+- Справжні Monobank (розміщення, холд, виплата, вебхук), Telegram-бот, адмінка спорів (окремий репозиторій), ручний кроп фото, реквізити виконавця для QR.
+- Дії виконавця в угоді (прийняти, підтвердити оплату, здати роботу): зараз їх імітує таймер, потрібні екран і API для виконавця.
+- Файли й фото в R2 (потрібне право R2 у токені), WebSocket на Durable Objects (опитування працює), сповіщення поштою й веб-пуш.
+- Прод: база `uposhuku-production`, домен, Resend із підтвердженим доменом, `AUTH_SECRET` і ключі Google для прода.
 
 Анімації лише на GSAP, Framer Motion у проєкт не додаємо.
 

@@ -5,13 +5,13 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { addPayment, getPlacement } from "@/lib/placement/mock-store";
+import { addPayment, getPlacement } from "@/lib/server/placement-repo";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/tiers";
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  return Response.json({ placement: getPlacement(user.id) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ placement: await getPlacement(user.id) }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -24,5 +24,5 @@ export async function POST(request: Request) {
   }
   // Тестова відмова, щоб побачити, як виглядає невдала оплата.
   if (body?.simulate === "declined") return problem(402, "Оплату відхилено", "Банк відхилив платіж. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
-  return Response.json({ placement: addPayment(user.id, amount) }, { status: 201 });
+  return Response.json({ placement: await addPayment(user.id, amount) }, { status: 201 });
 }

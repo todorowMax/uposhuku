@@ -1,13 +1,9 @@
-// lib/reviews/mock-store.ts
+// lib/reviews/demo.ts
 //
-// Відгуки в пам'яті сервера, поки немає D1 (таблиця reviews). Для
-// демо-виконавців додаємо кілька вигаданих, щоб профіль не був порожнім:
-// вони позначені demo і зникнуть разом із демо-даними.
+// Кілька вигаданих відгуків для демо-виконавців, щоб профіль не був порожнім.
+// Вони позначені demo й зникнуть разом із демо-даними; справжні лежать у D1.
 
 import type { Review } from "./types";
-
-const store = globalThis as typeof globalThis & { __vmReviews?: Review[] };
-const all = (): Review[] => (store.__vmReviews ??= []);
 
 const DEMO_TEXTS = [
   "Зробила швидко й охайно, усе пояснювала по ходу. Рекомендую.",
@@ -28,7 +24,7 @@ const hash = (value: string) => {
 };
 
 /** Кілька вигаданих відгуків для демо-виконавця; стабільні для людини. */
-const demoFor = (performerId: string): Review[] => {
+export const demoReviewsFor = (performerId: string): Review[] => {
   const count = 2 + (hash(`${performerId}:n`) % 3);
   return Array.from({ length: count }, (_, index) => {
     const seed = hash(`${performerId}:${index}`);
@@ -43,17 +39,4 @@ const demoFor = (performerId: string): Review[] => {
       demo: true,
     };
   });
-};
-
-export const reviewsFor = (performerId: string): Review[] =>
-  [...all().filter((review) => review.performerId === performerId), ...(performerId.startsWith("me-") ? [] : demoFor(performerId))].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt)
-  );
-
-export const reviewOfDeal = (dealId: string): Review | undefined => all().find((review) => review.dealId === dealId);
-
-export const addReview = (review: Omit<Review, "id" | "createdAt">): Review => {
-  const saved: Review = { ...review, id: `rev_${crypto.randomUUID().slice(0, 8)}`, createdAt: new Date().toISOString() };
-  all().unshift(saved);
-  return saved;
 };

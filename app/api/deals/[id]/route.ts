@@ -4,7 +4,7 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { actOnDeal } from "@/lib/deals/mock-store";
+import { actOnDeal } from "@/lib/server/deal-repo";
 import type { DealAction } from "@/lib/deals/types";
 
 const ACTIONS: DealAction[] = ["fund", "claim_paid", "release", "dispute", "cancel"];
@@ -20,7 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return problem(402, "Кошти не заморожено", "Банк відхилив операцію. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
   }
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
-  const result = actOnDeal(user.id, (await params).id, action, stageId);
+  const result = await actOnDeal(user.id, (await params).id, action, stageId);
   if (result === null) return problem(404, "Угоду не знайдено");
   return typeof result === "string" ? problem(409, "Дію не виконано", result) : Response.json({ deal: result });
 }

@@ -10,10 +10,10 @@
 import { CITIES } from "@/lib/map/cities";
 import { DEMO_PERFORMERS } from "@/lib/map/demo";
 import { primaryGroup } from "@/lib/map/groups";
-import { responsesTo } from "@/lib/feed/mock-feed";
-import { getPlacement } from "@/lib/placement/mock-store";
+import { getPlacement } from "@/lib/server/placement-repo";
+import { responsesTo } from "@/lib/server/request-repo";
 import { isPromoted } from "@/lib/placement/tiers";
-import { getProfile } from "@/lib/profile/mock-store";
+import { getProfile } from "@/lib/server/profile-repo";
 import { matchProfiles } from "@/lib/tags/match";
 import type { OfferResponse, PublishedRequest } from "./types";
 
@@ -99,19 +99,20 @@ const plannedResponses = (request: PublishedRequest): OfferResponse[] => {
  * Відгуки, що вже прийшли. Порядок — за оплатою розміщення (вищий рівень
  * вище), серед рівних — хто відповів раніше.
  */
-export const responsesFor = (request: PublishedRequest, now = Date.now()): OfferResponse[] =>
+export const responsesFor = async (request: PublishedRequest, now = Date.now()): Promise<OfferResponse[]> =>
   request.status === "open"
-    ? [...plannedResponses(request).filter((response) => Date.parse(response.createdAt) <= now), ...realResponses(request)].sort(
+    ? [...plannedResponses(request).filter((response) => Date.parse(response.createdAt) <= now), ...(await realResponses(request))].sort(
         (a, b) => b.tier - a.tier || a.createdAt.localeCompare(b.createdAt)
       )
     : [];
 
 /** Відгуки справжніх виконавців (інших акаунтів) на запит; рівень — за їхньою оплатою розміщення. */
-const realResponses = (request: PublishedRequest): OfferResponse[] =>
-  responsesTo(request.id).flatMap(({ userId, response }) => {
-    const profile = getProfile(userId);
+const realResponses = async (request: PublishedRequest): Promise<OfferResponse[]> =>
+  (await Promise.all(
+    (await responsesTo(request.id)).map(async ({ userId, response }) => {
+    const profile = await getProfile(userId);
     if (!profile?.published) return [];
-    const placement = getPlacement(userId);
+    const placement = await getPlacement(userId);
     return [
       {
         id: `resp_${request.id}_${userId}`,
@@ -131,4 +132,5 @@ const realResponses = (request: PublishedRequest): OfferResponse[] =>
         createdAt: response.createdAt,
       },
     ];
-  });
+  }),
+  )).flat();

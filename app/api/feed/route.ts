@@ -5,13 +5,13 @@
 import { problem } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { feedFor } from "@/lib/feed/mock-feed";
-import { getProfile } from "@/lib/profile/mock-store";
+import { getProfile } from "@/lib/server/profile-repo";
 import { profileTags } from "@/lib/profile/types";
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  const profile = getProfile(user.id);
+  const profile = await getProfile(user.id);
   if (!profile?.published) return problem(403, "Стрічка з'явиться після публікації профілю", "Опублікуйте профіль виконавця, і ми покажемо запити під ваші теги.");
-  return Response.json({ items: feedFor(user.id, profileTags(profile)) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ items: await feedFor(user.id, profileTags(profile)) }, { headers: { "cache-control": "no-store" } });
 }

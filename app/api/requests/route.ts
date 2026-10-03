@@ -4,7 +4,7 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { createRequest, listRequests } from "@/lib/requests/mock-store";
+import { createRequest, listRequests } from "@/lib/server/request-repo";
 import { CITIES } from "@/lib/map/cities";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type RequestDraft } from "@/lib/requests/types";
 
@@ -41,11 +41,11 @@ export async function POST(request: Request) {
   if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
-  return Response.json({ request: createRequest(user.id, draft) }, { status: 201 });
+  return Response.json({ request: await createRequest(user.id, draft) }, { status: 201 });
 }
 
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  return Response.json({ requests: listRequests(user.id) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ requests: await listRequests(user.id) }, { headers: { "cache-control": "no-store" } });
 }

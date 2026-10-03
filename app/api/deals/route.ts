@@ -1,14 +1,13 @@
 // /api/deals — угоди замовника.
 // GET ?requestId= — угоди за запитом; POST — запропонувати угоду виконавцю.
-// Справжня версія: D1 (deals, deal_stages), холд і фіналізація через Monobank,
-// події в Durable Object чату.
+// D1: угода документом (етапи всередині). Холд і фіналізація через Monobank — пізніше.
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { isFop } from "@/lib/deals/fop";
-import { listDeals, proposeDeal } from "@/lib/deals/mock-store";
+import { listDeals, proposeDeal } from "@/lib/server/deal-repo";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
-import { findRequest } from "@/lib/requests/mock-store";
+import { findRequest } from "@/lib/server/request-repo";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -16,7 +15,7 @@ export async function GET(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const requestId = new URL(request.url).searchParams.get("requestId") ?? undefined;
-  return Response.json({ deals: listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ deals: await listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
   if (!user) return problem(401, "Потрібен вхід");
   const body = await readJson(request);
   const requestId = text(body?.requestId, 40);
-  if (!findRequest(user.id, requestId)) return problem(404, "Запит не знайдено");
+  if (!(await findRequest(user.id, requestId))) return problem(404, "Запит не знайдено");
 
   const rawPerformer = body?.performer as Record<string, unknown> | undefined;
   const performerId = text(rawPerformer?.id, 60);
@@ -52,6 +51,6 @@ export async function POST(request: Request) {
     })),
   };
   if (!draft.performer.id || !draft.responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
-  const result = proposeDeal(user.id, draft);
+  const result = await proposeDeal(user.id, draft);
   return typeof result === "string" ? problem(400, "Угоду не створено", result) : Response.json({ deal: result }, { status: 201 });
 }

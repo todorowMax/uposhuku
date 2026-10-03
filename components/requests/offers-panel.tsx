@@ -5,7 +5,8 @@ import { gsap } from "gsap";
 import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, Maximize2, MessageCircle, Minimize2, ShieldCheck, Star, X } from "lucide-react";
 import { getPerformers } from "@/lib/map/performers";
 import { AVATAR_ATLAS } from "@/lib/map/portrait";
-import { mentionsContacts, useMockChat } from "@/lib/requests/mock-chat";
+import { useChat } from "@/lib/requests/chat";
+import { mentionsContacts } from "@/lib/requests/mock-chat";
 import {
   focusPerformerStore,
   offersCollapsedStore,
@@ -294,7 +295,7 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
  * «домовляйтеся тут»; контакти поза чатом не блокуємо, а попереджаємо.
  */
 function ChatView({ response, onBack }: { response: OfferResponse; onBack: () => void }) {
-  const { messages, typing, send } = useMockChat(response);
+  const { messages, typing, send, error } = useChat(response);
   const wide = useStore(offersWideStore);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -389,6 +390,11 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
             <time dateTime={message.at}>{TIME.format(new Date(message.at))}</time>
           </div>
         ))}
+        {error && (
+          <p role="status" className="chat-warn">
+            Немає зв'язку з сервером. Повідомлення підтягнуться, щойно він повернеться.
+          </p>
+        )}
         {typing && (
           <div className="chat-bubble chat-typing" data-from="them" aria-label="Виконавець друкує">
             <span />

@@ -8,8 +8,10 @@ import { TabBadge } from "@/components/account/tab-badge";
 import { MapModeSwitch } from "@/components/map/mode-switch";
 import { DealSync } from "@/lib/deals/client";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
+import { RealPerformersSync } from "@/lib/map/performers-sync";
 import { RequestComposer } from "@/components/composer/request-composer";
 import { PlacementPanel } from "@/components/placement/placement-panel";
+import { InboxPanel } from "@/components/chat/inbox-panel";
 import { DirectChatSync } from "@/components/profile/direct-chat-sync";
 import { ProfileEditorHost } from "@/components/profile/profile-editor";
 import { MapSkeleton } from "@/components/map-skeleton";
@@ -29,6 +31,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <MapModeSwitch />
       <DealSync />
       <MapRequestsSync />
+      <RealPerformersSync />
       <TabBadge />
       <NotificationSettings />
       <OffersPanel />
@@ -36,6 +39,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <ProfileEditorHost />
       <PlacementPanel />
       <DirectChatSync />
+      <InboxPanel />
       {children}
     </main>
   );

@@ -18,7 +18,7 @@ const SITE = "https://uposhuku.com";
 const load = async (params: Props["params"]) => {
   const { id } = await params;
   const decoded = decodeURIComponent(id);
-  return { id: decoded, performer: getPublicPerformer(decoded) };
+  return { id: decoded, performer: await getPublicPerformer(decoded) };
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

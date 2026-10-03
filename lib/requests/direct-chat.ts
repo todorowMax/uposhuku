@@ -2,10 +2,13 @@
 //
 // Особистий чат із виконавцем, який відкривається з його профілю
 // («Описати задачу»). Перше повідомлення — задача, вона висить угорі, поки
-// виконавець не відповів. Поки немає Durable Objects, переписка лежить у
-// цьому браузері, а виконавець «відповідає» сам. Справжній чат — той самий
-// WebSocket, що й для відгуків на запити (lib/requests/mock-chat.ts).
+// виконавець не відповів. З виконавцем-акаунтом (me-…) переписка йде через
+// сервер (/api/conversations, опитування раз на кілька секунд); з
+// демо-виконавцем лежить у цьому браузері, і він «відповідає» сам.
 
+import { useEffect } from "react";
+import { fetchConversations, fetchMessages, isRemotePerformer, openConversation, postMessage, toLines } from "@/lib/chat/client";
+import { sessionStore } from "@/lib/auth/client";
 import { useStore, createStore } from "@/lib/store";
 import type { ChatMessage } from "./mock-chat";
 
@@ -37,7 +40,9 @@ const timers = new Map<string, number[]>();
 
 const persist = () => {
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(dialogsStore.get()));
+    // Серверні розмови в браузері не зберігаємо: правда лежить у D1.
+    const local = Object.fromEntries(Object.entries(dialogsStore.get()).filter(([id]) => !isRemotePerformer(id)));
+    window.localStorage.setItem(KEY, JSON.stringify(local));
   } catch {
     // Без сховища переписка житиме до перезавантаження.
   }
@@ -88,8 +93,64 @@ export const hydrateDialogs = () => {
 export const useDialog = (performerId: string) => useStore(dialogsStore)[performerId] ?? null;
 export const useTyping = (performerId: string) => Boolean(useStore(typingStore)[performerId]);
 
+// ───────────── розмови з виконавцями-акаунтами ─────────────
+
+const conversationIds = new Map<string, string>();
+
+/** Підтягнути розмову з сервера в сховище. Немає розмови — нічого не робимо. */
+export const syncRemoteDialog = async (performerId: string) => {
+  try {
+    let id = conversationIds.get(performerId);
+    if (!id) {
+      id = (await fetchConversations()).find((item) => item.performerId === performerId && item.role === "customer")?.id;
+      if (!id) return;
+      conversationIds.set(performerId, id);
+    }
+    const { role, messages } = await fetchMessages(id, 0);
+    if (messages.length === 0) return;
+    const lines = toLines(messages, role);
+    write({
+      performerId,
+      messages: lines.map((line) => ({ id: line.id, from: line.from, text: line.text, at: line.at })),
+      status: lines.some((line) => line.from === "them") ? "answered" : "waiting",
+    });
+  } catch {
+    // Немає зв'язку: покажемо, що вже є, і спробуємо на наступному кроці.
+  }
+};
+
+const sendRemote = async (performerId: string, text: string) => {
+  try {
+    let id = conversationIds.get(performerId);
+    if (!id) {
+      id = await openConversation(performerId);
+      conversationIds.set(performerId, id);
+    }
+    await postMessage(id, text);
+    await syncRemoteDialog(performerId);
+  } catch {
+    // Не відправилось: людина побачить, що повідомлення не з'явилось, і спробує ще раз.
+  }
+};
+
+/** Поки відкрите вікно чату з виконавцем-акаунтом, питаємо сервер про нові повідомлення. */
+export const useRemoteDialogSync = (performerId: string, active: boolean) => {
+  const session = useStore(sessionStore);
+  const signedIn = session.status === "user";
+  useEffect(() => {
+    if (!active || !signedIn || !isRemotePerformer(performerId)) return;
+    void syncRemoteDialog(performerId);
+    const timer = window.setInterval(() => void syncRemoteDialog(performerId), 3500);
+    return () => window.clearInterval(timer);
+  }, [active, signedIn, performerId]);
+};
+
 /** Новий чат: задача стає першим повідомленням. Якщо чат уже є, задача дописується до нього. */
 export const startDialog = (performerId: string, text: string) => {
+  if (isRemotePerformer(performerId)) {
+    void sendRemote(performerId, text);
+    return;
+  }
   const existing = dialogsStore.get()[performerId];
   const message: ChatMessage = { id: crypto.randomUUID(), from: "me", text, at: new Date().toISOString() };
   write(existing ? { ...existing, messages: [...existing.messages, message] } : { performerId, messages: [message], status: "waiting" });
@@ -97,6 +158,10 @@ export const startDialog = (performerId: string, text: string) => {
 };
 
 export const sendDirect = (performerId: string, text: string) => {
+  if (isRemotePerformer(performerId)) {
+    void sendRemote(performerId, text);
+    return;
+  }
   const dialog = dialogsStore.get()[performerId];
   if (!dialog) return;
   write({ ...dialog, messages: [...dialog.messages, { id: crypto.randomUUID(), from: "me", text, at: new Date().toISOString() }] });
