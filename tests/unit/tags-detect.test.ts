@@ -129,3 +129,40 @@ describe("послуга без продукту", () => {
     expect(suggestTags(detectTags("сайт для стоматології")).map((suggestion) => suggestion.tagId)).toContain("online-booking");
   });
 });
+
+describe("слово продукту не губиться всередині довшої фрази", () => {
+  it("«оновити сайт» — це і редизайн, і сайт", () => {
+    const tags = detectTags("Потрібно оновити сайт стоматологічної клініки: застарілий дизайн, погано виглядає на телефоні, потрібен онлайн-запис.");
+    expect(tags).toEqual(expect.arrayContaining(["redesign", "website", "dentistry", "online-booking"]));
+  });
+
+  it("«сайт на WordPress», «парсер цін», «автоматизувати», «мобільного застосунку»", () => {
+    expect(detectTags("прискорити сайт на WordPress")).toEqual(expect.arrayContaining(["wordpress", "website"]));
+    expect(detectTags("парсер цін конкурентів")).toEqual(expect.arrayContaining(["price-monitoring", "parser"]));
+    expect(detectTags("Автоматизувати заявки з форми")).toContain("automation");
+    expect(detectTags("розробка мобільного застосунку-планера")).toContain("mobile-app");
+  });
+
+  it("не тягне родичів і зайвого: Telegram-бот без «Чат-бота», дизайн інтер'єру без UI-дизайну", () => {
+    const bot = detectTags("потрібен Telegram-бот для запису");
+    expect(bot).toContain("telegram-bot");
+    expect(bot).not.toContain("chat-bot");
+    expect(detectTags("дизайн інтер'єру квартири")).not.toContain("ui-ux-design");
+  });
+
+  it("підкреслює лише найдовшу фразу, допоміжна згадка лежить усередині неї", () => {
+    const mentions = detectTagMentions("оновити сайт");
+    expect(mentions).toEqual([
+      { tagId: "redesign", start: 0, end: 12 },
+      { tagId: "website", start: 8, end: 12 },
+    ]);
+  });
+});
+
+describe("заготовки запитів у стрічці", () => {
+  it("кожен тег заготовки розпізнається з її тексту, як у справжнього запиту", async () => {
+    const { TEMPLATES } = await import("@/lib/feed/mock-feed");
+    const gaps = TEMPLATES.map((template) => ({ text: template.text.slice(0, 40), missing: template.tags.filter((tag) => !detectTags(template.text).includes(tag)) })).filter((item) => item.missing.length);
+    expect(gaps).toEqual([]);
+  });
+});

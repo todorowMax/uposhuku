@@ -78,7 +78,7 @@ export const INTEGRATION_TAGS = [
 
   // Розсилки
   t("esputnik", "eSputnik", ["еспутнік", "e-sputnik", "eSputnik api", "еспутнік розсилка", "тригерні листи", "сегментація контактів", "автоматизація розсилок", "еспутник"]),
-  t("sendpulse", "SendPulse", ["сендпульс", "send pulse", "sendpulse api", "сендпульс розсилка", "ланцюжок листів", "автоматичні листи"]),
+  t("sendpulse", "SendPulse", ["сендпульс", "send pulse", "sendpulse api", "сендпульс розсилка", "автоматичні листи"]),
   t("mailchimp", "Mailchimp", ["мейлчімп", "мэйлчимп", "mailchimp api", "мейлчимп розсилка", "список підписників", "шаблон листа", "Мейлчимп"]),
   t("turbosms", "TurboSMS", ["турбосмс", "turbo sms", "turbosms api", "турбо смс", "відправка смс", "sms шлюз"]),
   t("resend", "Resend / SendGrid", ["sendgrid", "mailgun", "postmark", "resend api", "відправка email", "транзакційні листи", "поштовий api", "email провайдер"]),

@@ -112,7 +112,7 @@ describe("запити на карті", () => {
     const { createRequest } = await import("@/lib/requests/mock-store");
     createRequest("map-owner", { text: "Потрібен лендинг", tags: [{ id: "landing", label: "Лендинг" }], files: [], cityId: "kyiv" });
     saveResponse("map-perf", "demo-1", { price: 1000, days: 3, message: "Добрий день, зроблю." });
-    const items = mapRequests("map-perf", ["online-store", "catalog"], NOW2 + 600_000);
+    const items = mapRequests("map-perf", ["online-store", "cart-checkout"], NOW2 + 600_000);
     expect(items.find((item) => item.id === "demo-1")).toMatchObject({ matchedTags: 2, response: { price: 1000 } });
     const own = mapRequests("map-owner", [], NOW2 + 600_000).find((item) => item.own);
     expect(own).toMatchObject({ own: true, place: "Київ" });

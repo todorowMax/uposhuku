@@ -11,7 +11,7 @@
 // Це евристика, а не морфологічний аналізатор: закінчення відрізаємо за
 // списком, як у ukoshiku, і список росте з реальних запитів.
 
-import { TAGS } from "./dictionary";
+import { TAGS, TAGS_BY_ID } from "./dictionary";
 import { normalizeTagText } from "./normalize";
 
 /** Слово разом із назвами на кшталт next.js, c#, c++, 1с. */
@@ -30,13 +30,24 @@ const ENDINGS = [
 
 const CYRILLIC = /\p{Script=Cyrillic}/u;
 
+/**
+ * Випадний голосний: «застосунок» → «застосунку», «виконавець» → «виконавця».
+ * Зводимо обидві форми до однієї основи («застосунк», «виконавц»), інакше
+ * «мобільного застосунку» не знаходить «мобільний застосунок».
+ */
+const dropFleeting = (stem: string): string => {
+  if (stem.length >= 7 && /(ок|ек)$/.test(stem)) return stem.slice(0, -2) + stem.slice(-1);
+  if (stem.length >= 7 && stem.endsWith("ець")) return `${stem.slice(0, -3)}ц`;
+  return stem;
+};
+
 export const stemWord = (word: string): string => {
   if (CYRILLIC.test(word)) {
     if (word.length < 4) return word;
     for (const ending of ENDINGS) {
-      if (word.endsWith(ending) && word.length - ending.length >= 3) return word.slice(0, -ending.length);
+      if (word.endsWith(ending) && word.length - ending.length >= 3) return dropFleeting(word.slice(0, -ending.length));
     }
-    return word;
+    return dropFleeting(word);
   }
   // Латиниця: множина «bots», «apps».
   if (word.length > 4 && word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
@@ -123,6 +134,16 @@ const prefixMatch = (stem: string, singles: Map<string, string>): string | undef
  * збіглося цілком, ще пробуємо за початком: так «манікюрного кабінету»
  * знаходить «манікюр», а «ветеринарну» — «ветеринар».
  */
+/** Той самий тег, предок чи нащадок: «Мобільний застосунок» і «Застосунок». */
+const related = (a: string, b: string): boolean => {
+  const chain = (id: string) => {
+    const result = [id];
+    for (let parent = TAGS_BY_ID.get(id)?.parent; parent; parent = TAGS_BY_ID.get(parent)?.parent) result.push(parent);
+    return result;
+  };
+  return chain(a).includes(b) || chain(b).includes(a);
+};
+
 export const detectTagMentions = (text: string): TagMention[] => {
   const { byKey, longest, singles } = phraseIndex();
   const tokens = tokenize(text);
@@ -135,6 +156,19 @@ export const detectTagMentions = (text: string): TagMention[] => {
       const tagId = byKey.get(key);
       if (tagId) {
         mentions.push({ tagId, start: tokens[i].start, end: tokens[i + length - 1].end });
+        // Довша фраза поглинає слова, які теж щось означають: «оновити сайт»
+        // (редизайн) містить «сайт», «парсер цін» (моніторинг цін) — «парсер».
+        // Замовникові потрібне й те, й те. Додаємо лише назви продуктів і не
+        // родичів: «Telegram-бот» не тягне «Чат-бот», бо це той самий бот.
+        const group = TAGS_BY_ID.get(tagId)?.group;
+        if (length > 1 && (group === "service" || group === "product" || group === "tool")) {
+          for (const token of tokens.slice(i, i + length)) {
+            const product = byKey.get(token.stem);
+            if (product && product !== tagId && TAGS_BY_ID.get(product)?.group === "product" && !related(tagId, product)) {
+              mentions.push({ tagId: product, start: token.start, end: token.end });
+            }
+          }
+        }
         matched = length;
         break;
       }
@@ -145,6 +179,8 @@ export const detectTagMentions = (text: string): TagMention[] => {
     }
     i += matched || 1;
   }
+  // Допоміжні згадки лежать усередині довших: порядок за початком, підкреслює лише найдовша.
+  mentions.sort((a, b) => a.start - b.start || b.end - a.end);
   return combineBots(mentions);
 };
 
