@@ -206,7 +206,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                   ? "Вкажіть пошту: надішлемо код, і запит одразу побачать виконавці. Пароль не потрібен."
                   : mode === "performer"
                     ? "Створіть профіль, і замовники знайдуть вас на карті. Пошта й код з листа, без пароля."
-                    : "Пошта й код з листа, без пароля. Нова адреса — новий акаунт."}
+                    : "Пошта й код з листа, без пароля. Нова адреса створює новий акаунт."}
               </p>
               {draft && <DraftSummary draft={draft} />}
               <GoogleButton href={googleHref} onClick={() => draft && saveDraft(draft, true)} />

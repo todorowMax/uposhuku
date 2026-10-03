@@ -227,9 +227,9 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
           <>
             <span aria-hidden className="request-live-dot" />
             {phase === "done" ? (
-              <>Угоду завершено. Дякуємо, що користуєтесь Vibe Map!</>
+              <>Угоду завершено.</>
             ) : phase === "working" ? (
-              <>Угода в роботі. Деталі й оплата — у чаті з виконавцем.</>
+              <>Угода в роботі. Деталі й оплата в чаті з виконавцем.</>
             ) : phase === "negotiating" ? (
               <>Пропозицію угоди надіслано, чекаємо на відповідь виконавця.</>
             ) : offers > 0 ? (

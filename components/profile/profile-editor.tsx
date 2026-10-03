@@ -270,7 +270,7 @@ export function ProfileEditor() {
                 onAdd={tagging.add}
                 emptyHint="Розкажіть про себе вище, і теги з'являться тут самі. Нічого не знайшлося? Опишіть конкретніше: що саме робите."
               />
-              <p className="pe-hint">Галочка — тег підтверджений вашою роботою. Такі теги вагоміші: за запитом вас покажуть вище.</p>
+              <p className="pe-hint">Галочка стоїть біля тегів, які підтверджує ваша робота. З такими тегами вас покажуть вище.</p>
             </section>
 
             <section className="pe-section" aria-labelledby="pe-works">

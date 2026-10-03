@@ -195,7 +195,7 @@ function ProfileView({ id }: { id: string }) {
                     </span>
                   ))}
                 </div>
-                {proven.size > 0 && <p className="pe-hint">Галочка — тег підтверджений роботою в портфоліо.</p>}
+                {proven.size > 0 && <p className="pe-hint">Галочка стоїть біля тегів, які підтверджує робота в портфоліо.</p>}
               </section>
             )}
 

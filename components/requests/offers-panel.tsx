@@ -382,7 +382,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
       <form onSubmit={submit} className="chat-form">
         {warn && (
           <p role="status" className="chat-warn">
-            Контакти поза чатом — на ваш ризик: якщо щось піде не так, ми не побачимо домовленостей.
+            Домовляйтеся поза чатом на свій ризик: якщо щось піде не так, домовленостей ми не побачимо.
           </p>
         )}
         <div className="chat-input-row">

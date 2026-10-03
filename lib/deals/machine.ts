@@ -24,7 +24,7 @@ export const payoutOf = (amount: number, method: Deal["method"]) => amount - fee
 export const validateDraft = (draft: DealDraft): string | null => {
   if (draft.stages.length < 1 || draft.stages.length > MAX_STAGES) return `Етапів має бути від 1 до ${MAX_STAGES}.`;
   if (draft.method === "safe" && !draft.performer.fop) return "Безпечна угода доступна лише виконавцям-ФОП.";
-  if (draft.method === "direct" && draft.stages.length !== 1) return "Прямий переказ — одним платежем.";
+  if (draft.method === "direct" && draft.stages.length !== 1) return "Прямий переказ іде одним платежем.";
   for (const stage of draft.stages) {
     if (!stage.title.trim()) return "Назвіть кожен етап.";
     if (!Number.isFinite(stage.amount) || stage.amount < 1) return "Вкажіть суму кожного етапу.";
