@@ -3,7 +3,7 @@
 import { forwardRef, useImperativeHandle, useRef } from "react";
 
 /**
- * Шість комірок для коду з листа, як в ukoshiku. Масив, а не рядок: коли
+ * Комірки для коду (6 з листа, у тестовому режимі скільки в коді доступу), як в ukoshiku. Масив, а не рядок: коли
  * стираєш третю цифру, наступні не «підстрибують» ліворуч у чужі комірки.
  * Вставка з буфера й автозаповнення з SMS/пошти розкладаються по комірках.
  */
@@ -16,19 +16,19 @@ export const CodeInput = forwardRef<
     cells.current[index]?.focus();
     cells.current[index]?.select();
   };
-  useImperativeHandle(ref, () => ({ focus: () => focusCell(Math.max(0, Math.min(digits.findIndex((digit) => !digit), 5))) }));
+  useImperativeHandle(ref, () => ({ focus: () => focusCell(Math.max(0, Math.min(digits.findIndex((digit) => !digit), digits.length - 1))) }));
 
   const write = (value: string, startAt: number) => {
-    const inserted = value.replace(/\D/g, "").slice(0, 6 - startAt);
+    const inserted = value.replace(/\D/g, "").slice(0, digits.length - startAt);
     const next = [...digits];
     if (!inserted) next[startAt] = "";
     for (const [offset, digit] of [...inserted].entries()) next[startAt + offset] = digit;
     onChange(next);
-    if (inserted) focusCell(Math.min(startAt + inserted.length, 5));
+    if (inserted) focusCell(Math.min(startAt + inserted.length, digits.length - 1));
   };
 
   return (
-    <div className="code-input" role="group" aria-label="Код з листа, 6 цифр" data-invalid={invalid || undefined}>
+    <div className="code-input" role="group" aria-label={`Код, ${digits.length} цифр`} data-invalid={invalid || undefined}>
       {digits.map((digit, index) => (
         <input
           key={index}
@@ -38,7 +38,7 @@ export const CodeInput = forwardRef<
           aria-label={`Цифра ${index + 1}`}
           inputMode="numeric"
           autoComplete={index === 0 ? "one-time-code" : "off"}
-          maxLength={6}
+          maxLength={digits.length}
           pattern="[0-9]*"
           disabled={disabled}
           value={digit}
@@ -55,7 +55,7 @@ export const CodeInput = forwardRef<
               event.preventDefault();
               focusCell(index - 1);
             }
-            if (event.key === "ArrowRight" && index < 5) {
+            if (event.key === "ArrowRight" && index < digits.length - 1) {
               event.preventDefault();
               focusCell(index + 1);
             }
@@ -66,7 +66,7 @@ export const CodeInput = forwardRef<
           }}
           onFocus={(event) => event.currentTarget.select()}
           className="code-cell"
-          data-gap={index === 3 || undefined}
+          data-gap={(digits.length === 6 && index === 3) || undefined}
         />
       ))}
     </div>

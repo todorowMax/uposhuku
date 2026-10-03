@@ -169,7 +169,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
   const googleHref = `/api/auth/google?next=${encodeURIComponent(googleNext)}`;
   const title =
     step === "code"
-      ? (mock ? "Код доступу" : "Код з листа")
+      ? "Код з листа"
       : step === "publishing"
         ? "Публікуємо запит"
         : step === "failed"

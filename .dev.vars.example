@@ -4,6 +4,8 @@ AUTH_SECRET=
 # Без ключа локально вхід працює з кодом 000000, лист не надсилається.
 RESEND_API_KEY=
 MAIL_FROM=Vibe Map <hello@uposhuku.com>
+# Тестовий вхід без пошти: код доступу, 4–8 цифр. Без нього локально працює 000000.
+DEV_LOGIN_CODE=
 # Google OAuth; кнопку показуємо, лише коли обидва заповнені.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

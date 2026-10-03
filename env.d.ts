@@ -13,6 +13,8 @@ interface CloudflareEnv {
   MAIL_FROM?: string;
   /** "dev": тестовий вхід (код 000000) навіть із ключем Resend. Не діє на проді. */
   MAIL_MODE?: string;
+  /** Код доступу тестового входу (4–8 цифр), напр. 2628. Без нього тестовий код 000000. Секретом, не в git. */
+  DEV_LOGIN_CODE?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
 }

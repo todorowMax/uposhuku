@@ -14,6 +14,10 @@ export interface SessionUser {
 /** Відповідь POST /api/auth/email/start. */
 export interface EmailStartResult {
   sent: true;
-  /** Тестовий режим: листа немає, код — MOCK_CODE. Інтерфейс показує підказку. */
+  /** Тестовий режим: листа немає. */
   mock: boolean;
+  /** Скільки цифр у коді: 6 із листа, у тестовому режимі скільки в коді доступу. */
+  codeLength: number;
+  /** Підказка з самим кодом лише для локального 000000; закритий код доступу не показуємо. */
+  hint?: string;
 }

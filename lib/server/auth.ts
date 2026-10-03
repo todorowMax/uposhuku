@@ -76,6 +76,11 @@ const countAttempts = async (db: Db, key: string, kind: "email_start" | "email_v
 const recordAttempt = (db: Db, key: string, kind: "email_start" | "email_verify_fail") =>
   db.insert(authAttempts).values({ key, kind, createdAt: Date.now() });
 
+const recordFail = async (db: Db, email: string, ip: string) => {
+  await recordAttempt(db, `email:${email}`, "email_verify_fail");
+  await recordAttempt(db, `ip:${ip}`, "email_verify_fail");
+};
+
 /** Вхід і реєстрація одним кроком: надсилаємо код, нової пошти «неправильною» не буває. */
 export const startEmailLogin = async (email: string, ip: string) => {
   if (mailMode() === "off") throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
@@ -99,7 +104,7 @@ export const startEmailLogin = async (email: string, ip: string) => {
   const [last] = await db.select().from(emailCodes).where(eq(emailCodes.userId, user.id)).limit(1);
   if (last && Date.now() - last.createdAt < RESEND_GAP) return;
 
-  const code = mailMode() === "dev" ? MOCK_CODE : String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
+  const code = mailMode() === "dev" ? devCode().code : String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
   await db.delete(emailCodes).where(eq(emailCodes.userId, user.id));
   await db.insert(emailCodes).values({
     id: crypto.randomUUID(),
@@ -111,23 +116,32 @@ export const startEmailLogin = async (email: string, ip: string) => {
   await sendLoginCode(email, code);
 };
 
+/** Код тестового входу: свій з DEV_LOGIN_CODE (секрет) або типовий 000000 для локальної розробки. */
+export const devCode = (): { code: string; private: boolean } => {
+  const custom = readVar("DEV_LOGIN_CODE");
+  return custom && /^\d{4,8}$/.test(custom) ? { code: custom, private: true } : { code: MOCK_CODE, private: false };
+};
+
 const invalidCode = () => new AuthError(400, "Невірний код", "Невірний код. Спробуйте ще раз.", "/problems/invalid-code");
 
-export const verifyEmailLogin = async (email: string, code: string): Promise<SessionUser> => {
+export const verifyEmailLogin = async (email: string, code: string, ip: string): Promise<SessionUser> => {
   if (mailMode() === "off") throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
   const db = getDb();
-  if ((await countAttempts(db, `email:${email}`, "email_verify_fail")) >= MAX_FAILS) {
-    throw new AuthError(429, "Забагато спроб", "Спробуйте ще раз за пів години.", "/problems/rate-limited");
+  // Ліміт і за поштою, і за IP: інакше код підбирали б, міняючи пошту.
+  for (const key of [`email:${email}`, `ip:${ip}`]) {
+    if ((await countAttempts(db, key, "email_verify_fail")) >= MAX_FAILS) {
+      throw new AuthError(429, "Забагато спроб", "Спробуйте ще раз за пів години.", "/problems/rate-limited");
+    }
   }
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   const [stored] = user ? await db.select().from(emailCodes).where(eq(emailCodes.userId, user.id)).limit(1) : [];
   if (!user || !stored || stored.expiresAt < Date.now() || stored.attempts >= MAX_CODE_TRIES) {
-    await recordAttempt(db, `email:${email}`, "email_verify_fail");
+    await recordFail(db, email, ip);
     throw invalidCode();
   }
   if (!sameText(stored.codeHash, await sha256(`${user.id}:${code}`))) {
     await db.update(emailCodes).set({ attempts: stored.attempts + 1 }).where(eq(emailCodes.id, stored.id));
-    await recordAttempt(db, `email:${email}`, "email_verify_fail");
+    await recordFail(db, email, ip);
     throw invalidCode();
   }
   await db.delete(emailCodes).where(eq(emailCodes.userId, user.id));
