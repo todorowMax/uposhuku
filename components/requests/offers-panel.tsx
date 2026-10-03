@@ -308,7 +308,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
     const input = inputRef.current;
     if (!input) return;
     input.style.height = "auto";
-    input.style.height = `${Math.min(input.scrollHeight, 112)}px`;
+    input.style.height = `${Math.min(input.scrollHeight, 168)}px`;
   }, [draft]);
 
   const submit = (event?: FormEvent) => {

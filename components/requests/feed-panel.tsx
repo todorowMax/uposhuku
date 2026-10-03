@@ -13,6 +13,7 @@ import { feedCollapsedStore, useSidePanel } from "@/lib/requests/side-panel";
 import { placementOpenStore, placementStore } from "@/lib/placement/client";
 import { TIER_NAMES } from "@/lib/placement/tiers";
 import type { PlacementTier } from "@/lib/map/types";
+import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { useStore } from "@/lib/store";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -344,6 +345,7 @@ function ResponseForm({
   );
   const [localError, setLocalError] = useState<string | null>(null);
   const id = useId();
+  const messageRef = useAutoGrow(message, 10);
   const tier = useStore(placementStore)?.tier ?? 1;
 
   const submit = (event: FormEvent) => {
@@ -399,11 +401,12 @@ function ResponseForm({
       </label>
       <textarea
         id={`${id}-message`}
+        ref={messageRef}
         value={message}
         maxLength={RESPONSE_LIMITS.message}
         onChange={(event) => setMessage(event.target.value)}
         rows={4}
-        className="auth-input w-full resize-none py-2.5 leading-snug"
+        className="auth-input w-full resize-y py-2.5 leading-snug"
       />
       <p className="pe-hint">
         {tier <= 1 ? (

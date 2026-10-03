@@ -11,6 +11,7 @@ import { currentStage, dealTotal, feeOf, needsAction, payoutOf, splitIntoStages,
 import { fetchMyReview, sendReview } from "@/lib/reviews/client";
 import { REVIEW_TEXT_MAX, type Review } from "@/lib/reviews/types";
 import type { OfferResponse } from "@/lib/requests/types";
+import { useAutoGrow } from "@/lib/ui/auto-grow";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -564,6 +565,7 @@ function ReviewForm({ deal }: { deal: Deal }) {
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
+  const textRef = useAutoGrow(text, 8);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -632,12 +634,13 @@ function ReviewForm({ deal }: { deal: Deal }) {
       </label>
       <textarea
         id={`review-${deal.id}`}
+        ref={textRef}
         value={text}
         maxLength={REVIEW_TEXT_MAX}
         onChange={(event) => setText(event.target.value)}
         rows={3}
         placeholder="Що сподобалось, що можна покращити (необов'язково)"
-        className="auth-input mt-2 w-full resize-none py-2.5 leading-snug"
+        className="auth-input mt-2 w-full resize-y py-2.5 leading-snug"
       />
       {error && (
         <p role="alert" className="auth-error mt-1">
