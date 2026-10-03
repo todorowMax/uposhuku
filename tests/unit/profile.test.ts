@@ -64,4 +64,14 @@ describe("профіль виконавця", () => {
     expect(filterPerformers([me], { matches: null, groups: ["automation"], cities: ["lviv"], online: true })).toHaveLength(1);
     expect(filterPerformers([me], { matches: null, groups: ["design"], cities: [], online: false })).toHaveLength(0);
   });
+
+  it("точка на карті: округлюється, лише в межах України, потрапляє на карту", () => {
+    const parsed = parseProfile({ ...complete(), location: { lat: 49.84123456, lng: 24.02987654 } });
+    expect(parsed).toMatchObject({ location: { lat: 49.841, lng: 24.03 } });
+    expect(parseProfile({ ...complete(), location: { lat: 10, lng: 24 } })).toMatch(/України/);
+    expect(parseProfile({ ...complete(), location: { lat: "x", lng: 24 } })).toMatch(/України/);
+    expect(parseProfile({ ...complete(), location: null })).toMatchObject({ location: null });
+    const performer = profileToPerformer({ ...complete(), location: { lat: 49.8, lng: 24.1 } }, "u1", 0, 2)!;
+    expect(performer).toMatchObject({ lat: 49.8, lng: 24.1, tier: 2 });
+  });
 });

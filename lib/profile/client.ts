@@ -1,8 +1,8 @@
 // lib/profile/client.ts
 //
 // Профіль виконавця в браузері: відкритий редактор, збережений профіль,
-// виклики /api/profile. Опублікований профіль одразу з'являється на карті
-// (lib/map/performers.ts).
+// виклики /api/profile. Опублікований профіль з'являється на карті лише після
+// оплати розміщення (lib/map/performers.ts).
 
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { setMyPerformer } from "@/lib/map/performers";
@@ -38,17 +38,26 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   return data as T;
 };
 
-/** Профіль на карті: фото реєструємо для малювання маркера, потім кладемо у список. */
-const putOnMap = async (profile: Profile | null) => {
+/**
+ * Маркер на карті = опублікований профіль + оплата розміщення. Без оплати
+ * (рівень 1) людина відгукується на запити, але на карті її немає.
+ */
+export const syncMyMarker = async () => {
   const session = sessionStore.get();
+  const state = profileStore.get();
+  const profile = state.status === "ready" ? state.profile : null;
   if (!profile || !profile.published || session.status !== "user") {
     setMyPerformer(null);
     return null;
   }
-  const avatarIndex = profile.photo ? await registerCustomAvatar(profile.photo) : 0;
-  // Рівень — за оплатою розміщення; завантажуємо, щоб маркер одразу був правильного розміру.
+  // Рівень рахує сервер і він змінюється, коли інші платять: беремо свіжий.
   const placement = (await loadPlacement()) ?? null;
-  const performer = profileToPerformer(profile, session.user.id, avatarIndex, placement?.tier ?? 1);
+  if (!placement || placement.tier < 2) {
+    setMyPerformer(null);
+    return null;
+  }
+  const avatarIndex = profile.photo ? await registerCustomAvatar(profile.photo) : 0;
+  const performer = profileToPerformer(profile, session.user.id, avatarIndex, placement.tier);
   setMyPerformer(performer);
   return performer;
 };
@@ -57,17 +66,17 @@ export const loadMyProfile = async () => {
   try {
     const { profile } = await call<{ profile: Profile | null }>("/api/profile");
     profileStore.set({ status: "ready", profile });
-    await putOnMap(profile);
+    await syncMyMarker();
   } catch {
     profileStore.set({ status: "ready", profile: null });
   }
 };
 
-/** Зберегти чернетку або опублікувати. Опублікованого показуємо на карті. */
+/** Зберегти чернетку або опублікувати. На карті опублікований з'являється, якщо оплачено розміщення. */
 export const saveMyProfile = async (profile: Profile) => {
   const { profile: saved } = await call<{ profile: Profile }>("/api/profile", { method: "PUT", body: JSON.stringify(profile) });
   profileStore.set({ status: "ready", profile: saved });
-  const performer = await putOnMap(saved);
+  const performer = await syncMyMarker();
   if (performer) justPublishedStore.set({ id: performer.id, at: Date.now() });
   return saved;
 };

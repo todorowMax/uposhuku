@@ -196,10 +196,11 @@ const DEMO_INDUSTRIES = [
 ];
 
 /**
- * Скільки людей на якому рівні розміщення: більшість на базовому,
- * найбільший портрет — рідкість, як і буде з платним просуванням.
+ * Скільки людей на якому рівні розміщення. На карті стоять лише ті, хто
+ * заплатив (від рівня 2): найменший платний рівень тримає більшість,
+ * найбільший портрет — рідкість.
  */
-const TIER_SHARE: [PlacementTier, number][] = [[1, 0.4], [2, 0.62], [3, 0.77], [4, 0.88], [5, 0.95], [6, 1]];
+const TIER_SHARE: [PlacementTier, number][] = [[2, 0.55], [3, 0.77], [4, 0.89], [5, 0.96], [6, 1]];
 
 /** Стабільний хеш рядка в [0, 1): «онлайн» не має мигати між рендерами. */
 const unitHash = (value: string): number => {
@@ -222,7 +223,7 @@ export const DEMO_PERFORMERS: Performer[] = CITIES.flatMap((city, cityIndex) => 
     const options = MOCK_SPECIALTIES.filter((specialty) => specialty.group === group);
     const { title, skills, bio } = options[Math.floor(unitHash(`${id}:specialty`) * options.length)];
     const share = unitHash(`${id}:tier`);
-    const tier = TIER_SHARE.find(([, upTo]) => share < upTo)?.[0] ?? 1;
+    const tier = TIER_SHARE.find(([, upTo]) => share < upTo)?.[0] ?? 2;
     const industry = Math.floor(unitHash(`${id}:industry`) * DEMO_INDUSTRIES.length);
     const industries = [DEMO_INDUSTRIES[industry], DEMO_INDUSTRIES[(industry + 5) % DEMO_INDUSTRIES.length]];
     return {

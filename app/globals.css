@@ -3982,3 +3982,149 @@ html[data-map-ready] .map-skeleton {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* Вибір міста й точки на карті в профілі (components/profile/location-picker.tsx). */
+.loc-field {
+  display: flex;
+  gap: 8px;
+}
+
+.loc-field select {
+  min-width: 0;
+  flex: 1;
+}
+
+.loc-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  border-radius: 14px;
+  border: 1px solid rgb(184 196 199 / 70%);
+  background: rgb(255 255 255 / 70%);
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.loc-button:hover {
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.loc-button[data-set] {
+  border-color: #b48264;
+  color: #8e5f40;
+}
+
+.loc-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  background: #eef1f1;
+}
+
+.loc-map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.loc-map,
+.loc-map-wrap > .loc-map.maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+.loc-hint,
+.loc-fail {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 8px 22px rgb(45 60 67 / 16%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  pointer-events: none;
+  text-align: center;
+}
+
+.loc-fail {
+  top: 50%;
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+.loc-footer {
+  display: grid;
+  gap: 12px;
+  padding: 14px 20px max(16px, env(safe-area-inset-bottom));
+  border-top: 1px solid rgb(184 196 199 / 50%);
+  background: #f9faf9;
+}
+
+.loc-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.loc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.loc-actions > button {
+  flex: 1 1 140px;
+}
+
+.loc-pin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 38px;
+  cursor: grab;
+}
+
+.loc-pin-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px 999px 999px 0;
+  transform: rotate(-45deg);
+  background: #b48264;
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgb(45 60 67 / 35%);
+}
+
+.pe-notice {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8e5f40;
+}
+
+.place-warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgb(180 130 100 / 12%);
+  font-size: 12px;
+  line-height: 1.45;
+  color: #6f4a32;
+}
+
+.place-warn svg {
+  margin-top: 1px;
+}

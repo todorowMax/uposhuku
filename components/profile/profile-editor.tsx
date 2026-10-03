@@ -2,15 +2,18 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Loader2, Plus, X } from "lucide-react";
+import { Check, Loader2, MapPinned, Plus, X } from "lucide-react";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
+import { LocationPicker } from "@/components/profile/location-picker";
 import { PhotoField } from "@/components/profile/photo-field";
 import { TagChips } from "@/components/profile/tag-chips";
 import { TaggedField } from "@/components/profile/tagged-field";
 import { WorkEditor } from "@/components/profile/work-editor";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { CITIES } from "@/lib/map/cities";
-import { placementOpenStore } from "@/lib/placement/client";
+import { SAME_CITY_KM, distanceKm, nearestCity } from "@/lib/map/nearest-city";
+import { loadPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
+import { MIN_PAYMENT } from "@/lib/placement/pricing";
 import { profileEditorStore, profileStore, saveMyProfile } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import { PROFILE_LIMITS, emptyProfile, missingForPublish, profileTags, provenTags, type Profile, type ProfileWork } from "@/lib/profile/types";
@@ -36,9 +39,18 @@ export function ProfileEditor() {
   const profileState = useStore(profileStore);
   const stored = profileState.status === "ready" ? profileState.profile : null;
   const userName = session.status === "user" ? (session.user.name ?? "") : "";
+  const placement = useStore(placementStore);
+  // Без оплати профіль опубліковано, але на карті людини немає.
+  const onMap = (placement?.tier ?? 1) >= 2;
+
+  useEffect(() => {
+    void loadPlacement();
+  }, []);
 
   const [name, setName] = useState(stored?.name ?? userName);
   const [cityId, setCityId] = useState(stored?.cityId ?? "");
+  const [location, setLocation] = useState<Profile["location"]>(stored?.location ?? null);
+  const [picking, setPicking] = useState(false);
   const [specialty, setSpecialty] = useState(stored?.specialty ?? "");
   const [bio, setBio] = useState(stored?.bio ?? "");
   const [photo, setPhoto] = useState(stored?.photo ?? "");
@@ -63,6 +75,7 @@ export function ProfileEditor() {
       ...emptyProfile(),
       name,
       cityId,
+      location,
       specialty,
       bio,
       tags: tagging.tags,
@@ -70,7 +83,7 @@ export function ProfileEditor() {
       photo,
       published: stored?.published ?? false,
     }),
-    [name, cityId, specialty, bio, tagging.tags, works, photo, stored?.published]
+    [name, cityId, location, specialty, bio, tagging.tags, works, photo, stored?.published]
   );
   const proven = useMemo(() => provenTags(draft), [draft]);
   const allTags = useMemo(() => profileTags(draft), [draft]);
@@ -125,6 +138,8 @@ export function ProfileEditor() {
       initialSnapshot.current = snapshot({ ...draft, published });
       if (kind === "publish" || closeAfter) profileEditorStore.set(false);
       else setSaved(true);
+      // Опублікувалися, але на карті ще немає: одразу показуємо, як на неї потрапити.
+      if (kind === "publish" && (placementStore.get()?.tier ?? 1) < 2) placementOpenStore.set(true);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Не вдалося зберегти профіль.");
     } finally {
@@ -161,7 +176,11 @@ export function ProfileEditor() {
         <div className="min-w-0">
           <h1 className="text-[18px] font-semibold text-ink">{isPublished ? "Ваш профіль" : "Профіль виконавця"}</h1>
           <p className="mt-0.5 text-[12px] text-ink-muted">
-            {isPublished ? "Вас видно на карті. Зміни з'являться після збереження." : "Заповніть, і вас побачать замовники з потрібними запитами."}
+            {isPublished
+              ? onMap
+                ? "Вас видно на карті. Зміни з'являться після збереження."
+                : "Профіль опубліковано, але на карті вас ще немає."
+              : "Заповніть і опублікуйте: так ви зможете відгукуватися на запити."}
           </p>
         </div>
         <ul className="pe-checks" aria-label={`Заповнено ${done} з ${checks.length}`}>
@@ -212,16 +231,33 @@ export function ProfileEditor() {
                   <label htmlFor="pe-city" className="pe-label">
                     Місто
                   </label>
-                  <select id="pe-city" value={cityId} onChange={(event) => setCityId(event.target.value)} className="auth-input w-full" data-empty={!cityId || undefined}>
-                    <option value="">Оберіть місто</option>
-                    {CITY_OPTIONS.map((city) => (
-                      <option key={city.id} value={city.id}>
-                        {city.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="loc-field">
+                    <select id="pe-city" value={cityId} onChange={(event) => setCityId(event.target.value)} className="auth-input w-full" data-empty={!cityId || undefined}>
+                      <option value="">Оберіть місто</option>
+                      {CITY_OPTIONS.map((city) => (
+                        <option key={city.id} value={city.id}>
+                          {city.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setPicking(true)}
+                      className="loc-button"
+                      data-set={location ? true : undefined}
+                      aria-label={location ? "Змінити точку на карті" : "Поставити точку на карті"}
+                      title={location ? "Точку задано. Змінити на карті" : "Поставити точку на карті"}
+                    >
+                      <MapPinned className="size-[18px]" strokeWidth={1.9} />
+                    </button>
+                  </div>
                 </div>
               </div>
+
+              <p className="pe-hint mt-1.5">
+                {location ? "Ваша точка на карті задана. Її видно всім, коли ви на карті." : "Значок праворуч від міста відкриває карту: на ній можна поставити точку точніше."}
+                {!onMap && ` На карті ви з'явитесь після оплати розміщення, від ${MIN_PAYMENT} ₴. Відгукуватися на запити можна й без оплати.`}
+              </p>
 
               <label htmlFor="pe-specialty" className="pe-label mt-3">
                 Ким працюєте
@@ -319,7 +355,22 @@ export function ProfileEditor() {
                       {error}
                     </p>
                   )}
-                  {!isPublished && missing.length > 0 && <p className="pe-missing">Щоб показатися на карті, додайте: {missing.join(", ")}.</p>}
+                  {!isPublished && missing.length > 0 && <p className="pe-missing">Щоб опублікувати профіль, додайте: {missing.join(", ")}.</p>}
+                  {isPublished && !onMap && (
+                    <p className="pe-notice">
+                      Вас не видно на карті, поки не оплачено розміщення від {MIN_PAYMENT} ₴.{" "}
+                      <button
+                        type="button"
+                        className="auth-link text-[12px]"
+                        onClick={() => {
+                          profileEditorStore.set(false);
+                          placementOpenStore.set(true);
+                        }}
+                      >
+                        Стати на карту
+                      </button>
+                    </p>
+                  )}
                   <div className="pe-actions">
                     {isPublished ? (
                       <>
@@ -329,14 +380,14 @@ export function ProfileEditor() {
                         </button>
                         <button type="button" disabled={Boolean(busy)} onClick={() => void save("unpublish")} className="auth-secondary">
                           {busy === "unpublish" && <Loader2 className="size-4 animate-spin" />}
-                          Зняти з карти
+                          Приховати профіль
                         </button>
                       </>
                     ) : (
                       <>
                         <button type="submit" disabled={Boolean(busy) || missing.length > 0} className="auth-primary pe-primary">
                           {busy === "publish" && <Loader2 className="size-4 animate-spin" />}
-                          Показати на карті
+                          Опублікувати профіль
                         </button>
                         <button type="button" disabled={Boolean(busy)} onClick={() => void save("draft")} className="auth-secondary">
                           {busy === "draft" && <Loader2 className="size-4 animate-spin" />}
@@ -405,7 +456,7 @@ export function ProfileEditor() {
               )}
             </div>
             <p className="pe-preview-note">
-              Розмір вашого маркера на карті залежить від платного розміщення.{" "}
+              Без оплати розміщення вас не видно на карті. Розмір маркера залежить від суми, яку ви платите.{" "}
               {isPublished && (
                 <button type="button" onClick={() => placementOpenStore.set(true)} className="auth-link text-[11px]">
                   Стати на карту
@@ -415,6 +466,23 @@ export function ProfileEditor() {
           </aside>
         </div>
       </div>
+
+      {picking && (
+        <LocationPicker
+          initial={location}
+          cityId={cityId}
+          onClose={() => setPicking(false)}
+          onConfirm={(point) => {
+            setLocation(point);
+            // Місто обираємо за точкою, якщо його ще нема або точка далеко від вибраного.
+            if (point) {
+              const chosen = CITIES.find((city) => city.id === cityId);
+              if (!chosen || distanceKm(point, chosen) > SAME_CITY_KM) setCityId(nearestCity(point).city.id);
+            }
+            setPicking(false);
+          }}
+        />
+      )}
     </div>
   );
 }

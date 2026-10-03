@@ -17,6 +17,8 @@ export interface ProfileWork {
 export interface Profile {
   name: string;
   cityId: string;
+  /** Точка на карті, яку людина поставила сама; без неї стоїмо біля центру міста. */
+  location: { lat: number; lng: number } | null;
   /** Коротко, ким працює: «UI/UX дизайнер». Показуємо в картці. */
   specialty: string;
   /** «Про себе» вільним текстом. */
@@ -26,7 +28,7 @@ export interface Profile {
   works: ProfileWork[];
   /** Фото квадратом, JPEG як data URL. */
   photo: string;
-  /** Показувати на карті. Чернетка лишається приватною. */
+  /** Профіль опубліковано: його бачать замовники, а людина відгукується на запити. На карті вона з'являється лише після оплати розміщення. */
   published: boolean;
   updatedAt: string;
 }
@@ -69,6 +71,7 @@ export const missingForPublish = (profile: Profile): string[] => {
 export const emptyProfile = (name = ""): Profile => ({
   name,
   cityId: "",
+  location: null,
   specialty: "",
   bio: "",
   tags: [],

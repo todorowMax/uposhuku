@@ -29,10 +29,25 @@ const work = (value: unknown, index: number): ProfileWork | null => {
   };
 };
 
+/** Межі України з запасом: точка за ними — помилка, а не «ще один регіон». */
+const BOUNDS = { latMin: 44, latMax: 52.6, lngMin: 22, lngMax: 40.5 } as const;
+
+const location = (value: unknown): Profile["location"] | undefined => {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object") return undefined;
+  const { lat, lng } = value as Record<string, unknown>;
+  if (typeof lat !== "number" || typeof lng !== "number" || !Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (lat < BOUNDS.latMin || lat > BOUNDS.latMax || lng < BOUNDS.lngMin || lng > BOUNDS.lngMax) return undefined;
+  // Тисячні градуса, ~100 м: точніше сервісу не треба, а людині спокійніше.
+  return { lat: Math.round(lat * 1000) / 1000, lng: Math.round(lng * 1000) / 1000 };
+};
+
 export const parseProfile = (body: Record<string, unknown> | null): Profile | string => {
   if (!body) return "Порожній запит.";
   const cityId = text(body.cityId, 40);
   if (cityId && !CITIES.some((city) => city.id === cityId)) return "Невідоме місто.";
+  const point = location(body.location);
+  if (point === undefined) return "Точка має бути в межах України.";
   const photo = typeof body.photo === "string" ? body.photo : "";
   if (photo && !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(photo)) return "Фото має бути у форматі JPEG.";
   if (photo.length > PROFILE_LIMITS.photoBytes * 1.4) return "Фото завелике.";
@@ -43,6 +58,7 @@ export const parseProfile = (body: Record<string, unknown> | null): Profile | st
     ...emptyProfile(),
     name: text(body.name, PROFILE_LIMITS.name),
     cityId,
+    location: point,
     specialty: text(body.specialty, PROFILE_LIMITS.specialty),
     bio: text(body.bio, PROFILE_LIMITS.bio),
     tags: tags(body.tags),
@@ -53,7 +69,7 @@ export const parseProfile = (body: Record<string, unknown> | null): Profile | st
   // Показувати на карті без обов'язкового не можна: чернетка лишається, але приватна.
   if (profile.published) {
     const missing = missingForPublish(profile);
-    if (missing.length) return `Щоб показатися на карті, додайте: ${missing.join(", ")}.`;
+    if (missing.length) return `Щоб опублікувати профіль, додайте: ${missing.join(", ")}.`;
   }
   return profile;
 };

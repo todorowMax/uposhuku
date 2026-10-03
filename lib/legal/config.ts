@@ -6,7 +6,7 @@
 // не дублюємо: підставляємо через {плейсхолдери}.
 
 import { HOLD_DAYS, MAX_STAGES, SAFE_FEE } from "@/lib/deals/types";
-import { MAX_PAYMENT, MIN_PAYMENT, PACKAGES } from "@/lib/placement/tiers";
+import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
 export const SERVICE_NAME = "Vibe Map";
 
@@ -50,7 +50,6 @@ export const LEGAL_VALUES: Record<string, string> = {
   email: CONTACT_EMAIL,
   minPayment: money(MIN_PAYMENT),
   maxPayment: money(MAX_PAYMENT),
-  packages: PACKAGES.map(money).join(", "),
   holdDays: String(HOLD_DAYS),
   maxStages: String(MAX_STAGES),
   fee: String(Math.round(SAFE_FEE * 100)),

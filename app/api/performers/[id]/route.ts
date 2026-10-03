@@ -11,6 +11,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const userId = id.startsWith("me-") ? id.slice(3) : "";
   const profile = userId ? getProfile(userId) : null;
   if (!profile?.published) return problem(404, "Профіль не знайдено");
-  const { name, cityId, specialty, bio, tags, works, photo } = profile;
-  return Response.json({ profile: { name, cityId, specialty, bio, tags, works, photo }, tier: getPlacement(userId).tier, userId });
+  const { name, cityId, location, specialty, bio, tags, works, photo } = profile;
+  return Response.json({ profile: { name, cityId, location, specialty, bio, tags, works, photo }, tier: getPlacement(userId).tier, userId });
 }

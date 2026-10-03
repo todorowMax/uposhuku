@@ -3,6 +3,7 @@
 // Оплати розміщення: контракт сервера й клієнта.
 
 import type { PlacementTier } from "@/lib/map/types";
+import type { TierPrices } from "./pricing";
 
 export interface Payment {
   id: string;
@@ -15,7 +16,10 @@ export interface Payment {
 export interface Placement {
   /** Скільки сплачено разом. */
   total: number;
+  /** Рівень зараз: з нього видно, чи вас не перебили. Падає, якщо інші заплатили більше. */
   tier: PlacementTier;
+  /** Скільки сумарно треба мати, щоб зараз стояти на кожному платному рівні. */
+  prices: TierPrices;
   payments: Payment[];
 }
 

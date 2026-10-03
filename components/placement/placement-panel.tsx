@@ -2,12 +2,13 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { ArrowLeft, Check, Loader2, MapPin, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Check, Loader2, MapPin, Scale, ShieldCheck, X } from "lucide-react";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
 import type { PlacementTier } from "@/lib/map/types";
-import { payForPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
-import { MAX_PAYMENT, MIN_PAYMENT, PAID_TIERS, TIER_FROM, TIER_NAMES, TIER_PX, outrank, tierForTotal } from "@/lib/placement/tiers";
+import { loadPlacement, payForPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
+import { MAX_PAYMENT, MIN_PAYMENT, TIER_FLOOR, tierFor } from "@/lib/placement/pricing";
+import { PAID_TIERS, TIER_NAMES, TIER_PX, outrank } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
@@ -19,11 +20,13 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
 type Step = "choose" | "checkout" | "processing" | "done" | "failed";
 
 /**
- * «Стати на карту»: разова оплата розміщення. Рівні 1–6 — це розмір вашого
- * маркера й місце серед пропозицій замовникові (хто більше заплатив, той
- * вище). Сума накопичується, рівень не падає. Показуємо те, що людина
- * отримує: маркер у справжньому розмірі, скільки виконавців нижче, і
- * чесно: це «Просування» (закон «Про рекламу»).
+ * «Стати на карту»: разова оплата розміщення. Без оплати людини на карті
+ * немає (вона лише відгукується на запити). Від 100 ₴ вона з'являється, а
+ * далі розмір маркера й місце серед пропозицій залежать від суми. Ціни
+ * рівнів динамічні: рівень діє, поки інші не заплатили більше. Показуємо
+ * те, що людина отримує: маркер у справжньому розмірі, скільки виконавців
+ * нижче, позначку «Просування» (закон «Про рекламу») і попередження, що
+ * розмір можуть перебити.
  */
 export function PlacementPanel() {
   const open = useStore(placementOpenStore);
@@ -100,17 +103,25 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   const placement = useStore(placementStore);
   const performers = usePerformers();
   const total = placement?.total ?? 0;
-  const current = tierForTotal(total);
-  const firstUp = (Math.min(6, current + 1) as PlacementTier) ?? 2;
+  const prices = placement?.prices ?? TIER_FLOOR;
+  const current = placement?.tier ?? tierFor(total, prices);
+  const offMap = current < 2;
+  const firstUp = (offMap ? 2 : Math.min(6, current + 1)) as PlacementTier;
   const [selected, setSelected] = useState<PlacementTier>(current === 6 ? 6 : firstUp);
   const [step, setStep] = useState<Step>("choose");
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
   const [agreed, setAgreed] = useState(false);
 
+  // Ціни залежать від інших, тож перед вибором беремо свіжі.
+  useEffect(() => {
+    void loadPlacement();
+  }, []);
+
   const others = useMemo(() => performers.filter((person) => !person.mine), [performers]);
-  const amount = Math.min(MAX_PAYMENT, Math.max(MIN_PAYMENT, TIER_FROM[selected] - total));
-  const tierAfter = tierForTotal(total + amount);
+  const needed = (tier: PlacementTier) => (tier < 2 ? 0 : Math.min(MAX_PAYMENT, Math.max(MIN_PAYMENT, prices[tier as keyof typeof prices] - total)));
+  const amount = needed(selected);
+  const tierAfter = tierFor(total + amount, prices);
   const below = outrank(selected, others);
 
   const pay = async (outcome: "success" | "declined") => {
@@ -195,7 +206,9 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   return (
     <Shell title="Стати на карту">
       <p className="auth-lead">
-        Разова оплата: маркер більшає на карті, а у списку пропозицій замовникові ви стоїте вище за тих, хто платив менше. Відгукуватися можна й без оплати.
+        {offMap
+          ? "Без оплати вас не видно на карті. Від 100 ₴ ваше фото з'явиться на ній, а чим більше платите, тим більший маркер і вище ваш відгук у списку замовника. Відгукуватися на запити можна й без оплати."
+          : "Разова оплата: маркер більшає на карті, а у списку пропозицій замовникові ви стоїте вище за тих, хто платив менше."}
       </p>
 
       <Ladder photo={photo} name={name} selected={selected} current={current} />
@@ -208,21 +221,30 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
             <label key={tier} className="place-tier" data-selected={tier === selected || undefined} data-owned={owned || undefined}>
               <input type="radio" name="tier" value={tier} checked={tier === selected} disabled={owned} onChange={() => setSelected(tier)} />
               <span className="place-tier-name">{TIER_NAMES[tier]}</span>
-              <span className="place-tier-price">{owned ? (tier === current ? "ваш рівень" : "є") : `${PRICE.format(Math.max(MIN_PAYMENT, TIER_FROM[tier] - total))} ₴`}</span>
+              <span className="place-tier-price">{owned ? (tier === current ? "ваш рівень" : "є") : `${PRICE.format(needed(tier))} ₴`}</span>
             </label>
           );
         })}
       </fieldset>
 
+      <p className="place-warn" role="note">
+        <Scale className="size-4 shrink-0" strokeWidth={1.9} />
+        <span>
+          Розмір діє, поки вас не перебили. Ціни рівнів залежать від того, скільки платять інші виконавці. Якщо хтось заплатить більше, ваш маркер може зменшитись, і тоді його можна повернути доплатою.
+        </span>
+      </p>
+
       <ul className="place-facts">
         <li>
           <MapPin className="size-4 shrink-0" strokeWidth={1.9} />
-          Маркер {TIER_PX[selected - 1]} px замість {TIER_PX[current - 1]}.
+          {offMap ? `Ви з'явитесь на карті з маркером ${TIER_PX[selected - 1]} px.` : `Маркер ${TIER_PX[selected - 1]} px замість ${TIER_PX[current - 1]}.`}
         </li>
-        <li>
-          <Check className="size-4 shrink-0" strokeWidth={2.4} />
-          Вище за {below} з {others.length} виконавців.
-        </li>
+        {below > 0 && (
+          <li>
+            <Check className="size-4 shrink-0" strokeWidth={2.4} />
+            Вище за {below} з {others.length} виконавців.
+          </li>
+        )}
         <li>
           <ShieldCheck className="size-4 shrink-0" strokeWidth={1.9} />
           Біля імені позначка «Просування»: так вимагає закон «Про рекламу».
@@ -237,7 +259,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
         <p className="auth-lead text-center">Ви на найвищому рівні. Більшого маркера немає.</p>
       )}
       <p className="pe-hint">
-        Оплата разова й не залежить від кількості відгуків. Сума накопичується: докупити можна будь-коли, рівень не знижується.
+        Оплата разова й не залежить від кількості відгуків. Сума накопичується: докупити можна будь-коли.
         {placement && placement.payments.length > 0 && (
           <>
             {" "}
@@ -287,7 +309,7 @@ function Ladder({ photo, name, selected, current }: { photo: string; name: strin
             >
               {you && !photo && <span className="text-[13px] font-semibold text-ink-muted">{name.trim().charAt(0) || "?"}</span>}
             </span>
-            <span className="place-step-label">{tier === current ? "Зараз" : you ? "Буде" : ""}</span>
+            <span className="place-step-label">{tier === current ? (current < 2 ? "Не на карті" : "Зараз") : you ? "Буде" : ""}</span>
           </div>
         );
       })}
@@ -306,13 +328,13 @@ function Done({ name, photo, tier }: { name: string; photo: string; tier: Placem
   }, []);
   const size = Math.round(TIER_PX[tier - 1] * 1.8);
   return (
-    <Shell title="Ви на карті вище">
+    <Shell title="Ви на карті">
       <div className="grid justify-items-center gap-3 py-2">
         <span ref={dotRef} className="place-dot place-dot-big" style={{ width: size, height: size, ...(photo ? { backgroundImage: `url(${photo})` } : null) }}>
           {!photo && <span className="text-[18px] font-semibold text-ink-muted">{name.trim().charAt(0) || "?"}</span>}
         </span>
         <p className="text-center text-[13px] leading-relaxed text-ink-muted">
-          Рівень {tier} з 6: <strong className="font-semibold text-ink">{TIER_NAMES[tier]}</strong>. Маркер уже більший, а замовники бачать вас вище в пропозиціях.
+          Рівень {tier} з 6: <strong className="font-semibold text-ink">{TIER_NAMES[tier]}</strong>. Ваш маркер уже на карті, а замовники бачать вас вище в пропозиціях.
         </p>
       </div>
       <button

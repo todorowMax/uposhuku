@@ -162,7 +162,7 @@ export function AccountButton() {
           >
             <UserRound className="size-4" strokeWidth={1.9} />
             {profile ? "Мій профіль" : "Стати виконавцем"}
-            {profile && <span className="ml-auto text-[11px] text-ink-muted">{profile.published ? "на карті" : "чернетка"}</span>}
+            {profile && <span className="ml-auto text-[11px] text-ink-muted">{!profile.published ? "чернетка" : (placement?.tier ?? 1) >= 2 ? "на карті" : "не на карті"}</span>}
           </button>
           <button
             type="button"

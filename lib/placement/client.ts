@@ -3,10 +3,9 @@
 // lib/placement/client.ts
 //
 // Розміщення в браузері: скільки сплачено й який рівень, відкрита панель
-// «Стати на карту», оплата. Рівень одразу міняє маркер людини на карті.
+// «Стати на карту», оплата. Рівень одразу міняє маркер людини на карті; без оплати маркера на карті немає.
 
 import { ApiError, sessionStore } from "@/lib/auth/client";
-import { updateMyPerformer } from "@/lib/map/performers";
 import { createStore } from "@/lib/store";
 import type { PaymentOutcome, Placement } from "./types";
 
@@ -50,7 +49,9 @@ export const payForPlacement = async (amount: number, simulate?: PaymentOutcome)
     body: JSON.stringify({ amount, simulate: simulate === "declined" ? "declined" : undefined }),
   });
   placementStore.set(placement);
-  updateMyPerformer({ tier: placement.tier });
+  // Динамічний імпорт: профіль уже імпортує розміщення, цикл статично не склеїти.
+  const { syncMyMarker } = await import("@/lib/profile/client");
+  await syncMyMarker();
   tierUpStore.set({ tier: placement.tier, at: Date.now() });
   return placement;
 };

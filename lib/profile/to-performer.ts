@@ -37,8 +37,9 @@ const toWork = (work: ProfileWork): PortfolioWork => ({
 });
 
 /**
- * Власний профіль на карті. Точка — у межах свого міста з невеликим
- * зсувом, щоб не стояти точно на підписі міста. Рівень — за оплатою розміщення.
+ * Власний профіль на карті. Точка — та, що людина поставила сама, а якщо
+ * ні, то поряд зі своїм містом з невеликим зсувом, щоб не стояти точно на
+ * підписі міста. Рівень — за оплатою розміщення.
  */
 export const profileToPerformer = (profile: Profile, userId: string, avatarIndex: number, tier: PlacementTier = 1): Performer | null => {
   const city = CITIES.find((item) => item.id === profile.cityId);
@@ -46,8 +47,8 @@ export const profileToPerformer = (profile: Profile, userId: string, avatarIndex
   return {
     id: `me-${userId}`,
     cityId: city.id,
-    lat: city.lat + 0.045,
-    lng: city.lng - 0.07,
+    lat: profile.location?.lat ?? city.lat + 0.045,
+    lng: profile.location?.lng ?? city.lng - 0.07,
     online: true,
     tier,
     avatarIndex,
