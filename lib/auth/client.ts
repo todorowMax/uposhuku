@@ -25,6 +25,13 @@ export const requestsStore = createStore<PublishedRequest[] | null>(null);
 /** Запит, що стоїть на місці поля запиту. null — показуємо поле. */
 export const activeRequestStore = createStore<string | null>(null);
 
+/** Коротке підтвердження після публікації, без постійної великої картки. */
+export const recentlyPublishedRequestStore = createStore<string | null>(null);
+let publishedNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Відкрити список запитів із меню аватарки або поля вводу. */
+export const showRequestsListStore = createStore(false);
+
 /** Людина натиснула «Новий запит»: показуємо поле, хоча запити вже є. */
 export const composingStore = createStore(false);
 
@@ -82,6 +89,10 @@ export const logout = async () => {
   sessionStore.set({ status: "guest" });
   requestsStore.set(null);
   activeRequestStore.set(null);
+  showRequestsListStore.set(false);
+  recentlyPublishedRequestStore.set(null);
+  if (publishedNoticeTimer) clearTimeout(publishedNoticeTimer);
+  publishedNoticeTimer = null;
   composingStore.set(false);
   void import("@/lib/profile/client").then((module) => module.forgetProfile());
 };
@@ -115,6 +126,12 @@ export const loadMyRequests = async () => {
 export const addPublishedRequest = (request: PublishedRequest) => {
   requestsStore.set([request, ...(requestsStore.get() ?? []).filter((item) => item.id !== request.id)]);
   activeRequestStore.set(request.id);
+  recentlyPublishedRequestStore.set(request.id);
+  if (publishedNoticeTimer) clearTimeout(publishedNoticeTimer);
+  publishedNoticeTimer = setTimeout(() => {
+    recentlyPublishedRequestStore.set(null);
+    publishedNoticeTimer = null;
+  }, 2400);
   composingStore.set(false);
 };
 
@@ -131,4 +148,5 @@ export const showMyRequests = () => {
   const requests = requestsStore.get() ?? [];
   if (!activeRequestStore.get()) activeRequestStore.set(firstOpen(requests) ?? requests[0]?.id ?? null);
   composingStore.set(false);
+  if (requests.length > 0) showRequestsListStore.set(true);
 };

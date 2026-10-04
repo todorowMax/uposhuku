@@ -26,15 +26,22 @@ export const useActiveRequest = (): PublishedRequest | null => {
 export type OffersView = { kind: "list" } | { kind: "chat"; responseId: string };
 export const offersViewStore = createStore<OffersView>({ kind: "list" });
 /** Панель згорнута в язичок (на телефоні — шторка опущена). */
-export const offersCollapsedStore = createStore(false);
+export const offersCollapsedStore = createStore(true);
 /** Чат у правій колонці розтягнуто вліво (лише на широкому екрані). */
 export const offersWideStore = createStore(false);
+/** На мапі активного запиту показуємо тільки виконавців, які вже відгукнулися. */
+export const offersMapStore = createStore<{ requestId: string | null; responses: OfferResponse[] }>({
+  requestId: null,
+  responses: [],
+});
 /** Скільки пропозицій уже прийшло на активний запит: для кроків у картці запиту. */
 export const offersCountStore = createStore(0);
 /** Скільки нових пропозицій чекає за «+N нових»: для сповіщень і лічильника у вкладці. */
 export const offersPendingStore = createStore(0);
 /** Попросити карту показати виконавця: камера летить до нього й відкриває картку. */
-export const focusPerformerStore = createStore<{ id: string; at: number } | null>(null);
+export const focusPerformerStore = createStore<{ id: string; at: number; toggle?: boolean } | null>(null);
+/** Картка пропозиції під курсором або у фокусі клавіатури. */
+export const hoveredOfferStore = createStore<{ requestId: string; performerId: string } | null>(null);
 
 const POLL_MS = 4000;
 
@@ -71,6 +78,7 @@ export const useOffers = (request: PublishedRequest | null) => {
     setShown(null);
     setPending([]);
     setDeclined(requestId ? readSet(`vm:declined:${requestId}`) : []);
+    offersMapStore.set({ requestId, responses: [] });
     if (!requestId) return;
     let cancelled = false;
     let first = true;
@@ -80,6 +88,10 @@ export const useOffers = (request: PublishedRequest | null) => {
         if (!response.ok || cancelled) return;
         const { responses } = (await response.json()) as { responses: OfferResponse[] };
         if (cancelled) return;
+        const currentMap = offersMapStore.get();
+        if (currentMap.requestId !== requestId || currentMap.responses.length !== responses.length || responses.some((item, index) => item.id !== currentMap.responses[index]?.id)) {
+          offersMapStore.set({ requestId, responses });
+        }
         if (first) {
           first = false;
           shownIds.current = new Set(responses.map((item) => item.id));
@@ -132,30 +144,4 @@ export const useOffers = (request: PublishedRequest | null) => {
     decline: (id: string) => setDeclinedFor([...declined, id]),
     restore: (id: string) => setDeclinedFor(declined.filter((item) => item !== id)),
   };
-};
-
-/**
- * Картка запиту згорнута в смужку по центру: лише статус, крок і скільки
- * пропозицій. Вибір пам'ятаємо в браузері.
- */
-export const dockCompactStore = createStore(false);
-const COMPACT_KEY = "vm:dock-compact";
-
-export const loadDockCompact = () => {
-  try {
-    const saved = window.localStorage.getItem(COMPACT_KEY);
-    // Вибору ще не було: на телефоні карта важливіша за картку, тож починаємо зі смужки.
-    dockCompactStore.set(saved === null ? window.innerWidth < 640 : saved === "1");
-  } catch {
-    dockCompactStore.set(window.innerWidth < 640);
-  }
-};
-
-export const setDockCompact = (compact: boolean) => {
-  dockCompactStore.set(compact);
-  try {
-    window.localStorage.setItem(COMPACT_KEY, compact ? "1" : "0");
-  } catch {
-    // Запам'ятаємо до перезавантаження.
-  }
 };

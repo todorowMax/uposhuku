@@ -1,15 +1,14 @@
 "use client";
 
 import { forwardRef } from "react";
-import { X } from "lucide-react";
+import { X } from "@/components/icons";
 import { FeedCard, type RespondGate } from "@/components/requests/feed-panel";
 import { authFlowStore, sessionStore } from "@/lib/auth/client";
-import { mapRequestsStore, mapSelectedRequest, patchMapRequest } from "@/lib/feed/map-requests";
+import { mapRequestsStore, mapSelectedRequest, patchMapRequest, setMapMode } from "@/lib/feed/map-requests";
 import type { MapRequest } from "@/lib/feed/types";
 import { profileEditorStore } from "@/lib/profile/client";
 import { activeRequestStore, composingStore } from "@/lib/auth/client";
 import { offersCollapsedStore } from "@/lib/requests/offers";
-import { sidePanelChoice } from "@/lib/requests/side-panel";
 import { useStore } from "@/lib/store";
 
 const close = () => mapSelectedRequest.set(null);
@@ -33,7 +32,7 @@ export const RequestMapCard = forwardRef<HTMLElement, { item: MapRequest }>(func
         close();
         activeRequestStore.set(item.id);
         composingStore.set(false);
-        sidePanelChoice.set("offers");
+        setMapMode("performers");
         offersCollapsedStore.set(false);
       },
     };
@@ -63,7 +62,7 @@ export const RequestMapCard = forwardRef<HTMLElement, { item: MapRequest }>(func
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-[12px] font-semibold text-ink-muted">{item.own ? "Ваш запит" : "Запит замовника"}</p>
         <button type="button" onClick={close} aria-label="Закрити картку" className="grid size-7 shrink-0 place-items-center rounded-full bg-white/65 text-ink-muted transition-colors hover:bg-white hover:text-ink">
-          <X className="size-4" strokeWidth={2.2} />
+          <X className="size-4" />
         </button>
       </div>
       <FeedCard bare item={item} gate={gate} onChange={(change) => patchMapRequest(item.id, change)} />

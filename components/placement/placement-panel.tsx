@@ -2,13 +2,14 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { ArrowLeft, Check, Loader2, MapPin, Scale, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, Loader2 } from "@/components/icons";
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
-import type { PlacementTier } from "@/lib/map/types";
+import { avatarBackground } from "@/lib/map/avatar-style";
+import type { Performer, PlacementTier } from "@/lib/map/types";
 import { loadPlacement, payForPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
 import { MAX_PAYMENT, MIN_PAYMENT, TIER_FLOOR, tierFor } from "@/lib/placement/pricing";
-import { PAID_TIERS, TIER_NAMES, TIER_PX, outrank } from "@/lib/placement/tiers";
+import { TIER_NAMES, TIER_PX } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
@@ -18,6 +19,11 @@ const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", h
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 type Step = "choose" | "checkout" | "processing" | "done" | "failed";
+const CHOICES = [
+  { tier: 2, name: "Старт", description: "Невеликий маркер — і вас уже видно на мапі." },
+  { tier: 4, name: "Професійний", description: "Помітніший маркер і більше шансів отримати замовлення." },
+  { tier: 6, name: "Топ", description: "Найбільший маркер: вас помітять першими." },
+] as const;
 
 /**
  * «Стати на карту»: разова оплата розміщення. Без оплати людини на карті
@@ -40,7 +46,7 @@ export function PlacementPanel() {
 
 const close = () => placementOpenStore.set(false);
 
-function Shell({ title, back, children }: { title: string; back?: () => void; children: React.ReactNode }) {
+function Shell({ title, back, hero, children }: { title: string; back?: () => void; hero?: React.ReactNode; children: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     if (!ref.current || reduced()) return;
@@ -60,21 +66,28 @@ function Shell({ title, back, children }: { title: string; back?: () => void; ch
     <>
       <div aria-hidden className="auth-scrim place-scrim" onClick={close} />
       <div className="place-wrap">
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="place-panel glass-panel">
+      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="place-panel glass-panel" data-hero={Boolean(hero) || undefined}>
+        {hero ? (
+          <header className="place-hero">
+            <button type="button" onClick={close} className="place-hero-skip">Пропустити</button>
+            {hero}
+            <h2 className="place-hero-title">{title}</h2>
+            <p className="place-hero-lead">Хочете, щоб вас бачили на мапі й помічали серед перших? Опублікуйте свій профіль прямо тут.</p>
+          </header>
+        ) : (
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             {back && (
               <button type="button" onClick={back} aria-label="Назад" className="auth-icon-button -ml-1.5">
-                <ArrowLeft className="size-4" strokeWidth={2} />
+                <ArrowLeft className="size-4" />
               </button>
             )}
             <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
           </div>
-          <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button -mr-1.5">
-            <X className="size-4" strokeWidth={2} />
-          </button>
+          <button type="button" onClick={close} className="place-header-skip">Пропустити</button>
         </div>
-        {children}
+        )}
+        {hero ? <div className="place-body">{children}</div> : children}
       </div>
       </div>
     </>
@@ -105,9 +118,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   const total = placement?.total ?? 0;
   const prices = placement?.prices ?? TIER_FLOOR;
   const current = placement?.tier ?? tierFor(total, prices);
-  const offMap = current < 2;
-  const firstUp = (offMap ? 2 : Math.min(6, current + 1)) as PlacementTier;
-  const [selected, setSelected] = useState<PlacementTier>(current === 6 ? 6 : firstUp);
+  const [selected, setSelected] = useState<PlacementTier>(6);
   const [step, setStep] = useState<Step>("choose");
   const [error, setError] = useState<string | null>(null);
   const [history, setHistory] = useState(false);
@@ -122,7 +133,6 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   const needed = (tier: PlacementTier) => (tier < 2 ? 0 : Math.min(MAX_PAYMENT, Math.max(MIN_PAYMENT, prices[tier as keyof typeof prices] - total)));
   const amount = needed(selected);
   const tierAfter = tierFor(total + amount, prices);
-  const below = outrank(selected, others);
 
   const pay = async (outcome: "success" | "declined") => {
     setStep("processing");
@@ -204,61 +214,46 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   }
 
   return (
-    <Shell title="Стати на карту">
-      <p className="auth-lead">
-        {offMap
-          ? "Без оплати вас не видно на карті. Від 100 ₴ ваше фото з'явиться на ній, а чим більше платите, тим більший маркер і вище ваш відгук у списку замовника. Відгукуватися на запити можна й без оплати."
-          : "Разова оплата: маркер більшає на карті, а у списку пропозицій замовникові ви стоїте вище за тих, хто платив менше."}
-      </p>
-
-      <Ladder photo={photo} name={name} selected={selected} current={current} />
-
+    <Shell title="Зʼявитись на мапі" hero={<PlacementFaces people={others} photo={photo} name={name} />}>
       <fieldset className="place-tiers">
         <legend className="sr-only">Рівень розміщення</legend>
-        {PAID_TIERS.map((tier) => {
+        {CHOICES.map(({ tier, name: tierName }) => {
           const owned = tier <= current;
+          const chosen = tier === selected;
+          const size = Math.round(TIER_PX[tier - 1] * 1.6);
           return (
-            <label key={tier} className="place-tier" data-selected={tier === selected || undefined} data-owned={owned || undefined}>
-              <input type="radio" name="tier" value={tier} checked={tier === selected} disabled={owned} onChange={() => setSelected(tier)} />
-              <span className="place-tier-name">{TIER_NAMES[tier]}</span>
+            <label key={tier} className="place-tier" data-selected={chosen || undefined} data-owned={owned || undefined} data-current={tier === current || undefined}>
+              <input type="radio" name="tier" value={tier} checked={chosen} disabled={owned} onChange={() => setSelected(tier)} />
+              <span className="place-tier-preview" aria-hidden="true">
+                <span
+                  className="place-dot"
+                  style={{ width: size, height: size, ...(chosen && photo ? { backgroundImage: `url(${photo})` } : null) }}
+                >
+                  {chosen && !photo && <span className="text-[13px] font-semibold">{name.trim().charAt(0) || "?"}</span>}
+                </span>
+              </span>
+              <span className="place-tier-name">{tierName}</span>
               <span className="place-tier-price">{owned ? (tier === current ? "ваш рівень" : "є") : `${PRICE.format(needed(tier))} ₴`}</span>
             </label>
           );
         })}
       </fieldset>
-
-      <p className="place-warn" role="note">
-        <Scale className="size-4 shrink-0" strokeWidth={1.9} />
-        <span>
-          Розмір діє, поки вас не перебили. Ціни рівнів залежать від того, скільки платять інші виконавці. Якщо хтось заплатить більше, ваш маркер може зменшитись, і тоді його можна повернути доплатою.
-        </span>
+      <p key={selected} className="place-choice-description" aria-live="polite">
+        {CHOICES.find((choice) => choice.tier === selected)?.description}
       </p>
 
-      <ul className="place-facts">
-        <li>
-          <MapPin className="size-4 shrink-0" strokeWidth={1.9} />
-          {offMap ? `Ви з'явитесь на карті з маркером ${TIER_PX[selected - 1]} px.` : `Маркер ${TIER_PX[selected - 1]} px замість ${TIER_PX[current - 1]}.`}
-        </li>
-        {below > 0 && (
-          <li>
-            <Check className="size-4 shrink-0" strokeWidth={2.4} />
-            Вище за {below} з {others.length} виконавців.
-          </li>
-        )}
-        <li>
-          <ShieldCheck className="size-4 shrink-0" strokeWidth={1.9} />
-          Біля імені позначка «Просування»: так вимагає закон «Про рекламу».
-        </li>
-      </ul>
+      <p className="place-warn" role="note">
+        Інші виконавці можуть змінити ваш розмір на мапі. Повернути його можна доплатою.
+      </p>
 
       {current < 6 ? (
-        <button type="button" onClick={() => setStep("checkout")} className="auth-primary">
-          Сплатити {PRICE.format(amount)} ₴
+        <button type="button" onClick={() => setStep("checkout")} className="auth-primary place-publish">
+          Опублікуватись на мапі
         </button>
       ) : (
         <p className="auth-lead text-center">Ви на найвищому рівні. Більшого маркера немає.</p>
       )}
-      <p className="pe-hint">
+      <p className="pe-hint place-footnote">
         Оплата разова й не залежить від кількості відгуків. Сума накопичується: докупити можна будь-коли.
         {placement && placement.payments.length > 0 && (
           <>
@@ -273,46 +268,24 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   );
 }
 
-/**
- * Драбина рівнів: шість маркерів від найменшого до найбільшого, у справжній
- * пропорції (×1,6). Вибраний — з вашим фото, поточний — з тонким кільцем.
- */
-function Ladder({ photo, name, selected, current }: { photo: string; name: string; selected: PlacementTier; current: PlacementTier }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const first = useRef(true);
-  useLayoutEffect(() => {
-    const node = ref.current?.querySelector<HTMLElement>(`[data-tier="${selected}"] .place-dot`);
-    if (!node) return;
-    if (first.current || reduced()) {
-      first.current = false;
-      return;
-    }
-    const tween = gsap.fromTo(node, { scale: 0.8 }, { scale: 1, duration: 0.45, ease: "back.out(2.4)" });
-    return () => {
-      tween.kill();
-    };
-  }, [selected]);
+function PlacementFaces({ people, photo, name }: { people: Performer[]; photo: string; name: string }) {
   return (
-    <div ref={ref} className="place-ladder" role="img" aria-label={`Рівень ${selected} з 6: маркер ${TIER_PX[selected - 1]} пікселів`}>
-      {([1, 2, 3, 4, 5, 6] as PlacementTier[]).map((tier) => {
-        const size = Math.round(TIER_PX[tier - 1] * 1.6);
-        const you = tier === selected;
-        return (
-          <div key={tier} data-tier={tier} className="place-step" data-you={you || undefined} data-current={tier === current || undefined}>
-            <span
-              className="place-dot"
-              style={{
-                width: size,
-                height: size,
-                ...(you && photo ? { backgroundImage: `url(${photo})` } : null),
-              }}
-            >
-              {you && !photo && <span className="text-[13px] font-semibold text-ink-muted">{name.trim().charAt(0) || "?"}</span>}
-            </span>
-            <span className="place-step-label">{tier === current ? (current < 2 ? "Не на карті" : "Зараз") : you ? "Буде" : ""}</span>
-          </div>
-        );
-      })}
+    <div className="place-faces" aria-hidden="true">
+      {people.slice(0, 6).map((person, index) => (
+        <span
+          key={person.id}
+          className="place-face-orbiter"
+          style={{ "--orbit-angle": `${index * 60}deg` } as React.CSSProperties}
+        >
+          <span className="place-face place-face-orbit-avatar" style={avatarBackground(person)} />
+        </span>
+      ))}
+      <span
+        className="place-face place-face-center"
+        style={photo ? { backgroundImage: `url(${photo})`, backgroundSize: "cover", backgroundPosition: "center" } : undefined}
+      >
+        {!photo && name.trim().charAt(0)}
+      </span>
     </div>
   );
 }

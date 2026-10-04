@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@/components/icons";
 import { TagChips } from "@/components/profile/tag-chips";
 import { TaggedField } from "@/components/profile/tagged-field";
 import { useTagging } from "@/lib/tags/use-tagging";
@@ -57,7 +57,7 @@ export function WorkEditor({
           />
         </div>
         <button type="button" onClick={onRemove} aria-label={`Видалити роботу ${index + 1}`} className="auth-icon-button mt-6 shrink-0">
-          <Trash2 className="size-4" strokeWidth={1.9} />
+          <Trash2 className="size-4" />
         </button>
       </div>
 

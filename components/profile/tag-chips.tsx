@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Plus, X } from "lucide-react";
+import { Check, Plus, X } from "@/components/icons";
 
 /**
  * Теги в кілька рядків: вибрані з хрестиком, нижче сірі пропозиції з «+».
@@ -30,16 +30,16 @@ export function TagChips({
     <div className="flex flex-wrap items-center gap-1.5">
       {tags.map((id) => (
         <span key={id} className="tag-chip" data-kind="selected" title={proven?.has(id) ? "Підтверджено вашою роботою" : labelOf(id)}>
-          {proven?.has(id) && <Check aria-label="Підтверджено роботою" className="size-3 shrink-0 text-[#8e5f40]" strokeWidth={3} />}
+          {proven?.has(id) && <Check aria-label="Підтверджено роботою" className="size-3 shrink-0 text-brand" />}
           <span className="tag-chip-label">{labelOf(id)}</span>
           <button type="button" onClick={() => onRemove(id)} aria-label={`Прибрати тег «${labelOf(id)}»`} className="tag-chip-remove">
-            <X className="size-3" strokeWidth={2.4} />
+            <X className="size-3" />
           </button>
         </span>
       ))}
       {suggestions.map((id) => (
         <button key={id} type="button" onClick={() => onAdd(id)} className="tag-chip" data-kind="suggested" aria-label={`Додати тег «${labelOf(id)}»`} title={labelOf(id)}>
-          <Plus className="size-3 shrink-0" strokeWidth={2.4} />
+          <Plus className="size-3 shrink-0" />
           <span className="tag-chip-label">{labelOf(id)}</span>
         </button>
       ))}

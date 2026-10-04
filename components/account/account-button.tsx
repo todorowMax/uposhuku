@@ -1,21 +1,20 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bell, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "lucide-react";
+import { Bell, Code2, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "@/components/icons";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
 import { LegendButton } from "@/components/map/legend";
-import { mapModeStore, mapRequestsStore } from "@/lib/feed/map-requests";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
-import { matchInfoStore } from "@/lib/map/filters";
 import { feedCountStore } from "@/lib/feed/client";
+import { setMapMode } from "@/lib/feed/map-requests";
 import { placementOpenStore, placementStore } from "@/lib/placement/client";
 import { TIER_NAMES } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
-import { feedCollapsedStore, sidePanelChoice, useIsPerformer } from "@/lib/requests/side-panel";
+import { feedCollapsedStore, useIsPerformer } from "@/lib/requests/side-panel";
 
 /**
- * Акаунт у лівому нижньому куті, щоб угорі лишалось лише поле запиту.
+ * Акаунт по центру знизу, щоб угорі лишалось лише поле запиту.
  * Гість бачить «Увійти»; після входу — кружечок з першою літерою й меню
  * вгору: мої запити, стати виконавцем, вийти. Поруч — скільки виконавців
  * під запит; на телефоні цю плашку ховаємо: те саме число є в чипі «Усі».
@@ -62,26 +61,26 @@ export function AccountButton() {
 
   if (session.status === "loading") {
     return (
-      <div className="account-slot">
+      <div className="account-slot account-slot-guest">
         <span aria-hidden className="size-12" />
         <LegendButton />
-        <MatchPill />
       </div>
     );
   }
 
   if (session.status === "guest") {
     return (
-      <div className="account-slot">
+      <div className="account-slot account-slot-guest">
         <button type="button" onClick={() => authFlowStore.set({ mode: "login" })} className="account-login">
-          <UserRound className="size-4" strokeWidth={1.9} />
+          <UserRound className="size-4" />
           <span>Увійти</span>
         </button>
         <button type="button" onClick={() => authFlowStore.set({ mode: "performer" })} className="account-login account-performer">
-          <span>Я виконавець</span>
+          <MapPinned className="size-4" />
+          <span className="account-performer-short">На мапу</span>
+          <span className="account-performer-full">Зʼявитися на мапі</span>
         </button>
         <LegendButton />
-        <MatchPill />
       </div>
     );
   }
@@ -116,7 +115,7 @@ export function AccountButton() {
             disabled={!requests?.length}
             className="account-menu-item"
           >
-            <ListChecks className="size-4" strokeWidth={1.9} />
+            <ListChecks className="size-4" />
             Мої запити
             {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
           </button>
@@ -126,12 +125,12 @@ export function AccountButton() {
               role="menuitem"
               onClick={() => {
                 setOpen(false);
-                sidePanelChoice.set("feed");
+                setMapMode("requests");
                 feedCollapsedStore.set(false);
               }}
               className="account-menu-item"
             >
-              <Inbox className="size-4" strokeWidth={1.9} />
+              <Inbox className="size-4" />
               Запити для вас
               {feedCount > 0 && <span className="ml-auto text-[11px] text-ink-muted">{feedCount}</span>}
             </button>
@@ -146,7 +145,7 @@ export function AccountButton() {
               }}
               className="account-menu-item"
             >
-              <MapPinned className="size-4" strokeWidth={1.9} />
+              <MapPinned className="size-4" />
               Стати на карту
               <span className="ml-auto text-[11px] text-ink-muted">{TIER_NAMES[placement?.tier ?? 1]}</span>
             </button>
@@ -160,7 +159,7 @@ export function AccountButton() {
             }}
             className="account-menu-item"
           >
-            <UserRound className="size-4" strokeWidth={1.9} />
+            <UserRound className="size-4" />
             {profile ? "Мій профіль" : "Стати виконавцем"}
             {profile && <span className="ml-auto text-[11px] text-ink-muted">{!profile.published ? "чернетка" : (placement?.tier ?? 1) >= 2 ? "на карті" : "не на карті"}</span>}
           </button>
@@ -173,7 +172,7 @@ export function AccountButton() {
             }}
             className="account-menu-item"
           >
-            <Bell className="size-4" strokeWidth={1.9} />
+            <Bell className="size-4" />
             Сповіщення
           </button>
           <button
@@ -185,31 +184,26 @@ export function AccountButton() {
             }}
             className="account-menu-item"
           >
-            <LogOut className="size-4" strokeWidth={1.9} />
+            <LogOut className="size-4" />
             Вийти
           </button>
         </div>
       )}
+      {!profile && (
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            profileEditorStore.set(true);
+          }}
+          className="account-login account-performer"
+        >
+          <Code2 className="size-4" />
+          <span className="account-performer-short">Профіль</span>
+          <span className="account-performer-full">Стати розробником</span>
+        </button>
+      )}
       <LegendButton />
-        <MatchPill />
     </div>
-  );
-}
-
-/** «Під запит: 31 з 82 виконавців» поруч із кнопкою акаунта, лише на ширшому екрані. */
-function MatchPill() {
-  const info = useStore(matchInfoStore);
-  const mode = useStore(mapModeStore);
-  const { items, performer } = useStore(mapRequestsStore);
-  const onMap = items.filter((item) => item.point);
-  const matched = onMap.filter((item) => item.matchedTags > 0 && !item.own).length;
-  const text =
-    mode === "requests"
-      ? `Запитів на карті: ${onMap.length}${performer ? `, під ваші теги: ${matched}` : ""}`
-      : info && (info.shown ? `Під запит: ${info.shown} з ${info.total} виконавців` : "Під ці теги поки нікого, показуємо всіх");
-  return (
-    <p aria-live="polite" className="account-match glass-panel" data-shown={Boolean(text) || undefined}>
-      {text}
-    </p>
   );
 }

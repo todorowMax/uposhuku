@@ -3,7 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
-import { Check, Eraser, MapPin, X } from "lucide-react";
+import { Check, Eraser, MapPin, X } from "@/components/icons";
 import { CITIES } from "@/lib/map/cities";
 import { nearestCity } from "@/lib/map/nearest-city";
 import type { GeoPoint } from "@/lib/map/types";
@@ -137,7 +137,7 @@ export function LocationPicker({
           <p className="mt-0.5 text-[12px] text-ink-muted">Наблизьте карту й торкніться місця. Точку можна перетягнути.</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Закрити без збереження" className="auth-icon-button shrink-0">
-          <X className="size-5" strokeWidth={2} />
+          <X className="size-5" />
         </button>
       </header>
 
@@ -149,7 +149,7 @@ export function LocationPicker({
 
       <footer className="loc-footer">
         <p className="loc-note">
-          <MapPin className="size-4 shrink-0" strokeWidth={1.9} />
+          <MapPin className="size-4 shrink-0" />
           {draft && near ? (
             <span>
               {draft.lat.toFixed(3)}, {draft.lng.toFixed(3)} · найближче місто: {near.city.name}. Точку побачать усі, тож ставте її приблизно, а не біля дверей.
@@ -160,11 +160,11 @@ export function LocationPicker({
         </p>
         <div className="loc-actions">
           <button type="button" onClick={() => onConfirm(draft)} disabled={!changed} className="auth-primary">
-            <Check className="size-4" strokeWidth={2.4} />
+            <Check className="size-4" />
             {removing ? "Прибрати точку" : "Підтвердити"}
           </button>
           <button type="button" onClick={() => setDraft(null)} disabled={!draft} className="auth-secondary">
-            <Eraser className="size-4" strokeWidth={1.9} />
+            <Eraser className="size-4" />
             Зняти точку
           </button>
           <button type="button" onClick={onClose} className="auth-secondary">

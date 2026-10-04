@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Clock, Loader2, Lock, QrCode, ShieldCheck, Star, Plus, Trash2 } from "lucide-react";
+import { Check, Clock, Loader2, Lock, QrCode, ShieldCheck, Star, Plus, Trash2 } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, proposeDeal, useDeals } from "@/lib/deals/client";
 import { isFop } from "@/lib/deals/fop";
@@ -127,7 +127,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         <label className="deal-method" data-selected={method === "safe" || undefined} data-disabled={!fop || undefined}>
           <input type="radio" name="method" checked={method === "safe"} disabled={!fop} onChange={() => setMethod("safe")} />
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-            <ShieldCheck className="size-4 text-[#4d7a5e]" strokeWidth={2} />
+            <ShieldCheck className="size-4 text-[#4d7a5e]" />
             Безпечна угода
             {fop && <span className="deal-badge">Рекомендуємо</span>}
           </span>
@@ -140,7 +140,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         <label className="deal-method" data-selected={method === "direct" || undefined}>
           <input type="radio" name="method" checked={method === "direct"} onChange={() => setMethod("direct")} />
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-            <QrCode className="size-4 text-ink-muted" strokeWidth={2} />
+            <QrCode className="size-4 text-ink-muted" />
             Прямий переказ за QR
           </span>
           <span className="deal-method-text">Без комісії, переказ одним платежем на рахунок виконавця. Без гарантії платформи: у спорі гроші ми не повертаємо.</span>
@@ -174,7 +174,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
                   <input aria-label={`Днів в етапі ${index + 1}`} inputMode="numeric" value={stage.days} onChange={(event) => editStage(index, { days: event.target.value.replace(/\D/g, "").slice(0, 3) })} className="auth-input w-[52px] tabular-nums" />
                   {custom.length > 1 && (
                     <button type="button" onClick={() => setCustom(custom.filter((_, i) => i !== index))} aria-label={`Прибрати етап ${index + 1}`} className="auth-icon-button shrink-0">
-                      <Trash2 className="size-4" strokeWidth={1.9} />
+                      <Trash2 className="size-4" />
                     </button>
                   )}
                 </div>
@@ -190,7 +190,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
               ))}
           {custom && custom.length < MAX_STAGES && (
             <button type="button" onClick={() => setCustom([...custom, { title: `Етап ${custom.length + 1}`, amount: "", days: "" }])} className="auth-link inline-flex items-center gap-1 text-[12px]">
-              <Plus className="size-3.5" strokeWidth={2.2} />
+              <Plus className="size-3.5" />
               Додати етап
             </button>
           )}
@@ -323,7 +323,7 @@ function DealView({ deal }: { deal: Deal }) {
             const active = item.id === stage?.id && deal.status === "accepted";
             return (
               <li key={item.id} data-state={item.status} data-active={active || undefined}>
-                <span className="deal-dot">{item.status === "released" ? <Check className="size-3" strokeWidth={3.2} /> : index + 1}</span>
+                <span className="deal-dot">{item.status === "released" ? <Check className="size-3" /> : index + 1}</span>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-baseline justify-between gap-2 text-[13px] font-semibold text-ink">
                     <span className="truncate">{item.title}</span>
@@ -421,7 +421,7 @@ function StageActions({
       </div>
     ) : (
       <button type="button" onClick={onCheckout} className="offer-primary mt-2">
-        <Lock className="size-4" strokeWidth={1.9} />
+        <Lock className="size-4" />
         Заморозити {money(stage.amount)}
       </button>
     );
@@ -443,7 +443,7 @@ function StageActions({
   if (stage.status === "funded") {
     return (
       <p className="deal-note">
-        <Clock className="size-3.5" strokeWidth={2} />
+        <Clock className="size-3.5" />
         {safe && stage.holdUntil ? `Кошти заморожено до ${DATE.format(new Date(stage.holdUntil))}. Виконавець працює.` : "Оплату підтверджено, виконавець працює."}
       </p>
     );
@@ -471,7 +471,7 @@ function StageActions({
     return (
       <div className="mt-2 flex flex-wrap gap-2">
         <button type="button" onClick={onAskRelease} className="offer-primary">
-          <Check className="size-4" strokeWidth={2.4} />
+          <Check className="size-4" />
           {safe ? "Підтвердити й виплатити" : "Прийняти роботу"}
         </button>
         {safe && (
@@ -486,7 +486,7 @@ function StageActions({
   if (stage.status === "disputed") {
     return (
       <p className="deal-note deal-note-warn">
-        <ShieldCheck className="size-3.5" strokeWidth={2} />
+        <ShieldCheck className="size-3.5" />
         Спір відкрито. Кошти лишаються замороженими, модератор прочитає чат і зв'яжеться з вами протягом доби.
       </p>
     );
@@ -584,7 +584,7 @@ function ReviewForm({ deal }: { deal: Deal }) {
     return (
       <div className="deal-box">
         <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#4d7a5e]">
-          <Check className="size-4" strokeWidth={3} />
+          <Check className="size-4" />
           Дякуємо за відгук
         </p>
         <Stars value={existing.stars} />
@@ -625,7 +625,7 @@ function ReviewForm({ deal }: { deal: Deal }) {
             className="deal-star"
             data-on={value <= shown || undefined}
           >
-            <Star className="size-6" strokeWidth={1.8} />
+            <Star className="size-6" />
           </button>
         ))}
       </div>
@@ -659,7 +659,7 @@ export function Stars({ value, size = 14 }: { value: number; size?: number }) {
   return (
     <span className="inline-flex gap-0.5" role="img" aria-label={`${value} з 5`}>
       {[1, 2, 3, 4, 5].map((index) => (
-        <Star key={index} width={size} height={size} strokeWidth={1.8} className={index <= Math.round(value) ? "fill-[#b48264] text-[#b48264]" : "text-[#c9d2d4]"} />
+        <Star key={index} width={size} height={size} className={index <= Math.round(value) ? "fill-brand text-brand" : "text-[#a7bcc0]"} />
       ))}
     </span>
   );

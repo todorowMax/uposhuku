@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2, Trash2 } from "@/components/icons";
 import { isImageFile } from "@/lib/images/decode";
 import { resizeToSquareJpegDataUrl } from "@/lib/images/resize";
 
@@ -50,12 +50,12 @@ export function PhotoField({ value, name, onChange }: { value: string; name: str
           data-empty={!value || undefined}
           style={value ? { backgroundImage: `url(${value})` } : undefined}
         >
-          {!value && (busy ? <Loader2 className="size-6 animate-spin" /> : <Camera className="size-6" strokeWidth={1.6} />)}
+          {!value && (busy ? <Loader2 className="size-6 animate-spin" /> : <Camera className="size-6" />)}
           {!value && !busy && <span className="sr-only">{name || "Фото"}</span>}
         </button>
         {value && (
           <span className="pe-photo-badge" aria-hidden>
-            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Camera className="size-3.5" strokeWidth={2} />}
+            {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Camera className="size-3.5" />}
           </span>
         )}
       </div>
@@ -63,7 +63,7 @@ export function PhotoField({ value, name, onChange }: { value: string; name: str
         <p>Справжнє фото обличчя: так вам довіряють. Кадруємо по центру в коло.</p>
         {value && (
           <button type="button" onClick={() => onChange("")} className="auth-link mt-1 inline-flex items-center gap-1 text-[12px]">
-            <Trash2 className="size-3.5" strokeWidth={1.9} />
+            <Trash2 className="size-3.5" />
             Прибрати фото
           </button>
         )}

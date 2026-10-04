@@ -2,35 +2,34 @@
 
 // lib/requests/side-panel.ts
 //
-// Права колонка одна на двох ролей: замовник бачить пропозиції на свій
-// запит, виконавець — запити під свої теги. Хто і те, і те, перемикає. За
-// замовчуванням: є відкритий запит — пропозиції, інакше стрічка виконавця.
+// Права колонка відповідає режиму карти: у «Виконавцях» — пропозиції,
+// у «Запитах» — запити під теги профілю.
 
 import { profileStore } from "@/lib/profile/client";
+import { allPerformersStore, mapModeStore } from "@/lib/feed/map-requests";
 import { offersCollapsedStore, offersViewStore, offersWideStore, useActiveRequest } from "@/lib/requests/offers";
 import { createStore, useStore } from "@/lib/store";
 
 export type SidePanelKind = "offers" | "feed";
 
-/** Що людина вибрала сама; null — вирішує вміст. */
-export const sidePanelChoice = createStore<SidePanelKind | null>(null);
-/** Стрічка згорнута в язичок (на телефоні — шторка опущена). */
-export const feedCollapsedStore = createStore(false);
+/** Спершу видно карту; подальший стан стрічки визначає сама людина. */
+export const feedCollapsedStore = createStore(true);
 
 export const useIsPerformer = () => {
   const state = useStore(profileStore);
   return state.status === "ready" && Boolean(state.profile?.published);
 };
 
-/** Яка панель праворуч зараз і чи є друга, на яку можна перемкнутися. */
+/** Панель праворуч визначає лише режим карти. */
 export const useSidePanel = () => {
   const request = useActiveRequest();
+  const mapMode = useStore(mapModeStore);
+  const allPerformers = useStore(allPerformersStore);
   const performer = useIsPerformer();
-  const choice = useStore(sidePanelChoice);
-  const hasOffers = request?.status === "open";
-  const kind: SidePanelKind | null =
-    choice === "offers" && hasOffers ? "offers" : choice === "feed" && performer ? "feed" : hasOffers ? "offers" : performer ? "feed" : null;
-  return { kind, canSwitch: hasOffers && performer };
+  const kind: SidePanelKind | null = mapMode === "requests"
+    ? performer ? "feed" : null
+    : allPerformers ? null : request?.status === "open" ? "offers" : null;
+  return { kind };
 };
 
 /** Права колонка розгорнута: від неї зсуваються поле запиту й фільтри. */

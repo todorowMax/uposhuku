@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
-import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "lucide-react";
-import { SidePanelSwitch } from "@/components/requests/side-switch";
+import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
+import { hoveredFeedRequestStore } from "@/lib/feed/map-requests";
 import { sendResponse, useFeed, withdrawResponse } from "@/lib/feed/client";
 import { RESPONSE_LIMITS, type FeedItem, type MyResponse } from "@/lib/feed/types";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
-import { offersCountStore } from "@/lib/requests/offers";
 import { feedCollapsedStore, useSidePanel } from "@/lib/requests/side-panel";
 import { placementOpenStore, placementStore } from "@/lib/placement/client";
 import { TIER_NAMES } from "@/lib/placement/tiers";
@@ -50,16 +49,14 @@ export function FeedPanel() {
   const { kind } = useSidePanel();
   const active = kind === "feed";
   const collapsed = useStore(feedCollapsedStore);
-  const offersCount = useStore(offersCountStore);
   const { loading, error, items, pending, reveal, patch } = useFeed(active);
   const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
 
-  // На телефоні спершу язичок: карта важливіша.
-  useEffect(() => {
-    if (active) feedCollapsedStore.set(isPhone());
-  }, [active]);
+  useLayoutEffect(() => {
+    if (!active || collapsed) hoveredFeedRequestStore.set(null);
+  }, [active, collapsed]);
 
   useLayoutEffect(() => {
     if (!active || !panelRef.current || reduced()) return;
@@ -92,17 +89,25 @@ export function FeedPanel() {
   if (collapsed) {
     return (
       <button type="button" onClick={() => feedCollapsedStore.set(false)} className="offers-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
-        <Inbox className="size-4" strokeWidth={1.9} />
+        <Inbox className="size-4" />
         Запити для вас
         {items.length > 0 && <span className="filter-all-badge">{items.length}</span>}
         {pending.length > 0 && <span className="offers-tab-new">+{pending.length} {plural(pending.length, "новий", "нові", "нових")}</span>}
-        <ChevronDown className="size-4 lg:hidden" strokeWidth={2} style={{ rotate: "180deg" }} />
+        <ChevronDown className="size-4 lg:hidden" style={{ rotate: "180deg" }} />
       </button>
     );
   }
 
   return (
-    <aside ref={panelRef} aria-label="Запити для виконавця" className="offers-panel feed-panel glass-panel">
+    <aside
+      ref={panelRef}
+      aria-label="Запити для виконавця"
+      className="offers-panel feed-panel glass-panel"
+      onPointerLeave={() => hoveredFeedRequestStore.set(null)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !event.currentTarget.matches(":hover")) hoveredFeedRequestStore.set(null);
+      }}
+    >
       <header className="offers-header">
         <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-[16px] font-semibold text-ink">
@@ -110,11 +115,10 @@ export function FeedPanel() {
             {total > 0 && <span className="filter-all-badge">{total}</span>}
           </h2>
           <p className="mt-0.5 truncate text-[11px] text-ink-muted">Під ваші теги, найвідповідніші першими</p>
-          <SidePanelSwitch offers={offersCount} feed={total} />
         </div>
         <button type="button" onClick={() => feedCollapsedStore.set(true)} aria-label="Згорнути запити" className="auth-icon-button -mr-1.5">
-          <ChevronsRight className="hidden size-4 lg:block" strokeWidth={2} />
-          <ChevronDown className="size-4 lg:hidden" strokeWidth={2} />
+          <ChevronsRight className="hidden size-4 lg:block" />
+          <ChevronDown className="size-4 lg:hidden" />
         </button>
       </header>
 
@@ -147,7 +151,7 @@ export function FeedPanel() {
           </div>
         )}
         {items.map((item) => (
-          <FeedCard key={item.id} item={item} onChange={(change) => patch(item.id, change)} />
+          <FeedCard key={item.id} item={item} onChange={(change) => patch(item.id, change)} onHover={() => hoveredFeedRequestStore.set(item.id)} />
         ))}
       </div>
     </aside>
@@ -170,12 +174,14 @@ export function FeedCard({
   onChange,
   gate,
   bare = false,
+  onHover,
 }: {
   item: FeedItem;
   onChange: (change: (item: FeedItem) => FeedItem) => void;
   gate?: RespondGate;
   /** Без власної рамки: усередині картки на карті. */
   bare?: boolean;
+  onHover?: () => void;
 }) {
   const [formOpen, setFormOpen] = useState(false);
   const [more, setMore] = useState(false);
@@ -219,10 +225,10 @@ export function FeedCard({
   };
 
   return (
-    <article data-feed={item.id} className={bare ? "feed-bare" : "offer-card"} aria-label="Запит замовника">
+    <article data-feed={item.id} className={bare ? "feed-bare" : "offer-card"} aria-label="Запит замовника" onPointerEnter={onHover} onFocusCapture={onHover}>
       <div className="flex items-center justify-between gap-2 text-[11px] text-ink-muted">
         <span className="inline-flex items-center gap-1">
-          <MapPin className="size-3" strokeWidth={2} />
+          <MapPin className="size-3" />
           {item.place}
         </span>
         <time dateTime={item.createdAt}>{ago(item.createdAt)}</time>
@@ -238,22 +244,22 @@ export function FeedCard({
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         {item.tags.map((tag) => (
           <span key={tag.id} className="auth-draft-tag" data-matched={tag.matched || undefined}>
-            {tag.matched && <Check className="mr-1 size-3 text-[#8e5f40]" strokeWidth={3} aria-label="Є у вашому профілі" />}
+            {tag.matched && <Check className="mr-1 size-3 text-brand" aria-label="Є у вашому профілі" />}
             {tag.label}
           </span>
         ))}
       </div>
 
-      <p className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
         {item.budget && (
           <span className="inline-flex items-center gap-1 font-medium text-ink">
-            <Wallet className="size-3.5" strokeWidth={1.9} />
+            <Wallet className="size-3.5" />
             {item.budget}
           </span>
         )}
         {item.deadline && (
           <span className="inline-flex items-center gap-1 font-medium text-ink">
-            <CalendarClock className="size-3.5" strokeWidth={1.9} />
+            <CalendarClock className="size-3.5" />
             {item.deadline}
           </span>
         )}
@@ -261,7 +267,7 @@ export function FeedCard({
           Збіг: {item.matchedTags} з {item.tags.length} {plural(item.tags.length, "тегу", "тегів", "тегів")}
         </span>
         <span>{item.responses > 0 ? `Відгукнулись: ${item.responses}` : "Ще без відгуків"}</span>
-      </p>
+      </div>
 
       {gate ? (
         <div className="mt-3">
@@ -272,10 +278,10 @@ export function FeedCard({
         </div>
       ) : item.response ? (
         <div className="feed-sent">
-          <p className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4d7a5e]">
-            <Check className="size-3.5" strokeWidth={3} />
+          <div className="flex items-center gap-1.5 text-[12px] font-semibold text-[#4d7a5e]">
+            <Check className="size-3.5" />
             Ви відгукнулись
-          </p>
+          </div>
           <p className="mt-1 text-[13px] text-ink">
             <span className="font-semibold tabular-nums">{priceLabel(item.response.price)}</span> · {daysLabel(item.response.days)}
           </p>
@@ -292,7 +298,7 @@ export function FeedCard({
       ) : (
         !formOpen && (
           <button type="button" onClick={() => setFormOpen(true)} className="offer-primary mt-3 w-full">
-            <Send className="size-4" strokeWidth={1.9} />
+            <Send className="size-4" />
             Відгукнутися
           </button>
         )

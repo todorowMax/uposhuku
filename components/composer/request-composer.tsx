@@ -11,9 +11,10 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowRight, ArrowUp, Code2, ImageIcon, Paperclip, Plus } from "lucide-react";
+import { ArrowRight, ArrowUp, Code2, ImageIcon, Paperclip, Plus } from "@/components/icons";
 import { applyGlassPreference } from "@/lib/ui/glass";
 import { setRequestTags } from "@/lib/map/request-tags";
+import { setMapMode } from "@/lib/feed/map-requests";
 import { Attachments, type Attachment } from "@/components/composer/attachments";
 import { TagRow } from "@/components/composer/tag-row";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
@@ -21,13 +22,12 @@ import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/componen
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { RequestDock } from "@/components/requests/request-dock";
 import { authFlowStore, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
-import { useActiveRequest } from "@/lib/requests/offers";
+import { offersCollapsedStore, useActiveRequest } from "@/lib/requests/offers";
 import { useSidePanelOpen, useSidePanelWide } from "@/lib/requests/side-panel";
 import { loadDraft, saveDraft } from "@/lib/requests/draft";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
-
-type TagEngine = typeof import("@/lib/tags/engine");
+import * as tagEngine from "@/lib/tags/engine";
 
 /** Скільки файлів можна прикріпити до запиту. */
 const MAX_FILES = 10;
@@ -40,7 +40,7 @@ const MAX_ROWS = 5;
 /**
  * Поле запиту над картою. Спершу компактне, як у асистента в ukoshiku:
  * один рядок, «+» ліворуч і маленька кнопка праворуч, карта під ним
- * майже вся видна. Щойно людина починає писати, поле розкривається на
+ * майже вся видна. Коли людина натискає на поле, воно розкривається на
  * два поверхи: текст на всю ширину згори, дії знизу, і росте під текст
  * до п'яти рядків.
  *
@@ -50,9 +50,10 @@ const MAX_ROWS = 5;
  */
 export function RequestComposer() {
   const [text, setText] = useState("");
+  const [inputPhase, setInputPhase] = useState<"closed" | "wide" | "opening" | "open" | "closing">("closed");
+  const [narrowing, setNarrowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [files, setFiles] = useState<Attachment[]>([]);
-  const [engine, setEngine] = useState<TagEngine | null>(null);
   /** Теги, які людина прибрала: знову з тексту їх не додаємо. */
   const [dismissed, setDismissed] = useState<string[]>([]);
   /** Теги, додані з пропозицій одним кліком. */
@@ -62,9 +63,8 @@ export function RequestComposer() {
   const session = useStore(sessionStore);
   const requests = useStore(requestsStore);
   /**
-   * Опублікований запит стоїть на місці поля, поки людина не натисне
-   * «Новий запит». Карта тоді показує кандидатів саме під нього, а праворуч
-   * відкрита панель пропозицій: поле й фільтри зсуваються від неї.
+   * Компактна панель активного запиту стоїть на місці поля, доки людина
+   * не натисне «Новий запит». Карта й пропозиції відповідають активному запиту.
    */
   const activeRequest = useActiveRequest();
   const sidePanelOpen = useSidePanelOpen();
@@ -76,20 +76,67 @@ export function RequestComposer() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<Attachment[]>([]);
+  const phaseTimerRef = useRef<number | null>(null);
   filesRef.current = files;
-  const expanded = text.trim() !== "" || files.length > 0;
+  const wide = inputPhase !== "closed" && !narrowing;
+  const expanded = inputPhase === "opening" || inputPhase === "open" || inputPhase === "closing";
+  const actionsVisible = inputPhase === "open" || inputPhase === "opening";
 
-  // Словник тегів вантажимо, щойно людина почала писати, а не з першим екраном.
+  useEffect(() => () => {
+    if (phaseTimerRef.current !== null) window.clearTimeout(phaseTimerRef.current);
+  }, []);
+
+  const clearPhaseTimer = () => {
+    if (phaseTimerRef.current !== null) window.clearTimeout(phaseTimerRef.current);
+    phaseTimerRef.current = null;
+  };
+
+  const openInput = () => {
+    if (inputPhase === "open" || inputPhase === "opening") return;
+    clearPhaseTimer();
+    setNarrowing(false);
+    if (inputPhase === "closing") {
+      setInputPhase("open");
+      return;
+    }
+    setInputPhase("wide");
+    phaseTimerRef.current = window.setTimeout(() => {
+      setInputPhase("opening");
+      phaseTimerRef.current = window.setTimeout(() => {
+        setInputPhase("open");
+        phaseTimerRef.current = null;
+      }, 680);
+    }, inputPhase === "closed" ? 240 : 0);
+  };
+
+  const closeInput = () => {
+    if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "" || files.length > 0) return;
+    clearPhaseTimer();
+    if (inputPhase === "wide") {
+      setInputPhase("closed");
+      return;
+    }
+    setMenuOpen(false);
+    setInputPhase("closing");
+    setNarrowing(false);
+    phaseTimerRef.current = window.setTimeout(() => {
+      setNarrowing(true);
+      phaseTimerRef.current = window.setTimeout(() => {
+        setInputPhase("closed");
+        setNarrowing(false);
+        phaseTimerRef.current = null;
+      }, 380);
+    }, 300);
+  };
+
   useEffect(() => {
-    if (engine || text.trim() === "") return;
-    let cancelled = false;
-    import("@/lib/tags/engine").then((module) => {
-      if (!cancelled) setEngine(module);
-    });
-    return () => {
-      cancelled = true;
+    if (inputPhase === "closed") return;
+    const onPointer = (event: PointerEvent) => {
+      if (!formRef.current?.contains(event.target as Node)) closeInput();
     };
-  }, [engine, text]);
+    document.addEventListener("pointerdown", onPointer);
+    return () => document.removeEventListener("pointerdown", onPointer);
+  }, [inputPhase, text, files]);
 
   // Порожнє поле — чистий аркуш: прибрані й додані теги забуваємо.
   useEffect(() => {
@@ -99,8 +146,8 @@ export function RequestComposer() {
   }, [text]);
 
   const mentions = useMemo(
-    () => (engine ? engine.detectTagMentions(text).filter((mention) => !dismissed.includes(mention.tagId)) : []),
-    [engine, text, dismissed]
+    () => tagEngine.detectTagMentions(text).filter((mention) => !dismissed.includes(mention.tagId)),
+    [text, dismissed]
   );
   const selected = useMemo(
     () => [...new Set([...mentions.map((mention) => mention.tagId), ...added])].filter((id) => !dismissed.includes(id)),
@@ -108,10 +155,8 @@ export function RequestComposer() {
   );
   const suggestions = useMemo(
     () =>
-      engine
-        ? engine.suggestTags(selected, { exclude: dismissed, limit: MAX_SUGGESTIONS }).map((suggestion) => suggestion.tagId)
-        : [],
-    [engine, selected, dismissed]
+      tagEngine.suggestTags(selected, { exclude: dismissed, limit: MAX_SUGGESTIONS }).map((suggestion) => suggestion.tagId),
+    [selected, dismissed]
   );
 
   // Карта відсіює виконавців за тегами запиту. Із затримкою: поки слово
@@ -155,6 +200,7 @@ export function RequestComposer() {
         url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
       })),
     ]);
+    openInput();
     inputRef.current?.focus();
   };
   const detach = (id: string) => {
@@ -173,21 +219,25 @@ export function RequestComposer() {
   useLayoutEffect(() => {
     const textarea = inputRef.current;
     if (!textarea) return;
-    if (!expanded) {
-      textarea.style.removeProperty("height");
+    const styles = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
+    if (inputPhase === "closed" || inputPhase === "wide" || inputPhase === "closing") {
+      textarea.style.height = `${lineHeight + 16}px`;
       textarea.style.overflowY = "hidden";
       textarea.scrollTop = 0;
       return;
     }
     textarea.style.height = "auto";
-    const styles = window.getComputedStyle(textarea);
-    const lineHeight = Number.parseFloat(styles.lineHeight) || 24;
-    const padding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
-    const maxHeight = lineHeight * MAX_ROWS + padding;
-    const natural = textarea.scrollHeight;
-    textarea.style.height = `${Math.min(natural, maxHeight)}px`;
+    // Під час розкриття CSS ще анімує відступи з 8+8 до 2+4 px.
+    // Висота має одразу рахуватися за кінцевими 6 px, інакше наприкінці
+    // вона зменшується, коли фаза змінюється з opening на open.
+    const currentPadding = Number.parseFloat(styles.paddingTop) + Number.parseFloat(styles.paddingBottom);
+    const finalPadding = 6;
+    const natural = textarea.scrollHeight - currentPadding + finalPadding;
+    const maxHeight = lineHeight * MAX_ROWS + finalPadding;
+    textarea.style.height = `${Math.max(lineHeight * 2 + finalPadding, Math.min(natural, maxHeight))}px`;
     textarea.style.overflowY = natural > maxHeight ? "auto" : "hidden";
-  }, [text, expanded]);
+  }, [text, inputPhase]);
 
   // Скло під полем лише там, де розмиття не гальмує (lib/ui/glass.ts).
   useEffect(applyGlassPreference, []);
@@ -221,7 +271,7 @@ export function RequestComposer() {
     }
     const draft: RequestDraft = {
       text: text.trim(),
-      tags: selected.map((id) => ({ id, label: engine?.tagLabel(id) ?? id })),
+      tags: selected.map((id) => ({ id, label: tagEngine.tagLabel(id) })),
       files: files.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
       budget: params.budget,
       deadline: params.deadline,
@@ -233,7 +283,12 @@ export function RequestComposer() {
   };
 
   const onPublished = (_request: PublishedRequest) => {
+    setMapMode("performers");
+    offersCollapsedStore.set(true);
     setText("");
+    clearPhaseTimer();
+    setInputPhase("closed");
+    setNarrowing(false);
     setParams(EMPTY_PARAMS);
     setFiles((current) => {
       current.forEach((item) => item.url && URL.revokeObjectURL(item.url));
@@ -245,7 +300,7 @@ export function RequestComposer() {
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
-      if (expanded) submit();
+      if (text.trim().length >= 3) submit();
     }
   };
 
@@ -257,6 +312,31 @@ export function RequestComposer() {
   };
 
   const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0;
+
+  useLayoutEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const measure = () => {
+      if (inputPhase === "closed" || inputPhase === "wide" || inputPhase === "closing") {
+        form.style.height = "58px";
+        return;
+      }
+      const trayHeight = form.querySelector<HTMLElement>(".composer-tray")?.offsetHeight ?? 0;
+      // Беремо кінцеву висоту textarea й відступів, а не їхні проміжні
+      // значення під час CSS-переходу: інакше контейнер змінює ціль на льоту.
+      const fieldHeight = Number.parseFloat(inputRef.current?.style.height ?? "") || 40;
+      const height = 12 + 10 + fieldHeight + 40 + 6 + (trayHeight ? trayHeight + 6 : 0);
+      form.style.height = `${Math.max(58, Math.ceil(height))}px`;
+    };
+    measure();
+    if (!expanded || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    for (const selector of [".composer-tray", ".composer-field", ".composer-actions"]) {
+      const element = form.querySelector(selector);
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [inputPhase, expanded, text, files, selected, suggestions]);
 
   return (
     <div
@@ -271,6 +351,9 @@ export function RequestComposer() {
         ref={formRef}
         onSubmit={submit}
         data-expanded={expanded}
+        data-wide={wide}
+        data-actions-visible={actionsVisible}
+        data-phase={inputPhase}
         data-tray={expanded && hasTray}
         className="composer glass-panel pointer-events-auto relative w-full"
       >
@@ -280,7 +363,7 @@ export function RequestComposer() {
             <TagRow
               selected={selected}
               suggestions={suggestions}
-              labelOf={engine?.tagLabel ?? ((id) => id)}
+              labelOf={tagEngine.tagLabel}
               onRemove={removeTag}
               onAdd={addTag}
             />
@@ -300,6 +383,7 @@ export function RequestComposer() {
             ref={inputRef}
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onFocus={openInput}
             onKeyDown={onKeyDown}
             onScroll={(event) => {
               if (mirrorRef.current) mirrorRef.current.scrollTop = event.currentTarget.scrollTop;
@@ -313,50 +397,74 @@ export function RequestComposer() {
         <input ref={fileInputRef} type="file" multiple hidden onChange={attach} />
         <input ref={imageInputRef} type="file" accept="image/*" multiple hidden onChange={attach} />
 
-        <button
-          type="button"
-          onClick={() => setMenuOpen((open) => !open)}
-          aria-label="Додати файл, зображення або код"
-          aria-expanded={menuOpen}
-          aria-haspopup="menu"
-          className="composer-plus grid size-10 place-items-center rounded-xl text-ink-muted transition-[color,background-color,transform] duration-150 hover:bg-white/65 hover:text-ink active:scale-[0.97] aria-expanded:bg-white/65 aria-expanded:text-ink"
-        >
-          <Plus
-            className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`}
-            strokeWidth={2.1}
-          />
-        </button>
-
-        {expanded && <RequestParams value={params} onChange={setParams} />}
-
-        <button
-          type="submit"
-          disabled={!expanded}
-          aria-label="Знайти виконавців"
-          className="composer-send flex h-10 items-center justify-center gap-2 rounded-xl bg-brand text-[15px] font-medium text-brand-ink transition-[transform,background-color,opacity] duration-150 ease-out hover:bg-[#4c5558] active:scale-[0.97] disabled:cursor-default disabled:opacity-35 disabled:hover:bg-brand"
-        >
-          {expanded ? (
-            <>
+        {expanded && (
+          <div className="composer-actions">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Додати файл, зображення або код"
+              aria-expanded={menuOpen}
+              aria-haspopup="menu"
+              tabIndex={actionsVisible ? 0 : -1}
+              className="composer-plus composer-action grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
+            >
+              <Plus className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`} />
+            </button>
+            <RequestParams value={params} onChange={setParams} />
+            <button
+              type="submit"
+              tabIndex={actionsVisible ? 0 : -1}
+              aria-label="Знайти виконавців"
+              className="composer-send composer-action flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-[15px] font-medium text-white hover:bg-[#ff8258] active:scale-[0.97]"
+            >
               <span className="pl-1">Знайти виконавців</span>
-              <ArrowRight className="size-4" strokeWidth={2.2} />
-            </>
-          ) : (
-            <ArrowUp className="size-[18px]" strokeWidth={2.4} />
-          )}
-        </button>
+              <ArrowRight className="size-4" />
+            </button>
+          </div>
+        )}
+
+        <span className="composer-compact-plus-wrap" style={{ position: "absolute", top: 8, left: 8, width: 40, height: 40 }}>
+          <button
+            type="button"
+            onClick={() => setMenuOpen((open) => !open)}
+            aria-label="Додати файл, зображення або код"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-hidden={expanded}
+            tabIndex={expanded ? -1 : 0}
+            className="composer-compact-plus grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
+            style={{ transform: inputPhase === "opening" || inputPhase === "open" ? "translateX(-48px)" : "translateX(0)" }}
+          >
+            <Plus className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`} />
+          </button>
+        </span>
+
+        <span className="composer-compact-send-wrap" style={{ position: "absolute", top: 8, right: 8, width: 40, height: 40 }}>
+          <button
+            type="button"
+            aria-label="Розкрити чат"
+            aria-hidden={expanded}
+            tabIndex={expanded ? -1 : 0}
+            onClick={() => { inputRef.current?.focus(); openInput(); }}
+            className="composer-compact-send flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white hover:bg-[#ff8258]"
+            style={{ transform: inputPhase === "opening" || inputPhase === "open" ? "translateX(48px)" : "translateX(0)" }}
+          >
+            <ArrowUp className="size-[18px]" />
+          </button>
+        </span>
 
         {menuOpen && (
           <div
             role="menu"
             className="composer-menu glass-panel absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl p-1.5"
           >
-            <MenuItem icon={<Paperclip className="size-4" strokeWidth={1.9} />} onClick={() => pick("file")}>
+            <MenuItem icon={<Paperclip className="size-4" />} onClick={() => pick("file")}>
               Прикріпити файл
             </MenuItem>
-            <MenuItem icon={<ImageIcon className="size-4" strokeWidth={1.9} />} onClick={() => pick("image")}>
+            <MenuItem icon={<ImageIcon className="size-4" />} onClick={() => pick("image")}>
               Додати зображення
             </MenuItem>
-            <MenuItem icon={<Code2 className="size-4" strokeWidth={1.9} />} onClick={() => pick("code")}>
+            <MenuItem icon={<Code2 className="size-4" />} onClick={() => pick("code")}>
               Код або посилання на репозиторій
             </MenuItem>
           </div>
@@ -365,12 +473,12 @@ export function RequestComposer() {
 
       {authFlow ? (
         <AuthPanel key={authFlow.mode} onPublished={onPublished} />
-      ) : (
+      ) : !activeRequest ? (
         <SpecialistFilters
-          expanded={expanded && !activeRequest}
-          myRequests={!activeRequest && requestCount > 0 ? { count: requestCount, onOpen: showMyRequests } : null}
+          expanded={wide}
+          myRequests={requestCount > 0 ? { count: requestCount, onOpen: showMyRequests } : null}
         />
-      )}
+      ) : null}
     </div>
   );
 }

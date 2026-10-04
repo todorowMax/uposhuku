@@ -6,6 +6,7 @@ import "./globals.css";
 const fixel = localFont({
   src: "../public/fonts/FixelVariable.ttf",
   variable: "--font-fixel",
+  weight: "100 900",
   display: "swap",
 });
 
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#b9c0ca",
+  themeColor: "#03090d",
   viewportFit: "cover",
 };
 

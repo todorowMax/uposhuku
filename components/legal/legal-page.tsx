@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@/components/icons";
 import { fill, SERVICE_NAME } from "@/lib/legal/config";
 import { LEGAL_LINKS } from "@/lib/legal/links";
 import type { LegalSectionData } from "@/lib/legal/types";
@@ -15,7 +15,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
     <main className="legal-page">
       <div className="legal-sheet">
         <Link href="/" className="legal-back">
-          <ArrowLeft className="size-4" strokeWidth={2} /> На карту
+          <ArrowLeft className="size-4" /> На карту
         </Link>
         <header className="grid gap-1">
           <p className="legal-brand">{SERVICE_NAME}</p>

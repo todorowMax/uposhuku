@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Mail, Send, X } from "lucide-react";
+import { Bell, Mail, Send, X } from "@/components/icons";
 import { sessionStore } from "@/lib/auth/client";
 import { enablePush, pushState, setPrefs, usePrefs, type PushState } from "@/lib/notifications";
 import { createStore, useStore } from "@/lib/store";
@@ -81,20 +81,20 @@ export function NotificationSettings() {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-[17px] font-semibold text-ink">Сповіщення</h2>
             <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button -mr-1.5">
-              <X className="size-4" strokeWidth={2} />
+              <X className="size-4" />
             </button>
           </div>
           <p className="auth-lead">Про що повідомляти: нові пропозиції на ваш запит, нові запити під ваші теги, повідомлення в чаті й угоди, що чекають на вас.</p>
           <div className="grid gap-1">
             <Row
-              icon={<Mail className="size-[18px]" strokeWidth={1.9} />}
+              icon={<Mail className="size-[18px]" />}
               title="Пошта"
               hint={`Листи на ${session.user.email}. Надсилання підключимо разом із сервером.`}
               checked={prefs.email}
               onChange={(email) => setPrefs({ email })}
             />
             <Row
-              icon={<Bell className="size-[18px]" strokeWidth={1.9} />}
+              icon={<Bell className="size-[18px]" />}
               title="Сповіщення в браузері"
               hint={pushHint}
               checked={prefs.push && push === "granted"}
@@ -108,7 +108,7 @@ export function NotificationSettings() {
               }}
             />
             <Row
-              icon={<Send className="size-[18px]" strokeWidth={1.9} />}
+              icon={<Send className="size-[18px]" />}
               title="Telegram"
               hint="Особистий бот напише, коли відгукнулись на запит. Скоро."
               checked={false}

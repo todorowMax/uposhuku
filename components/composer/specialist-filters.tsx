@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ListChecks, SlidersHorizontal } from "lucide-react";
-import { applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
-import { feedCollapsedStore, sidePanelChoice } from "@/lib/requests/side-panel";
+import { ListChecks, SlidersHorizontal } from "@/components/icons";
+import { allPerformersStore, applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
+import { feedCollapsedStore } from "@/lib/requests/side-panel";
 import { CITIES } from "@/lib/map/cities";
 import { usePerformers } from "@/lib/map/performers";
 import type { Performer } from "@/lib/map/types";
@@ -34,11 +34,12 @@ export function SpecialistFilters({
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const mode = useStore(mapModeStore);
+  const allPerformers = useStore(allPerformersStore);
 
   // Лічильники груп — без вибору груп: число каже, скільки людей у групі.
   const pool = useMemo(
-    () => filterPerformers(performers, { matches, groups: [], cities, online }),
-    [performers, matches, cities, online]
+    () => filterPerformers(performers, { matches: allPerformers ? null : matches, groups: [], cities, online }),
+    [performers, matches, allPerformers, cities, online]
   );
   const groups = useMemo(() => countGroups(pool), [pool]);
   const shown = selectedGroups.length
@@ -101,7 +102,7 @@ export function SpecialistFilters({
     <div ref={barRef} className="filter-bar" data-expanded={expanded}>
       {myRequests && (
         <button type="button" onClick={myRequests.onOpen} className="filter-chip filter-all">
-          <ListChecks aria-hidden className="size-4" strokeWidth={1.9} />
+          <ListChecks aria-hidden className="size-4" />
           Мої запити
           <span className="filter-all-badge">{myRequests.count}</span>
         </button>
@@ -123,10 +124,10 @@ export function SpecialistFilters({
         aria-expanded={open}
         aria-haspopup="dialog"
         onClick={() => setOpen((value) => !value)}
-        className="filter-chip filter-all"
+        className="filter-chip filter-all filter-action"
         data-active={active > 0}
       >
-        <SlidersHorizontal aria-hidden className="size-4" strokeWidth={1.9} />
+        <SlidersHorizontal aria-hidden className="size-4" />
         Фільтри
         {active > 0 && <span className="filter-all-badge">{active}</span>}
       </button>
@@ -137,6 +138,7 @@ export function SpecialistFilters({
           groupChips={groupChips}
           pool={pool}
           shown={shown}
+          allPerformers={allPerformers}
           onClose={() => setOpen(false)}
         />
       )}
@@ -148,11 +150,13 @@ function FilterPanel({
   groupChips,
   pool,
   shown,
+  allPerformers,
   onClose,
 }: {
   groupChips: React.ReactNode;
   pool: Performer[];
   shown: number;
+  allPerformers: boolean;
   onClose: () => void;
 }) {
   const selectedCities = useStore(cityFilter);
@@ -164,13 +168,13 @@ function FilterPanel({
   // Міста рахуємо без вибору міст і «онлайн» — так видно, де скільки людей узагалі.
   const cities = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const performer of filterPerformers(performers, { matches, groups, cities: [], online: false })) {
+    for (const performer of filterPerformers(performers, { matches: allPerformers ? null : matches, groups, cities: [], online: false })) {
       counts.set(performer.cityId, (counts.get(performer.cityId) ?? 0) + 1);
     }
     return CITIES.filter((item) => counts.has(item.id))
       .map((item) => ({ ...item, count: counts.get(item.id) ?? 0 }))
       .sort((a, b) => b.count - a.count);
-  }, [performers, matches, groups]);
+  }, [performers, matches, allPerformers, groups]);
   const onlineCount = pool.filter((performer) => performer.online).length;
   // Спершу найбільші міста: решта за «ще N», щоб «Онлайн» і кнопки були під рукою.
   const [allCities, setAllCities] = useState(false);
@@ -270,7 +274,6 @@ function RequestChips() {
           type="button"
           className="filter-chip"
           onClick={() => {
-            sidePanelChoice.set("feed");
             feedCollapsedStore.set(false);
           }}
           title="Віддалені запити без точки на карті: вони в списку «Запити для вас»"

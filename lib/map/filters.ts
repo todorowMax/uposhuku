@@ -34,9 +34,3 @@ export const onlineFilter = createStore(false);
  * ніхто: тоді карта й чипи рахують усіх. Ставить карта після підбору.
  */
 export const tagMatches = createStore<ReadonlySet<string> | null>(null);
-
-/**
- * Скільки виконавців під теги запиту: плашка поруч із кнопкою акаунта.
- * shown = 0 — не підійшов ніхто, і карта показує всіх. Ставить карта.
- */
-export const matchInfoStore = createStore<{ shown: number; total: number } | null>(null);

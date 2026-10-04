@@ -15,9 +15,9 @@ export const TIER_NAMES: Record<PlacementTier, string> = {
   1: "Базовий",
   2: "Старт",
   3: "Помітний",
-  4: "Вище",
-  5: "Топ",
-  6: "Найбільший",
+  4: "Професійний",
+  5: "Високий",
+  6: "Топ",
 };
 
 export const PAID_TIERS: PlacementTier[] = [2, 3, 4, 5, 6];

@@ -10,6 +10,6 @@ const nextConfig: NextConfig = {
 
 // Той самий шлях, що в mealcart: `next dev` бачить біндинги Cloudflare,
 // коли вони з'являться (D1, R2). Зараз їх немає, виклик нічого не ламає.
-initOpenNextCloudflareForDev({ environment: "development" });
+initOpenNextCloudflareForDev({ environment: "development", persist: false });
 
 export default nextConfig;

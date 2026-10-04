@@ -1,34 +1,34 @@
 "use client";
 
 import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature } from "maplibre-gl";
 import { gsap } from "gsap";
 import type { FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
-import { ChevronRight } from "lucide-react";
-import { MapZoomControl } from "@/components/maplibre/zoom-control";
+import { ChevronRight } from "@/components/icons";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas, drawPortrait } from "@/lib/map/portrait";
-import { BUILDINGS_ZOOM, FONT_BOLD, UKRAINE_TRACE_RING, buildMapStyle } from "@/lib/maplibre/style";
+import { FONT_BOLD, UKRAINE_TRACE_RING, buildMapStyle } from "@/lib/maplibre/style";
 import { DETAIL_ZOOM } from "@/lib/maplibre/static";
 import { CITIES } from "@/lib/map/cities";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { RequestMapCard } from "@/components/requests/request-map-card";
-import { applyRequestFilter, mapModeStore, mapRequestsStore, mapSelectedRequest, requestFilterStore } from "@/lib/feed/map-requests";
+import { requestsStore } from "@/lib/auth/client";
+import { allPerformersStore, applyRequestFilter, hoveredFeedRequestStore, mapModeStore, mapRequestsStore, mapSelectedRequest, requestFilterStore } from "@/lib/feed/map-requests";
 import type { MapRequest } from "@/lib/feed/types";
+import { DEADLINES, type PublishedRequest } from "@/lib/requests/types";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import { performerStats } from "@/lib/map/stats";
 import { TIER_PX } from "@/lib/placement/tiers";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
-import type { Performer } from "@/lib/map/types";
-import { cityFilter, groupFilter, matchInfoStore, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
-import { createStore } from "@/lib/store";
+import type { Performer, PlacementTier } from "@/lib/map/types";
+import { cityFilter, groupFilter, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
 import { isChromium } from "@/lib/ui/glass";
 import { filterPerformers } from "@/lib/map/groups";
-import { focusPerformerStore } from "@/lib/requests/offers";
+import { focusPerformerStore, hoveredOfferStore, offersMapStore, useActiveRequest } from "@/lib/requests/offers";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
 import { placementOpenStore } from "@/lib/placement/client";
@@ -53,16 +53,15 @@ const ZOOM_OUT_SLACK = 0.35;
 const PAN_SLACK = { far: { lng: 2.5, lat: 1.5 }, near: { lng: 10, lat: 4.5 } };
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
-/** Повзунок «Місто» доходить до кварталів з будинками. */
-const CITY_ZOOM = BUILDINGS_ZOOM + 2;
 /**
  * Розмір портрета на екрані за рівнем розміщення 1–6, CSS-пікселі.
  * Кроки ростуть разом із розміром, щоб сусідні рівні розрізнялися на око.
  */
 const tierPx = (performer: Performer) => TIER_PX[performer.tier - 1];
 /** Наскільки портрет виростає під курсором. */
-const HOVER_SCALE = 1.25;
+const HOVER_SCALE = 1.38;
 const CLUSTER_HOVER_SCALE = 1.1;
+const REQUEST_HOVER_SCALE = 1.08;
 /** Картинка групи: полотно 160×140 з pixelRatio 1.5. */
 const CLUSTER_W = 160;
 const CLUSTER_H = 140;
@@ -70,6 +69,8 @@ const CLUSTER_RATIO = 1.5;
 /** Полотно портрета 192px, малюємо з pixelRatio 4: логічний розмір 48px. */
 const PORTRAIT_RATIO = 4;
 const PORTRAIT_LOGICAL = PORTRAIT_SIZE / PORTRAIT_RATIO;
+const PEOPLE_FADE_MS = 480;
+const canvasFont = (weight: number, size: number) => `${weight} ${size}px ${getComputedStyle(document.body).fontFamily}`;
 
 // Довжина сегментів потрібна, щоб світлова точка рухалась уздовж контуру
 // рівномірно, а не прискорювалась на густіше оцифрованих ділянках.
@@ -159,21 +160,19 @@ const clusterFaces = (faces: string) => {
  * кружечку збоку. Найбільший портрет — у того, хто вище в розміщенні.
  * Малюємо на вимогу, бо картинка залежить від складу групи.
  */
-const createClusterImage = (source: HTMLImageElement, faces: string) => {
+const createClusterImage = (source: HTMLImageElement, faces: string, resolution = 1, requestCount = 0) => {
   const { count, avatars } = clusterFaces(faces);
   const width = CLUSTER_W;
   const height = CLUSTER_H;
   const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
+  canvas.width = width * resolution;
+  canvas.height = height * resolution;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas 2D is unavailable");
+  context.scale(resolution, resolution);
 
   const face = (index: number, x: number, y: number, radius: number, ring: number) => {
     context.save();
-    context.shadowColor = "rgba(48, 68, 64, .24)";
-    context.shadowBlur = radius > 15 ? 10 : 6;
-    context.shadowOffsetY = radius > 15 ? 4 : 2;
     context.fillStyle = "#ffffff";
     context.beginPath();
     context.arc(x, y, radius + ring, 0, Math.PI * 2);
@@ -190,6 +189,26 @@ const createClusterImage = (source: HTMLImageElement, faces: string) => {
     context.fill();
     context.stroke();
   };
+
+  if (!avatars.length && requestCount) {
+    context.fillStyle = "#ffffff";
+    context.beginPath();
+    context.arc(80, 70, 31, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#00364a";
+    context.beginPath();
+    context.arc(80, 70, 25, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#ffffff";
+    context.font = canvasFont(700, 27);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText("$", 80, 70);
+    context.font = canvasFont(700, 14);
+    context.fillStyle = "#00364a";
+    context.fillText(String(requestCount), 80, 116);
+    return canvas;
+  }
 
   // Облич не більше, ніж людей: двоє — це два портрети, а не три.
   const main = Math.min(avatars.length, 3);
@@ -208,42 +227,58 @@ const createClusterImage = (source: HTMLImageElement, faces: string) => {
   face(avatars[0], 84, 94, 27, 3.5);
 
   // Число — лише коли людей більше, ніж облич на картинці.
-  if (count <= main + small) return canvas;
-  const label = count > 99 ? "99+" : String(count);
-  context.save();
-  context.shadowColor = "rgba(48, 68, 64, .22)";
-  context.shadowBlur = 6;
-  context.shadowOffsetY = 2;
-  context.fillStyle = "#ffffff";
-  context.beginPath();
-  context.arc(126, 120, 15, 0, Math.PI * 2);
-  context.fill();
-  context.restore();
-  context.fillStyle = "#30363a";
-  context.font = `600 ${label.length > 2 ? 12 : 15}px system-ui, sans-serif`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(label, 126, 121);
+  if (count > main + small) {
+    const label = count > 99 ? "99+" : String(count);
+    context.fillStyle = "#ffffff";
+    context.beginPath();
+    context.arc(126, 120, 15, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#30363a";
+    context.font = canvasFont(600, label.length > 2 ? 12 : 15);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(label, 126, 121);
+  }
+  if (requestCount) {
+    context.fillStyle = "#ffffff";
+    context.beginPath();
+    context.arc(27, 111, 19, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#00364a";
+    context.beginPath();
+    context.arc(27, 111, 15, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = "#ffffff";
+    context.font = canvasFont(700, 13);
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.fillText(requestCount > 1 ? String(requestCount) : "$", 27, 111);
+  }
   return canvas;
 };
 
 interface GroupPreview {
   key: string;
   members: Performer[];
+  requests: MapRequest[];
   /** Збільшена група на екрані, px відносно карти. */
   box: { left: number; top: number; width: number; height: number };
 }
 
-/** Портрет у списку групи: теж більший у вищого рівня, але стриманіше, ніж на карті. */
-const LIST_PX = [26, 29, 32, 35, 39, 44] as const;
-
-/** «1 людина», «3 людини», «12 людей». */
-const peopleCount = (count: number) => {
+/** «1 розробник», «4 розробники», «12 розробників». */
+const developerCount = (count: number) => {
   const tens = count % 100;
   const ones = count % 10;
-  if (ones === 1 && tens !== 11) return `${count} людина`;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} людини`;
-  return `${count} людей`;
+  if (ones === 1 && tens !== 11) return `${count} розробник`;
+  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} розробники`;
+  return `${count} розробників`;
+};
+const groupTitle = ({ members, requests }: GroupPreview) => {
+  const tens = requests.length % 100;
+  const ones = requests.length % 10;
+  const word = ones === 1 && tens !== 11 ? "запит" : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? "запити" : "запитів";
+  const jobs = `${requests.length} ${word}`;
+  return [members.length ? developerCount(members.length) : null, requests.length ? jobs : null].filter(Boolean).join(" · ");
 };
 
 /**
@@ -261,10 +296,21 @@ const topEdgeUnderStack = (bounds: DOMRect, left: number, width: number) => {
   return edge;
 };
 
-/** Скільки в бюджеті словами для піна: «до 15 тис ₴», «20–40 тис ₴», без суми — «Запит». */
+const budgetNumbers = (budget: string | null) =>
+  [...(budget ?? "").matchAll(/\d[\d\s\u00a0]*/g)].map((match) => Number(match[0].replace(/\D/g, "")));
+
+/** Компактна цінова категорія: до 10 тис., до 25 тис., понад 25 тис. */
+const budgetSymbols = (budget: string | null) => {
+  const values = budgetNumbers(budget);
+  if (!values.length) return "?";
+  const upper = Math.max(...values);
+  return upper <= 10_000 ? "$" : upper <= 25_000 ? "$$" : "$$$";
+};
+
+/** Повна ціна з'являється лише під час наведення. */
 const shortBudget = (budget: string | null) => {
-  const numbers = [...(budget ?? "").matchAll(/\d[\d\s\u00a0]*/g)].map((match) => Number(match[0].replace(/\D/g, "")));
-  if (numbers.length === 0) return "Запит";
+  const numbers = budgetNumbers(budget);
+  if (numbers.length === 0) return "Ціну узгодимо";
   const part = (value: number) => (value >= 1000 ? `${Math.round(value / 1000)}` : String(value));
   const unit = numbers.every((value) => value >= 1000) ? " тис" : "";
   const range = numbers.slice(0, 2).map(part).join("–");
@@ -273,39 +319,57 @@ const shortBudget = (budget: string | null) => {
 
 type PinVariant = "plain" | "match" | "own" | "sent";
 
-const pinLabel = (item: MapRequest): { variant: PinVariant; label: string } => {
-  if (item.own) return { variant: "own", label: "Ваш запит" };
-  if (item.response) return { variant: "sent", label: "Ви відгукнулись" };
-  if (item.matchedTags > 0) return { variant: "match", label: shortBudget(item.budget) };
-  return { variant: "plain", label: shortBudget(item.budget) };
+const pinLabel = (item: MapRequest) => {
+  const variant: PinVariant = item.own ? "own" : item.response ? "sent" : item.matchedTags > 0 ? "match" : "plain";
+  const age = Date.now() - Date.parse(item.createdAt);
+  return {
+    variant,
+    compact: budgetSymbols(item.budget),
+    price: shortBudget(item.budget),
+    fresh: age >= -60_000 && age < 30 * 60_000,
+  };
 };
 
 const PIN_STYLE: Record<PinVariant, { fill: string; text: string; badge: string; glyph: string }> = {
-  plain: { fill: "#ffffff", text: "#2f3a3e", badge: "#91a99d", glyph: "#ffffff" },
-  match: { fill: "#b48264", text: "#ffffff", badge: "#ffffff", glyph: "#b48264" },
-  own: { fill: "#303638", text: "#ffffff", badge: "#ffffff", glyph: "#303638" },
-  sent: { fill: "#e5efe8", text: "#3d6a4f", badge: "#4d7a5e", glyph: "#ffffff" },
+  plain: { fill: "#ffffff", text: "#2f3a3e", badge: "#6ba0b2", glyph: "#ffffff" },
+  match: { fill: "#ffffff", text: "#2f3a3e", badge: "#f2693c", glyph: "#ffffff" },
+  own: { fill: "#ffffff", text: "#2f3a3e", badge: "#00364a", glyph: "#ffffff" },
+  sent: { fill: "#ffffff", text: "#2f3a3e", badge: "#4d7a5e", glyph: "#ffffff" },
 };
 
 const PIN_RATIO = 3;
-
-/**
- * Пін запиту: «бульбашка» з іконкою документа й сумою. Не схожий на фото
- * виконавця, тож на карті видно різницю з першого погляду; золотий — запит
- * під ваші теги, темний — ваш власний, зелений — ви вже відгукнулись.
- */
-const createRequestPin = (variant: PinVariant, label: string) => {
-  const style = PIN_STYLE[variant];
-  const font = "600 12px system-ui, -apple-system, 'Segoe UI', sans-serif";
+const PIN_BODY_HEIGHT = 28;
+const PIN_TOP = 10;
+const PIN_HEIGHT = PIN_TOP + PIN_BODY_HEIGHT + 7 + 6;
+const budgetBadgeWidth = (label: string) => {
   const probe = document.createElement("canvas").getContext("2d");
   if (!probe) throw new Error("Canvas 2D is unavailable");
-  probe.font = font;
-  const textWidth = Math.ceil(probe.measureText(label).width);
+  probe.font = canvasFont(700, 12);
+  return Math.max(22, Math.ceil(probe.measureText(label).width) + 12);
+};
+const pinTextWidth = (label: string) => {
+  const probe = document.createElement("canvas").getContext("2d");
+  if (!probe) throw new Error("Canvas 2D is unavailable");
+  probe.font = canvasFont(600, 12);
+  return Math.ceil(probe.measureText(label).width);
+};
+const pinWidth = (label: string) => {
+  return 12 + budgetBadgeWidth(label) + 8;
+};
+
+/**
+ * Компактний пін запиту з ціновою категорією. Не схожий на фото
+ * виконавця, тож на карті видно різницю з першого погляду. Плашки білі;
+ * колір блоку з доларами показує збіг тегів, власний запит або відгук.
+ */
+const createRequestPin = (variant: PinVariant, label: string, fresh: boolean) => {
+  const style = PIN_STYLE[variant];
   const pad = 6;
-  const body = { w: 8 + 18 + 6 + textWidth + 12, h: 28 };
+  const badgeWidth = budgetBadgeWidth(label);
+  const body = { w: 4 + badgeWidth + 4, h: PIN_BODY_HEIGHT };
   const tip = 7;
   const width = body.w + pad * 2;
-  const height = body.h + tip + pad * 2;
+  const height = PIN_HEIGHT;
   const canvas = document.createElement("canvas");
   canvas.width = width * PIN_RATIO;
   canvas.height = height * PIN_RATIO;
@@ -314,7 +378,7 @@ const createRequestPin = (variant: PinVariant, label: string) => {
   context.scale(PIN_RATIO, PIN_RATIO);
 
   const x = pad;
-  const y = pad;
+  const y = PIN_TOP;
   const radius = body.h / 2;
   // Тіло з хвостиком одним контуром: тінь лягає цілою фігурою.
   context.save();
@@ -334,35 +398,34 @@ const createRequestPin = (variant: PinVariant, label: string) => {
   context.closePath();
   context.fill();
   context.restore();
-  if (variant === "plain" || variant === "sent") {
-    context.strokeStyle = "rgba(145, 169, 157, .55)";
-    context.lineWidth = 1;
-    context.stroke();
-  }
-
-  // Значок-документ у кружечку.
-  const bx = x + 5 + 9;
-  const by = y + body.h / 2;
-  context.fillStyle = style.badge;
-  context.beginPath();
-  context.arc(bx, by, 9, 0, Math.PI * 2);
-  context.fill();
-  context.strokeStyle = style.glyph;
-  context.lineWidth = 1.5;
-  context.lineCap = "round";
-  context.beginPath();
-  context.moveTo(bx - 3.5, by - 2.5);
-  context.lineTo(bx + 3.5, by - 2.5);
-  context.moveTo(bx - 3.5, by + 0.2);
-  context.lineTo(bx + 3.5, by + 0.2);
-  context.moveTo(bx - 3.5, by + 2.9);
-  context.lineTo(bx + 1, by + 2.9);
+  context.strokeStyle = "rgba(145, 169, 157, .55)";
+  context.lineWidth = 1;
   context.stroke();
 
-  context.fillStyle = style.text;
-  context.font = font;
+  // Долари в кольоровому блоці: його ширина залежить від цінової категорії.
+  const bx = x + 4;
+  const by = y + 4;
+  context.fillStyle = style.badge;
+  context.beginPath();
+  context.roundRect(bx, by, badgeWidth, 20, 10);
+  context.fill();
+  context.fillStyle = style.glyph;
+  context.font = canvasFont(700, 12);
   context.textBaseline = "middle";
-  context.fillText(label, x + 8 + 18 + 6, y + body.h / 2 + 0.5);
+  context.textAlign = "center";
+  context.fillText(label, bx + badgeWidth / 2, y + body.h / 2 + 0.5);
+  if (fresh) {
+    const badgeWidth = 30;
+    const badgeX = x + body.w - badgeWidth - 2;
+    context.fillStyle = variant === "match" ? "#00364a" : "#f2693c";
+    context.beginPath();
+    context.roundRect(badgeX, 2, badgeWidth, 12, 5);
+    context.fill();
+    context.fillStyle = "#ffffff";
+    context.font = canvasFont(700, 8);
+    context.textAlign = "center";
+    context.fillText("NEW", badgeX + badgeWidth / 2, 8.5);
+  }
   return canvas;
 };
 
@@ -371,31 +434,60 @@ const requestFeatures = (items: MapRequest[]): FeatureCollection<Point> => ({
   features: items
     .filter((item) => item.point)
     .map((item) => {
-      const { variant, label } = pinLabel(item);
+      const { variant, compact, price, fresh } = pinLabel(item);
       return {
         type: "Feature" as const,
         geometry: { type: "Point" as const, coordinates: [item.point!.lng, item.point!.lat] },
-        properties: { rid: item.id, icon: `req|${variant}|${label}`, prio: variant === "match" ? 3 : variant === "own" ? 4 : variant === "plain" ? 1 : 2 },
+        properties: { kind: "request", rid: item.id, face: "", requestCount: 1, icon: `req|${variant}|${compact}|${fresh ? 1 : 0}`, variant, compact, price, fresh, prio: variant === "match" ? 3 : variant === "own" ? 4 : variant === "plain" ? 1 : 2 },
       };
     }),
 });
 
-const toPeople = (performers: Performer[]): FeatureCollection<Point> => ({
+/** Власний відкритий запит видно поруч із виконавцями одразу після публікації. */
+const ownRequestOnMap = (request: PublishedRequest, responses: number): MapRequest => {
+  const city = CITIES.find((item) => item.id === request.cityId);
+  let hash = 2166136261;
+  for (let index = 0; index < request.id.length; index++) {
+    hash ^= request.id.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
+  const radius = city ? 0.03 + (((hash >>> 9) >>> 0) % 50) / 1000 : 0.2;
+  const center = city ?? { lat: 48.4, lng: 31.2 };
+  return {
+    id: request.id,
+    text: request.text,
+    tags: request.tags.map((tag) => ({ ...tag, matched: false })),
+    place: city?.name ?? "Віддалено",
+    budget: request.budget ? `до ${new Intl.NumberFormat("uk-UA").format(request.budget)} ₴` : null,
+    deadline: request.deadline ? DEADLINES[request.deadline] : null,
+    createdAt: request.createdAt,
+    responses,
+    matchedTags: 0,
+    response: null,
+    point: { lat: center.lat + Math.sin(angle) * radius, lng: center.lng + (Math.cos(angle) * radius) / 0.65 },
+    own: true,
+  };
+};
+
+const toPeople = (performers: Performer[], requests: MapRequest[] = []): FeatureCollection<Point> => ({
   type: "FeatureCollection",
-  features: performers.map((performer) => ({
+  features: [...performers.map((performer) => ({
     type: "Feature",
     id: performer.id,
     geometry: { type: "Point", coordinates: [performer.lng, performer.lat] },
     properties: {
+      kind: "person",
       id: performer.id,
+      requestCount: 0,
       avatar: `avatar-${performer.avatarIndex}`,
       size: tierPx(performer) / PORTRAIT_LOGICAL,
       rank: performer.tier,
       face: personFace(performer),
     },
-  })),
+  })), ...requestFeatures(requests).features],
 });
-const initialPeople = () => toPeople(getPerformers());
+const initialPeople = () => toPeople([]);
 
 /**
  * Символи MapLibre далі від камери менші: розмір множиться на
@@ -415,27 +507,6 @@ const perspectiveAt = (map: MapLibreMap, [lng, lat]: [number, number]) => {
   return atCenter ? clamp(0.5 + 0.5 * groundPx(lng, lat) / atCenter, 0.5, 2) : 1;
 };
 
-const zoomToSlider = (zoom: number, far: number) => Math.min(1, Math.max(0, (zoom - far) / (CITY_ZOOM - far)));
-const sliderToZoom = (value: number, far: number) => far + value * (CITY_ZOOM - far);
-
-/**
- * Положення повзунка масштабу лежить у сховищі, а не в стані сцени: під час
- * зуму воно змінюється щокадру, і перемальовувати через нього всю сцену
- * (1400 рядків) було б марною роботою, особливо в Safari.
- */
-const zoomSliderStore = createStore(0);
-
-function ConnectedZoomControl({ mapRef, farZoomRef }: { mapRef: React.RefObject<MapLibreMap | null>; farZoomRef: React.RefObject<number> }) {
-  const value = useStore(zoomSliderStore);
-  return (
-    <MapZoomControl
-      value={value}
-      onChange={(next) => mapRef.current?.jumpTo({ zoom: sliderToZoom(next, farZoomRef.current) })}
-      onStep={(direction) => mapRef.current?.easeTo({ zoom: (mapRef.current?.getZoom() ?? 0) + direction * 1.2, duration: 320 })}
-    />
-  );
-}
-
 export default function MapLibreScene() {
   const openProfile = useOpenProfile();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -448,7 +519,8 @@ export default function MapLibreScene() {
   const cardRef = useRef<HTMLElement>(null);
   /** Масштаб, до якого зараз летить камера: потрібен для меж панорами, див. transformConstrain. */
   const flightZoomRef = useRef<number | null>(null);
-  const reqActiveRef = useRef<(() => void) | null>(null);
+  const requestLensRef = useRef<HTMLDivElement>(null);
+  const requestLensControlRef = useRef({ hide: (_instant?: boolean) => {} });
   const flyToRef = useRef<((map: MapLibreMap, center: [number, number], zoom: number, duration: number) => void) | null>(null);
   const [ready, setReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -457,7 +529,10 @@ export default function MapLibreScene() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const lensRef = useRef<HTMLDivElement>(null);
+  const selectedMarkerRef = useRef<HTMLDivElement>(null);
   const groupRef = useRef<HTMLDivElement>(null);
+  const groupListRef = useRef<HTMLUListElement>(null);
+  const groupPointerInsideRef = useRef(false);
   /**
    * Керування збільшеною копією маркера ззовні ефекту карти: сховати, коли
    * змінився склад карти, і не ховати, поки курсор у списку групи.
@@ -465,19 +540,65 @@ export default function MapLibreScene() {
   const lensControlRef = useRef({ hide: (_instant?: boolean) => {}, enterPanel: () => {}, leavePanel: () => {} });
   /** Список людей групи під курсором і де стоїть сама група на екрані. */
   const [groupPreview, setGroupPreview] = useState<GroupPreview | null>(null);
-  /** Людина зі списку групи під курсором: поруч зі списком її коротка статистика. */
-  const [peek, setPeek] = useState<{ performer: Performer; top: number; side: "left" | "right" } | null>(null);
-  const peekRef = useRef<HTMLDivElement>(null);
-  const peekShownRef = useRef(false);
   /** Теги з поля запиту: карта лишає лише тих, хто під них підходить. */
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
   const matches = useStore(tagMatches);
   const performers = usePerformers();
+  const activeRequest = useActiveRequest();
+  const mapOffers = useStore(offersMapStore);
+  const hoveredOffer = useStore(hoveredOfferStore);
+  const respondingPerformers = useMemo(() => {
+    if (activeRequest?.status !== "open" || mapOffers.requestId !== activeRequest.id) return [];
+    const existing = new Set(performers.map((performer) => performer.id));
+    return mapOffers.responses.flatMap((response): Performer[] => {
+      if (existing.has(response.performerId)) return [];
+      const city = CITIES.find((item) => item.name === response.cityName);
+      if (!city) return [];
+      return [{
+        id: response.performerId,
+        cityId: city.id,
+        lat: city.lat,
+        lng: city.lng,
+        online: false,
+        tier: Math.max(1, Math.min(6, response.tier)) as PlacementTier,
+        tags: [],
+        bio: "",
+        works: [],
+        photo: response.photo,
+        avatarIndex: response.avatarIndex,
+        name: response.name,
+        specialty: response.specialty,
+      }];
+    });
+  }, [activeRequest?.id, activeRequest?.status, mapOffers, performers]);
+  const mapPeople = useMemo(() => [...performers, ...respondingPerformers], [performers, respondingPerformers]);
+  const mapPeopleRef = useRef(mapPeople);
+  mapPeopleRef.current = mapPeople;
+  const peopleSnapshotRef = useRef<FeatureCollection<Point>>(initialPeople());
+  const peopleSnapshotKeyRef = useRef("");
+  const peoplePendingRef = useRef<{ data: FeatureCollection<Point>; key: string } | null>(null);
+  const peopleTransitioningRef = useRef(false);
+  const runPeopleTransitionRef = useRef<() => void>(() => {});
+  const peopleFadeFrameRef = useRef(0);
+  const peopleOpacityRef = useRef(1);
+  const setClusterOpacityRef = useRef((_opacity: number) => {});
   const mode = useStore(mapModeStore);
+  const allPerformers = useStore(allPerformersStore);
   const requestFilter = useStore(requestFilterStore);
   const requestState = useStore(mapRequestsStore);
+  const myRequests = useStore(requestsStore);
+  const ownMapRequests = useMemo(
+    () => (myRequests ?? [])
+      .filter((request) => request.status === "open")
+      .map((request) => ownRequestOnMap(request, mapOffers.requestId === request.id ? mapOffers.responses.length : 0)),
+    [myRequests, mapOffers]
+  );
+  const ownMapRequestsRef = useRef(ownMapRequests);
+  ownMapRequestsRef.current = ownMapRequests;
+  const hoveredFeedRequest = useStore(hoveredFeedRequestStore);
   const selectedRequestId = useStore(mapSelectedRequest);
-  const selectedRequest = mode === "requests" ? requestState.items.find((item) => item.id === selectedRequestId && item.point) : undefined;
+  const selectedRequest = (mode === "requests" ? requestState.items : allPerformers ? [] : ownMapRequests)
+    .find((item) => item.id === selectedRequestId && item.point);
   const groups = useStore(groupFilter);
   const cities = useStore(cityFilter);
   const online = useStore(onlineFilter);
@@ -523,6 +644,7 @@ export default function MapLibreScene() {
     map.touchPitch.disable();
     map.keyboard.disableRotation();
     let traceFrame = 0;
+    let hoverFrame = 0;
     let traceStart = 0;
     let lastTraceFrame = 0;
     /** У паузі між обльотами все вже згасло: перемальовувати карту нема чого. */
@@ -603,6 +725,7 @@ export default function MapLibreScene() {
       const source = new Image();
       source.src = AVATAR_ATLAS;
       await source.decode();
+      await document.fonts.ready;
       avatarAtlasRef.current = source;
       for (let index = 0; index < AVATAR_COUNT; index++) {
         const canvas = createPortraitCanvas(source, index);
@@ -612,11 +735,6 @@ export default function MapLibreScene() {
           pixelRatio: PORTRAIT_RATIO,
         });
       }
-      const activeCanvas = document.createElement("canvas");
-      activeCanvas.width = 256;
-      activeCanvas.height = 256;
-      const activeContext = activeCanvas.getContext("2d");
-      if (activeContext) map.addImage("active-avatar", activeContext.getImageData(0, 0, 256, 256), { pixelRatio: PORTRAIT_RATIO });
       // Картинка групи залежить від складу, а власні фото профілів з'являються
       // вже після старту, тож малюємо їх, коли MapLibre попросить.
       map.setMissingStyleImageResolver((id) => {
@@ -628,16 +746,16 @@ export default function MapLibreScene() {
           return;
         }
         if (id.startsWith("req|")) {
-          const [, variant, ...rest] = id.split("|");
+          const [, variant, label, fresh] = id.split("|");
           if (map.hasImage(id) || !(variant in PIN_STYLE)) return;
-          const canvas = createRequestPin(variant as PinVariant, rest.join("|"));
+          const canvas = createRequestPin(variant as PinVariant, label, fresh === "1");
           const context = canvas.getContext("2d");
           if (context) map.addImage(id, context.getImageData(0, 0, canvas.width, canvas.height), { pixelRatio: PIN_RATIO });
           return;
         }
-        const match = /^cluster-((?:[1-6][0-9a-f]{2})+)$/.exec(id);
+        const match = /^cluster-((?:[1-6][0-9a-f]{2})*)-(\d+)$/.exec(id);
         if (!match || map.hasImage(id)) return;
-        const canvas = createClusterImage(source, match[1]);
+        const canvas = createClusterImage(source, match[1], 1, Number(match[2]));
         const context = canvas.getContext("2d");
         if (context) map.addImage(id, context.getImageData(0, 0, CLUSTER_W, CLUSTER_H), { pixelRatio: CLUSTER_RATIO });
       });
@@ -650,23 +768,36 @@ export default function MapLibreScene() {
         clusterRadius: 46,
         clusterMaxZoom: 11,
         // Склад групи рядком облич, див. personFace.
-        clusterProperties: { faces: [["concat", ["accumulated"], ["get", "faces"]], ["get", "face"]] },
+        clusterProperties: {
+          faces: [["concat", ["accumulated"], ["get", "faces"]], ["get", "face"]],
+          requests: ["+", ["get", "requestCount"]],
+        },
       });
-      map.addLayer({
-        id: "people-clusters",
-        type: "symbol",
-        source: "people",
-        filter: ["has", "point_count"],
-        layout: {
-          "icon-image": ["concat", "cluster-", ["get", "faces"]],
-          "icon-allow-overlap": true,
+      // Попередній набір лишається на мапі, доки новий плавно проявляється.
+      map.addSource("people-outgoing", {
+        type: "geojson",
+        data: initialPeople(),
+        cluster: true,
+        clusterRadius: 46,
+        clusterMaxZoom: 11,
+        clusterProperties: {
+          faces: [["concat", ["accumulated"], ["get", "faces"]], ["get", "face"]],
+          requests: ["+", ["get", "requestCount"]],
         },
       });
       map.addLayer({
-        id: "people",
+        id: "people-clusters-outgoing",
         type: "symbol",
-        source: "people",
-        filter: ["!", ["has", "point_count"]],
+        source: "people-outgoing",
+        filter: ["has", "point_count"],
+        layout: { "icon-image": ["concat", "cluster-", ["get", "faces"], "-", ["to-string", ["get", "requests"]]], "icon-allow-overlap": true },
+        paint: { "icon-opacity": 0, "icon-opacity-transition": { duration: 0 } },
+      });
+      map.addLayer({
+        id: "people-outgoing",
+        type: "symbol",
+        source: "people-outgoing",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "kind"], "person"]],
         layout: {
           "icon-image": ["get", "avatar"],
           "icon-size": ["get", "size"],
@@ -674,22 +805,52 @@ export default function MapLibreScene() {
           "icon-allow-overlap": true,
           "symbol-sort-key": ["get", "rank"],
         },
+        paint: { "icon-opacity": 0, "icon-opacity-transition": { duration: 0 } },
       });
       map.addLayer({
-        id: "people-selected",
+        id: "own-req-pins-outgoing",
+        type: "symbol",
+        source: "people-outgoing",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "kind"], "request"]],
+        layout: { "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true },
+        paint: { "icon-opacity": 0, "icon-opacity-transition": { duration: 0 } },
+      });
+      map.addLayer({
+        id: "people-clusters",
         type: "symbol",
         source: "people",
-        filter: ["==", ["get", "id"], "__none__"],
+        filter: ["has", "point_count"],
         layout: {
-          "icon-image": "active-avatar",
+          "icon-image": ["concat", "cluster-", ["get", "faces"], "-", ["to-string", ["get", "requests"]]],
+          "icon-allow-overlap": true,
+        },
+        paint: { "icon-opacity-transition": { duration: 0 } },
+      });
+      map.addLayer({
+        id: "people",
+        type: "symbol",
+        source: "people",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "kind"], "person"]],
+        layout: {
+          "icon-image": ["get", "avatar"],
           "icon-size": ["get", "size"],
           "icon-anchor": "bottom",
           "icon-allow-overlap": true,
+          "symbol-sort-key": ["get", "rank"],
         },
-        paint: { "icon-opacity": 1 },
+        paint: { "icon-opacity-transition": { duration: 0 } },
       });
 
-      // Запити замовників: свої кластери й піни, видимі лише в режимі «Запити».
+      map.addLayer({
+        id: "own-req-pins",
+        type: "symbol",
+        source: "people",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "kind"], "request"]],
+        layout: { "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true, "symbol-sort-key": ["get", "prio"] },
+        paint: { "icon-opacity-transition": { duration: 0 } },
+      });
+
+      // Стрічка запитів виконавця має окреме джерело в режимі «Запити».
       map.addSource("requests-map", {
         type: "geojson",
         data: requestFeatures([]),
@@ -727,14 +888,6 @@ export default function MapLibreScene() {
         filter: ["!", ["has", "point_count"]],
         layout: { ...hidden, "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true, "symbol-sort-key": ["get", "prio"] },
       });
-      map.addLayer({
-        id: "req-active",
-        type: "symbol",
-        source: "requests-map",
-        filter: ["==", ["get", "rid"], "__none__"],
-        layout: { ...hidden, "icon-image": ["get", "icon"], "icon-anchor": "bottom", "icon-allow-overlap": true, "icon-size": 1.16 },
-      });
-
       // Підписи міст після людей: колізія сама ховає підпис, що наїхав би
       // на фото чи ромб.
       map.addSource("cities", {
@@ -781,55 +934,132 @@ export default function MapLibreScene() {
 
       const expandCluster = async (feature: MapGeoJSONFeature) => {
         setSelectedId(null);
+        mapSelectedRequest.set(null);
         const clusterId = feature.properties?.cluster_id as number;
         const zoom = await (map.getSource("people") as GeoJSONSource).getClusterExpansionZoom(clusterId);
         flyTo(map, (feature.geometry as Point).coordinates as [number, number], zoom + 0.3, 620);
       };
       const selectPerson = (feature: MapGeoJSONFeature | undefined) => {
+        mapSelectedRequest.set(null);
         setSelectedId((feature?.properties?.id as string) ?? null);
         setCardNotice(null);
       };
-      for (const layer of ["people", "people-selected", "people-clusters", "req-pins", "req-clusters"]) {
+      for (const layer of ["people", "people-clusters", "req-pins", "own-req-pins", "req-clusters"]) {
         map.on("mouseenter", layer, () => { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", layer, () => { map.getCanvas().style.cursor = ""; });
       }
 
-      // Запити: наведення збільшує пін, клік відкриває картку, кластер розкривається.
+      // Компактний пін лишається на карті, а над ним розгортається DOM-копія.
+      // Оригінал приховано тільки на час анімації, тому під ним немає дубля.
+      const requestLens = requestLensRef.current;
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const badgeText = requestLens?.querySelector<HTMLElement>(".request-lens-badge");
+      const priceText = requestLens?.querySelector<HTMLElement>(".request-lens-price");
       let hoveredRequest: string | null = null;
-      const updateActive = () => {
-        const ids = [hoveredRequest, mapSelectedRequest.get()].filter((id): id is string => Boolean(id));
-        map.setFilter("req-active", ["in", ["get", "rid"], ["literal", ids.length ? ids : ["__none__"]]]);
+      let requestCompactWidth = 0;
+      let requestLensCenterX = 0;
+      let requestLensGeneration = 0;
+      const requestLensContains = (point: { x: number; y: number }) => {
+        if (!requestLens || requestLens.hidden) return false;
+        const bounds = requestLens.getBoundingClientRect();
+        const origin = map.getContainer().getBoundingClientRect();
+        return origin.left + point.x >= bounds.left && origin.left + point.x <= bounds.right
+          && origin.top + point.y >= bounds.top && origin.top + point.y <= bounds.bottom;
       };
-      reqActiveRef.current = updateActive;
-      map.on("mousemove", "req-pins", (event) => {
-        const rid = event.features?.[0]?.properties?.rid as string | undefined;
-        if (rid && rid !== hoveredRequest) {
-          hoveredRequest = rid;
-          updateActive();
-        }
-      });
-      map.on("mouseleave", "req-pins", () => {
+      const restoreRequestPin = () => {
+        map.setPaintProperty("req-pins", "icon-opacity", 1);
+        map.setPaintProperty("own-req-pins", "icon-opacity", peopleOpacityRef.current);
+      };
+      const hideRequestLens = (instant = false) => {
+        if (!requestLens || (!hoveredRequest && (requestLens.hidden || !instant))) return;
         hoveredRequest = null;
-        updateActive();
-      });
-      map.on("click", "req-pins", (event) => {
+        const generation = ++requestLensGeneration;
+        if (instant) {
+          gsap.killTweensOf([requestLens, priceText]);
+          requestLens.hidden = true;
+          restoreRequestPin();
+          return;
+        }
+        gsap.to(requestLens, {
+          width: requestCompactWidth, left: requestLensCenterX - requestCompactWidth / 2,
+          scale: 1, duration: 0.28, ease: "power2.out", overwrite: true,
+          onComplete: () => {
+            restoreRequestPin();
+            map.once("render", () => {
+              if (generation === requestLensGeneration && !hoveredRequest) requestLens.hidden = true;
+            });
+          },
+        });
+        if (priceText) gsap.to(priceText, { opacity: 0, duration: 0.16, ease: "power2.out", overwrite: true });
+      };
+      requestLensControlRef.current.hide = hideRequestLens;
+      const showRequestLens = (feature: MapGeoJSONFeature) => {
+        if (!requestLens || !badgeText || !priceText) return;
+        const rid = String(feature.properties?.rid ?? "");
+        if (!rid) return;
+        if (rid === hoveredRequest) return;
+        const variant = String(feature.properties?.variant ?? "plain") as PinVariant;
+        const style = PIN_STYLE[variant] ?? PIN_STYLE.plain;
+        const compact = String(feature.properties?.compact ?? "?");
+        const price = String(feature.properties?.price ?? "Ціну узгодимо");
+        const fresh = feature.properties?.fresh === true || feature.properties?.fresh === 1;
+        const point = map.project((feature.geometry as Point).coordinates as [number, number]);
+        requestCompactWidth = pinWidth(compact);
+        requestLensCenterX = point.x;
+        const expandedWidth = requestCompactWidth + 10 + pinTextWidth(price);
+        hoveredRequest = rid;
+        ++requestLensGeneration;
+        map.setPaintProperty("req-pins", "icon-opacity", ["case", ["==", ["get", "rid"], rid], 0, 1]);
+        map.setPaintProperty("own-req-pins", "icon-opacity", ["case", ["==", ["get", "rid"], rid], 0, peopleOpacityRef.current]);
+        requestLens.dataset.variant = variant;
+        requestLens.dataset.fresh = String(fresh);
+        requestLens.style.setProperty("--pin-fill", style.fill);
+        requestLens.style.setProperty("--pin-text", style.text);
+        requestLens.style.setProperty("--pin-badge", style.badge);
+        requestLens.style.setProperty("--pin-glyph", style.glyph);
+        Object.assign(requestLens.style, { left: `${point.x - requestCompactWidth / 2}px`, top: `${point.y - PIN_HEIGHT}px` });
+        badgeText.textContent = compact;
+        badgeText.style.width = `${budgetBadgeWidth(compact)}px`;
+        priceText.textContent = price;
+        requestLens.hidden = false;
+        gsap.killTweensOf([requestLens, priceText]);
+        gsap.set(requestLens, { width: requestCompactWidth, left: point.x - requestCompactWidth / 2, scale: 1 });
+        gsap.set(priceText, { opacity: 0 });
+        gsap.to(requestLens, {
+          width: expandedWidth, left: point.x - expandedWidth / 2,
+          scale: REQUEST_HOVER_SCALE,
+          duration: reducedMotion ? 0 : 0.35, ease: "power2.out", overwrite: true,
+        });
+        gsap.to(priceText, { opacity: 1, duration: reducedMotion ? 0 : 0.24, ease: "power2.out", overwrite: true });
+      };
+      map.on("mouseout", () => hideRequestLens());
+      map.on("movestart", () => hideRequestLens(true));
+      const selectRequestPin = (event: maplibregl.MapLayerMouseEvent) => {
         const rid = event.features?.[0]?.properties?.rid as string | undefined;
         if (!rid) return;
         setSelectedId(null);
         mapSelectedRequest.set(rid);
-      });
+      };
+      map.on("click", "req-pins", selectRequestPin);
+      map.on("click", "own-req-pins", selectRequestPin);
       map.on("click", "req-clusters", async (event) => {
         const feature = event.features?.[0];
         if (!feature) return;
+        setSelectedId(null);
         mapSelectedRequest.set(null);
         const zoom = await (map.getSource("requests-map") as GeoJSONSource).getClusterExpansionZoom(feature.properties?.cluster_id as number);
         flyTo(map, (feature.geometry as Point).coordinates as [number, number], zoom + 0.3, 620);
       });
       // Клік повз запити знімає вибір.
       map.on("click", (event) => {
+        if (hoveredRequest && requestLensContains(event.point)) {
+          setSelectedId(null);
+          mapSelectedRequest.set(hoveredRequest);
+          return;
+        }
         if (!mapSelectedRequest.get()) return;
         const { x, y } = event.point;
-        if (map.queryRenderedFeatures([[x - 4, y - 4], [x + 4, y + 4]], { layers: ["req-pins", "req-clusters"] }).length === 0) mapSelectedRequest.set(null);
+        if (map.queryRenderedFeatures([[x - 4, y - 4], [x + 4, y + 4]], { layers: ["req-pins", "own-req-pins", "req-clusters"] }).length === 0) mapSelectedRequest.set(null);
       });
 
       /*
@@ -842,10 +1072,21 @@ export default function MapLibreScene() {
       const lens = lensRef.current;
       const lensImage = lens?.querySelector("img");
       const canHover = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const lensUrls = new Map<string, string>();
       let lensFeature: MapGeoJSONFeature | null = null;
       let lensKey = "";
+      let hiddenClusterId: number | null = null;
+      const setClusterOpacity = (opacity: number) => {
+        map.setPaintProperty("people-clusters", "icon-opacity", hiddenClusterId === null
+          ? opacity
+          : ["case", ["==", ["get", "cluster_id"], hiddenClusterId], 0, opacity]);
+      };
+      setClusterOpacityRef.current = setClusterOpacity;
+      const hideOriginalCluster = (id: number | null) => {
+        if (hiddenClusterId === id) return;
+        hiddenClusterId = id;
+        setClusterOpacity(peopleOpacityRef.current);
+      };
 
       const lensUrl = (key: string, draw: () => HTMLCanvasElement) => {
         let url = lensUrls.get(key);
@@ -873,27 +1114,59 @@ export default function MapLibreScene() {
       const releaseLens = () => {
         window.clearTimeout(switchTimer);
         if (panelHovered) return;
+        if (groupOpen && !lensFeature) return;
+        if (!lensFeature) return;
         keepLens();
-        hideTimer = window.setTimeout(() => hideLens(), 220);
+        if (lensFeature?.layer.id === "people-clusters") {
+          // Група зменшується одразу. Список лишається на мить, щоб курсор
+          // встиг перейти в нього через проміжок між маркером і панеллю.
+          hideLens(false, true);
+          hideTimer = window.setTimeout(() => {
+            if (!panelHovered) {
+              groupOpen = false;
+              setGroupPreview(null);
+            }
+          }, 220);
+          return;
+        }
+        hideLens();
       };
-      const hideLens = (instant = false) => {
+      const hideLens = (instant = false, keepGroupPanel = false) => {
         keepLens();
         window.clearTimeout(switchTimer);
         pendingKey = "";
-        panelHovered = false;
-        groupOpen = false;
-        setGroupPreview(null);
-        if (!lens || !lensFeature) return;
+        if (!keepGroupPanel) {
+          panelHovered = false;
+          groupPointerInsideRef.current = false;
+          groupOpen = false;
+          setGroupPreview(null);
+        }
+        const wasCluster = lensFeature?.layer.id === "people-clusters";
         lensFeature = null;
         lensKey = "";
-        gsap.killTweensOf(lens);
+        if (!lens) return;
         if (instant || reducedMotion) {
+          gsap.killTweensOf(lens);
           lens.hidden = true;
+          hideOriginalCluster(null);
+          return;
+        }
+        if (lens.hidden) return;
+        if (wasCluster) {
+          gsap.to(lens, {
+            scale: 1, opacity: 1, duration: 0.25, ease: "power2.out", overwrite: true,
+            onComplete: () => {
+              // Спочатку повертаємо маркер на карту; копію прибираємо лише
+              // після кадру, в якому MapLibre його вже намалював.
+              hideOriginalCluster(null);
+              map.once("render", () => { if (!lensFeature) lens.hidden = true; });
+            },
+          });
           return;
         }
         gsap.to(lens, {
-          scale: 1, opacity: 0, duration: 0.14, ease: "power1.in",
-          onComplete: () => { lens.hidden = true; },
+          scale: 1, opacity: 1, duration: 0.25, ease: "power2.out", overwrite: true,
+          onComplete: () => { lens.hidden = true; hideOriginalCluster(null); },
         });
       };
       lensControlRef.current = {
@@ -905,7 +1178,13 @@ export default function MapLibreScene() {
         },
         leavePanel: () => {
           panelHovered = false;
-          releaseLens();
+          groupPointerInsideRef.current = false;
+          groupOpen = false;
+          setGroupPreview(null);
+          keepLens();
+          // Якщо група вже зменшується, не перериваємо передачу її
+          // видимості назад маркеру на карті.
+          if (lensFeature) hideLens();
         },
       };
       /*
@@ -917,10 +1196,24 @@ export default function MapLibreScene() {
         let best: MapGeoJSONFeature | undefined;
         let bestDistance = Infinity;
         for (const feature of features) {
-          const point = map.project((feature.geometry as Point).coordinates as [number, number]);
+          const coordinates = (feature.geometry as Point).coordinates as [number, number];
+          const point = map.project(coordinates);
+          const cluster = feature.layer.id === "people-clusters";
+          const perspective = perspectiveAt(map, coordinates);
+          const portraitSize = Number(feature.properties?.size ?? 1) * PORTRAIT_LOGICAL * perspective;
           // Портрет стоїть на точці нижнім краєм: його центр вище точки.
-          const lift = feature.layer.id === "people-clusters" ? 0 : Number(feature.properties?.size ?? 1) * PORTRAIT_LOGICAL * 0.57;
+          const lift = cluster ? 0 : portraitSize * 0.57;
           const distance = Math.hypot(point.x - x, point.y - lift - y);
+          // Картинка маркера має прозорі краї. Вони не повинні утримувати hover.
+          if (!cluster && distance > portraitSize * 0.43 + 3) continue;
+          if (cluster) {
+            if (!feature.properties?.faces && Number(feature.properties?.requests ?? 0) > 0) {
+              if (distance > (36 / CLUSTER_RATIO) * perspective) continue;
+            }
+            const halfWidth = (CLUSTER_W / CLUSTER_RATIO) * perspective * 0.5;
+            const halfHeight = (CLUSTER_H / CLUSTER_RATIO) * perspective * 0.5;
+            if (((x - point.x) / halfWidth) ** 2 + ((y - point.y) / halfHeight) ** 2 > 1) continue;
+          }
           if (distance < bestDistance) {
             best = feature;
             bestDistance = distance;
@@ -929,7 +1222,7 @@ export default function MapLibreScene() {
         return best;
       };
       const featureKey = (feature: MapGeoJSONFeature) =>
-        feature.layer.id === "people-clusters" ? `cluster-${feature.properties?.faces}` : `person-${feature.properties?.id}`;
+        feature.layer.id === "people-clusters" ? `cluster-${feature.properties?.cluster_id}` : `person-${feature.properties?.id}`;
       /** Курсор рухається до відкритого списку групи і вже майже навпроти нього. */
       const headingToPanel = (from: { x: number; y: number }, to: { x: number; y: number }) => {
         const panel = groupRef.current;
@@ -951,6 +1244,8 @@ export default function MapLibreScene() {
         const key = featureKey(feature);
         keepLens();
         if (key === lensKey) return;
+        if (!cluster) panelHovered = false;
+        hideOriginalCluster(cluster ? Number(feature.properties?.cluster_id) : null);
         lensFeature = feature;
         lensKey = key;
         const coordinates = (feature.geometry as Point).coordinates as [number, number];
@@ -961,7 +1256,9 @@ export default function MapLibreScene() {
         if (cluster) {
           width = (CLUSTER_W / CLUSTER_RATIO) * scale;
           height = (CLUSTER_H / CLUSTER_RATIO) * scale;
-          lensImage.src = lensUrl(key, () => createClusterImage(source, String(feature.properties?.faces ?? "")));
+          const faces = String(feature.properties?.faces ?? "");
+          const requests = Number(feature.properties?.requests ?? 0);
+          lensImage.src = lensUrl(`cluster-${faces}-${requests}`, () => createClusterImage(source, faces, 2, requests));
         } else {
           width = height = Number(feature.properties?.size ?? 1) * PORTRAIT_LOGICAL * scale;
           const avatar = String(feature.properties?.avatar ?? "avatar-0");
@@ -980,10 +1277,14 @@ export default function MapLibreScene() {
         gsap.killTweensOf(lens);
         const target = cluster ? CLUSTER_HOVER_SCALE : HOVER_SCALE;
         if (reducedMotion) gsap.set(lens, { scale: target, opacity: 1 });
-        else gsap.fromTo(lens, { scale: 1, opacity: 1 }, { scale: target, duration: 0.32, ease: "back.out(2.6)" });
+        else {
+          gsap.set(lens, { scale: 1, opacity: 1 });
+          gsap.to(lens, { scale: target, duration: 0.35, ease: "power2.out", overwrite: true });
+        }
 
         // Для групи поруч список її людей: спершу вищий рівень розміщення.
         groupOpen = false;
+        groupPointerInsideRef.current = false;
         setGroupPreview(null);
         if (!cluster) return;
         const box = {
@@ -999,18 +1300,21 @@ export default function MapLibreScene() {
           .then((leaves) => {
             if (lensKey !== key) return;
             const ids = new Set(leaves.map((leaf) => leaf.properties?.id as string));
-            const members = getPerformers().filter((performer) => ids.has(performer.id)).sort((a, b) => b.tier - a.tier);
+            const members = mapPeopleRef.current.filter((performer) => ids.has(performer.id)).sort((a, b) => b.tier - a.tier);
+            const requestIds = new Set(leaves.map((leaf) => leaf.properties?.rid as string));
+            const requests = ownMapRequestsRef.current.filter((request) => requestIds.has(request.id));
             groupOpen = true;
-            setGroupPreview({ key, members, box });
+            setGroupPreview({ key, members, requests, box });
           });
       };
 
       // Клік — по тому ж маркеру, що й підсвічений наведенням: найближчому.
       map.on("click", (event) => {
         const { x, y } = event.point;
+        if (map.queryRenderedFeatures([[x - 3, y - 3], [x + 3, y + 3]], { layers: ["req-pins", "own-req-pins", "req-clusters"] }).length) return;
         const feature = nearestMarker(
           map.queryRenderedFeatures([[x - 3, y - 3], [x + 3, y + 3]], {
-            layers: ["people-selected", "people", "people-clusters"],
+            layers: ["people", "people-clusters"],
           }),
           x,
           y
@@ -1021,19 +1325,43 @@ export default function MapLibreScene() {
         else selectPerson(feature);
       });
 
-      if (lens && canHover) {
-        map.on("mousemove", (event) => {
-          if (map.isMoving()) return;
-          // Кілька пікселів запасу: маленький портрет легко проскочити.
-          const { x, y } = event.point;
+      const hoverLayers = canHover
+        ? ["req-pins", "own-req-pins", "req-clusters", "people", "people-clusters"]
+        : ["req-pins", "own-req-pins", "req-clusters"];
+      let hoverPoint: { x: number; y: number } | null = null;
+      const cancelHover = () => {
+        cancelAnimationFrame(hoverFrame);
+        hoverFrame = 0;
+        hoverPoint = null;
+      };
+      map.on("mousemove", (event) => {
+        if (map.isMoving()) return;
+        hoverPoint = { x: event.point.x, y: event.point.y };
+        if (hoverFrame) return;
+        hoverFrame = requestAnimationFrame(() => {
+          hoverFrame = 0;
+          const point = hoverPoint;
+          hoverPoint = null;
+          if (!point || map.isMoving()) return;
+          const { x, y } = point;
+          // Один пошук на кадр для запитів і людей; остання позиція курсора
+          // перемагає проміжні mousemove під час швидкого руху.
+          const features = map.queryRenderedFeatures([[x - 3, y - 3], [x + 3, y + 3]], { layers: hoverLayers });
+          const request = features.find((feature) => feature.layer.id === "req-pins" || feature.layer.id === "own-req-pins");
+          if (request) showRequestLens(request);
+          else if (!hoveredRequest || !requestLensContains(point)) hideRequestLens();
+          if (!lens || !canHover) return;
+          if (features.some((feature) => feature.layer.id === "req-pins" || feature.layer.id === "own-req-pins" || feature.layer.id === "req-clusters")
+            || (hoveredRequest && requestLensContains(point))) {
+            releaseLens();
+            return;
+          }
           const feature = nearestMarker(
-            map.queryRenderedFeatures([[x - 3, y - 3], [x + 3, y + 3]], {
-              layers: ["people-selected", "people", "people-clusters"],
-            }),
+            features.filter((item) => item.layer.id === "people" || item.layer.id === "people-clusters"),
             x,
             y
           );
-          if (!feature || feature.layer.id === "people-selected") {
+          if (!feature) {
             releaseLens();
             return;
           }
@@ -1063,6 +1391,10 @@ export default function MapLibreScene() {
           pendingKey = "";
           showLens(feature);
         });
+      });
+      map.on("movestart", cancelHover);
+      map.on("mouseout", cancelHover);
+      if (lens && canHover) {
         map.on("movestart", () => hideLens(true));
         map.on("mouseout", releaseLens);
       }
@@ -1070,9 +1402,6 @@ export default function MapLibreScene() {
       setReady(true);
       setMapReady(true);
     });
-
-    const syncSlider = () => zoomSliderStore.set(zoomToSlider(map.getZoom(), farZoomRef.current));
-    map.on("zoom", syncSlider);
 
     // Плашка «Підвантажуємо деталі» лише там, де справді йдемо в мережу:
     // з DETAIL_ZOOM і поки тайли OSM не доїхали.
@@ -1083,7 +1412,16 @@ export default function MapLibreScene() {
 
     return () => {
       cancelAnimationFrame(traceFrame);
+      cancelAnimationFrame(hoverFrame);
       document.removeEventListener("visibilitychange", onVisibility);
+      cancelAnimationFrame(peopleFadeFrameRef.current);
+      peopleTransitioningRef.current = false;
+      peoplePendingRef.current = null;
+      runPeopleTransitionRef.current = () => {};
+      peopleSnapshotRef.current = initialPeople();
+      peopleSnapshotKeyRef.current = "";
+      requestLensControlRef.current.hide(true);
+      setClusterOpacityRef.current = () => {};
       setMapReady(false);
       map.remove();
       mapRef.current = null;
@@ -1103,81 +1441,216 @@ export default function MapLibreScene() {
         : null;
       if (cancelled) return;
       tagMatches.set(matched?.size ? matched : null);
-      matchInfoStore.set(matched ? { shown: matched.size, total: performers.length } : null);
     })();
     return () => {
       cancelled = true;
     };
   }, [ready, requestTags, performers]);
 
-  // Режим карти: або виконавці, або запити. Другого не показуємо взагалі, щоб не плутати.
+  // На мапі виконавців також показуємо власні відкриті запити замовника.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    const requestLayers = ["req-clusters", "req-cluster-count", "req-pins", "req-active"];
-    const peopleLayers = ["people", "people-clusters", "people-selected"];
+    const requestLayers = ["req-clusters", "req-cluster-count", "req-pins"];
+    const peopleLayers = ["people", "people-clusters", "people-outgoing", "people-clusters-outgoing", "own-req-pins", "own-req-pins-outgoing"];
     for (const id of requestLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "visible" : "none");
     for (const id of peopleLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "none" : "visible");
     lensControlRef.current.hide(true);
+    requestLensControlRef.current.hide(true);
     if (mode === "requests") setSelectedId(null);
   }, [ready, mode]);
 
-  // Запити на карті: усі або відфільтровані, без віддалених (їм нема де стати).
+  // У режимі запитів окремо показуємо стрічку; власні завдання об'єднані з людьми в їхньому джерелі.
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    (map.getSource("requests-map") as GeoJSONSource | undefined)?.setData(requestFeatures(applyRequestFilter(requestState.items, requestFilter)));
-    reqActiveRef.current?.();
-  }, [ready, requestState.items, requestFilter]);
+    const filtered = mode === "requests" ? applyRequestFilter(requestState.items, requestFilter) : [];
+    const focused = hoveredFeedRequest && filtered.some((item) => item.id === hoveredFeedRequest && item.point)
+      ? filtered.filter((item) => item.id === hoveredFeedRequest)
+      : filtered;
+    (map.getSource("requests-map") as GeoJSONSource | undefined)?.setData(requestFeatures(focused));
+  }, [ready, mode, requestState.items, requestFilter, hoveredFeedRequest]);
 
-  useEffect(() => reqActiveRef.current?.(), [ready, selectedRequestId]);
-
-  // На карті — ті, хто під запит, з вибраних груп і міст, за потреби лише онлайн.
   useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
-    const visible = filterPerformers(performers, { matches, groups, cities, online });
+    requestLensControlRef.current.hide(true);
+  }, [hoveredFeedRequest]);
+
+  useEffect(() => {
     lensControlRef.current.hide(true);
-    (map.getSource("people") as GeoJSONSource | undefined)?.setData(toPeople(visible));
-    const ids = new Set(visible.map((performer) => performer.id));
+    requestLensControlRef.current.hide(true);
+  }, [ownMapRequests]);
+
+  // Після публікації запиту мапа порожня, доки не прийдуть відгуки на нього.
+  useEffect(() => {
+    lensControlRef.current.hide(true);
+  }, [matches, groups, cities, online, activeRequest?.id, activeRequest?.status]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const responderIds = activeRequest?.status === "open" && mapOffers.requestId === activeRequest.id
+      ? new Set(mapOffers.responses.map((offer) => offer.performerId))
+      : null;
+    const available = allPerformers
+      ? filterPerformers(mapPeople, { matches: null, groups, cities, online })
+      : activeRequest?.status === "open"
+      ? mapPeople.filter((performer) => responderIds?.has(performer.id))
+      : filterPerformers(performers, { matches, groups, cities, online });
+    const ownRequests = mode === "performers" && !allPerformers ? ownMapRequests : [];
+    // Порівнюємо лише поля, які потрапляють у GeoJSON. Інші зміни стану
+    // (наприклад, hover пропозиції) не мають запускати кластеризацію.
+    const key = JSON.stringify([
+      available.map((person) => [person.id, person.lng, person.lat, person.avatarIndex, person.tier]),
+      ownRequests.map((request) => {
+        const pin = pinLabel(request);
+        return [request.id, request.point?.lng, request.point?.lat, pin.variant, pin.compact, pin.price, pin.fresh];
+      }),
+    ]);
+    const source = map.getSource("people") as GeoJSONSource | undefined;
+    const outgoing = map.getSource("people-outgoing") as GeoJSONSource | undefined;
+    if (!source || !outgoing) return;
+    if (key !== peoplePendingRef.current?.key && (key !== peopleSnapshotKeyRef.current || peopleTransitioningRef.current)) {
+      peoplePendingRef.current = {
+        data: key === peopleSnapshotKeyRef.current ? peopleSnapshotRef.current : toPeople(available, ownRequests),
+        key,
+      };
+    }
+    const runTransition = () => {
+      if (peopleTransitioningRef.current) return;
+      const pending = peoplePendingRef.current;
+      if (!pending || pending.key === peopleSnapshotKeyRef.current) return;
+      peoplePendingRef.current = null;
+      peopleTransitioningRef.current = true;
+      const instant = mode === "requests" || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (instant) {
+        peopleSnapshotRef.current = pending.data;
+        peopleSnapshotKeyRef.current = pending.key;
+        source.setData(pending.data);
+        peopleTransitioningRef.current = false;
+        runPeopleTransitionRef.current();
+        return;
+      }
+
+      // Старий набір лишається видимим, поки його копія справді не готова.
+      // Жодного таймауту: інакше повільна кластеризація створює порожній кадр.
+      outgoing.setData(peopleSnapshotRef.current);
+      const waitForOutgoing = () => {
+        if (!map.isSourceLoaded("people-outgoing")) {
+          peopleFadeFrameRef.current = requestAnimationFrame(waitForOutgoing);
+          return;
+        }
+        const latest = peoplePendingRef.current ?? pending;
+        peoplePendingRef.current = null;
+        if (latest.key === peopleSnapshotKeyRef.current) {
+          peopleTransitioningRef.current = false;
+          runPeopleTransitionRef.current();
+          return;
+        }
+        // Обидва джерела поки містять ті самі маркери, тому передача
+        // видимості між ними не змінює жодного пікселя на мапі.
+        peopleOpacityRef.current = 0;
+        map.setPaintProperty("people", "icon-opacity", 0);
+        map.setPaintProperty("own-req-pins", "icon-opacity", 0);
+        setClusterOpacityRef.current(0);
+        map.setPaintProperty("people-outgoing", "icon-opacity", 1);
+        map.setPaintProperty("own-req-pins-outgoing", "icon-opacity", 1);
+        map.setPaintProperty("people-clusters-outgoing", "icon-opacity", 1);
+        peopleSnapshotRef.current = latest.data;
+        peopleSnapshotKeyRef.current = latest.key;
+        source.setData(latest.data);
+        const waitForIncoming = () => {
+          if (!map.isSourceLoaded("people")) {
+            peopleFadeFrameRef.current = requestAnimationFrame(waitForIncoming);
+            return;
+          }
+          const start = performance.now();
+          const fade = (now: number) => {
+            const progress = Math.min((now - start) / PEOPLE_FADE_MS, 1);
+            const incoming = smoothstep(progress);
+            peopleOpacityRef.current = incoming;
+            map.setPaintProperty("people", "icon-opacity", incoming);
+            map.setPaintProperty("own-req-pins", "icon-opacity", incoming);
+            setClusterOpacityRef.current(incoming);
+            map.setPaintProperty("people-outgoing", "icon-opacity", 1 - incoming);
+            map.setPaintProperty("own-req-pins-outgoing", "icon-opacity", 1 - incoming);
+            map.setPaintProperty("people-clusters-outgoing", "icon-opacity", 1 - incoming);
+            if (progress < 1) peopleFadeFrameRef.current = requestAnimationFrame(fade);
+            else {
+              peopleTransitioningRef.current = false;
+              runPeopleTransitionRef.current();
+            }
+          };
+          peopleFadeFrameRef.current = requestAnimationFrame(fade);
+        };
+        peopleFadeFrameRef.current = requestAnimationFrame(waitForIncoming);
+      };
+      peopleFadeFrameRef.current = requestAnimationFrame(waitForOutgoing);
+    };
+    runPeopleTransitionRef.current = runTransition;
+    runTransition();
+    const ids = new Set(available.map((performer) => performer.id));
     setSelectedId((current) => (current && ids.has(current) ? current : null));
-  }, [ready, performers, matches, groups, cities, online]);
+  }, [ready, mode, allPerformers, performers, mapPeople, ownMapRequests, matches, groups, cities, online, activeRequest?.id, activeRequest?.status, mapOffers]);
+
+  const highlightedId = !allPerformers && activeRequest?.status === "open" && hoveredOffer?.requestId === activeRequest.id
+    ? hoveredOffer.performerId
+    : selectedId;
+  // Hover пропозиції показує одного виконавця, але не міняє склад
+  // кластеризованого джерела. Його маркер малює DOM-копія нижче.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    const isolate = mode === "performers" && !allPerformers && activeRequest?.status === "open"
+      && hoveredOffer?.requestId === activeRequest.id;
+    for (const id of ["people", "people-clusters", "people-outgoing", "people-clusters-outgoing", "own-req-pins", "own-req-pins-outgoing"]) {
+      map.setLayoutProperty(id, "visibility", mode === "requests" || isolate ? "none" : "visible");
+    }
+  }, [ready, mode, allPerformers, activeRequest?.id, activeRequest?.status, hoveredOffer]);
 
   useEffect(() => {
     const map = mapRef.current;
     const atlas = avatarAtlasRef.current;
-    if (!ready || !map?.getLayer("people-selected") || !atlas) return;
+    const marker = selectedMarkerRef.current;
+    const image = marker?.querySelector("img");
+    if (!ready || !map || !atlas || !marker || !image) return;
     let frame = 0;
-    if (selectedId) {
-      const performer = getPerformers().find((person) => person.id === selectedId);
-      if (!performer) return;
-      const base = createPortraitCanvas(atlas, performer.avatarIndex, true);
-      const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 256;
-      const context = canvas.getContext("2d");
-      if (!context) return;
-      map.setFilter("people-selected", ["==", ["get", "id"], selectedId]);
-      const start = performance.now();
-      const animate = (now: number) => {
-        const progress = Math.min((now - start) / 420, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        context.clearRect(0, 0, 256, 256);
-        context.save();
-        context.translate(128, 256);
-        context.scale(1 + eased * 0.3, 1 + eased * 0.3);
-        context.globalAlpha = eased;
-        context.drawImage(base, -96, -192);
-        context.restore();
-        map.updateImage("active-avatar", context.getImageData(0, 0, 256, 256));
-        if (progress < 1) frame = requestAnimationFrame(animate);
+    gsap.killTweensOf(marker);
+    if (highlightedId) {
+      const performer = mapPeopleRef.current.find((person) => person.id === highlightedId);
+      if (!performer) {
+        marker.hidden = true;
+        return;
+      }
+      image.src = createPortraitCanvas(atlas, performer.avatarIndex, true).toDataURL();
+      const place = () => {
+        frame = 0;
+        const point = map.project([performer.lng, performer.lat]);
+        const size = tierPx(performer) * perspectiveAt(map, [performer.lng, performer.lat]);
+        Object.assign(marker.style, {
+          width: `${size}px`, height: `${size}px`,
+          left: `${point.x - size / 2}px`, top: `${point.y - size}px`,
+        });
       };
-      frame = requestAnimationFrame(animate);
+      const schedule = () => {
+        if (!frame) frame = requestAnimationFrame(place);
+      };
+      place();
+      marker.hidden = false;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) gsap.set(marker, { scale: 1.3, opacity: 1 });
+      else {
+        gsap.set(marker, { scale: 1, opacity: 0 });
+        gsap.to(marker, { scale: 1.3, opacity: 1, duration: 0.42, ease: "power2.out", overwrite: true });
+      }
+      map.on("move", schedule);
+      return () => {
+        map.off("move", schedule);
+        cancelAnimationFrame(frame);
+        gsap.killTweensOf(marker);
+      };
     } else {
-      map.setFilter("people-selected", ["==", ["get", "id"], "__none__"]);
+      marker.hidden = true;
     }
-    return () => cancelAnimationFrame(frame);
-  }, [ready, selectedId]);
+  }, [ready, highlightedId]);
 
   /*
    * Картка відкривається біля маркера, а не в куті: з того боку, де є
@@ -1188,8 +1661,8 @@ export default function MapLibreScene() {
   useLayoutEffect(() => {
     const map = mapRef.current;
     const card = cardRef.current;
-    const performer = getPerformers().find((person) => person.id === selectedId);
-    const request = mapRequestsStore.get().items.find((item) => item.id === mapSelectedRequest.get() && item.point);
+    const performer = mapPeopleRef.current.find((person) => person.id === selectedId);
+    const request = selectedRequest;
     // Маркер, біля якого стоїть картка: фото виконавця або пін запиту.
     const anchor = performer
       ? { lng: performer.lng, lat: performer.lat, centerDy: tierPx(performer) * 1.3 * 0.6, half: (tierPx(performer) * 1.3) / 2 }
@@ -1234,17 +1707,17 @@ export default function MapLibreScene() {
       map.off("resize", place);
       observer.disconnect();
     };
-  }, [ready, selectedId, selectedRequestId]);
+  }, [ready, selectedId, selectedRequestId, selectedRequest]);
 
-  /*
-   * Список групи стоїть поруч із нею: праворуч, якщо влазить, інакше
-   * ліворуч; по висоті — навпроти групи, не під полем запиту. Виїжджає
-   * з боку групи.
-   */
+  /* Список групи розміщується поруч із маркером і проявляється на місці. */
   useLayoutEffect(() => {
     const panel = groupRef.current;
+    const list = groupListRef.current;
     const container = containerRef.current;
-    if (!groupPreview || !panel || !container) return;
+    if (!groupPreview || !panel || !list || !container) return;
+    gsap.killTweensOf(panel);
+    gsap.set(panel, { opacity: 0 });
+    list.dataset.initializing = "true";
     const { box } = groupPreview;
     const { width, height } = panel.getBoundingClientRect();
     const bounds = container.getBoundingClientRect();
@@ -1255,51 +1728,56 @@ export default function MapLibreScene() {
     const top = clamp(box.top + box.height / 2 - height / 2, topEdge, Math.max(topEdge, bounds.height - height - 16));
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(top)}px`;
-    panel.style.transformOrigin = fitsRight ? "0% 50%" : "100% 50%";
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = gsap.fromTo(
-      panel,
-      { opacity: 0, x: fitsRight ? -8 : 8, scale: 0.97 },
-      { opacity: 1, x: 0, scale: 1, duration: 0.22, ease: "power2.out" }
-    );
+    const items = [...list.querySelectorAll<HTMLElement>("li")];
+    if (items.length) {
+      const edge = Math.max(0, (list.clientHeight - items[0].offsetHeight) / 2);
+      list.style.setProperty("--stack-edge", `${edge}px`);
+      const middle = items[Math.floor((items.length - 1) / 2)];
+      list.style.scrollSnapType = "none";
+      list.scrollTop = middle.offsetTop - edge;
+      updateGroupStack();
+    }
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion) panel.style.opacity = "1";
+    const frame = requestAnimationFrame(() => {
+      delete list.dataset.initializing;
+      list.style.scrollSnapType = "";
+      if (!reducedMotion) gsap.to(panel, { opacity: 1, duration: 0.2, ease: "power2.out", overwrite: true });
+    });
     return () => {
-      tween.kill();
+      cancelAnimationFrame(frame);
+      gsap.killTweensOf(panel);
     };
   }, [groupPreview]);
 
-  useEffect(() => setPeek(null), [groupPreview]);
-
-  // Статистика виїжджає збоку, а між рядками лише пересувається й оновлюється.
-  useLayoutEffect(() => {
-    const inner = peekRef.current;
-    if (!peek) {
-      peekShownRef.current = false;
-      return;
+  /** Центрований рядок виростає, сусідні відступають у глибину при прокрутці. */
+  const updateGroupStack = () => {
+    const list = groupListRef.current;
+    if (!list) return;
+    const center = list.scrollTop + list.clientHeight / 2;
+    const positions = [...list.querySelectorAll<HTMLElement>("li")].map((item) => ({
+      item,
+      distance: Math.abs(item.offsetTop + item.offsetHeight / 2 - center) / Math.max(item.offsetHeight - 6, 1),
+    }));
+    for (const { item, distance } of positions) {
+      item.style.setProperty("--stack-scale", String(Math.max(0.76, 1 - distance * 0.095)));
+      item.style.setProperty("--stack-opacity", String(Math.max(0.26, 1 - distance * 0.27)));
+      item.style.zIndex = String(Math.max(0, 20 - Math.round(distance * 4)));
+      item.dataset.centered = distance < 0.5 ? "true" : "false";
     }
-    if (!inner || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = peekShownRef.current
-      ? gsap.fromTo(inner, { opacity: 0.55 }, { opacity: 1, duration: 0.16, ease: "power1.out" })
-      : gsap.fromTo(
-          inner,
-          { opacity: 0, x: peek.side === "right" ? -6 : 6 },
-          { opacity: 1, x: 0, duration: 0.2, ease: "power2.out" }
-        );
-    peekShownRef.current = true;
-    return () => {
-      tween.kill();
-    };
-  }, [peek]);
+  };
 
-  /** Рядок списку під курсором: статистика навпроти нього, з того боку, де є місце. */
-  const peekAt = (performer: Performer, row: HTMLElement) => {
-    const panel = groupRef.current;
-    const container = containerRef.current;
-    if (!panel || !container) return;
-    const rowBox = row.getBoundingClientRect();
-    const panelBox = panel.getBoundingClientRect();
-    const bounds = container.getBoundingClientRect();
-    const side = bounds.right - panelBox.right >= 250 + 16 ? "right" : "left";
-    setPeek({ performer, top: rowBox.top - panelBox.top + rowBox.height / 2, side });
+  /** Поля прокрутки залишають місце для тіней, але не тримають список відкритим. */
+  const trackGroupPointer = (x: number, y: number) => {
+    const list = groupListRef.current;
+    if (!list) return;
+    const box = list.getBoundingClientRect();
+    const shadowSpace = Math.max(0, Number.parseFloat(getComputedStyle(list).paddingLeft) - 8);
+    const inside = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < box.bottom - 16;
+    if (inside === groupPointerInsideRef.current) return;
+    groupPointerInsideRef.current = inside;
+    if (inside) lensControlRef.current.enterPanel();
+    else lensControlRef.current.leavePanel();
   };
 
   // Щойно опублікували профіль: летимо до себе й показуємо, як нас бачать.
@@ -1312,10 +1790,22 @@ export default function MapLibreScene() {
   }, [justPublished, ready]);
 
   // «На карті» з панелі пропозицій: летимо до людини й відкриваємо її картку.
+  const closeSelectedPerson = () => {
+    setSelectedId(null);
+    setCardNotice(null);
+    const map = mapRef.current;
+    if (!map || !flyToRef.current) return;
+    const home = homeRef.current;
+    flyToRef.current(map, [home.lng, home.lat], home.zoom, 700);
+  };
   const focus = useStore(focusPerformerStore);
   useEffect(() => {
     if (!focus || !ready) return;
-    const performer = getPerformers().find((person) => person.id === focus.id);
+    if (focus.toggle && selectedId === focus.id) {
+      closeSelectedPerson();
+      return;
+    }
+    const performer = mapPeopleRef.current.find((person) => person.id === focus.id);
     if (performer) openFromGroup(performer);
     // openFromGroup — звичайна функція компонента, запит на фокус міняється лише з `at`.
   }, [focus, ready]);
@@ -1325,23 +1815,32 @@ export default function MapLibreScene() {
     const map = mapRef.current;
     lensControlRef.current.hide(true);
     if (!map) return;
+    mapSelectedRequest.set(null);
     if (flyToRef.current) flyToRef.current(map, [performer.lng, performer.lat], Math.max(map.getZoom(), 12), 700);
     setSelectedId(performer.id);
     setCardNotice(null);
+  };
+  const openRequestFromGroup = (request: MapRequest) => {
+    lensControlRef.current.hide(true);
+    setSelectedId(null);
+    if (request.point && mapRef.current && flyToRef.current) {
+      flyToRef.current(mapRef.current, [request.point.lng, request.point.lat], Math.max(mapRef.current.getZoom(), 12), 700);
+    }
+    mapSelectedRequest.set(request.id);
   };
 
   useEffect(() => {
     if (!selectedId && !selectedRequestId) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      setSelectedId(null);
+      closeSelectedPerson();
       mapSelectedRequest.set(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedId, selectedRequestId]);
 
-  const selected = performers.find((performer) => performer.id === selectedId);
+  const selected = mapPeople.find((performer) => performer.id === selectedId);
   const selectedCity = CITIES.find((city) => city.id === selected?.cityId);
 
   return (
@@ -1358,64 +1857,77 @@ export default function MapLibreScene() {
         />
       </div>
 
+      <div ref={selectedMarkerRef} aria-hidden hidden className="map-selected-marker">
+        <img alt="" draggable={false} />
+      </div>
       {/* Збільшена копія маркера під курсором, див. showLens. Миша крізь неї йде на карту. */}
       <div ref={lensRef} aria-hidden hidden className="map-lens">
         <img alt="" draggable={false} />
+      </div>
+
+      <div ref={requestLensRef} aria-hidden hidden className="request-lens" data-variant="plain" data-fresh="false">
+        <div className="request-lens-body">
+          <span className="request-lens-badge" />
+          <span className="request-lens-price" />
+        </div>
+        <span className="request-lens-new">NEW</span>
       </div>
 
       {groupPreview && (
         <div
           ref={groupRef}
           role="dialog"
-          aria-label={`У групі ${peopleCount(groupPreview.members.length)}`}
+          aria-label={groupTitle(groupPreview)}
           className="group-preview glass-panel"
-          onPointerEnter={() => lensControlRef.current.enterPanel()}
-          onPointerLeave={() => lensControlRef.current.leavePanel()}
+          onPointerEnter={(event) => trackGroupPointer(event.clientX, event.clientY)}
+          onPointerMove={(event) => trackGroupPointer(event.clientX, event.clientY)}
+          onPointerLeave={() => {
+            groupPointerInsideRef.current = false;
+            lensControlRef.current.leavePanel();
+          }}
         >
-          <p className="group-preview-title">У групі {peopleCount(groupPreview.members.length)}</p>
-          <ul className="group-preview-list" onPointerLeave={() => setPeek(null)}>
+          <p className="group-preview-title">{groupTitle(groupPreview)}</p>
+          <ul ref={groupListRef} className="group-preview-list" onScroll={updateGroupStack} aria-label="Виконавці й запити у групі">
             {groupPreview.members.map((performer) => {
-              const size = LIST_PX[performer.tier - 1];
               return (
                 <li key={performer.id}>
                   <button
                     type="button"
                     className="group-preview-row"
                     onClick={() => openFromGroup(performer)}
-                    onPointerEnter={(event) => peekAt(performer, event.currentTarget)}
-                    onFocus={(event) => peekAt(performer, event.currentTarget)}
-                    onBlur={() => setPeek(null)}
+                    onFocus={(event) => {
+                      const list = groupListRef.current;
+                      const item = event.currentTarget.parentElement;
+                      if (list && item) list.scrollTo({ top: item.offsetTop - (list.clientHeight - item.offsetHeight) / 2, behavior: reduced() ? "auto" : "smooth" });
+                    }}
                   >
                     <span
                       aria-hidden
                       className="group-preview-avatar"
-                      style={avatarBackground(performer, size)}
+                      style={avatarBackground(performer, 48)}
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-semibold leading-tight text-ink">{performer.name}</span>
                       <span className="block truncate text-[11px] leading-snug text-ink-muted">{performer.specialty}</span>
                     </span>
-                    <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" strokeWidth={2} />
+                    <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" />
                   </button>
                 </li>
               );
             })}
+            {groupPreview.requests.map((request) => (
+              <li key={request.id}>
+                <button type="button" className="group-preview-row" onClick={() => openRequestFromGroup(request)}>
+                  <span aria-hidden className="group-preview-request-avatar">$</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-semibold leading-tight text-ink">Ваш запит</span>
+                    <span className="block truncate text-[11px] leading-snug text-ink-muted">{request.text}</span>
+                  </span>
+                  <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" />
+                </button>
+              </li>
+            ))}
           </ul>
-          <p className="group-preview-hint">Клік по групі розкриє її на карті</p>
-
-          {peek && (
-            <div className="group-peek" data-side={peek.side} style={{ top: peek.top }} aria-hidden>
-              <div ref={peekRef} className="group-peek-card glass-panel">
-                <p className="truncate text-[14px] font-semibold leading-tight text-ink">{peek.performer.name}</p>
-                <p className="mt-0.5 truncate text-[11px] text-ink-muted">
-                  {peek.performer.specialty} · {CITIES.find((city) => city.id === peek.performer.cityId)?.name}
-                </p>
-                <div className="mt-2.5">
-                  <ProfileStats performer={peek.performer} compact />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1445,7 +1957,7 @@ export default function MapLibreScene() {
                 <p className="mt-1 text-[11px] text-ink-muted">{selectedCity?.name}</p>
               </div>
             </div>
-            <button type="button" onClick={() => setSelectedId(null)} aria-label="Закрити картку" className="grid size-7 shrink-0 place-items-center rounded-full bg-white/65 text-[19px] leading-none text-ink-muted transition-colors hover:bg-white hover:text-ink">×</button>
+            <button type="button" onClick={closeSelectedPerson} aria-label="Закрити картку" className="grid size-7 shrink-0 place-items-center rounded-full bg-white/65 text-[19px] leading-none text-ink-muted transition-colors hover:bg-white hover:text-ink">×</button>
           </div>
           <ProfileStats performer={selected} />
           <PerformerAbout
@@ -1454,20 +1966,19 @@ export default function MapLibreScene() {
           />
           {selected.mine ? (
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
+              <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-brand px-4 text-[12px] font-medium text-brand-ink transition-colors hover:bg-[#ff8258]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
               <button type="button" onClick={() => profileEditorStore.set(true)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Редагувати профіль</button>
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={() => openProfile(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
-              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[#303638] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[#4c5558]">Запропонувати роботу</button>
+              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-brand px-4 text-[12px] font-medium text-brand-ink transition-colors hover:bg-[#ff8258]">Запропонувати роботу</button>
             </div>
           )}
           <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>
         </aside>
       )}
 
-      <ConnectedZoomControl mapRef={mapRef} farZoomRef={farZoomRef} />
     </div>
   );
 }

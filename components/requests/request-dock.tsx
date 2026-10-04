@@ -2,111 +2,129 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, ChevronDown, ChevronUp, MoreHorizontal, Paperclip, Plus } from "lucide-react";
-import { ApiError, activeRequestStore, closeActiveRequest, composingStore } from "@/lib/auth/client";
-import { tagMatches, useStore } from "@/lib/map/filters";
-import { sidePanelChoice } from "@/lib/requests/side-panel";
-import { requestFacts } from "@/lib/requests/format";
+import { ArrowRight, Check, ChevronDown, MoreHorizontal, Plus } from "@/components/icons";
+import {
+  ApiError,
+  activeRequestStore,
+  closeActiveRequest,
+  composingStore,
+  recentlyPublishedRequestStore,
+  showRequestsListStore,
+} from "@/lib/auth/client";
 import { useDeals } from "@/lib/deals/client";
-import { dealPhase, type DealPhase } from "@/lib/deals/machine";
-import { dockCompactStore, loadDockCompact, offersCollapsedStore, offersCountStore, setDockCompact } from "@/lib/requests/offers";
+import { dealPhase } from "@/lib/deals/machine";
+import { setMapMode } from "@/lib/feed/map-requests";
+import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
+import { requestFacts } from "@/lib/requests/format";
 import type { PublishedRequest } from "@/lib/requests/types";
+import { useStore } from "@/lib/store";
 
-const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
-
-/**
- * Шлях запиту від публікації до готової роботи. Поки є лише перші два
- * кроки: відгуки, вибір і угода з'являться разом із чатом і оплатою.
- */
-const STEPS = ["Опубліковано", "Відгуки", "Вибір виконавця", "Угода", "Готово"] as const;
-
-/** «1 виконавець», «3 виконавці», «15 виконавців». */
-const performersCount = (count: number) => {
+const plural = (count: number, one: string, few: string, many: string) => {
   const tens = count % 100;
   const ones = count % 10;
-  if (ones === 1 && tens !== 11) return `${count} виконавець`;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} виконавці`;
-  return `${count} виконавців`;
+  if (ones === 1 && tens !== 11) return one;
+  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return few;
+  return many;
 };
+const offerLabel = (count: number) => `${count} ${plural(count, "пропозиція", "пропозиції", "пропозицій")}`;
 
-/** На якому кроці запит: без відгуків чекаємо їх, з відгуками — вибір виконавця. */
-const stepOf = (request: PublishedRequest, offers: number, deal: DealPhase) =>
-  request.status === "closed" ? -1 : deal === "done" ? 5 : deal === "working" ? 3 : offers > 0 ? 2 : 1;
-
-/** «1 пропозиція», «3 пропозиції», «7 пропозицій». */
-const offersCount = (count: number) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  if (ones === 1 && tens !== 11) return `${count} пропозиція`;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} пропозиції`;
-  return `${count} пропозицій`;
-};
-
-/**
- * Опублікований запит стоїть на місці поля запиту: текст, теги, кроки й що
- * зараз відбувається. Поле знову з'являється за «Новий запит». Коли
- * запитів два й більше, знизу «Усі запити» розгортають список.
- */
+/** Один активний запит над мапою; решта доступні у списку, не займаючи екран. */
 export function RequestDock({ requests, active }: { requests: PublishedRequest[]; active: PublishedRequest }) {
-  const matches = useStore(tagMatches);
-  const offers = useStore(offersCountStore);
-  const compact = useStore(dockCompactStore);
-  const [listOpen, setListOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [closing, setClosing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const cardRef = useRef<HTMLElement>(null);
-  const fillRef = useRef<HTMLSpanElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const observedOffers = useStore(offersCountStore);
+  const offersMap = useStore(offersMapStore);
+  const offers = offersMap.requestId === active.id ? observedOffers : 0;
+  const recentlyPublished = useStore(recentlyPublishedRequestStore);
+  const showRequestedList = useStore(showRequestsListStore);
   const deals = useDeals(active.id);
   const phase = dealPhase(deals);
-  const current = stepOf(active, offers, phase);
   const closed = active.status === "closed";
-  const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const [listOpen, setListOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [otherOfferCounts, setOtherOfferCounts] = useState<Record<string, number>>({});
+  const rootRef = useRef<HTMLElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(loadDockCompact, []);
-
-  // Поле запиту ніби стискається в картку, картка — у смужку й назад.
-  useLayoutEffect(() => {
-    if (!cardRef.current || reduced()) return;
-    const tween = gsap.fromTo(cardRef.current, { opacity: 0, y: -8, scale: 0.985 }, { opacity: 1, y: 0, scale: 1, duration: 0.32, ease: "power3.out" });
-    return () => {
-      tween.kill();
-    };
-  }, [compact]);
-
-  // Смуга прогресу доїжджає до поточного кроку щоразу, як міняється запит.
-  useLayoutEffect(() => {
-    const fill = fillRef.current;
-    if (!fill) return;
-    const progress = current <= 0 ? 0 : Math.min(1, current / (STEPS.length - 1));
-    if (reduced()) {
-      gsap.set(fill, { scaleX: progress });
-      return;
-    }
-    const tween = gsap.fromTo(fill, { scaleX: 0 }, { scaleX: progress, duration: 0.7, delay: 0.15, ease: "power2.out" });
-    return () => {
-      tween.kill();
-    };
-  }, [active.id, current]);
+  useEffect(() => {
+    if (!showRequestedList) return;
+    setListOpen(true);
+    setMenuOpen(false);
+    setDetailsOpen(false);
+    showRequestsListStore.set(false);
+  }, [showRequestedList]);
 
   useLayoutEffect(() => {
-    if (!listOpen || !listRef.current || reduced()) return;
-    const tween = gsap.fromTo(listRef.current, { height: 0, opacity: 0 }, { height: "auto", opacity: 1, duration: 0.28, ease: "power2.out" });
-    return () => {
-      tween.kill();
-    };
+    if (!rootRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = gsap.fromTo(rootRef.current, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
+    return () => tween.kill();
+  }, [active.id]);
+
+  useLayoutEffect(() => {
+    if (!listOpen || !listRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = gsap.fromTo(listRef.current, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" });
+    return () => tween.kill();
   }, [listOpen]);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!listOpen && !menuOpen && !detailsOpen) return;
     const onPointer = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setListOpen(false);
+      setMenuOpen(false);
+      setDetailsOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setListOpen(false);
+        setMenuOpen(false);
+        setDetailsOpen(false);
+      }
     };
     document.addEventListener("pointerdown", onPointer);
-    return () => document.removeEventListener("pointerdown", onPointer);
-  }, [menuOpen]);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [listOpen, menuOpen, detailsOpen]);
+
+  // Лічильники інших запитів потрібні лише коли людина відкрила їхній список.
+  useEffect(() => {
+    if (!listOpen) return;
+    const controller = new AbortController();
+    const others = requests.filter((request) => request.status === "open" && request.id !== active.id);
+    void Promise.all(others.map(async (request) => {
+      try {
+        const response = await fetch(`/api/requests/${encodeURIComponent(request.id)}/responses`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) return null;
+        const data = (await response.json()) as { responses?: unknown[] };
+        return [request.id, data.responses?.length ?? 0] as const;
+      } catch {
+        return null;
+      }
+    })).then((counts) => {
+      if (!controller.signal.aborted) setOtherOfferCounts(Object.fromEntries(counts.filter((item): item is readonly [string, number] => item !== null)));
+    });
+    return () => controller.abort();
+  }, [listOpen, requests, active.id]);
+
+  const openOffers = () => {
+    setMapMode("performers");
+    offersCollapsedStore.set(false);
+  };
+
+  const selectRequest = (id: string) => {
+    activeRequestStore.set(id);
+    setMapMode("performers");
+    setListOpen(false);
+    setMenuOpen(false);
+    setDetailsOpen(false);
+  };
 
   const close = async () => {
     setMenuOpen(false);
@@ -121,177 +139,154 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
     }
   };
 
-  if (compact) {
-    return (
-      <section ref={cardRef} aria-label="Ваш запит" className="request-pill glass-panel" data-closed={closed || undefined}>
-        <button type="button" onClick={() => setDockCompact(false)} aria-expanded={false} className="request-pill-button">
-          <span className="my-request-status shrink-0" role="img" aria-label={closed ? "Закритий" : "Відкритий"} />
-          <span className="min-w-0 flex-1 truncate text-left text-[14px] text-ink">{active.text}</span>
-          <span aria-hidden className="request-mini-steps">
-            {STEPS.map((label, index) => (
-              <span key={label} data-state={closed ? "idle" : index < current ? "done" : index === current ? "current" : "idle"} />
-            ))}
-          </span>
-          <span className="hidden shrink-0 text-[12px] font-medium text-ink sm:inline">{closed ? "Закрито" : STEPS[Math.min(STEPS.length - 1, Math.max(0, current))]}</span>
-          {offers > 0 && <span className="filter-all-badge shrink-0">{offers}</span>}
-          <ChevronDown className="size-4 shrink-0 text-ink-muted" strokeWidth={2} />
-          <span className="sr-only">Розгорнути запит</span>
-        </button>
-      </section>
-    );
-  }
-
-  const shownTags = active.tags.slice(0, 5);
-  const others = requests.filter((request) => request.id !== active.id);
-  const seen = matches?.size;
+  const hasOfferAction = !closed && (offers > 0 || phase !== "none");
+  const status = closed
+    ? "Запит закрито"
+    : recentlyPublished === active.id
+      ? "Запит опубліковано · шукаємо виконавців"
+      : phase === "done"
+        ? "Роботу завершено"
+        : phase === "working"
+          ? "Робота триває · деталі в чаті"
+          : phase === "negotiating"
+            ? "Чекаємо на відповідь виконавця"
+            : offers > 0
+              ? "Є пропозиції — час обрати виконавця"
+              : "Очікуємо на перші пропозиції";
+  const ordered = [...requests].sort((a, b) => {
+    if (a.status !== b.status) return a.status === "open" ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+  const facts = requestFacts(active);
 
   return (
-    <section ref={cardRef} aria-label="Ваш запит" className="request-dock glass-panel" data-closed={closed || undefined}>
-      <header className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2 text-[12px] text-ink-muted">
-          <span className="my-request-status">{closed ? "Закритий" : "Відкритий"}</span>
-          <span aria-hidden>·</span>
-          <time dateTime={active.createdAt} className="truncate">
-            {DATE.format(new Date(active.createdAt))}
-          </time>
-        </div>
-        <div className="flex items-center">
-        <button type="button" onClick={() => setDockCompact(true)} aria-label="Згорнути запит" title="Згорнути" className="auth-icon-button">
-          <ChevronUp className="size-4" strokeWidth={2} />
+    <section ref={rootRef} className="request-summary glass-panel" aria-label="Активний запит" data-closed={closed || undefined}>
+      <div className="request-summary-bar">
+        <button
+          type="button"
+          className="request-summary-switch"
+          onClick={() => { setListOpen((value) => !value); setMenuOpen(false); setDetailsOpen(false); }}
+          aria-expanded={listOpen}
+          aria-controls="my-requests-list"
+        >
+          <span>Мої запити</span>
+          <span className="request-summary-count">{requests.length}</span>
+          <ChevronDown className="size-4 shrink-0 transition-transform" style={{ rotate: listOpen ? "180deg" : "0deg" }} />
         </button>
-        {!closed && (
-          <div ref={menuRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((value) => !value)}
-              aria-label="Дії із запитом"
-              aria-expanded={menuOpen}
-              className="auth-icon-button -mr-1.5"
-            >
-              <MoreHorizontal className="size-4" strokeWidth={2} />
+
+        <div className="request-summary-current">
+          <button
+            type="button"
+            className="request-summary-title"
+            title="Переглянути запит"
+            onClick={() => { setDetailsOpen((value) => !value); setListOpen(false); setMenuOpen(false); }}
+            aria-expanded={detailsOpen}
+          >
+            {active.text}
+          </button>
+          {hasOfferAction ? (
+            <button type="button" className="request-summary-status request-summary-status-action" onClick={openOffers}>
+              {status}<ArrowRight className="size-3.5 shrink-0" />
             </button>
-            {menuOpen && (
-              <div role="menu" className="request-dock-menu glass-panel">
-                <button type="button" role="menuitem" onClick={() => void close()} className="account-menu-item">
-                  Закрити запит
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        </div>
-      </header>
-
-      <p className="mt-2 line-clamp-2 text-[15px] leading-snug text-ink">{active.text}</p>
-      {requestFacts(active).length > 0 && <p className="mt-1.5 text-[12px] font-medium text-ink-muted">{requestFacts(active).join(" · ")}</p>}
-      {(shownTags.length > 0 || active.files.length > 0) && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {shownTags.map((tag) => (
-            <span key={tag.id} className="auth-draft-tag">
-              {tag.label}
-            </span>
-          ))}
-          {active.tags.length > shownTags.length && (
-            <span className="text-[11px] text-ink-muted">ще +{active.tags.length - shownTags.length}</span>
-          )}
-          {active.files.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-[11px] text-ink-muted">
-              <Paperclip className="size-3" strokeWidth={2} />
-              {active.files.length}
-            </span>
+          ) : (
+            <div className="request-summary-status" role="status">
+              {recentlyPublished === active.id && <Check className="size-3.5 shrink-0" />}
+              {status}
+            </div>
           )}
         </div>
-      )}
 
-      <div className="request-steps">
-        <span aria-hidden className="request-steps-track">
-          <span ref={fillRef} className="request-steps-fill" />
-        </span>
-        <ol className="request-steps-list" aria-label="Кроки виконання">
-        {STEPS.map((label, index) => {
-          const state = closed ? "idle" : index < current ? "done" : index === current ? "current" : "idle";
-          return (
-            <li key={label} className="request-step" data-state={state} aria-current={state === "current" ? "step" : undefined}>
-              <span className="request-step-dot">{state === "done" && <Check className="size-2.5" strokeWidth={3.4} />}</span>
-              <span className="request-step-label">{label}</span>
-            </li>
-          );
-        })}
-        </ol>
+        <div className="request-summary-actions">
+          {!closed && (
+            <div className="relative">
+              <button
+                type="button"
+                className="request-summary-icon"
+                onClick={() => { setMenuOpen((value) => !value); setListOpen(false); setDetailsOpen(false); }}
+                aria-label="Дії із запитом"
+                aria-expanded={menuOpen}
+                disabled={closing}
+              >
+                <MoreHorizontal className="size-4" />
+              </button>
+              {menuOpen && (
+                <div role="menu" className="request-summary-menu glass-panel">
+                  <button type="button" role="menuitem" className="account-menu-item" onClick={() => void close()}>
+                    Закрити запит
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+          <button
+            type="button"
+            className="request-summary-icon request-summary-add"
+            onClick={() => { setListOpen(false); setMenuOpen(false); setDetailsOpen(false); composingStore.set(true); }}
+            aria-label="Новий запит"
+            title="Новий запит"
+          >
+            <Plus className="size-5" />
+          </button>
+        </div>
       </div>
 
-      <p className="request-dock-now" role="status">
-        {closed ? (
-          "Запит закрито: виконавці його більше не бачать."
-        ) : (
-          <>
-            <span aria-hidden className="request-live-dot" />
-            {phase === "done" ? (
-              <>Угоду завершено.</>
-            ) : phase === "working" ? (
-              <>Угода в роботі. Деталі й оплата в чаті з виконавцем.</>
-            ) : phase === "negotiating" ? (
-              <>Пропозицію угоди надіслано, чекаємо на відповідь виконавця.</>
-            ) : offers > 0 ? (
-              <>
-                {offersCount(offers)} від виконавців.{" "}
-                <button type="button" onClick={() => { sidePanelChoice.set("offers"); offersCollapsedStore.set(false); }} className="auth-link">
-                  Порівняйте й напишіть
-                </button>{" "}
-                тому, хто підходить.
-              </>
-            ) : seen
-              ? `Запит бачать ${performersCount(seen)} з потрібними навичками. Відгуки з ціною прийдуть сюди й на пошту.`
-              : "Шукаємо виконавців під ваш запит. Відгуки з ціною прийдуть сюди й на пошту."}
-          </>
-        )}
-      </p>
-      {error && (
-        <p role="alert" className="auth-error mt-1">
-          {error}
-        </p>
+      {error && <p role="alert" className="auth-error request-summary-error">{error}</p>}
+
+      {detailsOpen && (
+        <div className="request-details glass-panel" aria-label="Деталі запиту">
+          <div className="request-switcher-heading">Деталі запиту</div>
+          <p className="request-details-text">{active.text}</p>
+          {facts.length > 0 && <p className="request-details-facts">{facts.join(" · ")}</p>}
+          {active.tags.length > 0 && (
+            <div className="request-details-tags">
+              {active.tags.map((tag) => <span key={tag.id} className="auth-draft-tag">{tag.label}</span>)}
+            </div>
+          )}
+          {active.files.length > 0 && <p className="request-details-facts">Прикріплено файлів: {active.files.length}</p>}
+        </div>
       )}
 
-      <footer className="request-dock-footer">
-        <button type="button" onClick={() => composingStore.set(true)} disabled={closing} className="request-dock-new">
-          <Plus className="size-4" strokeWidth={2.2} />
-          Новий запит
-        </button>
-        {others.length > 0 && (
-          <button type="button" onClick={() => setListOpen((value) => !value)} aria-expanded={listOpen} className="request-dock-all">
-            Усі запити · {requests.length}
-            <ChevronDown className="size-4 transition-transform" strokeWidth={2} style={{ rotate: listOpen ? "180deg" : "0deg" }} />
-          </button>
-        )}
-      </footer>
-
-      {listOpen && others.length > 0 && (
-        <div ref={listRef} className="overflow-hidden">
-          <ul className="request-dock-list" aria-label="Інші запити">
-            {others.map((request) => (
-              <li key={request.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    activeRequestStore.set(request.id);
-                    setListOpen(false);
-                  }}
-                  className="request-dock-row"
-                  data-closed={request.status === "closed" || undefined}
-                >
-                  <span
-                    className="my-request-status shrink-0"
-                    role="img"
-                    aria-label={request.status === "open" ? "Відкритий" : "Закритий"}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{request.text}</span>
-                  <time dateTime={request.createdAt} className="shrink-0 text-[11px] text-ink-muted">
-                    {DATE.format(new Date(request.createdAt))}
-                  </time>
-                </button>
-              </li>
-            ))}
+      {listOpen && (
+        <div ref={listRef} id="my-requests-list" className="request-switcher glass-panel">
+          <div className="request-switcher-heading">Мої запити <span>{requests.length}</span></div>
+          <ul className="request-switcher-list" aria-label="Усі мої запити">
+            {ordered.map((request) => {
+              const count = request.id === active.id ? offers : otherOfferCounts[request.id];
+              const subline = request.status === "closed"
+                ? "Закритий"
+                : count === undefined
+                  ? "Шукаємо виконавців"
+                  : count === 0
+                    ? "Очікує відгуків"
+                    : offerLabel(count);
+              return (
+                <li key={request.id}>
+                  <button
+                    type="button"
+                    className="request-switcher-row"
+                    data-active={request.id === active.id || undefined}
+                    data-closed={request.status === "closed" || undefined}
+                    aria-current={request.id === active.id ? "true" : undefined}
+                    onClick={() => selectRequest(request.id)}
+                  >
+                    <span className="request-switcher-dot" aria-hidden />
+                    <span className="request-switcher-copy">
+                      <span className="request-switcher-title">{request.text}</span>
+                      <span className="request-switcher-meta">{subline}</span>
+                    </span>
+                    {count !== undefined && count > 0 && request.status === "open" && <span className="request-switcher-offers">{count}</span>}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+          <button
+            type="button"
+            className="request-switcher-new"
+            onClick={() => { setListOpen(false); composingStore.set(true); }}
+          >
+            <Plus className="size-4" /> Новий запит
+          </button>
         </div>
       )}
     </section>

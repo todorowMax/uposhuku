@@ -2,13 +2,14 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
-import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MapPin, Maximize2, MessageCircle, Minimize2, ShieldCheck, Star, X } from "lucide-react";
-import { getPerformers } from "@/lib/map/performers";
+import { ArrowLeft, ArrowUp, ChevronDown, ChevronsRight, Loader2, MessageCircle, ShieldCheck, Star, X } from "@/components/icons";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { AVATAR_ATLAS } from "@/lib/map/portrait";
 import { useChat } from "@/lib/requests/chat";
 import { mentionsContacts } from "@/lib/chat/contacts";
 import {
   focusPerformerStore,
+  hoveredOfferStore,
   offersCollapsedStore,
   offersViewStore,
   offersWideStore,
@@ -19,8 +20,7 @@ import type { OfferResponse } from "@/lib/requests/types";
 import { DealTab, liveDeal } from "@/components/deals/deal-tab";
 import { useDeals } from "@/lib/deals/client";
 import { needsAction } from "@/lib/deals/machine";
-import { feedCountStore } from "@/lib/feed/client";
-import { SidePanelSwitch } from "@/components/requests/side-switch";
+import { mapModeStore } from "@/lib/feed/map-requests";
 import { useSidePanel } from "@/lib/requests/side-panel";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
@@ -51,11 +51,11 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
  */
 export function OffersPanel() {
   const request = useActiveRequest();
+  const mapMode = useStore(mapModeStore);
   const { kind } = useSidePanel();
-  const feedCount = useStore(feedCountStore);
   const requestOpen = request?.status === "open";
   /** Панель видно, лише коли вона вибрана: пропозиції живуть і тоді, коли праворуч стрічка запитів. */
-  const open = requestOpen && kind === "offers";
+  const open = requestOpen && kind === "offers" && mapMode === "performers";
   const view = useStore(offersViewStore);
   const collapsed = useStore(offersCollapsedStore);
   const wide = useStore(offersWideStore);
@@ -65,13 +65,18 @@ export function OffersPanel() {
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
 
-  // Інший запит — починаємо зі списку. На телефоні шторка спершу згорнута: карта важливіша.
+  // Інший запит — починаємо зі згорнутої панелі, щоб спершу була видна мапа.
   useEffect(() => {
     offersViewStore.set({ kind: "list" });
-    offersCollapsedStore.set(isPhone());
+    offersCollapsedStore.set(true);
+    hoveredOfferStore.set(null);
     setShowDeclined(false);
     known.current = new Set();
   }, [request?.id]);
+
+  useEffect(() => {
+    if (collapsed || view.kind !== "list" || !open) hoveredOfferStore.set(null);
+  }, [collapsed, view.kind, open]);
 
   // Панель виїжджає збоку (на телефоні — знизу), коли з'являється або розгортається.
   useLayoutEffect(() => {
@@ -116,17 +121,28 @@ export function OffersPanel() {
   if (collapsed) {
     return (
       <button type="button" onClick={() => offersCollapsedStore.set(false)} className="offers-tab glass-panel" aria-label={`Розгорнути пропозиції: ${total}`}>
-        <MessageCircle className="size-4" strokeWidth={1.9} />
+        <MessageCircle className="size-4" />
         Пропозиції
         {offers.length > 0 && <span className="filter-all-badge">{offers.length}</span>}
         {pending.length > 0 && <span className="offers-tab-new">+{pending.length} {plural(pending.length, "нова", "нові", "нових")}</span>}
-        <ChevronDown className="size-4 lg:hidden" strokeWidth={2} style={{ rotate: "180deg" }} />
+        <ChevronDown className="size-4 lg:hidden" style={{ rotate: "180deg" }} />
       </button>
     );
   }
 
   return (
-    <aside ref={panelRef} aria-label="Пропозиції виконавців" className="offers-panel glass-panel" data-wide={(chatWith && wide) || undefined}>
+    <aside
+      ref={panelRef}
+      aria-label="Пропозиції виконавців"
+      className="offers-panel glass-panel"
+      data-wide={(chatWith && wide) || undefined}
+      onPointerLeave={() => hoveredOfferStore.set(null)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !event.currentTarget.matches(":hover")) {
+          hoveredOfferStore.set(null);
+        }
+      }}
+    >
       {chatWith ? (
         <div ref={bodyRef} className="offers-body">
           <ChatView
@@ -146,18 +162,17 @@ export function OffersPanel() {
                 {total > 0 && <span className="filter-all-badge">{total}</span>}
               </h2>
               <p className="mt-0.5 truncate text-[11px] text-ink-muted">Вище ті, хто оплатив розміщення</p>
-              <SidePanelSwitch offers={total} feed={feedCount} />
             </div>
             <button type="button" onClick={() => offersCollapsedStore.set(true)} aria-label="Згорнути пропозиції" className="auth-icon-button -mr-1.5">
-              <ChevronsRight className="hidden size-4 lg:block" strokeWidth={2} />
-              <ChevronDown className="size-4 lg:hidden" strokeWidth={2} />
+              <ChevronsRight className="hidden size-4 lg:block" />
+              <ChevronDown className="size-4 lg:hidden" />
             </button>
           </header>
 
           <div ref={bodyRef} className="offers-body offers-list">
             {pending.length > 0 && (
               <button type="button" onClick={revealPending} className="offers-new">
-                <ArrowUp className="size-3.5" strokeWidth={2.4} />+{pending.length} {plural(pending.length, "нова", "нові", "нових")}
+                <ArrowUp className="size-3.5" />+{pending.length} {plural(pending.length, "нова", "нові", "нових")}
               </button>
             )}
 
@@ -189,7 +204,7 @@ export function OffersPanel() {
               <div className="pt-1">
                 <button type="button" onClick={() => setShowDeclined((value) => !value)} aria-expanded={showDeclined} className="offers-declined-toggle">
                   Відхилені · {declinedOffers.length}
-                  <ChevronDown className="size-3.5 transition-transform" strokeWidth={2} style={{ rotate: showDeclined ? "180deg" : "0deg" }} />
+                  <ChevronDown className="size-3.5 transition-transform" style={{ rotate: showDeclined ? "180deg" : "0deg" }} />
                 </button>
                 {showDeclined &&
                   declinedOffers.map((offer) => (
@@ -233,12 +248,27 @@ function Avatar({ index, size, photo }: { index: number; size: number; photo?: s
 
 function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat: () => void; onDecline: () => void }) {
   const openProfile = useOpenProfile();
+  const highlightOnMap = () => hoveredOfferStore.set({ requestId: offer.requestId, performerId: offer.performerId });
+  useEffect(() => () => {
+    const current = hoveredOfferStore.get();
+    if (current?.requestId === offer.requestId && current.performerId === offer.performerId) hoveredOfferStore.set(null);
+  }, [offer.requestId, offer.performerId]);
   const showOnMap = () => {
-    focusPerformerStore.set({ id: offer.performerId, at: Date.now() });
+    focusPerformerStore.set({ id: offer.performerId, at: Date.now(), toggle: true });
     if (isPhone()) offersCollapsedStore.set(true);
   };
   return (
-    <article data-offer={offer.id} className="offer-card" aria-label={`Пропозиція: ${offer.name}`}>
+    <article
+      data-offer={offer.id}
+      className="offer-card"
+      aria-label={`Пропозиція: ${offer.name}`}
+      onPointerEnter={highlightOnMap}
+      onFocusCapture={highlightOnMap}
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest("button, a, input, select, textarea")) return;
+        showOnMap();
+      }}
+    >
       <div className="flex items-start gap-3">
         <button type="button" onClick={showOnMap} aria-label={`Показати ${offer.name} на карті`} className="shrink-0 rounded-full">
           <Avatar index={offer.avatarIndex} size={42} photo={offer.photo} />
@@ -250,7 +280,7 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
             </button>
             {offer.rating !== "—" && (
               <span className="inline-flex shrink-0 items-center gap-0.5 text-[12px] text-ink-muted">
-                <Star className="size-3 fill-current" strokeWidth={0} />
+                <Star className="size-3 fill-current" />
                 {offer.rating}
               </span>
             )}
@@ -272,17 +302,11 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
 
       <div className="mt-3 flex items-center gap-1.5">
         <button type="button" onClick={onChat} className="offer-primary">
-          <MessageCircle className="size-4" strokeWidth={1.9} />
+          <MessageCircle className="size-4" />
           Написати
         </button>
-        {getPerformers().some((person) => person.id === offer.performerId) && (
-          <button type="button" onClick={showOnMap} className="offer-secondary">
-            <MapPin className="size-4" strokeWidth={1.9} />
-            На карті
-          </button>
-        )}
         <button type="button" onClick={onDecline} aria-label={`Відхилити пропозицію ${offer.name}`} className="offer-secondary ml-auto">
-          <X className="size-4" strokeWidth={1.9} />
+          <X className="size-4" />
           <span className="sr-only sm:not-sr-only">Відхилити</span>
         </button>
       </div>
@@ -334,7 +358,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
     <div className="chat">
       <header className="chat-header">
         <button type="button" onClick={onBack} aria-label="До пропозицій" className="auth-icon-button -ml-1.5">
-          <ArrowLeft className="size-4" strokeWidth={2} />
+          <ArrowLeft className="size-4" />
         </button>
         <Avatar index={response.avatarIndex} size={34} photo={response.photo} />
         <div className="min-w-0 flex-1">
@@ -381,7 +405,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
 
       <div ref={listRef} className="chat-messages" aria-live="polite">
         <p className="chat-notice">
-          <ShieldCheck className="size-3.5 shrink-0" strokeWidth={2} />
+          <ShieldCheck className="size-3.5 shrink-0" />
           Домовляйтеся тут: якщо щось піде не так, ми побачимо переписку й допоможемо.
         </p>
         {messages.map((message) => (
@@ -430,7 +454,7 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
             className="chat-input"
           />
           <button type="submit" disabled={!draft.trim()} aria-label="Надіслати" className="chat-send">
-            <ArrowUp className="size-4" strokeWidth={2.4} />
+            <ArrowUp className="size-4" />
           </button>
         </div>
       </form>

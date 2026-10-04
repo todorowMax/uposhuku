@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, MapPin, Wallet, X } from "lucide-react";
+import { CalendarClock, MapPin, Wallet, X } from "@/components/icons";
 import { CITIES } from "@/lib/map/cities";
 import { DEADLINES, type Deadline } from "@/lib/requests/types";
 
@@ -59,7 +59,7 @@ export function RequestParams({ value, onChange }: { value: RequestParamsValue; 
       </button>
       {filled && (
         <button type="button" onClick={clear} aria-label={`Прибрати: ${label}`} className="param-chip-clear">
-          <X className="size-3" strokeWidth={2.4} />
+          <X className="size-3" />
         </button>
       )}
     </span>
@@ -67,17 +67,17 @@ export function RequestParams({ value, onChange }: { value: RequestParamsValue; 
 
   return (
     <div ref={rootRef} className="composer-params" role="group" aria-label="Умови запиту">
-      {chip("budget", <Wallet className="size-3.5 shrink-0" strokeWidth={1.9} />, "Бюджет", value.budget ? `до ${PRICE.format(value.budget)} ₴` : null, () => {
+      {chip("budget", <Wallet className="size-3.5 shrink-0" />, "Бюджет", value.budget ? `до ${PRICE.format(value.budget)} ₴` : null, () => {
         set({ budget: null });
         setBudgetText("");
       })}
-      {chip("deadline", <CalendarClock className="size-3.5 shrink-0" strokeWidth={1.9} />, "Термін", value.deadline ? DEADLINES[value.deadline] : null, () => set({ deadline: null }))}
-      {chip("city", <MapPin className="size-3.5 shrink-0" strokeWidth={1.9} />, "Де", place, () => set({ cityId: null, remote: false }))}
+      {chip("deadline", <CalendarClock className="size-3.5 shrink-0" />, "Термін", value.deadline ? DEADLINES[value.deadline] : null, () => set({ deadline: null }))}
+      {chip("city", <MapPin className="size-3.5 shrink-0" />, "Де", place, () => set({ cityId: null, remote: false }))}
 
       {open === "budget" && (
         <div className="param-pop" role="dialog" aria-label="Бюджет">
           <p className="param-pop-title">Скільки готові витратити, максимум</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="param-presets">
             {BUDGET_PRESETS.map((preset) => (
               <button
                 key={preset}
@@ -97,7 +97,7 @@ export function RequestParams({ value, onChange }: { value: RequestParamsValue; 
           <label htmlFor="param-budget" className="sr-only">
             Своя сума, гривні
           </label>
-          <div className="mt-2 flex gap-2">
+          <div className="param-custom-amount mt-2">
             <input
               id="param-budget"
               inputMode="numeric"

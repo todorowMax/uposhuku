@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Loader2, MapPin, MessageSquareText, X } from "lucide-react";
+import { Check, Loader2, MapPin, MessageSquareText, X } from "@/components/icons";
 import { DirectChatPanel } from "@/components/profile/direct-chat";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { Stars } from "@/components/deals/deal-tab";
@@ -148,7 +148,7 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
           <h1 className="truncate text-[18px] font-semibold text-ink">{performer?.name ?? "Профіль виконавця"}</h1>
         </div>
         <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button shrink-0">
-          <X className="size-5" strokeWidth={2} />
+          <X className="size-5" />
         </button>
       </header>
 
@@ -167,7 +167,7 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
                 <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
                   {city && (
                     <span className="inline-flex items-center gap-1">
-                      <MapPin className="size-3.5" strokeWidth={2} />
+                      <MapPin className="size-3.5" />
                       {city}
                     </span>
                   )}
@@ -207,7 +207,7 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
                 <div className="flex flex-wrap gap-1.5">
                   {tags.map((tag) => (
                     <span key={tag} className="auth-draft-tag">
-                      {proven.has(tag) && <Check className="mr-1 size-3 text-[#8e5f40]" strokeWidth={3} aria-label="Підтверджено роботою" />}
+                      {proven.has(tag) && <Check className="mr-1 size-3 text-brand" aria-label="Підтверджено роботою" />}
                       {labels[tag] ?? tag}
                     </span>
                   ))}
@@ -285,7 +285,7 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
               aria-haspopup="dialog"
               onClick={() => setComposing(true)}
             >
-              <MessageSquareText className="size-4" strokeWidth={1.9} />
+              <MessageSquareText className="size-4" />
               {dialog ? "Відкрити чат" : `Описати задачу для ${performer.name.split(" ")[0]}`}
             </button>
           )}

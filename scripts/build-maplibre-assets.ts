@@ -7,8 +7,7 @@
 //    Mercator. Вони в рівнокутній проєкції (широта лінійна), а MapLibre
 //    тягне картинку між кутами лінійно в Меркаторі: без перепроєкції
 //    Україна з'їхала б приблизно на 1° (близько 100 км).
-// 2. Гліфи підписів (Noto Sans з OpenFreeMap) для латиниці, кирилиці й
-//    типографських знаків, щоб назви міст з'являлися разом з картою.
+// Підписи карта малює локальним FixelVariable.ttf з public/fonts.
 //
 // Результат лежить у git (public/map), як і самі текстури.
 // Запуск: npm run map:assets
@@ -55,9 +54,6 @@ const toMercator = async (
   console.log(`  ${out}: ${width}×${height}, ${(bytes.length / 1024).toFixed(0)} КБ`);
 };
 
-const GLYPH_RANGES = ["0-255", "256-511", "1024-1279", "8192-8447"];
-const FONTS = ["Noto Sans Regular", "Noto Sans Bold"];
-
 const main = async () => {
   mkdirSync(outDir, { recursive: true });
 
@@ -76,18 +72,6 @@ const main = async () => {
     3040,
     "region.webp"
   );
-
-  for (const font of FONTS) {
-    const dir = resolve(outDir, "fonts", font);
-    mkdirSync(dir, { recursive: true });
-    for (const range of GLYPH_RANGES) {
-      const url = `https://tiles.openfreemap.org/fonts/${encodeURIComponent(font)}/${range}.pbf`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`${url}: ${response.status}`);
-      writeFileSync(resolve(dir, `${range}.pbf`), Buffer.from(await response.arrayBuffer()));
-    }
-    console.log(`  fonts/${font}: ${GLYPH_RANGES.join(", ")}`);
-  }
 };
 
 main().catch((error) => {

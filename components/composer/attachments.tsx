@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, X } from "lucide-react";
+import { FileText, X } from "@/components/icons";
 
 export interface Attachment {
   id: string;
@@ -24,7 +24,7 @@ export function Attachments({ items, onRemove }: { items: Attachment[]; onRemove
             <img src={item.url} alt={item.file.name} className="attachment-image" />
           ) : (
             <span className="attachment-file">
-              <FileText className="size-4 shrink-0 text-ink-muted" strokeWidth={1.9} />
+              <FileText className="size-4 shrink-0 text-ink-muted" />
               <span className="truncate">{item.file.name}</span>
             </span>
           )}
@@ -34,7 +34,7 @@ export function Attachments({ items, onRemove }: { items: Attachment[]; onRemove
             aria-label={`Прибрати «${item.file.name}»`}
             className="attachment-remove"
           >
-            <X className="size-3" strokeWidth={2.4} />
+            <X className="size-3" />
           </button>
         </li>
       ))}

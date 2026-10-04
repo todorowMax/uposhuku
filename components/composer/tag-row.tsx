@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X } from "@/components/icons";
 
 interface TagRowProps {
   /** Теги, що вже на запиті: знайдені в тексті й додані вручну. */
@@ -95,7 +95,7 @@ export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagR
           aria-label={`Прибрати тег «${labelOf(item.id)}»`}
           className="tag-chip-remove"
         >
-          <X className="size-3" strokeWidth={2.4} />
+          <X className="size-3" />
         </button>
       </span>
     ) : (
@@ -110,7 +110,7 @@ export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagR
         title={labelOf(item.id)}
         {...(measuring ? { "data-measure-chip": "" } : {})}
       >
-        <Plus className="size-3 shrink-0" strokeWidth={2.4} />
+        <Plus className="size-3 shrink-0" />
         <span className="tag-chip-label">{labelOf(item.id)}</span>
       </button>
     );

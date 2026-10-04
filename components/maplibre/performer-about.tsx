@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "@/components/icons";
 import { gsap } from "gsap";
 import type { Performer, PortfolioWork } from "@/lib/map/types";
 
@@ -127,7 +127,7 @@ export function PerformerAbout({ performer, onOpenWork, full = false }: { perfor
               {open.url && (
                 <a href={open.url} target="_blank" rel="noopener noreferrer nofollow" className="auth-link mt-2 inline-flex items-center gap-1 text-[12px]">
                   Відкрити проєкт
-                  <ArrowUpRight className="size-3.5" strokeWidth={2} />
+                  <ArrowUpRight className="size-3.5" />
                 </a>
               )}
             </div>

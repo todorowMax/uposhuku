@@ -20,9 +20,12 @@ import { MAP_PALETTE as P } from "@/lib/map/palette";
 import { DETAIL_ZOOM, STATIC_MAP, corners } from "@/lib/maplibre/static";
 import { ukraineRim } from "@/lib/maplibre/rim";
 
-/** Шрифти підписів з OpenFreeMap, мають кирилицю. */
-export const FONT_REGULAR = ["Noto Sans Regular"];
-export const FONT_BOLD = ["Noto Sans Bold"];
+/** MapLibre бере підписи з того самого локального Fixel, що й інтерфейс. */
+export const FONT_REGULAR = ["Fixel"];
+export const FONT_BOLD = ["Fixel"];
+export const fixelMapFaces = (origin: string): NonNullable<StyleSpecification["font-faces"]> => ({
+  Fixel: `${origin}/fonts/FixelVariable.ttf`,
+});
 
 /** Масштаб, з якого з'являються об'ємні будинки. */
 export const BUILDINGS_ZOOM = 13;
@@ -47,11 +50,11 @@ const fadeOut = ["interpolate", ["linear"], ["zoom"], DETAIL_ZOOM, 1, DETAIL_ZOO
 /** Шар OSM проявляється з DETAIL_ZOOM. */
 const fadeIn = ["interpolate", ["linear"], ["zoom"], DETAIL_ZOOM, 0, DETAIL_ZOOM + 1, 1] as unknown as number;
 
-/** `origin` — адреса сайту: гліфам MapLibre потрібна абсолютна URL. */
+/** `origin` — адреса сайту для локального файлу Fixel у MapLibre. */
 export const buildMapStyle = (origin: string): StyleSpecification => ({
   version: 8,
   projection: { type: "globe" },
-  glyphs: `${origin}/map/fonts/{fontstack}/{range}.pbf`,
+  "font-faces": fixelMapFaces(origin),
   sky: {
     // Над планетою космос (.space-bg), тож небо напівпрозоре: тонкий блакитний
     // ореол атмосфери по краю глобуса, а далі видно зорі.
@@ -214,7 +217,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       source: "ukraine-rim",
       maxzoom: 9,
       paint: {
-        "fill-extrusion-color": "#b48264",
+        "fill-extrusion-color": P.ukraineSide,
         "fill-extrusion-height": PLATEAU_HEIGHT,
         "fill-extrusion-base": 0,
         "fill-extrusion-opacity": plateauOpacity(0.7),
@@ -228,7 +231,7 @@ export const buildMapStyle = (origin: string): StyleSpecification => ({
       source: "ukraine",
       maxzoom: 10,
       paint: {
-        "line-color": "#b48264",
+        "line-color": P.ukraineStroke,
         "line-width": ["interpolate", ["linear"], ["zoom"], 4, 1.8, 9, 2.4],
         "line-opacity": 0.42,
       },

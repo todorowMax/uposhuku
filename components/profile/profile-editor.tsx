@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Loader2, MapPinned, Plus, X } from "lucide-react";
+import { Check, Loader2, MapPinned, Plus, X } from "@/components/icons";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { LocationPicker } from "@/components/profile/location-picker";
 import { PhotoField } from "@/components/profile/photo-field";
@@ -187,13 +187,13 @@ export function ProfileEditor() {
         <ul className="pe-checks" aria-label={`Заповнено ${done} з ${checks.length}`}>
           {checks.map(([label, ok]) => (
             <li key={label} data-ok={ok || undefined}>
-              {ok ? <Check className="size-3" strokeWidth={3} /> : <span aria-hidden className="pe-check-dot" />}
+              {ok ? <Check className="size-3" /> : <span aria-hidden className="pe-check-dot" />}
               {label}
             </li>
           ))}
         </ul>
         <button type="button" onClick={requestClose} aria-label="Закрити" className="auth-icon-button shrink-0">
-          <X className="size-5" strokeWidth={2} />
+          <X className="size-5" />
         </button>
       </header>
 
@@ -253,7 +253,7 @@ export function ProfileEditor() {
                       aria-label={location ? "Змінити точку на карті" : "Поставити точку на карті"}
                       title={location ? "Точку задано. Змінити на карті" : "Поставити точку на карті"}
                     >
-                      <MapPinned className="size-[18px]" strokeWidth={1.9} />
+                      <MapPinned className="size-[18px]" />
                     </button>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export function ProfileEditor() {
               ))}
               {works.length < PROFILE_LIMITS.works && (
                 <button type="button" onClick={addWork} className="pe-add">
-                  <Plus className="size-4" strokeWidth={2.2} />
+                  <Plus className="size-4" />
                   {works.length ? "Ще одна робота" : "Додати роботу"}
                 </button>
               )}
@@ -401,7 +401,7 @@ export function ProfileEditor() {
                       </>
                     )}
                     <span role="status" className="pe-saved" data-shown={saved || undefined}>
-                      <Check className="size-3.5" strokeWidth={3} />
+                      <Check className="size-3.5" />
                       Збережено
                     </span>
                   </div>
@@ -452,7 +452,7 @@ export function ProfileEditor() {
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {allTags.map((id) => (
                       <span key={id} className="auth-draft-tag">
-                        {proven.has(id) && <Check className="mr-1 size-3 text-[#8e5f40]" strokeWidth={3} aria-label="Підтверджено роботою" />}
+                        {proven.has(id) && <Check className="mr-1 size-3 text-brand" aria-label="Підтверджено роботою" />}
                         {tagging.labelOf(id)}
                       </span>
                     ))}

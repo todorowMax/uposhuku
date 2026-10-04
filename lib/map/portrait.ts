@@ -64,14 +64,10 @@ export const createPortraitCanvas = (source: HTMLImageElement, index: number, se
   if (!context) throw new Error("Canvas 2D is unavailable");
   // Фото й маленький якір з'єднані в один «живий» маркер. Контур
   // залишає портрет упізнаваним навіть у найменшому платному рівні.
-  context.shadowColor = selected ? "rgba(172, 103, 57, .48)" : "rgba(48, 68, 64, .22)";
-  context.shadowBlur = selected ? 32 : 17;
-  context.shadowOffsetY = 6;
   context.fillStyle = "#ffffff";
   context.beginPath();
   context.arc(96, 83, 72, 0, Math.PI * 2);
   context.fill();
-  context.shadowColor = "transparent";
   drawPortrait(context, source, index, 96, 83, 65);
   context.strokeStyle = "#ffffff";
   context.lineWidth = 8;

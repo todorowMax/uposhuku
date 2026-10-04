@@ -18,7 +18,7 @@ export const PLACE_LABEL_LAYERS: LayerSpecification[] = [
     minzoom: 9,
     filter: ["in", ["get", "class"], ["literal", ["village", "suburb", "neighbourhood"]]],
     layout: { "text-field": NAME, "text-font": FONT_REGULAR, "text-size": 11 },
-    paint: { "text-color": "#69777f", "text-halo-color": "#f9faf9", "text-halo-width": 1.4 },
+    paint: { "text-color": "#427484", "text-halo-color": "#dce7e4", "text-halo-width": 1.4 },
   },
   {
     id: "place-city",
@@ -27,6 +27,6 @@ export const PLACE_LABEL_LAYERS: LayerSpecification[] = [
     "source-layer": "place",
     filter: ["in", ["get", "class"], ["literal", ["city", "town"]]],
     layout: { "text-field": NAME, "text-font": FONT_BOLD, "text-size": ["interpolate", ["linear"], ["zoom"], 5, 11, 12, 16] },
-    paint: { "text-color": "#30363a", "text-halo-color": "#f9faf9", "text-halo-width": 1.6 },
+    paint: { "text-color": "#00364a", "text-halo-color": "#dce7e4", "text-halo-width": 1.6 },
   },
 ];
