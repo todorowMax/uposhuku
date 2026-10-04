@@ -51,6 +51,8 @@ const ZOOM_OUT_SLACK = 0.35;
  * дійти до будь-якого кута України, але не до сусідів.
  */
 const PAN_SLACK = { far: { lng: 2.5, lat: 1.5 }, near: { lng: 10, lat: 4.5 } };
+/** Людина просила менше руху в системі: плавні прокрутки й анімації вимикаємо. */
+const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const lerp = (from: number, to: number, t: number) => from + (to - from) * t;
 /**
@@ -473,9 +475,9 @@ const ownRequestOnMap = (request: PublishedRequest, responses: number): MapReque
 const toPeople = (performers: Performer[], requests: MapRequest[] = []): FeatureCollection<Point> => ({
   type: "FeatureCollection",
   features: [...performers.map((performer) => ({
-    type: "Feature",
+    type: "Feature" as const,
     id: performer.id,
-    geometry: { type: "Point", coordinates: [performer.lng, performer.lat] },
+    geometry: { type: "Point" as const, coordinates: [performer.lng, performer.lat] },
     properties: {
       kind: "person",
       id: performer.id,

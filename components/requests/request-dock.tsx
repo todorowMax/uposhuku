@@ -58,13 +58,17 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   useLayoutEffect(() => {
     if (!rootRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tween = gsap.fromTo(rootRef.current, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
-    return () => tween.kill();
+    return () => {
+      tween.kill();
+    };
   }, [active.id]);
 
   useLayoutEffect(() => {
     if (!listOpen || !listRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tween = gsap.fromTo(listRef.current, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" });
-    return () => tween.kill();
+    return () => {
+      tween.kill();
+    };
   }, [listOpen]);
 
   useEffect(() => {
