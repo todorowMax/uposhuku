@@ -1,15 +1,14 @@
 // /api/feed/:id/response — відгук виконавця на запит.
 // PUT — надіслати або змінити {price|null, days, message}; DELETE — відкликати.
-// Справжня версія: таблиця responses, подія в Durable Object запиту, щоб
-// замовник побачив пропозицію одразу.
+// Відгукнутися можна на будь-який відкритий чужий запит; замовник бачить
+// пропозицію одразу (подія offer у реальному часі).
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { feedHas, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
+import { canRespond, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
 import { pushGlobal, pushUser } from "@/lib/server/realtime";
 import { requestOwner } from "@/lib/server/request-repo";
-import { profileTags } from "@/lib/profile/types";
 
 /** Замовник бачить відгук одразу, а всі — лічильник відгуків у стрічці. */
 const notifyOffer = async (requestId: string) => {
@@ -22,7 +21,7 @@ const authorize = async (id: string) => {
   if (!user) return { error: problem(401, "Потрібен вхід") };
   const profile = await getProfile(user.id);
   if (!profile?.published) return { error: problem(403, "Спершу опублікуйте профіль виконавця") };
-  if (!(await feedHas(user.id, id, profileTags(profile)))) return { error: problem(404, "Запит не знайдено", "Цього запиту вже немає у вашій стрічці.") };
+  if (!(await canRespond(user.id, id))) return { error: problem(404, "Запит не знайдено", "Цей запит уже закрито, його немає або він ваш власний.") };
   return { user };
 };
 

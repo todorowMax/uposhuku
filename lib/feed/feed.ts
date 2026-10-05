@@ -5,7 +5,7 @@
 
 import { CITIES } from "@/lib/map/cities";
 import { DEADLINES } from "@/lib/requests/types";
-import { listOthersOpen, listRequests, myResponses, removeResponse, responseCounts, saveResponse } from "@/lib/server/request-repo";
+import { listOthersOpen, listRequests, myResponses, removeResponse, requestOwner, responseCounts, saveResponse } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { MATCH_THRESHOLD, tagSimilarity } from "@/lib/tags/match";
 import { RESPONSE_LIMITS, type FeedItem, type MapRequest, type MyResponse } from "./types";
@@ -106,8 +106,15 @@ export const mapRequests = async (userId: string | null, profileTags: string[]):
   return raw.map((item) => ({ ...toItem(userId, item, profileTags, mine), point: pointOf(item), own: item.own })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
-/** Чи є такий запит у стрічці цієї людини: відповісти можна лише на показане. */
-export const feedHas = async (userId: string, requestId: string, profileTags: string[]) => (await feedFor(userId, profileTags)).some((item) => item.id === requestId);
+/**
+ * Чи може ця людина відгукнутися: запит існує, відкритий і не її власний. Збіг тегів не
+ * вимагаємо: карта показує виконавцю й запити без збігу («Збіг: 0 з 5»), і відповісти
+ * на них теж можна, це його рішення.
+ */
+export const canRespond = async (userId: string, requestId: string) => {
+  const owner = await requestOwner(requestId);
+  return Boolean(owner && owner.status === "open" && owner.userId !== userId);
+};
 
 /** Тіло відгуку від клієнта: ціна, термін, повідомлення в розумних межах. */
 export const parseResponse = (body: Record<string, unknown> | null): Omit<MyResponse, "createdAt"> | string => {

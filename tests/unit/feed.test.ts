@@ -49,6 +49,21 @@ describe("стрічка запитів виконавця", () => {
   });
 });
 
+describe("хто може відгукнутися", () => {
+  it("на будь-який відкритий чужий запит, навіть без збігу тегів; на свій, закритий чи неіснуючий не можна", async () => {
+    const { canRespond } = await import("@/lib/feed/feed");
+    const { closeRequest } = await import("@/lib/server/request-repo");
+    const open = await createRequest("cust-a", { text: "Потрібен сайт для дорослого одягу", tags: [{ id: "website", label: "Сайт" }], files: [] });
+    expect(await canRespond("perf-a", open.id)).toBe(true);
+    // Збіг тегів профілю нічого не вирішує: у perf-a немає тегів, а відповісти можна.
+    expect((await feedFor("perf-a", ["branding"])).some((item) => item.id === open.id)).toBe(false);
+    expect(await canRespond("cust-a", open.id)).toBe(false);
+    expect(await canRespond("perf-a", "req_nope")).toBe(false);
+    await closeRequest("cust-a", open.id);
+    expect(await canRespond("perf-a", open.id)).toBe(false);
+  });
+});
+
 describe("відгук виконавця: перевірка тіла", () => {
   const ok = { price: 12500, days: 14, message: "Добрий день! Зроблю, почну завтра." };
 
