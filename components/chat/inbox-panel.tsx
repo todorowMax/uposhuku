@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { gsap } from "gsap";
 import { ArrowLeft, ArrowUp, MessageCircle, X } from "lucide-react";
 import { fetchConversations, useRemoteChat } from "@/lib/chat/client";
 import { startPolling } from "@/lib/realtime/client";
@@ -25,6 +26,46 @@ export function InboxPanel() {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<ConversationDto | null>(null);
   const signedIn = session.status === "user";
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
+  const closing = useRef(false);
+
+  // Панель розкривається з кнопки: розмір, форма й м'яке світіння.
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const button = buttonRef.current;
+    if (!open || !panel) return;
+    closing.current = false;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || !button) return;
+    const to = panel.getBoundingClientRect();
+    const from = button.getBoundingClientRect();
+    const timeline = gsap.timeline({ onComplete: () => gsap.set(panel, { clearProps: "left,top,width,height,right,bottom,borderRadius" }) });
+    timeline.fromTo(panel, { right: "auto", bottom: "auto", left: from.left, top: from.top, width: from.width, height: from.height, borderRadius: 20 }, { left: to.left, top: to.top, width: to.width, height: to.height, borderRadius: 24, duration: 0.46, ease: "expo.out" }, 0);
+    timeline.fromTo(innerRef.current, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 0.18);
+    timeline.fromTo(glowRef.current, { opacity: 1 }, { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 0.04);
+    return () => {
+      timeline.kill();
+    };
+  }, [open]);
+
+  const close = () => {
+    const panel = panelRef.current;
+    const button = buttonRef.current;
+    if (closing.current) return;
+    if (!panel || !button || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setOpen(false);
+    closing.current = true;
+    const from = panel.getBoundingClientRect();
+    const to = button.getBoundingClientRect();
+    gsap
+      .timeline({ onComplete: () => setOpen(false) })
+      .set(panel, { right: "auto", bottom: "auto", left: from.left, top: from.top, width: from.width, height: from.height })
+      .to(innerRef.current, { opacity: 0, duration: 0.12, ease: "power1.in" }, 0)
+      .to(glowRef.current, { opacity: 1, duration: 0.22, ease: "power2.in" }, 0.04)
+      .to(panel, { left: to.left, top: to.top, width: to.width, height: to.height, borderRadius: 20, duration: 0.34, ease: "expo.inOut" }, 0.04);
+  };
 
   useEffect(() => {
     if (!signedIn) {
@@ -52,22 +93,24 @@ export function InboxPanel() {
 
   return (
     <>
-      {!open && (
-        <button type="button" onClick={() => setOpen(true)} className="inbox-button" aria-label={`Повідомлення: ${items.length}`}>
+      {(
+        <button ref={buttonRef} type="button" onClick={() => setOpen(true)} className="inbox-button" style={open ? { visibility: "hidden" } : undefined} aria-label={`Повідомлення: ${items.length}`}>
           <MessageCircle className="size-4" strokeWidth={1.9} />
           Повідомлення
           {asPerformer > 0 && <span className="inbox-badge">{asPerformer}</span>}
         </button>
       )}
       {open && (
-        <section role="dialog" aria-label="Повідомлення" className="inbox-panel">
+        <section ref={panelRef} role="dialog" aria-label="Повідомлення" className="inbox-panel">
+          <div ref={glowRef} className="dr-glow" data-soft aria-hidden />
+          <div ref={innerRef} className="inbox-inner">
           {active ? (
-            <Thread conversation={active} onBack={() => setActive(null)} onClose={() => setOpen(false)} />
+            <Thread conversation={active} onBack={() => setActive(null)} onClose={close} />
           ) : (
             <>
               <header className="inbox-header">
                 <h2>Повідомлення</h2>
-                <button type="button" onClick={() => setOpen(false)} aria-label="Закрити" className="dr-close">
+                <button type="button" onClick={close} aria-label="Закрити" className="dr-close">
                   <X className="size-4" strokeWidth={2.2} />
                 </button>
               </header>
@@ -86,6 +129,7 @@ export function InboxPanel() {
               </ul>
             </>
           )}
+          </div>
         </section>
       )}
     </>

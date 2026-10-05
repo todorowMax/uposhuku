@@ -4793,6 +4793,17 @@ html[data-map-ready] .map-skeleton {
   background: radial-gradient(90% 120% at 50% 0%, #ff9a72 0%, var(--brand-solid) 55%, #b93c14 100%);
 }
 
+.dr-glow[data-soft] {
+  background: radial-gradient(90% 120% at 50% 0%, #fbd5c4 0%, #fdeee7 60%, #ffffff 100%);
+}
+
+.inbox-inner {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+
 .dr-body {
   display: flex;
   flex-direction: column;
@@ -5198,6 +5209,7 @@ html[data-map-ready] .map-skeleton {
 
 .inbox-panel {
   position: fixed;
+  overflow: hidden;
   z-index: 60;
   right: 16px;
   bottom: 16px;
