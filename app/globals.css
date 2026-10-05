@@ -5198,7 +5198,7 @@ html[data-map-ready] .map-skeleton {
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #b48264;
+  background: var(--brand-solid);
   font-size: 11px;
   color: #ffffff;
 }
