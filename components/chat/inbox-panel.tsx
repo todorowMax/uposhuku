@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
-import { ArrowLeft, ArrowUp, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, FileText, MessageCircle, X } from "lucide-react";
 import { fetchConversations, useRemoteChat } from "@/lib/chat/client";
 import { startPolling } from "@/lib/realtime/client";
 import { CHAT_TEXT_MAX, type ConversationDto } from "@/lib/chat/types";
@@ -29,7 +29,6 @@ export function InboxPanel() {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
-  const glowRef = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
 
   // Панель розкривається з кнопки: розмір, форма й м'яке світіння.
@@ -45,7 +44,6 @@ export function InboxPanel() {
     const timeline = gsap.timeline({ onComplete: () => gsap.set(panel, { clearProps: "left,top,width,height,right,bottom,borderRadius" }) });
     timeline.fromTo(panel, { right: "auto", bottom: "auto", left: from.left, top: from.top, width: from.width, height: from.height, borderRadius: 20 }, { left: to.left, top: to.top, width: to.width, height: to.height, borderRadius: 24, duration: 0.46, ease: "expo.out" }, 0);
     timeline.fromTo(innerRef.current, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.26, ease: "power2.out" }, 0.18);
-    timeline.fromTo(glowRef.current, { opacity: 1 }, { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 0.04);
     return () => {
       timeline.kill();
     };
@@ -63,7 +61,6 @@ export function InboxPanel() {
       .timeline({ onComplete: () => setOpen(false) })
       .set(panel, { right: "auto", bottom: "auto", left: from.left, top: from.top, width: from.width, height: from.height })
       .to(innerRef.current, { opacity: 0, duration: 0.12, ease: "power1.in" }, 0)
-      .to(glowRef.current, { opacity: 1, duration: 0.22, ease: "power2.in" }, 0.04)
       .to(panel, { left: to.left, top: to.top, width: to.width, height: to.height, borderRadius: 20, duration: 0.34, ease: "expo.inOut" }, 0.04);
   };
 
@@ -89,7 +86,8 @@ export function InboxPanel() {
   }, [signedIn, open]);
 
   if (!signedIn || items.length === 0) return null;
-  const asPerformer = items.filter((item) => item.role === "performer").length;
+  // Бейдж: розмови, де щось чекає на мене (угода), а якщо таких немає, то де я виконавець.
+  const actionCount = items.filter((item) => item.deal?.needsMe).length || items.filter((item) => item.role === "performer").length;
 
   return (
     <>
@@ -97,13 +95,12 @@ export function InboxPanel() {
         <button ref={buttonRef} type="button" onClick={() => setOpen(true)} className="inbox-button" style={open ? { visibility: "hidden" } : undefined} aria-label={`Повідомлення: ${items.length}`}>
           <MessageCircle className="size-4" strokeWidth={1.9} />
           Повідомлення
-          {asPerformer > 0 && <span className="inbox-badge">{asPerformer}</span>}
+          {actionCount > 0 && <span className="inbox-badge">{actionCount}</span>}
         </button>
       )}
       {open && (
         <section ref={panelRef} role="dialog" aria-label="Повідомлення" className="inbox-panel">
-          <div ref={glowRef} className="dr-glow" data-soft aria-hidden />
-          <div ref={innerRef} className="inbox-inner">
+                    <div ref={innerRef} className="inbox-inner">
           {active ? (
             <Thread conversation={active} onBack={() => setActive(null)} onClose={close} />
           ) : (
@@ -122,6 +119,12 @@ export function InboxPanel() {
                         {item.other.name}
                         <em>{item.role === "performer" ? "замовник" : (item.other.specialty ?? "виконавець")}</em>
                       </span>
+                      {item.deal && (
+                        <span className="inbox-deal-tag" data-action={item.deal.needsMe || undefined}>
+                          <FileText aria-hidden className="size-3" strokeWidth={2} />
+                          {item.deal.label}
+                        </span>
+                      )}
                       <span className="inbox-preview">{item.lastMessage ? item.lastMessage.text : "Без повідомлень"}</span>
                     </button>
                   </li>

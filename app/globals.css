@@ -4778,7 +4778,7 @@ html[data-map-ready] .map-skeleton {
   position: fixed;
   z-index: 6;
   overflow: hidden;
-  background: radial-gradient(120% 70% at 50% -10%, #f6d9cc 0%, rgb(246 217 204 / 0%) 60%), linear-gradient(180deg, #fbf3ee 0%, #ffffff 42%);
+  background: #ffffff;
   color: var(--ink);
   box-shadow: 0 24px 60px -12px rgb(16 45 55 / 28%), 0 2px 8px rgb(16 45 55 / 10%), inset 0 0 0 1px rgb(255 255 255 / 80%);
 }
@@ -4790,11 +4790,7 @@ html[data-map-ready] .map-skeleton {
   z-index: 2;
   pointer-events: none;
   border-radius: inherit;
-  background: radial-gradient(90% 120% at 50% 0%, #ff9a72 0%, var(--brand-solid) 55%, #b93c14 100%);
-}
-
-.dr-glow[data-soft] {
-  background: radial-gradient(90% 120% at 50% 0%, #fbd5c4 0%, #fdeee7 60%, #ffffff 100%);
+  background: radial-gradient(100% 110% at 50% 40%, #ffd6c4 0%, #ff8d63 45%, var(--brand-solid) 100%);
 }
 
 .inbox-inner {
@@ -5219,7 +5215,7 @@ html[data-map-ready] .map-skeleton {
   height: min(560px, calc(100dvh - 32px));
   padding: 14px 16px;
   border-radius: 24px;
-  background: radial-gradient(120% 50% at 50% -10%, #f6d9cc 0%, rgb(246 217 204 / 0%) 60%), linear-gradient(180deg, #fbf3ee 0%, #ffffff 36%);
+  background: #ffffff;
   color: var(--ink);
   box-shadow: 0 24px 60px -12px rgb(16 45 55 / 28%), inset 0 0 0 1px rgb(255 255 255 / 80%);
 }
@@ -5333,4 +5329,24 @@ html[data-map-ready] .map-skeleton {
   width: auto;
   padding: 0 12px;
   font-size: 13px;
+}
+
+/* Мітка угоди в списку розмов; оранжева, коли чекають моєї дії. */
+.inbox-deal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6eef0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inbox-deal-tag[data-action] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
 }

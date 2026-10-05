@@ -5,7 +5,9 @@
 // таблиць, цей API лишиться запасним.
 
 import { and, asc, desc, eq, gt, inArray, or } from "drizzle-orm";
-import { conversations, messages, users } from "@/db/schema";
+import { conversations, deals, messages, users } from "@/db/schema";
+import type { Deal } from "@/lib/deals/types";
+import { performerNeeds } from "@/lib/deals/machine";
 import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
 import { getDb, inChunks } from "./db";
 import { getProfile } from "./profile-repo";
@@ -60,6 +62,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   if (rows.length === 0) return [];
   const ids = rows.map((row) => row.id);
   const allMessages = (await inChunks(ids, (chunk) => db.select().from(messages).where(inArray(messages.conversationId, chunk)))).sort((a, b) => b.createdAt - a.createdAt);
+  const mine = (await db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200)).filter((row) => row.status !== "declined" && row.status !== "cancelled");
   const customerIds = [...new Set(rows.filter((row) => row.performerUserId === userId).map((row) => row.customerUserId))];
   const customers = await inChunks(customerIds, (chunk) => db.select().from(users).where(inArray(users.id, chunk)));
   const result: ConversationDto[] = [];
@@ -74,7 +77,15 @@ export const listConversations = async (userId: string): Promise<ConversationDto
       const customer = customers.find((user) => user.id === row.customerUserId);
       other = { name: customer?.displayName ?? customer?.email.split("@")[0] ?? "Замовник" };
     }
-    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, updatedAt: new Date(row.updatedAt).toISOString() });
+    const dealRow = mine.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
+    let deal: ConversationDto["deal"];
+    if (dealRow) {
+      const parsed = JSON.parse(dealRow.data) as Deal;
+      const needs = role === "performer" ? performerNeeds(parsed) !== null : false;
+      const label = parsed.status === "completed" ? "Угоду завершено" : parsed.status === "proposed" ? (role === "performer" ? "Пропонує угоду" : "Угоду запропоновано") : "Угода в роботі";
+      deal = { label, needsMe: needs };
+    }
+    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, ...(deal ? { deal } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
   }
   return result;
 };

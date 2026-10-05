@@ -18,6 +18,8 @@ export interface ConversationDto {
   /** Друга сторона: ім'я й фото виконавця для замовника, ім'я замовника для виконавця. */
   other: { name: string; photo?: string; specialty?: string };
   lastMessage: ChatMessageDto | null;
+  /** Найновіша жива угода з цією людиною: щоб у списку було видно, де є угода. */
+  deal?: { label: string; needsMe: boolean };
   updatedAt: string;
 }
 
