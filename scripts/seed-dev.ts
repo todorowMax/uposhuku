@@ -9,6 +9,8 @@
 // Скрипт лише складає SQL у .cache/seed.sql, а накочує його wrangler:
 //   npm run db:seed:local          локальна D1
 //   npm run db:seed:development    dev-воркер (remote)
+//   з прапорцем --clean лише прибирає демо-рядки, нічого не додаючи:
+//   npm run db:unseed:local, npm run db:unseed:development
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -76,6 +78,14 @@ emit(
   `DELETE FROM profiles WHERE user_id IN ${demoUsers};`,
   `DELETE FROM users WHERE id LIKE 'demo-%';`,
 );
+
+if (process.argv.includes("--clean")) {
+  const dir = resolve(__dirname, "../.cache");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(resolve(dir, "seed.sql"), `${out.join("\n")}\n`);
+  console.log("Демо-рядки (id demo-…) буде видалено, нічого не додаємо → .cache/seed.sql");
+  process.exit(0);
+}
 
 // ───────────── користувачі ─────────────
 const userRows: (string | number | null)[][] = [];
