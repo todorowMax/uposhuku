@@ -273,11 +273,13 @@ function RequestChips() {
       {performer && remote > 0 && (
         <button
           type="button"
-          className="filter-chip"
+          aria-pressed={filter === "remote"}
           onClick={() => {
+            requestFilterStore.set(filter === "remote" ? "all" : "remote");
             feedCollapsedStore.set(false);
           }}
-          title="Віддалені запити без точки на карті: вони в списку «Запити для вас»"
+          className="filter-chip"
+          title="Запити без міста: на карті їх немає, вони лише в списку «Запити для вас»"
         >
           Віддалено
           <span className="filter-chip-count">{remote}</span>

@@ -4,7 +4,7 @@ import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react"
 import { gsap } from "gsap";
 import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
-import { hoveredFeedRequestStore } from "@/lib/feed/map-requests";
+import { applyRequestFilter, hoveredFeedRequestStore, mapRequestsStore, requestFilterStore } from "@/lib/feed/map-requests";
 import { sendResponse, useFeed, withdrawResponse } from "@/lib/feed/client";
 import { RESPONSE_LIMITS, type FeedItem, type MyResponse } from "@/lib/feed/types";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
@@ -49,7 +49,14 @@ export function FeedPanel() {
   const { kind } = useSidePanel();
   const active = kind === "feed";
   const collapsed = useStore(feedCollapsedStore);
-  const { loading, error, items, pending, reveal, patch } = useFeed(active);
+  const { loading, error, items: allItems, pending, reveal, patch } = useFeed(active);
+  const mapState = useStore(mapRequestsStore);
+  const filter = useStore(requestFilterStore);
+  // Список слухається тих самих чипів, що й карта; без даних карти показуємо все.
+  const allowed = mapState.loaded && filter !== "all" ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter).map((item) => item.id)) : null;
+  const items = allowed ? allItems.filter((item) => allowed.has(item.id)) : allItems;
+  const others = mapState.items.filter((item) => !item.own);
+  const noCity = mapState.loaded ? others.filter((item) => !item.point).length : 0;
   const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
@@ -84,7 +91,7 @@ export function FeedPanel() {
   }, [items]);
 
   if (!active) return null;
-  const total = items.length + pending.length;
+  const total = allItems.length + pending.length;
 
   if (collapsed) {
     return (
@@ -114,7 +121,9 @@ export function FeedPanel() {
             Запити для вас
             {total > 0 && <span className="filter-all-badge">{total}</span>}
           </h2>
-          <p className="mt-0.5 truncate text-[11px] text-ink-muted">Під ваші теги, найвідповідніші першими</p>
+          <p className="mt-0.5 truncate text-[11px] text-ink-muted">
+            {noCity > 0 ? `На карті ${others.length - noCity} · без міста ${noCity}, їх видно лише тут` : "Усі відкриті, найвідповідніші під ваші теги першими"}
+          </p>
         </div>
         <button type="button" onClick={() => feedCollapsedStore.set(true)} aria-label="Згорнути запити" className="auth-icon-button -mr-1.5">
           <ChevronsRight className="hidden size-4 lg:block" />
@@ -138,7 +147,12 @@ export function FeedPanel() {
             {error}
           </p>
         )}
-        {!loading && !error && items.length === 0 && pending.length === 0 && (
+        {allowed && (
+          <button type="button" onClick={() => requestFilterStore.set("all")} className="offers-new">
+            Фільтр: показано {items.length} з {allItems.length}. Скинути
+          </button>
+        )}
+        {!loading && !error && items.length === 0 && pending.length === 0 && !allowed && (
           <div className="offers-empty">
             <span aria-hidden className="request-live-dot" />
             <p>

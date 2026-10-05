@@ -52,7 +52,7 @@ export const mapSelectedRequest = createStore<string | null>(null);
 /** Остання картка під курсором у відкритій панелі запитів. */
 export const hoveredFeedRequestStore = createStore<string | null>(null);
 
-export type RequestFilter = "all" | "matched" | "urgent" | "budget";
+export type RequestFilter = "all" | "matched" | "urgent" | "budget" | "remote";
 export const requestFilterStore = createStore<RequestFilter>("all");
 
 const POLL_MS = 6000;
@@ -81,6 +81,8 @@ export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter): 
   if (filter === "matched") return items.filter((item) => item.matchedTags > 0 && !item.own);
   if (filter === "urgent") return items.filter((item) => item.deadline === "Терміново, до 3 днів" || item.deadline === "Протягом тижня");
   if (filter === "budget") return items.filter((item) => item.budget);
+  // Без міста: піна на карті немає, такі запити живуть лише в списку.
+  if (filter === "remote") return items.filter((item) => !item.point);
   return items;
 };
 
