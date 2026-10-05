@@ -319,7 +319,7 @@ function OfferCard({ offer, onChat, onDecline }: { offer: OfferResponse; onChat:
  * «домовляйтеся тут»; контакти поза чатом не блокуємо, а попереджаємо.
  */
 function ChatView({ response, onBack }: { response: OfferResponse; onBack: () => void }) {
-  const { messages, typing, send, error } = useChat(response);
+  const { messages, typing, onType, send, error } = useChat(response);
   const wide = useStore(offersWideStore);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -443,7 +443,10 @@ function ChatView({ response, onBack }: { response: OfferResponse; onBack: () =>
             ref={inputRef}
             rows={1}
             value={draft}
-            onChange={(event) => setDraft(event.target.value)}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              onType();
+            }}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();

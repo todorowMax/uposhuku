@@ -40,15 +40,19 @@ const realtime = async (request: Request, env: CloudflareEnv): Promise<Response>
   const origin = request.headers.get("Origin");
   if (origin && new URL(origin).host !== url.host) return new Response("Заборонено", { status: 403 });
 
+  // Заголовок x-rt-user ставимо лише ми: з клієнта він не береться, тож підробити, чий це сокет, не вийде.
+  const headers = new Headers(request.headers);
+  headers.delete("x-rt-user");
   let room = "global";
   if (url.pathname === "/api/realtime/me") {
     const userId = await sessionUserId(request, env);
     if (!userId) return new Response("Потрібен вхід", { status: 401 });
     room = `user:${userId}`;
+    headers.set("x-rt-user", userId);
   } else if (url.pathname !== "/api/realtime/global") {
     return new Response("Не знайдено", { status: 404 });
   }
-  return env.REALTIME.get(env.REALTIME.idFromName(room)).fetch(request);
+  return env.REALTIME.get(env.REALTIME.idFromName(room)).fetch(new Request(request, { headers }));
 };
 
 export default {

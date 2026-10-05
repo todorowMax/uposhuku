@@ -415,7 +415,7 @@ export function RequestComposer() {
               type="submit"
               tabIndex={actionsVisible ? 0 : -1}
               aria-label="Знайти виконавців"
-              className="composer-send composer-action flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-[15px] font-medium text-white hover:bg-[#ff8258] active:scale-[0.97]"
+              className="composer-send composer-action flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--brand-solid)] px-4 text-[15px] font-medium text-white hover:bg-[var(--brand-solid-hover)] active:scale-[0.97]"
             >
               <span className="pl-1">Знайти виконавців</span>
               <ArrowRight className="size-4" />
@@ -446,7 +446,7 @@ export function RequestComposer() {
             aria-hidden={expanded}
             tabIndex={expanded ? -1 : 0}
             onClick={() => { inputRef.current?.focus(); openInput(); }}
-            className="composer-compact-send flex h-10 w-10 items-center justify-center rounded-xl bg-brand text-white hover:bg-[#ff8258]"
+            className="composer-compact-send flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--brand-solid)] text-white hover:bg-[var(--brand-solid-hover)]"
             style={{ transform: inputPhase === "opening" || inputPhase === "open" ? "translateX(48px)" : "translateX(0)" }}
           >
             <ArrowUp className="size-[18px]" />

@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { fetchConversations, fetchMessages, openConversation, postMessage, toLines } from "@/lib/chat/client";
 import { startPolling } from "@/lib/realtime/client";
+
 import { createStore, useStore } from "@/lib/store";
 
 export interface ChatMessage {
@@ -33,6 +34,9 @@ export const dialogsStore = createStore<Record<string, DirectDialog>>({});
 export const directChatOpenStore = createStore<string | null>(null);
 
 const conversationIds = new Map<string, string>();
+
+/** Розмова з цим виконавцем, якщо вона вже є: для індикатора «друкує» і подій набору. */
+export const conversationIdOf = (performerId: string) => conversationIds.get(performerId) ?? null;
 
 /** Підтягнути розмову з сервера в сховище. Немає розмови — нічого не робимо. */
 export const syncDialog = async (performerId: string) => {

@@ -277,3 +277,18 @@ export const messages = sqliteTable(
   },
   (table) => [index("messages_conversation_idx").on(table.conversationId, table.createdAt)],
 );
+
+// ───────────── присутність ─────────────
+
+/**
+ * Хто зараз на сайті: Durable Object (worker/realtime.ts) пише сюди, коли
+ * відкривається й закривається сокет, і оновлює `last_seen` пульсом. Онлайн
+ * лише якщо `online` і пульс свіжий: так нічия обірвана вкладка не висить вічно.
+ */
+export const presence = sqliteTable("presence", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  online: integer("online", { mode: "boolean" }).notNull().default(false),
+  lastSeen: integer("last_seen").notNull(),
+});

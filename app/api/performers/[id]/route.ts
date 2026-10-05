@@ -5,6 +5,7 @@
 import { problem } from "@/lib/api/problem";
 import { getPlacement } from "@/lib/server/placement-repo";
 import { getProfile } from "@/lib/server/profile-repo";
+import { isOnline } from "@/lib/server/presence-repo";
 import { performerStatsOf } from "@/lib/server/stats-repo";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,5 +14,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const profile = userId ? await getProfile(userId) : null;
   if (!profile?.published) return problem(404, "Профіль не знайдено");
   const { name, cityId, location, specialty, bio, tags, works, photo } = profile;
-  return Response.json({ profile: { name, cityId, location, specialty, bio, tags, works, photo }, tier: (await getPlacement(userId)).tier, stats: await performerStatsOf(userId), userId });
+  return Response.json({ profile: { name, cityId, location, specialty, bio, tags, works, photo }, tier: (await getPlacement(userId)).tier, stats: await performerStatsOf(userId), online: await isOnline(userId), userId });
 }

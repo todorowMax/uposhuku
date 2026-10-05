@@ -115,7 +115,10 @@ function Thread({ conversation, onBack, onClose }: { conversation: ConversationD
         <button type="button" onClick={onBack} aria-label="До списку" className="dr-close">
           <ArrowLeft className="size-4" strokeWidth={2.2} />
         </button>
-        <h2 className="min-w-0 flex-1 truncate">{conversation.other.name}</h2>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate">{conversation.other.name}</h2>
+          {chat.typing && <p className="text-[11px] leading-tight text-ink-muted">друкує…</p>}
+        </div>
         <button type="button" onClick={onClose} aria-label="Закрити" className="dr-close">
           <X className="size-4" strokeWidth={2.2} />
         </button>
@@ -140,7 +143,10 @@ function Thread({ conversation, onBack, onClose }: { conversation: ConversationD
           rows={1}
           value={draft}
           maxLength={CHAT_TEXT_MAX}
-          onChange={(event) => setDraft(event.target.value)}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            chat.onType();
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();

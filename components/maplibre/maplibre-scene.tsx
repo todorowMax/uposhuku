@@ -1936,7 +1936,7 @@ export default function MapLibreScene() {
       {/* Плашка догрузки по центру внизу, над перемикачем режиму карти. */}
       <div
         aria-live="polite"
-        className={`pointer-events-none absolute bottom-[132px] left-1/2 z-[var(--z-controls)] -translate-x-1/2 transition-[opacity,translate] duration-300 sm:bottom-[84px] ${
+        className={`pointer-events-none absolute bottom-[132px] left-1/2 z-[var(--z-controls)] -translate-x-1/2 transition-[opacity,translate] duration-300 sm:bottom-[124px] ${
           detailLoading ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
         }`}
       >
@@ -1968,13 +1968,13 @@ export default function MapLibreScene() {
           />
           {selected.mine ? (
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-brand px-4 text-[12px] font-medium text-brand-ink transition-colors hover:bg-[#ff8258]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
+              <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[var(--brand-solid)] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-solid-hover)]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
               <button type="button" onClick={() => profileEditorStore.set(true)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Редагувати профіль</button>
             </div>
           ) : (
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={() => openProfile(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
-              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-brand px-4 text-[12px] font-medium text-brand-ink transition-colors hover:bg-[#ff8258]">Запропонувати роботу</button>
+              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[var(--brand-solid)] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-solid-hover)]">Запропонувати роботу</button>
             </div>
           )}
           <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>

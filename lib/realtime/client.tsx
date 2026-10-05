@@ -8,7 +8,7 @@
 // живі, воно рідкісне, а впав сокет (або його немає, як у локальному next dev),
 // повертається звичайна частота.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { createStore, useStore } from "@/lib/store";
 import type { RealtimeEvent, RealtimeType } from "./types";
@@ -26,8 +26,32 @@ export const onRealtime = (handler: Handler) => {
   };
 };
 
+/** Розмова → до коли показувати «друкує» (мс від епохи). */
+const typingStore = createStore<Record<string, number>>({});
+const TYPING_SHOWN_MS = 4500;
+
 const dispatch = (event: RealtimeEvent) => {
+  if (event.t === "typing" && event.conversationId) {
+    typingStore.set({ ...typingStore.get(), [event.conversationId]: Date.now() + TYPING_SHOWN_MS });
+  } else if (event.t === "message" && event.conversationId && typingStore.get()[event.conversationId]) {
+    // Повідомлення прийшло: «друкує» більше не потрібне.
+    typingStore.set({ ...typingStore.get(), [event.conversationId]: 0 });
+  }
   for (const handler of [...handlers]) handler(event);
+};
+
+/** Співрозмовник зараз набирає повідомлення в цій розмові. */
+export const useTyping = (conversationId: string | null | undefined): boolean => {
+  const all = useStore(typingStore);
+  const [, tick] = useState(0);
+  const until = conversationId ? (all[conversationId] ?? 0) : 0;
+  useEffect(() => {
+    const left = until - Date.now();
+    if (left <= 0) return;
+    const timer = window.setTimeout(() => tick((value) => value + 1), left + 50);
+    return () => window.clearTimeout(timer);
+  }, [until]);
+  return until > Date.now();
 };
 
 /** Після (пере)підключення: невідомо, що пропущено, тож кожен екран перечитує своє. */
@@ -37,9 +61,31 @@ const refreshEverything = () => {
   dispatch({ t: "offer", requestId: "" });
   dispatch({ t: "feed" });
   dispatch({ t: "map" });
+  dispatch({ t: "presence" });
+};
+
+/** Особистий сокет: через нього йдуть пульс присутності й «друкує». */
+let personal: WebSocket | null = null;
+
+const sendPersonal = (message: object) => {
+  if (personal && personal.readyState === WebSocket.OPEN) personal.send(JSON.stringify(message));
+};
+
+const lastTyping = new Map<string, number>();
+const TYPING_SEND_GAP = 2500;
+
+/** Скажіть другій стороні, що ми набираємо; не частіше, ніж раз на 2,5 с на розмову. */
+export const notifyTyping = (conversationId: string | null | undefined) => {
+  if (!conversationId) return;
+  const now = Date.now();
+  if (now - (lastTyping.get(conversationId) ?? 0) < TYPING_SEND_GAP) return;
+  lastTyping.set(conversationId, now);
+  sendPersonal({ t: "typing", c: conversationId });
 };
 
 const PING_MS = 25_000;
+/** Пульс присутності: DO оновлює `last_seen`, поки вкладка жива. */
+const BEAT_MS = 60_000;
 const FAST_RETRIES = 5;
 
 interface Channel {
@@ -47,11 +93,12 @@ interface Channel {
   reconnectNow: () => void;
 }
 
-const openChannel = (path: string, onState: (open: boolean) => void): Channel => {
+const openChannel = (path: string, onState: (open: boolean) => void, personalChannel = false): Channel => {
   let socket: WebSocket | null = null;
   let retries = 0;
   let retryTimer = 0;
   let pingTimer = 0;
+  let beatTimer = 0;
   let closed = false;
 
   const connect = () => {
@@ -69,6 +116,10 @@ const openChannel = (path: string, onState: (open: boolean) => void): Channel =>
       onState(true);
       refreshEverything();
       pingTimer = window.setInterval(() => ws.readyState === WebSocket.OPEN && ws.send("ping"), PING_MS);
+      if (personalChannel) {
+        personal = ws;
+        beatTimer = window.setInterval(() => ws.readyState === WebSocket.OPEN && ws.send('{"t":"hb"}'), BEAT_MS);
+      }
     };
     ws.onmessage = (message) => {
       if (message.data === "pong") return;
@@ -80,6 +131,8 @@ const openChannel = (path: string, onState: (open: boolean) => void): Channel =>
     };
     ws.onclose = () => {
       window.clearInterval(pingTimer);
+      window.clearInterval(beatTimer);
+      if (personal === ws) personal = null;
       onState(false);
       socket = null;
       if (closed) return;
@@ -96,6 +149,7 @@ const openChannel = (path: string, onState: (open: boolean) => void): Channel =>
       closed = true;
       window.clearTimeout(retryTimer);
       window.clearInterval(pingTimer);
+      window.clearInterval(beatTimer);
       socket?.close();
     },
     // Вкладка знову видима: не чекаємо таймера, якщо сокет упав.
@@ -121,7 +175,7 @@ export function RealtimeSync() {
       else open.delete(name);
       realtimeConnected.set(open.size >= wanted);
     };
-    const channels = [openChannel("/api/realtime/global", track("global")), ...(signedIn ? [openChannel("/api/realtime/me", track("me"))] : [])];
+    const channels = [openChannel("/api/realtime/global", track("global")), ...(signedIn ? [openChannel("/api/realtime/me", track("me"), true)] : [])];
     const onVisible = () => {
       if (!document.hidden) channels.forEach((channel) => channel.reconnectNow());
     };

@@ -7,7 +7,8 @@ import { authFlowStore, sessionStore } from "@/lib/auth/client";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import type { Performer } from "@/lib/map/types";
 import { mentionsContacts } from "@/lib/chat/contacts";
-import { savePending, sendDirect, startDialog, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
+import { conversationIdOf, savePending, sendDirect, startDialog, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
+import { notifyTyping, useTyping } from "@/lib/realtime/client";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 
@@ -56,7 +57,7 @@ export function DirectChatPanel({
 }) {
   const dialog = useDialog(performer.id);
   useDialogSync(performer.id, true);
-  const typing = false;
+  const typing = useTyping(conversationIdOf(performer.id));
   const session = useStore(sessionStore);
   const view: View = dialog ? "chat" : "compose";
   const [expanded, setExpanded] = useState(false);
@@ -64,6 +65,7 @@ export function DirectChatPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLFormElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const closingRef = useRef(false);
@@ -83,6 +85,7 @@ export function DirectChatPanel({
       const origin = getOrigin();
       if (reduced()) {
         gsap.set(panel, { ...to, borderRadius: 24 });
+        if (glowRef.current) gsap.set(glowRef.current, { opacity: 0 });
         inputRef.current?.focus();
         return;
       }
@@ -94,6 +97,9 @@ export function DirectChatPanel({
         timeline.fromTo(panel, { ...to, borderRadius: 24, opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.36, ease: "power3.out" }, 0);
       }
       timeline.fromTo(body, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: "power2.out" }, 0.18);
+      // Оранжевий кнопки перетікає у світлу панель.
+      if (origin && glowRef.current) timeline.fromTo(glowRef.current, { opacity: 1 }, { opacity: 0, duration: 0.52, ease: "power2.inOut" }, 0.06);
+      else if (glowRef.current) gsap.set(glowRef.current, { opacity: 0 });
       return () => {
         timeline.kill();
       };
@@ -143,6 +149,7 @@ export function DirectChatPanel({
     const origin = getOrigin();
     const timeline = gsap.timeline({ onComplete: after });
     timeline.to(body, { opacity: 0, duration: 0.12, ease: "power1.in" }, 0).to(backdrop, { opacity: 0, duration: 0.25, ease: "power2.in" }, 0);
+    if (origin && glowRef.current) timeline.to(glowRef.current, { opacity: 1, duration: 0.26, ease: "power2.in" }, 0.06);
     if (origin) timeline.to(panel, { left: origin.left, top: origin.top, width: origin.width, height: origin.height, borderRadius: 14, duration: 0.34, ease: "expo.inOut", overwrite: "auto" }, 0.04);
     else timeline.to(panel, { opacity: 0, y: 24, duration: 0.24, ease: "power2.in" }, 0.04);
   };
@@ -223,6 +230,7 @@ export function DirectChatPanel({
     <>
       <div ref={backdropRef} className="dr-backdrop" data-active={view === "compose" || undefined} onClick={view === "compose" ? close : undefined} aria-hidden />
       <div ref={panelRef} role="dialog" aria-modal="false" aria-label={view === "chat" ? `Чат з ${performer.name}` : `Задача для ${performer.name}`} className="dr-panel" data-view={view}>
+        <div ref={glowRef} className="dr-glow" aria-hidden />
         <form ref={bodyRef} onSubmit={submit} className="dr-body">
           <header className="dr-header">
             {view === "chat" && <span className="dr-avatar" style={avatarBackground(performer)} aria-hidden />}
@@ -295,7 +303,10 @@ export function DirectChatPanel({
               ref={inputRef}
               value={text}
               maxLength={REQUEST_TEXT_MAX}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => {
+                setText(event.target.value);
+                notifyTyping(conversationIdOf(performer.id));
+              }}
               onKeyDown={onKeyDown}
               placeholder={`Опишіть, що потрібно зробити. ${firstName} побачить це першою.`}
               className="dr-input"
@@ -311,7 +322,10 @@ export function DirectChatPanel({
             </footer>
           ) : (
             <div className="dm-input-row">
-              <textarea id="dr-text" ref={inputRef} rows={1} value={text} maxLength={REQUEST_TEXT_MAX} onChange={(event) => setText(event.target.value)} onKeyDown={onKeyDown} placeholder="Повідомлення" className="dm-input" />
+              <textarea id="dr-text" ref={inputRef} rows={1} value={text} maxLength={REQUEST_TEXT_MAX} onChange={(event) => {
+                setText(event.target.value);
+                notifyTyping(conversationIdOf(performer.id));
+              }} onKeyDown={onKeyDown} placeholder="Повідомлення" className="dm-input" />
               <button type="submit" disabled={!ready} aria-label="Надіслати" className="dm-send">
                 <ArrowUp className="size-4" strokeWidth={2.4} />
               </button>

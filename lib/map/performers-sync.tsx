@@ -10,7 +10,7 @@ const POLL_MS = 30_000;
 export function RealPerformersSync() {
   useEffect(() => {
     void loadRealPerformers();
-    const stop = startPolling(() => !document.hidden && void loadRealPerformers(), POLL_MS, ["map"]);
+    const stop = startPolling(() => !document.hidden && void loadRealPerformers(), POLL_MS, ["map", "presence"]);
     const onVisible = () => {
       if (!document.hidden) void loadRealPerformers();
     };

@@ -253,13 +253,14 @@ function FilterPanel({
 function RequestChips() {
   const { items, performer } = useStore(mapRequestsStore);
   const filter = useStore(requestFilterStore);
-  const onMap = items.filter((item) => item.point);
-  const remote = items.length - onMap.length;
+  // Рахуємо чужі запити, як і список «Запити для вас»: свої там не показуємо.
+  const others = items.filter((item) => !item.own);
+  const remote = others.filter((item) => !item.point).length;
 
   const chip = (id: RequestFilter, label: string) => (
     <button key={id} type="button" aria-pressed={filter === id} onClick={() => requestFilterStore.set(id)} className="filter-chip">
       {label}
-      <span className="filter-chip-count">{applyRequestFilter(onMap, id).length}</span>
+      <span className="filter-chip-count">{applyRequestFilter(others, id).length}</span>
     </button>
   );
 

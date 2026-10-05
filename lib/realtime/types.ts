@@ -13,6 +13,10 @@ export type RealtimeEvent =
   /** Публічне: з'явився чи закрився запит. */
   | { t: "feed" }
   /** Публічне: на карті змінились виконавці. */
-  | { t: "map" };
+  | { t: "map" }
+  /** Хтось вийшов в мережу або з неї: оновлюємо значок «онлайн». */
+  | { t: "presence" }
+  /** Співрозмовник набирає повідомлення в розмові. */
+  | { t: "typing"; conversationId: string };
 
 export type RealtimeType = RealtimeEvent["t"];

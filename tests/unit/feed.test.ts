@@ -30,8 +30,8 @@ describe("стрічка запитів виконавця", () => {
     expect(items.flatMap((item) => item.tags).every((tag) => TAGS_BY_ID.has(tag.id))).toBe(true);
     const counts = items.map((item) => item.matchedTags);
     expect(counts).toEqual([...counts].sort((x, y) => y - x));
-    // Без збігу запит не показуємо; свої запити виконавець у стрічці не бачить.
-    expect((await feedFor("perf-a", ["branding"])).some((item) => item.id === a.id)).toBe(false);
+    // Без збігу запит теж у стрічці (з нулем збігів); свої запити виконавець у стрічці не бачить.
+    expect((await feedFor("perf-a", ["branding"])).find((item) => item.id === a.id)?.matchedTags).toBe(0);
     expect((await feedFor("cust-a", ["telegram-bot"])).some((item) => item.id === a.id)).toBe(false);
   });
 
@@ -55,8 +55,8 @@ describe("хто може відгукнутися", () => {
     const { closeRequest } = await import("@/lib/server/request-repo");
     const open = await createRequest("cust-a", { text: "Потрібен сайт для дорослого одягу", tags: [{ id: "website", label: "Сайт" }], files: [] });
     expect(await canRespond("perf-a", open.id)).toBe(true);
-    // Збіг тегів профілю нічого не вирішує: у perf-a немає тегів, а відповісти можна.
-    expect((await feedFor("perf-a", ["branding"])).some((item) => item.id === open.id)).toBe(false);
+    // Збіг тегів профілю нічого не вирішує: стрічка теж показує запит, лише з нулем збігів.
+    expect((await feedFor("perf-a", ["branding"])).find((item) => item.id === open.id)?.matchedTags).toBe(0);
     expect(await canRespond("cust-a", open.id)).toBe(false);
     expect(await canRespond("perf-a", "req_nope")).toBe(false);
     await closeRequest("cust-a", open.id);

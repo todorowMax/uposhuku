@@ -10,5 +10,5 @@ import type { OfferResponse } from "./types";
 
 export const useChat = (response: OfferResponse) => {
   const live = useRemoteChat(response.performerId, true, { id: `${response.id}-offer`, from: "them", text: response.message, at: response.createdAt });
-  return { messages: live.lines, typing: false, send: (text: string) => void live.send(text), error: live.error };
+  return { messages: live.lines, typing: live.typing, onType: live.onType, send: (text: string) => void live.send(text), error: live.error };
 };

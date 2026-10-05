@@ -70,15 +70,14 @@ const toItem = (userId: string | null, raw: Raw, profileTags: string[], mine: Ma
 };
 
 /**
- * Запити під теги профілю: спершу ті, що закривають більше тегів, потім
- * свіжіші. Без жодного збігу запит виконавцю не показуємо. Свої не бачимо.
+ * Усі чужі відкриті запити: спершу ті, що закривають більше тегів профілю, потім
+ * свіжіші. Збігу не вимагаємо, як і на карті. Свої не бачимо.
  */
 export const feedFor = async (userId: string, profileTags: string[]): Promise<FeedItem[]> => {
   const [raw, mine] = await Promise.all([collect(userId), myResponses(userId)]);
   return raw
     .filter((item) => !item.own)
     .map((item) => toItem(userId, item, profileTags, mine))
-    .filter((item) => item.matchedTags > 0)
     .sort((a, b) => b.matchedTags - a.matchedTags || b.createdAt.localeCompare(a.createdAt));
 };
 

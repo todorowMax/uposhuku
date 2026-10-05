@@ -7,7 +7,7 @@
 // лишиться запасним.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { startPolling } from "@/lib/realtime/client";
+import { notifyTyping, startPolling, useTyping } from "@/lib/realtime/client";
 import type { ChatMessageDto, ConversationDto } from "./types";
 
 const POLL_MS = 3500;
@@ -48,6 +48,7 @@ export const toLines = (messages: ChatMessageDto[], myRole: "customer" | "perfor
 export const useRemoteChat = (performerId: string, enabled: boolean, seed?: ChatLine, existing?: { id: string; role: "customer" | "performer" }) => {
   const [lines, setLines] = useState<ChatLine[]>(seed ? [seed] : []);
   const [error, setError] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(existing?.id ?? null);
   // Розмову можна передати готовою (вхідні виконавця), інакше знайдемо чи створимо за виконавцем.
   const conversationRef = useRef<string | null>(existing?.id ?? null);
   const sinceRef = useRef(0);
@@ -77,7 +78,10 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
     let cancelled = false;
     const tick = async () => {
       try {
-        if (!conversationRef.current) conversationRef.current = await openConversation(performerId);
+        if (!conversationRef.current) {
+          conversationRef.current = await openConversation(performerId);
+          if (!cancelled) setConversationId(conversationRef.current);
+        }
         await pull();
         if (!cancelled) setError(false);
       } catch {
@@ -96,7 +100,10 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
   const send = useCallback(
     async (text: string) => {
       try {
-        if (!conversationRef.current) conversationRef.current = await openConversation(performerId);
+        if (!conversationRef.current) {
+          conversationRef.current = await openConversation(performerId);
+          setConversationId(conversationRef.current);
+        }
         const message = await postMessage(conversationRef.current, text);
         sinceRef.current = Math.max(sinceRef.current, Date.parse(message.at));
         merge(toLines([message], roleRef.current));
@@ -108,5 +115,9 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
     [merge, performerId],
   );
 
-  return { lines, send, error };
+  const typing = useTyping(conversationId);
+  /** Вызывать при наборі в полі: друга сторона побачить «друкує…». */
+  const onType = useCallback(() => notifyTyping(conversationRef.current), []);
+
+  return { lines, send, error, typing, onType };
 };
