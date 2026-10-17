@@ -19,10 +19,10 @@ export const OPERATOR = {
 } as const;
 
 /**
- * Пошта для звернень. Назва проєкту ще може змінитися; коли оберемо кінцевий
- * домен і підключимо пошту в Resend, міняємо тут (і більше ніде).
+ * Пошта для звернень. Cloudflare Email Routing пересилає її на пошту власника,
+ * відправка йде через Resend. Якщо адреса зміниться, міняємо тут (і більше ніде).
  */
-export const CONTACT_EMAIL = "hello@uposhuku.com";
+export const CONTACT_EMAIL = "hello@findlyfy.com";
 
 /**
  * Безпечну угоду (холд і виплата виконавцю через Monobank) не вмикаємо до
@@ -33,10 +33,10 @@ export const SAFE_DEAL_ENABLED = false;
 
 /** Дати останньої правки кожного документа. */
 export const UPDATED = {
-  offer: "3 жовтня 2026 року",
-  terms: "3 жовтня 2026 року",
-  privacy: "3 жовтня 2026 року",
-  contacts: "3 жовтня 2026 року",
+  offer: "17 жовтня 2026 року",
+  terms: "17 жовтня 2026 року",
+  privacy: "17 жовтня 2026 року",
+  contacts: "17 жовтня 2026 року",
 } as const;
 
 const money = (value: number) => new Intl.NumberFormat("uk-UA").format(value).replace(/ /g, " ");
