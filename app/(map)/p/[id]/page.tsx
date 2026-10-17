@@ -13,7 +13,7 @@ import { tagLabel } from "@/lib/tags/engine";
 
 type Props = { params: Promise<{ id: string }> };
 
-const SITE = "https://uposhuku.com";
+const SITE = "https://findlyfy.com";
 
 /** Виконавець із сіда dev-бази: id виду me-demo-…, вигаданий. */
 const isDemo = (id: string) => id.startsWith("me-demo-");

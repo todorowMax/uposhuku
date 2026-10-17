@@ -3,9 +3,21 @@
 AUTH_SECRET=
 # Без ключа локально вхід працює з кодом 000000, лист не надсилається.
 RESEND_API_KEY=
-MAIL_FROM=Vibe Map <hello@uposhuku.com>
+MAIL_FROM=Vibe Map <hello@findlyfy.com>
 # Тестовий вхід без пошти: код доступу, 4–8 цифр. Без нього локально працює 000000.
 DEV_LOGIN_CODE=
 # Google OAuth; кнопку показуємо, лише коли обидва заповнені.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
+# Telegram-бот (lib/telegram). Токен від @BotFather, не в чат і не в git. Без токена й секрету бот вимкнений.
+TELEGRAM_BOT_TOKEN=
+# openssl rand -hex 32
+TELEGRAM_WEBHOOK_SECRET=
+TELEGRAM_BOT_USERNAME=
+# Публічний канал запитів: id каналу (-100…) з'явиться в журналі, коли додасте бота адміном.
+TELEGRAM_CHANNEL_ID=
+CHANNEL_ENABLED=
+CHANNEL_DELAY_MIN=20
+# openssl rand -hex 32: захищає /api/internal/tick, який викликає cron воркера.
+INTERNAL_TOKEN=

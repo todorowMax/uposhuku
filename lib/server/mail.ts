@@ -3,6 +3,7 @@
 // Лист із кодом входу через Resend. Без ключа (локально) лист не йде, а код
 // друкуємо в лог сервера: для розробки цього досить.
 
+import { logServer } from "@/lib/telemetry/log";
 import { readVar } from "./env";
 
 export type MailMode = "resend" | "dev" | "off";
@@ -25,11 +26,16 @@ export const sendLoginCode = async (email: string, code: string) => {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from: readVar("MAIL_FROM") ?? "Vibe Map <hello@uposhuku.com>",
+      from: readVar("MAIL_FROM") ?? "Vibe Map <hello@findlyfy.com>",
       to: [email],
       subject: `Код входу: ${code}`,
       text: `Ваш код для входу у Vibe Map: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
     }),
   });
-  if (!response.ok) throw new Error(`Resend відповів ${response.status}: ${(await response.text()).slice(0, 300)}`);
+  if (!response.ok) {
+    const body = (await response.text()).slice(0, 300);
+    // Без листа людина не увійде: це треба бачити в журналі, не лише в відповіді 500.
+    logServer({ level: "error", event: "mail_send_failed", message: `Resend відповів ${response.status}`, detail: { status: response.status, body } });
+    throw new Error(`Resend відповів ${response.status}: ${body}`);
+  }
 };
