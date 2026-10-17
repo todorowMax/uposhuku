@@ -1,14 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ListChecks, SlidersHorizontal } from "@/components/icons";
+import { ListChecks, Plus, SlidersHorizontal, X } from "@/components/icons";
 import { allPerformersStore, applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
 import { feedCollapsedStore } from "@/lib/requests/side-panel";
 import { CITIES } from "@/lib/map/cities";
 import { usePerformers } from "@/lib/map/performers";
 import type { Performer } from "@/lib/map/types";
-import { clearFilter, cityFilter, groupFilter, onlineFilter, tagMatches, toggleIn, useStore } from "@/lib/map/filters";
+import { clearFilter, cityFilter, filterTags, groupFilter, onlineFilter, tagMatches, toggleIn, useStore } from "@/lib/map/filters";
+import { TagPicker } from "@/components/tags/tag-picker";
+import { tagLabel } from "@/lib/tags/engine";
 import { countGroups, filterPerformers } from "@/lib/map/groups";
+import { EVENTS, track } from "@/lib/telemetry/track";
+
+const toggleGroup = (id: string) => {
+  track(EVENTS.filterGroupToggled, { group: id, on: !groupFilter.get().includes(id) });
+  toggleIn(groupFilter, id);
+};
+const toggleCity = (id: string) => {
+  track(EVENTS.filterCityToggled, { city: id, on: !cityFilter.get().includes(id) });
+  toggleIn(cityFilter, id);
+};
+const toggleTag = (id: string) => {
+  track(EVENTS.filterTagToggled, { tag: id, on: !filterTags.get().includes(id) });
+  toggleIn(filterTags, id);
+};
 
 /**
  * Фільтри під полем запиту, завширшки як саме поле. Спершу «Усі», далі
@@ -30,6 +46,7 @@ export function SpecialistFilters({
   const cities = useStore(cityFilter);
   const online = useStore(onlineFilter);
   const matches = useStore(tagMatches);
+  const pickedTags = useStore(filterTags);
   const performers = usePerformers();
   const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
@@ -70,7 +87,7 @@ export function SpecialistFilters({
   }, [open]);
 
   /** Скільки фільтрів з панелі ввімкнено: число на кнопці «Фільтри». */
-  const active = selectedGroups.length + cities.length + Number(online);
+  const active = selectedGroups.length + cities.length + pickedTags.length + Number(online);
 
   const groupChips = (
     <>
@@ -88,7 +105,7 @@ export function SpecialistFilters({
           key={item.id}
           type="button"
           aria-pressed={selectedGroups.includes(item.id)}
-          onClick={() => toggleIn(groupFilter, item.id)}
+          onClick={() => toggleGroup(item.id)}
           className="filter-chip"
         >
           {item.label}
@@ -116,7 +133,14 @@ export function SpecialistFilters({
           event.currentTarget.dataset.scrolled = String(event.currentTarget.scrollLeft > 2);
         }}
       >
-        <div className="filter-strip-inner">{mode === "requests" ? <RequestChips /> : groupChips}</div>
+        <div className="filter-strip-inner">{mode === "requests" ? (
+            <RequestChips />
+          ) : (
+            <>
+              {groupChips}
+              <PickedTagChips />
+            </>
+          )}</div>
       </div>
       {mode === "performers" && (
       <button
@@ -163,6 +187,7 @@ function FilterPanel({
   const online = useStore(onlineFilter);
   const matches = useStore(tagMatches);
   const groups = useStore(groupFilter);
+  const pickedTags = useStore(filterTags);
   const performers = usePerformers();
 
   // Міста рахуємо без вибору міст і «онлайн» — так видно, де скільки людей узагалі.
@@ -187,6 +212,7 @@ function FilterPanel({
   const reset = () => {
     clearFilter(groupFilter);
     clearFilter(cityFilter);
+    clearFilter(filterTags);
     onlineFilter.set(false);
   };
 
@@ -195,6 +221,29 @@ function FilterPanel({
       <section>
         <h3 className="filter-panel-title">Спеціалісти</h3>
         <div className="filter-panel-chips">{groupChips}</div>
+      </section>
+
+      <section>
+        <h3 className="filter-panel-title">Теги</h3>
+        <div className="filter-panel-chips">
+          <PickedTagChips />
+          <TagPicker
+            context="filter"
+            title="Теги спеціалістів"
+            selected={pickedTags}
+            labelOf={tagLabel}
+            onToggle={(id) => {
+              toggleTag(id);
+              return true;
+            }}
+            trigger={
+              <button type="button" className="filter-chip" aria-label="Додати тег у фільтр">
+                <Plus aria-hidden className="size-3.5" />
+                Тег
+              </button>
+            }
+          />
+        </div>
       </section>
 
       <section>
@@ -213,7 +262,7 @@ function FilterPanel({
               key={item.id}
               type="button"
               aria-pressed={selectedCities.includes(item.id)}
-              onClick={() => toggleIn(cityFilter, item.id)}
+              onClick={() => toggleCity(item.id)}
               className="filter-chip"
             >
               {item.name}
@@ -233,7 +282,10 @@ function FilterPanel({
           Онлайн зараз
           <span className="filter-chip-count ml-1.5">{onlineCount}</span>
         </span>
-        <input type="checkbox" checked={online} onChange={(event) => onlineFilter.set(event.target.checked)} />
+        <input type="checkbox" checked={online} onChange={(event) => {
+            track(EVENTS.filterOnlineToggled, { on: event.target.checked });
+            onlineFilter.set(event.target.checked);
+          }} />
         <span aria-hidden className="filter-switch-track" />
       </label>
 
@@ -249,10 +301,26 @@ function FilterPanel({
   );
 }
 
+/** Теги, вибрані пошуком у «Фільтрах»: чип з хрестиком, клік прибирає тег із фільтра. */
+function PickedTagChips() {
+  const tags = useStore(filterTags);
+  return (
+    <>
+      {tags.map((id) => (
+        <button key={id} type="button" aria-pressed onClick={() => toggleTag(id)} className="filter-chip" title="Прибрати з фільтра">
+          {tagLabel(id)}
+          <X aria-hidden className="size-3" />
+        </button>
+      ))}
+    </>
+  );
+}
+
 /** Фільтри запитів: чипи замість груп спеціалістів. */
 function RequestChips() {
   const { items, performer } = useStore(mapRequestsStore);
   const filter = useStore(requestFilterStore);
+  const pickedTags = useStore(filterTags);
   // Рахуємо чужі запити, як і список «Запити для вас»: свої там не показуємо.
   const others = items.filter((item) => !item.own);
   const remote = others.filter((item) => !item.point).length;
@@ -260,7 +328,7 @@ function RequestChips() {
   const chip = (id: RequestFilter, label: string) => (
     <button key={id} type="button" aria-pressed={filter === id} onClick={() => requestFilterStore.set(id)} className="filter-chip">
       {label}
-      <span className="filter-chip-count">{applyRequestFilter(others, id).length}</span>
+      <span className="filter-chip-count">{applyRequestFilter(others, id, pickedTags).length}</span>
     </button>
   );
 
@@ -285,6 +353,23 @@ function RequestChips() {
           <span className="filter-chip-count">{remote}</span>
         </button>
       )}
+      <PickedTagChips />
+      <TagPicker
+        context="filter"
+        title="Теги запитів"
+        selected={pickedTags}
+        labelOf={tagLabel}
+        onToggle={(id) => {
+          toggleTag(id);
+          return true;
+        }}
+        trigger={
+          <button type="button" className="filter-chip" aria-label="Додати тег у фільтр">
+            <Plus aria-hidden className="size-3.5" />
+            Тег
+          </button>
+        }
+      />
     </>
   );
 }
