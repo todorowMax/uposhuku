@@ -2,6 +2,8 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Telemetry } from "@/kit/telemetry/client";
+import { ConsentBanner } from "@/components/legal/consent-banner";
 
 const fixel = localFont({
   src: "../public/fonts/FixelVariable.ttf",
@@ -11,6 +13,8 @@ const fixel = localFont({
 });
 
 export const metadata: Metadata = {
+  // Закрито від індексації, доки не запустимось публічно (також X-Robots-Tag у worker/index.ts і app/robots.ts).
+  robots: { index: false, follow: false },
   title: "Vibe Map: виконавці й запити на карті України",
   description:
     "Опиши, що потрібно створити, і побач на карті, хто поруч уже робив схоже. " +
@@ -29,7 +33,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // suppressHydrationWarning діє лише на атрибути самого <html>, не на
     // вміст сторінки. data-map-ready ставимо вже після гідратації.
     <html lang="uk" className={fixel.variable} suppressHydrationWarning>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        {children}
+        {/* Помилки браузера, перегляди сторінок і аналітика: kit/telemetry. */}
+        <Telemetry storagePrefix="vm" />
+        <ConsentBanner />
+      </body>
     </html>
   );
 }

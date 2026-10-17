@@ -17,13 +17,29 @@
       "name": "uposhuku-development",
       // Домену для листів ще немає, тому на dev-воркері тестовий вхід: будь-яка пошта, код 000000.
       // Коли купимо домен і підтвердимо його в Resend, прибрати MAIL_MODE і додати MAIL_FROM.
-      "vars": { "DEPLOY_ENV": "development", "MAIL_MODE": "dev" },
+      "vars": {
+        "DEPLOY_ENV": "development",
+        "MAIL_MODE": "dev",
+        "SITE_URL": "https://dev.findlyfy.com",
+        // Telegram: тестовий бот. Username бота (не секрет) дописати після створення в @BotFather.
+        // TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, INTERNAL_TOKEN: лише секретами (wrangler secret put).
+        "TELEGRAM_BOT_USERNAME": "",
+        // Канал запитів на dev можна перевіряти з короткою затримкою.
+        "CHANNEL_DELAY_MIN": "1"
+      },
       // Явно, щоб wrangler не попереджав: dev-воркер живе на workers.dev, прев'ю-адреси не потрібні.
       "workers_dev": true,
+      "routes": [{ "pattern": "dev.findlyfy.com", "custom_domain": true }],
+      // Раз на 5 хвилин: пости в Telegram-канал й прибирання (worker/index.ts → /api/internal/tick).
+      "triggers": { "crons": ["*/5 * * * *"] },
       "preview_urls": false,
       // Привʼязки не успадковуються між середовищами, тож у кожного свої.
       "d1_databases": [
-        { "binding": "DB", "database_name": "uposhuku-development", "database_id": "6770bc21-d5a1-4829-ab92-ff465831d4b6", "migrations_dir": "db/migrations" }
+        { "binding": "DB", "database_name": "uposhuku-development", "database_id": "6770bc21-d5a1-4829-ab92-ff465831d4b6", "migrations_dir": "db/migrations" },
+        // Телеметрія (kit/telemetry): помилки й події окремо від бази продукту. Без database_id wrangler
+        // працює локально й у тестах; для remote: `npx wrangler d1 create uposhuku-telemetry-development`
+        // і вписати id сюди. Без привʼязки телеметрія мовчки вимкнена.
+        { "binding": "TELEMETRY_DB", "database_name": "uposhuku-telemetry-development", "database_id": "d2b788ec-82b6-40e9-bd99-6ff36f5e3453", "migrations_dir": "kit/telemetry/migrations" }
       ],
       "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "uposhuku-uploads" }],
       "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "Realtime" }] },
@@ -35,12 +51,24 @@
     },
     "production": {
       "name": "uposhuku",
-      "vars": { "DEPLOY_ENV": "production" },
+      "triggers": { "crons": ["*/5 * * * *"] },
+      "routes": [{ "pattern": "findlyfy.com", "custom_domain": true }, { "pattern": "www.findlyfy.com", "custom_domain": true }],
+      "vars": {
+        "DEPLOY_ENV": "production",
+        // Домен ще не вирішено: змінити, коли він буде.
+        "SITE_URL": "https://findlyfy.com",
+        "TELEGRAM_BOT_USERNAME": "",
+        // Публікація в канал вимкнена, доки Макс не ввімкне: CHANNEL_ENABLED=1.
+        "CHANNEL_ENABLED": "",
+        "CHANNEL_DELAY_MIN": "20"
+      },
       // Прод: окрема база й бакет. На проді вхід вимкнений, доки немає RESEND_API_KEY
       // (див. lib/server/mail.ts), а MAIL_MODE=dev тут не діє. Перед першим деплоєм:
       //   npm run db:migrate:production, secret put AUTH_SECRET, RESEND_API_KEY, GOOGLE_*.
       "d1_databases": [
-        { "binding": "DB", "database_name": "uposhuku-production", "database_id": "2b92cc09-29cc-4ae1-86c6-01f6223bb706", "migrations_dir": "db/migrations" }
+        { "binding": "DB", "database_name": "uposhuku-production", "database_id": "2b92cc09-29cc-4ae1-86c6-01f6223bb706", "migrations_dir": "db/migrations" },
+        // Див. коментар у development: `wrangler d1 create uposhuku-telemetry-production`, id сюди.
+        { "binding": "TELEMETRY_DB", "database_name": "uposhuku-telemetry-production", "database_id": "dd577de9-152f-4a89-bbd7-96ba2d9a91ed", "migrations_dir": "kit/telemetry/migrations" }
       ],
       "r2_buckets": [{ "binding": "UPLOADS", "bucket_name": "uposhuku-uploads-production" }],
       "durable_objects": { "bindings": [{ "name": "REALTIME", "class_name": "Realtime" }] },
