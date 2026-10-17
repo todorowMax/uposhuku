@@ -4158,7 +4158,12 @@ select.auth-input[data-empty] {
   align-items: center;
   justify-content: center;
   padding: 6rem 1.5rem 0;
-  background: var(--bg);
+  overflow: hidden;
+  /* Космос: холодне світіння знизу, ледь теплий відблиск зверху. Планета під ними в ::before. */
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 112%, rgb(70 140 200 / 45%), transparent 70%),
+    radial-gradient(ellipse 60% 35% at 50% -8%, rgb(242 105 60 / 12%), transparent 70%),
+    var(--bg);
   pointer-events: none;
   transition:
     opacity 600ms var(--ease-out-quint),
@@ -4170,6 +4175,30 @@ html[data-map-ready] .map-skeleton {
   opacity: 0;
   transform: scale(1.02);
   visibility: hidden;
+}
+
+/* Обрій планети: та сама карта регіону, що в сцені, приглушена й затемнена до країв. */
+.map-skeleton::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: max(150vw, 170vh);
+  aspect-ratio: 1;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: url("/map/loading-planet.webp") center / cover no-repeat;
+  opacity: 0.42;
+  box-shadow:
+    inset 0 0 14vmax 6vmax var(--deep),
+    0 0 8vmax 1vmax rgb(100 170 225 / 35%);
+  animation: skeleton-planet 14s ease-in-out infinite alternate;
+}
+
+.map-skeleton-svg,
+.map-skeleton-label {
+  position: relative;
+  z-index: 1;
 }
 
 .map-skeleton-svg {
@@ -4243,6 +4272,15 @@ html[data-map-ready] .map-skeleton {
   animation-delay: 400ms;
 }
 
+@keyframes skeleton-planet {
+  from {
+    transform: rotate(-1.5deg) scale(1);
+  }
+  to {
+    transform: rotate(1.5deg) scale(1.04);
+  }
+}
+
 @keyframes skeleton-draw {
   to {
     stroke-dashoffset: 0;
@@ -4299,7 +4337,8 @@ html[data-map-ready] .map-skeleton {
 
   .map-skeleton-shine,
   .map-skeleton-ring,
-  .map-skeleton-dots span {
+  .map-skeleton-dots span,
+  .map-skeleton::before {
     animation: none;
   }
 
@@ -5349,4 +5388,409 @@ html[data-map-ready] .map-skeleton {
 .inbox-deal-tag[data-action] {
   background: var(--accent-soft);
   color: var(--accent-ink);
+}
+
+/* ───────────── Вибір тегу: shadcn Popover + Command + Sheet (components/tags/tag-picker.tsx) ───────────── */
+.tag-chip[data-kind="add"] {
+  padding-left: 8px;
+  border: 1px solid rgb(0 54 74 / 24%);
+  color: var(--ink);
+  background: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.tag-chip[data-kind="add"]:hover,
+.tag-chip[data-kind="add"][aria-expanded="true"] {
+  background: var(--hover-blue);
+  border-color: rgb(0 54 74 / 38%);
+}
+
+.tag-chip[data-kind="add"]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ui-popover {
+  z-index: 90;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  border: 1px solid rgb(184 196 199 / 70%);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px -8px rgb(48 54 58 / 28%), 0 2px 6px rgb(48 54 58 / 8%);
+  transform-origin: var(--radix-popover-content-transform-origin);
+  outline: none;
+}
+
+.ui-popover[data-state="open"] {
+  animation: ui-select-in 140ms var(--ease-out-quint);
+}
+
+.ui-popover[data-state="closed"] {
+  animation: ui-select-out 100ms ease-in;
+}
+
+.ui-command {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: inherit;
+  color: var(--ink);
+}
+
+.ui-popover-picker .ui-command {
+  max-height: min(420px, calc(var(--radix-popover-content-available-height, 420px) - 8px));
+}
+
+.ui-command-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgb(184 196 199 / 55%);
+}
+
+.ui-command-search {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+}
+
+.ui-command-input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+}
+
+.ui-command-input::placeholder {
+  color: var(--ink-muted);
+}
+
+.ui-command-note {
+  margin: 0;
+  padding: 8px 14px;
+  background: #f1f4f4;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.ui-command-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+}
+
+.ui-command-group [cmdk-group-heading] {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.ui-command-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-command-item[data-selected="true"] {
+  background: #eef1f1;
+}
+
+.ui-command-item[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-command-item[data-checked] .ui-command-title {
+  font-weight: 600;
+}
+
+.ui-command-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  flex: none;
+  color: #4e6262;
+}
+
+.ui-command-main {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-command-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-command-title b {
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(transparent 62%, rgb(242 105 60 / 28%) 62%);
+}
+
+.ui-command-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.ui-command-meta {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.ui-command-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.ui-command-propose {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.ui-command-propose:hover {
+  background: #fbd6c4;
+}
+
+.ui-command-more {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.ui-command-more:hover {
+  background: #eef1f1;
+  color: var(--ink);
+}
+
+.ui-command-more:focus-visible,
+.ui-command-propose:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.ui-inline-picker {
+  overflow: hidden;
+  border: 1px solid rgb(184 196 199 / 70%);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.ui-inline-picker .ui-command-list {
+  max-height: 280px;
+}
+
+/* Шторка знизу (телефон). */
+.ui-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgb(3 9 13 / 45%);
+}
+
+.ui-sheet-overlay[data-state="open"] {
+  animation: ui-sheet-fade 200ms ease-out;
+}
+
+.ui-sheet-overlay[data-state="closed"] {
+  animation: ui-sheet-fade 140ms ease-in reverse;
+}
+
+.ui-sheet {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  max-height: 80dvh;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-radius: 20px 20px 0 0;
+  background: #ffffff;
+  box-shadow: 0 -12px 40px -12px rgb(48 54 58 / 35%);
+  outline: none;
+}
+
+.ui-sheet[data-state="open"] {
+  animation: ui-sheet-in 260ms var(--ease-out-quint);
+}
+
+.ui-sheet[data-state="closed"] {
+  animation: ui-sheet-in 160ms ease-in reverse;
+}
+
+.ui-sheet-picker {
+  height: 75dvh;
+}
+
+.ui-sheet-picker .ui-command {
+  flex: 1;
+}
+
+.ui-sheet-grip {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  margin: 8px 0 4px;
+  border-radius: 999px;
+  background: rgb(0 54 74 / 18%);
+}
+
+.ui-sheet-title {
+  padding: 4px 16px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@keyframes ui-sheet-fade {
+  from { opacity: 0; }
+}
+
+@keyframes ui-sheet-in {
+  from { transform: translateY(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-popover[data-state],
+  .ui-sheet[data-state],
+  .ui-sheet-overlay[data-state] {
+    animation: none;
+  }
+}
+
+/* Рядок тегів запиту й «+ Додати тег» праворуч від нього (components/composer/tag-row.tsx). */
+.tag-row-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tag-row-line > .tag-chip[data-kind="add"] {
+  flex: none;
+}
+
+/* Запит згоди на статистику (components/legal/consent-banner.tsx). */
+.consent-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 35;
+  display: grid;
+  gap: 10px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  animation: consent-in 220ms var(--ease-out-quint);
+}
+
+.consent-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.consent-actions > * {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+@keyframes consent-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* На телефоні над нижніми кнопками (акаунт, режим карти). */
+@media (max-width: 639px) {
+  .consent-banner {
+    left: 16px;
+    right: 16px;
+    bottom: calc(88px + env(safe-area-inset-bottom));
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-banner {
+    animation: none;
+  }
+}
+
+/* Тег, запропонований людиною, але ще не доданий до словника (components/profile/tag-chips.tsx). */
+.tag-chip[data-kind="pending"] {
+  padding-left: 8px;
+  padding-right: 4px;
+  border: 1px dashed rgb(165 62 27 / 45%);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.ui-command-note[data-tone="notice"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.ui-command-propose:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Дії під рядком Telegram у налаштуваннях сповіщень. */
+.notif-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 10px 8px 42px;
+}
+
+/*
+  Панелі поверх карти (поле запиту, нижні кнопки, повідомлення) з'являються,
+  коли карта готова: components/map/chrome-reveal ставить <html data-chrome-ready>
+  і виїжджає ними через GSAP. Без цього атрибута вони сховані, тож заставка
+  лишається чистою.
+*/
+html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-button) {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
 }

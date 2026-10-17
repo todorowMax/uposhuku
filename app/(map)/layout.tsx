@@ -5,7 +5,9 @@
 import { AccountButton } from "@/components/account/account-button";
 import { NotificationSettings } from "@/components/account/notification-settings";
 import { TabBadge } from "@/components/account/tab-badge";
+import { ChromeReveal } from "@/components/map/chrome-reveal";
 import { MapModeSwitch } from "@/components/map/mode-switch";
+import { DeepLinkSync } from "@/components/map/deep-link-sync";
 import { DealSync } from "@/lib/deals/client";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
 import { RealPerformersSync } from "@/lib/map/performers-sync";
@@ -32,6 +34,8 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
         <AccountButton />
         <MapModeSwitch />
       </div>
+      <ChromeReveal />
+      <DeepLinkSync />
       <DealSync />
       <MapRequestsSync />
       <RealPerformersSync />

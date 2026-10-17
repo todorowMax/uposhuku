@@ -55,7 +55,7 @@
       "routes": [{ "pattern": "findlyfy.com", "custom_domain": true }, { "pattern": "www.findlyfy.com", "custom_domain": true }],
       "vars": {
         "DEPLOY_ENV": "production",
-        "MAIL_FROM": "Vibe Map <hello@findlyfy.com>",
+        "MAIL_FROM": "Findlyfy <hello@findlyfy.com>",
         "SITE_URL": "https://findlyfy.com",
         "TELEGRAM_BOT_USERNAME": "",
         // Публікація в канал вимкнена, доки Макс не ввімкне: CHANNEL_ENABLED=1.

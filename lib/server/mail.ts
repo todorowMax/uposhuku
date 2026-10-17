@@ -26,10 +26,10 @@ export const sendLoginCode = async (email: string, code: string) => {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
     body: JSON.stringify({
-      from: readVar("MAIL_FROM") ?? "Vibe Map <hello@findlyfy.com>",
+      from: readVar("MAIL_FROM") ?? "Findlyfy <hello@findlyfy.com>",
       to: [email],
       subject: `Код входу: ${code}`,
-      text: `Ваш код для входу у Vibe Map: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
+      text: `Ваш код для входу у Findlyfy: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
     }),
   });
   if (!response.ok) {

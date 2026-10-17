@@ -3,8 +3,8 @@ import { LegalDetails, LegalPage } from "@/components/legal/legal-page";
 import { CONTACT_EMAIL, OPERATOR, UPDATED } from "@/lib/legal/config";
 
 export const metadata: Metadata = {
-  title: "Контакти · Vibe Map",
-  description: "Як зв'язатися з Vibe Map і хто юридично надає сервіс.",
+  title: "Контакти · Findlyfy",
+  description: "Як зв'язатися з Findlyfy і хто юридично надає сервіс.",
   alternates: { canonical: "/contacts" },
 };
 

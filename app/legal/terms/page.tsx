@@ -4,7 +4,7 @@ import { fill, UPDATED } from "@/lib/legal/config";
 import { TERMS_INTRO, termsSections } from "@/lib/legal/terms";
 
 export const metadata: Metadata = {
-  title: "Умови користування · Vibe Map",
+  title: "Умови користування · Findlyfy",
   description: "Правила сервісу: хто що робить, чат і оплата роботи, відгуки, заборонене, скарги.",
   alternates: { canonical: "/legal/terms" },
 };

@@ -8,7 +8,7 @@
 import { HOLD_DAYS, MAX_STAGES, SAFE_FEE } from "@/lib/deals/types";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
-export const SERVICE_NAME = "Vibe Map";
+export const SERVICE_NAME = "Findlyfy";
 
 /** Той самий ФОП, що й в Укошику. Якщо проєкт піде на іншу особу, міняємо лише тут. */
 export const OPERATOR = {

@@ -15,7 +15,7 @@ const fixel = localFont({
 export const metadata: Metadata = {
   // Закрито від індексації, доки не запустимось публічно (також X-Robots-Tag у worker/index.ts і app/robots.ts).
   robots: { index: false, follow: false },
-  title: "Vibe Map: виконавці й запити на карті України",
+  title: "Findlyfy: виконавці й запити на карті України",
   description:
     "Опиши, що потрібно створити, і побач на карті, хто поруч уже робив схоже. " +
     "Реальні проєкти, реальні люди, з точністю до міста.",

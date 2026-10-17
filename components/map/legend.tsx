@@ -41,7 +41,7 @@ export function LegendButton() {
       {open && (
         <div role="dialog" aria-label="Про сервіс" className="legend-panel glass-panel">
           <div className="flex items-center justify-between">
-            <h2 className="text-[14px] font-semibold text-ink">Про Vibe Map</h2>
+            <h2 className="text-[14px] font-semibold text-ink">Про Findlyfy</h2>
             <button type="button" onClick={() => setOpen(false)} aria-label="Закрити інформацію про сервіс" className="auth-icon-button -mr-1.5">
               <X className="size-4" />
             </button>

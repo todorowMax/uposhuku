@@ -5,7 +5,7 @@ import { offerSections } from "@/lib/legal/offer";
 import { numbered } from "@/lib/legal/types";
 
 export const metadata: Metadata = {
-  title: "Публічна оферта · Vibe Map",
+  title: "Публічна оферта · Findlyfy",
   description: "Договір про розміщення профілю на карті: сторони, оплата, повернення коштів, відповідальність.",
   alternates: { canonical: "/offer" },
 };
