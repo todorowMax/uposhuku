@@ -4,7 +4,7 @@
 // «зараз» передаємо ззовні, тож усе перевіряється тестами. Дії замовника й
 // виконавця; гроші підтверджуватиме вебхук банку.
 
-import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage, type PerformerAction } from "./types";
+import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "./types";
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -60,6 +60,10 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
   status: "proposed",
   createdAt: iso(now),
   number: `#${id.replace(/\W/g, "").slice(-4).toUpperCase()}`,
+  ...(draft.title ? { title: draft.title.trim() } : {}),
+  ...(draft.description?.trim() ? { description: draft.description.trim() } : {}),
+  ...(draft.conversationId ? { conversationId: draft.conversationId } : {}),
+  ...(draft.proposedBy ? { proposedBy: draft.proposedBy } : {}),
   stages: draft.stages.map((stage, index) => ({ id: `${id}-s${index + 1}`, ...stage, title: stage.title.trim(), status: "pending" })),
 });
 
@@ -68,7 +72,14 @@ export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.f
 
 /** Замовник щось робить з угодою. Повертає нову угоду або текст помилки. */
 export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number): Deal | string => {
+  // Умови виставив виконавець: замовник їх приймає або відхиляє.
+  if (action === "accept" || action === "decline") {
+    if (deal.proposedBy !== "performer") return "Цю пропозицію приймає виконавець.";
+    if (deal.status !== "proposed") return "Ця пропозиція вже не чекає на відповідь.";
+    return action === "accept" ? { ...deal, status: "accepted", acceptedAt: iso(now) } : { ...deal, status: "declined" };
+  }
   if (action === "cancel") {
+    if (deal.proposedBy === "performer") return "Це пропозиція виконавця: її можна відхилити.";
     return deal.status === "proposed" ? { ...deal, status: "cancelled" } : "Скасувати можна лише ще не прийняту пропозицію.";
   }
   if (deal.status !== "accepted") return "Спершу виконавець має погодитися на угоду.";
@@ -95,7 +106,7 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
     case "dispute":
       if (stage.status !== "delivered" && stage.status !== "funded") return "Спір можна відкрити, коли кошти заморожено або етап здано.";
       if (deal.method === "direct") return "У прямому переказі гроші в нас не лежать, спір можна лише позначити в профілі.";
-      updated = { ...stage, status: "disputed" };
+      updated = { ...stage, status: "disputed", disputedAt: iso(now) };
       break;
     default:
       return "Невідома дія.";
@@ -107,7 +118,12 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
 
 /** Виконавець щось робить з угодою. Повертає нову угоду або текст помилки. */
 export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageId: string | undefined, now: number): Deal | string => {
+  if (action === "withdraw") {
+    if (deal.proposedBy !== "performer") return "Відкликати можна лише свою пропозицію.";
+    return deal.status === "proposed" ? { ...deal, status: "cancelled" } : "Відкликати можна лише ще не прийняту пропозицію.";
+  }
   if (action === "accept" || action === "decline") {
+    if (deal.proposedBy === "performer") return "Це ваша пропозиція: відповідає замовник.";
     if (deal.status !== "proposed") return "Ця пропозиція вже не чекає на відповідь.";
     return action === "accept" ? { ...deal, status: "accepted", acceptedAt: iso(now) } : { ...deal, status: "declined" };
   }
@@ -129,9 +145,46 @@ export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageI
   return { ...deal, stages: deal.stages.map((item) => (item.id === updated.id ? updated : item)) };
 };
 
+/** Етап, який зараз у спорі. */
+export const disputedStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status === "disputed");
+
+/**
+ * Модератор вирішує спір на етапі. Гроші тут не рухаються (оплата ще не підключена):
+ * рішення лише змінює стан угоди, а виплату чи повернення банк виконає окремо.
+ * - release: етап виплачено виконавцю, угода йде далі або завершується;
+ * - refund: кошти повертаються замовнику, угода закривається (статус «скасовано»);
+ * - rework: етап повертається виконавцю на доопрацювання, холд лишається той самий.
+ */
+export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageId: string | undefined, now: number): Deal | string => {
+  const stage = stageId ? deal.stages.find((item) => item.id === stageId) : disputedStage(deal);
+  if (!stage || stage.status !== "disputed") return "Цей етап не в спорі.";
+  let updated: DealStage;
+  switch (action) {
+    case "release":
+      updated = { ...stage, status: "released", releasedAt: iso(now) };
+      break;
+    case "refund":
+      updated = { ...stage, status: "refunded", refundedAt: iso(now) };
+      break;
+    case "rework": {
+      // Банк тримає холд не довше 9 днів: коли він збіг, повертати роботу вже нема на чому.
+      if (stage.holdUntil && Date.parse(stage.holdUntil) <= now) return "Холд уже збіг: оберіть виплату або повернення коштів.";
+      const { deliveredAt: _delivered, ...rest } = stage;
+      updated = { ...rest, status: "funded", reworkAt: iso(now) };
+      break;
+    }
+    default:
+      return "Невідоме рішення.";
+  }
+  const stages = deal.stages.map((item) => (item.id === updated.id ? updated : item));
+  const completed = stages.every((item) => item.status === "released");
+  const status = action === "refund" ? "cancelled" : completed ? "completed" : deal.status;
+  return { ...deal, stages, disputed: stages.some((item) => item.status === "disputed"), status };
+};
+
 /** Чого від виконавця чекає угода зараз: для підказки й кнопок у його вхідних. */
 export const performerNeeds = (deal: Deal): "answer" | "confirm" | "deliver" | null => {
-  if (deal.status === "proposed") return "answer";
+  if (deal.status === "proposed") return deal.proposedBy === "performer" ? null : "answer";
   if (deal.status !== "accepted") return null;
   const stage = currentStage(deal);
   if (!stage) return null;
@@ -151,7 +204,8 @@ export const dealPhase = (deals: Deal[]): DealPhase => {
 };
 
 /** Чого від замовника чекає угода зараз: для крапки на вкладці й підказки. */
-export const needsAction = (deal: Deal): "fund" | "pay" | "confirm" | "dispute" | null => {
+export const needsAction = (deal: Deal): "answer" | "fund" | "pay" | "confirm" | "dispute" | null => {
+  if (deal.status === "proposed") return deal.proposedBy === "performer" ? "answer" : null;
   if (deal.status !== "accepted") return null;
   const stage = currentStage(deal);
   if (!stage) return null;

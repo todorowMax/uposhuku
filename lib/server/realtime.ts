@@ -6,6 +6,7 @@
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { RealtimeEvent } from "@/lib/realtime/types";
+import { logServer } from "@/lib/telemetry/log";
 
 const send = async (room: string, event: RealtimeEvent) => {
   try {
@@ -14,6 +15,7 @@ const send = async (room: string, event: RealtimeEvent) => {
     await namespace.get(namespace.idFromName(room)).fetch("https://realtime/push", { method: "POST", body: JSON.stringify(event) });
   } catch (error) {
     console.warn("realtime push не вдався", error);
+    logServer({ level: "warn", event: "realtime_push_failed", message: error instanceof Error ? error.message : String(error), detail: { room, type: event.t } });
   }
 };
 

@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     const result = await putPhoto(user.id, bytes);
     return typeof result === "string" ? problem(400, "Файл не прийнято", result) : Response.json(result, { status: 201 });
   } catch (error) {
-    return failure(error);
+    return failure(error, request);
   }
 }

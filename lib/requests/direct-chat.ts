@@ -30,8 +30,6 @@ export interface DirectDialog {
 const PENDING_KEY = "vm:dm-pending";
 
 export const dialogsStore = createStore<Record<string, DirectDialog>>({});
-/** Чат у профілі цього виконавця треба відкрити одразу, як тільки профіль з'явиться. */
-export const directChatOpenStore = createStore<string | null>(null);
 
 const conversationIds = new Map<string, string>();
 

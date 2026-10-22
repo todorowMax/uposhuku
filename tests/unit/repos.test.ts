@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDeal } from "@/lib/deals/machine";
-import type { DealDraft } from "@/lib/deals/types";
+import type { Deal, DealDraft } from "@/lib/deals/types";
 import { emptyProfile } from "@/lib/profile/types";
-import { accessibleConversation, addMessage, getOrCreateConversation, listConversations, listMessages, performerKnown } from "@/lib/server/chat-repo";
-import { actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
+import { accessibleConversation, addMessage, listConversationOrders, claimableAttachments, findChatAttachment, getOrCreateConversation, listConversations, listMessages, performerKnown, saveChatPhoto } from "@/lib/server/chat-repo";
+import { actAsModerator, actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDeal, proposeDirectDeal } from "@/lib/server/deal-repo";
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
 import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
+import { findDisputeAttachment, getDisputeCard, listDisputes } from "@/lib/server/admin-repo";
 import { allPerformerStats, performerStatsOf } from "@/lib/server/stats-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
@@ -29,8 +30,8 @@ const profile = (name: string, published = true) => ({
   photo: "data:image/jpeg;base64,AAAA",
   published,
   works: [
-    { id: "w1", title: "Сайт кав'ярні", description: "Лендинг для кав'ярні", url: "https://example.com", tags: ["landing"] },
-    { id: "w2", title: "Бот", description: "Telegram-бот", url: "", tags: ["telegram-bot", "automation"] },
+    { id: "w1", title: "Сайт кав'ярні", description: "Лендинг для кав'ярні", url: "https://example.com", tags: ["landing"], manualTags: [], hiddenTags: [] },
+    { id: "w2", title: "Бот", description: "Telegram-бот", url: "", tags: ["telegram-bot", "automation"], manualTags: ["automation"], hiddenTags: [] },
   ],
 });
 
@@ -45,9 +46,20 @@ describe("профіль на D1", () => {
     expect(saved.photo).toBe("data:image/jpeg;base64,AAAA");
   });
 
+  it("джерело тегів зберігається: ручні й приховані окремо, приховані не потрапляють у підсумок", async () => {
+    const saved = await saveProfile("p1", { ...profile("Олена"), tags: ["website", "landing"], manualTags: ["landing"], hiddenTags: ["telegram-bot"] });
+    expect(saved.tags.sort()).toEqual(["landing", "website"]);
+    expect(saved.manualTags).toEqual(["landing"]);
+    expect(saved.hiddenTags).toEqual(["telegram-bot"]);
+    expect(saved.works[1]).toMatchObject({ manualTags: ["automation"], hiddenTags: [] });
+    // Приховані не бачить ніхто: ні карта, ні підбір.
+    const published = await listPublishedProfiles();
+    expect(published.get("p1")?.tags).not.toContain("telegram-bot");
+  });
+
   it("повторне збереження замінює теги й роботи, а не множить їх; id робіт стабільні", async () => {
     await saveProfile("p1", profile("Олена"));
-    const again = await saveProfile("p1", { ...profile("Олена Коваль"), tags: ["website"], works: [{ id: "w1", title: "Інше", description: "", url: "", tags: [] }] });
+    const again = await saveProfile("p1", { ...profile("Олена Коваль"), tags: ["website"], works: [{ id: "w1", title: "Інше", description: "", url: "", tags: [], manualTags: [], hiddenTags: [] }] });
     expect(again).toMatchObject({ name: "Олена Коваль", tags: ["website"] });
     expect(again.works).toHaveLength(1);
     expect(again.works[0].id).toBe("w1");
@@ -185,6 +197,56 @@ describe("чат на D1", () => {
   });
 });
 
+describe("умови з розмови на D1", () => {
+  const draft = { method: "direct" as const, title: "Лендинг", description: "Дизайн і верстка", performer: { id: "me-perf", name: "Виконавець", avatarIndex: 0, specialty: "Розробник", fop: false }, stages: [{ title: "Робота", amount: 8000, days: 10 }] };
+
+  it("виконавець виставляє умови, замовник їх приймає, список показує обидві сторони", async () => {
+    const conv = await getOrCreateConversation("c2", "me-perf", "perf");
+    const deal = (await proposeDirectDeal(conv, "performer", draft)) as Deal;
+    expect(deal).toMatchObject({ status: "proposed", proposedBy: "performer", title: "Лендинг", conversationId: conv.id });
+    const forCustomer = await listConversationOrders(conv, "customer");
+    expect(forCustomer[0]).toMatchObject({ title: "Лендинг", needsMe: true, mineProposal: false, direct: true });
+    const forPerformer = await listConversationOrders(conv, "performer");
+    expect(forPerformer[0]).toMatchObject({ needsMe: false, mineProposal: true });
+    const accepted = (await actOnDeal("c2", deal.id, "accept", undefined)) as Deal;
+    expect(accepted.status).toBe("accepted");
+    expect((await listDealsForPerformer("perf", conv.id)).find((item) => item.id === deal.id)?.status).toBe("accepted");
+  });
+
+  it("не приймає порожню назву й більше п'яти відкритих замовлень", async () => {
+    const conv = await getOrCreateConversation("c1", "me-perf", "perf");
+    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: " " })).toMatch(/Назвіть/);
+    for (let index = 0; index < 5; index++) expect(typeof (await proposeDirectDeal(conv, "customer", { ...draft, title: `Замовлення ${index}` }))).toBe("object");
+    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: "Шосте" })).toMatch(/відкритих замовлень/);
+  });
+});
+
+describe("фото в чаті", () => {
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+
+  it("приймає фото, прикріплює до повідомлення й віддає лише своїй розмові", async () => {
+    const conv = await getOrCreateConversation("c1", "me-perf", "perf");
+    const saved = await saveChatPhoto(conv.id, "c1", jpeg);
+    expect(saved).toMatchObject({ id: expect.stringMatching(/^att_/) });
+    const id = (saved as { id: string }).id;
+    // Чуже фото прикріпити не можна, своє можна один раз.
+    expect(await claimableAttachments(conv.id, "perf", [id])).toEqual([]);
+    expect(await claimableAttachments(conv.id, "c1", [id])).toEqual([id]);
+    const message = await addMessage(conv.id, "customer", "", { attachmentIds: [id] });
+    expect(message.attachments).toEqual([{ id, url: `/api/conversations/${conv.id}/attachments/${id}` }]);
+    expect(await claimableAttachments(conv.id, "c1", [id])).toEqual([]);
+    expect((await listMessages(conv.id)).find((item) => item.id === message.id)?.attachments).toHaveLength(1);
+    expect(await findChatAttachment(conv.id, id)).toMatchObject({ mime: "image/jpeg" });
+    expect(await findChatAttachment("conv_other", id)).toBeNull();
+  });
+
+  it("відхиляє не-зображення й завеликі файли", async () => {
+    const conv = await getOrCreateConversation("c1", "me-perf", "perf");
+    expect(await saveChatPhoto(conv.id, "c1", new TextEncoder().encode("<svg onload=alert(1)>"))).toMatch(/JPEG, PNG або WebP/);
+    expect(await saveChatPhoto(conv.id, "c1", new Uint8Array(700_000).fill(0xff))).toMatch(/завелике/);
+  });
+});
+
 describe("великі обсяги: у D1 не більше 100 параметрів у запиті", () => {
   it("профілі, проєкти й запити читаються пачками", async () => {
     const ids = Array.from({ length: 160 }, (_, index) => `bulk-${index}`);
@@ -224,5 +286,111 @@ describe("цифри виконавця з бази", () => {
     expect(await performerStatsOf("stat-perf")).toEqual({ months: 3, orders: 1, rating: 4.5, reviews: 2 });
     expect((await allPerformerStats()).get("me-stat-perf")).toMatchObject({ orders: 1 });
     expect(await performerStatsOf("nobody-here")).toEqual({ months: 0, orders: 0, rating: null, reviews: 0 });
+  });
+});
+
+describe("спори для модератора на D1", () => {
+  const performer = { id: "me-mod-p", name: "Виконавець", avatarIndex: 0, specialty: "Розробник", fop: true };
+  const admin = { userId: "mod-a", email: "mod@example.com", comment: "Роботу здано за ТЗ, виплачуємо." };
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
+
+  const disputedDeal = async (responseId: string) => {
+    const created = (await proposeDeal("mod-c", draft({ responseId, method: "safe", performer, stages: [{ title: "Сайт", amount: 10000, days: 7 }] }), 40_000_000)) as { id: string };
+    await actAsPerformer("mod-p", created.id, "accept", undefined, 40_000_001);
+    await actOnDeal("mod-c", created.id, "fund", undefined, 40_000_002);
+    await actAsPerformer("mod-p", created.id, "deliver", undefined, 40_000_003);
+    return (await actOnDeal("mod-c", created.id, "dispute", undefined, 40_000_004)) as Deal;
+  };
+
+  beforeAll(async () => {
+    await makeUser(ctx.db, "mod-c");
+    await makeUser(ctx.db, "mod-p");
+    await makeUser(ctx.db, "mod-a");
+    await saveProfile("mod-p", profile("Модератор-виконавець"));
+  });
+
+  it("у чергу потрапляють лише угоди зі спором, відкриті з датою, а розв'язані йдуть окремо", async () => {
+    const disputed = await disputedDeal("resp_mod_1");
+    await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm", method: "direct", performer: { ...performer, id: "me-other", fop: false } }), 40_000_010);
+    const { open, resolved } = await listDisputes();
+    const row = open.find((item) => item.dealId === disputed.id)!;
+    expect(row).toMatchObject({ number: disputed.number, total: 10000, stageTitle: "Сайт", method: "safe", performerName: "Модератор-виконавець", decision: null });
+    expect(row.openedAt).toBe(new Date(40_000_004).toISOString());
+    expect(row.holdUntil).toBe(disputed.stages[0].holdUntil);
+    expect(open.every((item) => item.decision === null)).toBe(true);
+    expect(resolved.find((item) => item.dealId === disputed.id)).toBeUndefined();
+  });
+
+  it("картка збирає угоду, сторін і всю переписку з фото через адмінські адреси", async () => {
+    const disputed = await disputedDeal("resp_mod_2");
+    const conv = await getOrCreateConversation("mod-c", "me-mod-p", "mod-p");
+    const saved = (await saveChatPhoto(conv.id, "mod-c", jpeg)) as { id: string };
+    await addMessage(conv.id, "customer", "Ось що вийшло", { attachmentIds: [saved.id] });
+    await addMessage(conv.id, "customer", `Відкрито спір за угодою ${disputed.number}`, { kind: "system", contextId: disputed.id });
+    const card = (await getDisputeCard(disputed.id))!;
+    expect(card.deal.id).toBe(disputed.id);
+    expect(card.openStageId).toBe(disputed.stages[0].id);
+    expect(card.customer).toMatchObject({ email: "mod-c@example.com", demo: false });
+    expect(card.performer).toMatchObject({ name: "Модератор-виконавець", city: "Львів", demo: false });
+    expect(card.messages.map((item) => item.kind)).toContain("system");
+    expect(card.messages.find((item) => item.photos.length)?.photos).toEqual([`/api/admin/disputes/${disputed.id}/attachments/${saved.id}`]);
+    // Фото віддається лише з розмови цієї угоди, а чужа угода без спору недоступна зовсім.
+    expect(await findDisputeAttachment(disputed.id, saved.id)).toMatchObject({ mime: "image/jpeg" });
+    expect(await findDisputeAttachment(disputed.id, "att_nope")).toBeNull();
+    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm2" }), 40_000_020)) as { id: string };
+    expect(await getDisputeCard(calm.id)).toBeNull();
+    expect(await findDisputeAttachment(calm.id, saved.id)).toBeNull();
+    expect(await getDisputeCard("deal_missing")).toBeNull();
+  });
+
+  it("рішення міняє угоду, пишеться в журнал і виводить спір із черги", async () => {
+    const disputed = await disputedDeal("resp_mod_3");
+    const done = (await actAsModerator(disputed.id, "release", undefined, admin, 40_100_000)) as { deal: Deal; stage: { title: string }; ownerUserId: string; decisionId: string };
+    expect(done.deal).toMatchObject({ status: "completed", disputed: false });
+    expect(done.stage.title).toBe("Сайт");
+    expect(done.ownerUserId).toBe("mod-c");
+    // Угода справді змінена в базі, а не лише у відповіді.
+    expect((await listDeals("mod-c")).find((item) => item.id === disputed.id)?.status).toBe("completed");
+    const card = (await getDisputeCard(disputed.id))!;
+    expect(card.log).toEqual([{ id: done.decisionId, stageId: disputed.stages[0].id, action: "release", comment: admin.comment, adminEmail: admin.email, at: new Date(40_100_000).toISOString() }]);
+    expect(card.openStageId).toBeNull();
+    const { open, resolved } = await listDisputes();
+    expect(open.find((item) => item.dealId === disputed.id)).toBeUndefined();
+    expect(resolved.find((item) => item.dealId === disputed.id)).toMatchObject({ decision: { action: "release" }, stageTitle: "Сайт" });
+    // Повторне рішення по тому самому спору відхиляється й не пише в журнал.
+    expect(await actAsModerator(disputed.id, "refund", undefined, admin, 40_100_100)).toMatch(/не в спорі/);
+    expect((await getDisputeCard(disputed.id))!.log).toHaveLength(1);
+  });
+
+  it("повернення закриває угоду, а на доопрацюванні спір можна відкрити знову", async () => {
+    const refunded = await disputedDeal("resp_mod_4");
+    const first = (await actAsModerator(refunded.id, "refund", undefined, { ...admin, comment: "Роботи немає, повертаємо." }, 40_200_000)) as { deal: Deal };
+    expect(first.deal).toMatchObject({ status: "cancelled" });
+    expect(first.deal.stages[0].status).toBe("refunded");
+
+    const rework = await disputedDeal("resp_mod_5");
+    const second = (await actAsModerator(rework.id, "rework", undefined, { ...admin, comment: "Виправте розбіжності з ТЗ." }, 40_300_000)) as { deal: Deal };
+    expect(second.deal.stages[0].status).toBe("funded");
+    expect(await actAsPerformer("mod-p", rework.id, "deliver", undefined, 40_300_100)).toMatchObject({ stages: [{ status: "delivered" }] });
+    expect(await actOnDeal("mod-c", rework.id, "dispute", undefined, 40_300_200)).toMatchObject({ disputed: true });
+    expect((await getDisputeCard(rework.id))!.log).toHaveLength(1);
+  });
+
+  it("невідома угода дає null, помилка машини не лишає слідів у журналі", async () => {
+    expect(await actAsModerator("deal_missing", "release", undefined, admin)).toBeNull();
+    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm3" }), 40_400_000)) as { id: string };
+    expect(await actAsModerator(calm.id, "release", undefined, admin)).toMatch(/не в спорі/);
+    expect(await getDisputeCard(calm.id)).toBeNull();
+  });
+
+  it("двоє модераторів одночасно: рішення застосовується один раз, у журналі один запис", async () => {
+    const deal = await disputedDeal("resp_mod_6");
+    const results = await Promise.all([
+      actAsModerator(deal.id, "release", undefined, admin, 40_500_000),
+      actAsModerator(deal.id, "refund", undefined, { ...admin, email: "second@example.com", comment: "Повертаємо кошти замовнику." }, 40_500_001),
+    ]);
+    expect(results.filter((item) => typeof item === "object")).toHaveLength(1);
+    expect(results.filter((item) => typeof item === "string")).toHaveLength(1);
+    expect((await getDisputeCard(deal.id))!.log).toHaveLength(1);
   });
 });

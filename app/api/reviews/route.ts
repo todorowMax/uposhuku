@@ -8,6 +8,8 @@ import { getSessionUser } from "@/lib/server/auth";
 import { listDeals } from "@/lib/server/deal-repo";
 import { addReview, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
 import { REVIEW_TEXT_MAX, averageStars } from "@/lib/reviews/types";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -36,5 +38,7 @@ export async function POST(request: Request) {
   if (stars < 1 || stars > 5) return problem(400, "Оберіть оцінку від 1 до 5");
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, REVIEW_TEXT_MAX) : "";
   const author = (user.name ?? user.email.split("@")[0]).split(/\s+/)[0].slice(0, 30);
-  return Response.json({ review: await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author }) }, { status: 201 });
+  const review = await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author });
+  serverEvent(EVENTS.reviewLeft, { deal_id: dealId, stars }, user.id, "/api/reviews");
+  return Response.json({ review }, { status: 201 });
 }

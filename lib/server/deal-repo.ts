@@ -4,9 +4,9 @@
 // (lib/deals/machine.ts) працює з усім об'єктом.
 
 import { and, desc, eq } from "drizzle-orm";
-import { deals } from "@/db/schema";
-import { applyAction, applyPerformerAction, createDeal, validateDraft } from "@/lib/deals/machine";
-import type { Deal, DealAction, DealDraft, PerformerAction } from "@/lib/deals/types";
+import { deals, moderationActions } from "@/db/schema";
+import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft } from "@/lib/deals/machine";
+import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
 import { getDb } from "./db";
 
@@ -85,4 +85,82 @@ export const actAsPerformer = async (performerUserId: string, id: string, action
   if (typeof result === "string") return result;
   await write(row.ownerUserId, result, now);
   return result;
+};
+
+// ───────────── умови з розмови (без запиту) ─────────────
+
+const MAX_LIVE_DIRECT = 5;
+
+/**
+ * Умови, виставлені прямо в розмові: назва, опис, сума, етапи. Виставити може
+ * будь-яка сторона; власник угоди завжди замовник, а `proposedBy` каже, хто чекає відповіді.
+ */
+export const proposeDirectDeal = async (
+  conversation: { id: string; customerUserId: string; performerId: string },
+  proposedBy: "customer" | "performer",
+  draft: Omit<DealDraft, "requestId" | "responseId" | "conversationId" | "proposedBy">,
+  now = Date.now(),
+): Promise<Deal | string> => {
+  const title = draft.title?.trim() ?? "";
+  if (title.length < 2) return "Назвіть замовлення: хоча б кілька літер.";
+  if (title.length > 80) return "Назва задовга: до 80 символів.";
+  if ((draft.description?.length ?? 0) > 1000) return "Опис задовгий: до 1000 символів.";
+  const full: DealDraft = { ...draft, title, requestId: directRequestId(conversation.id), responseId: DIRECT_RESPONSE_ID, conversationId: conversation.id, proposedBy };
+  const error = validateDraft(full);
+  if (error) return error;
+  const live = (await readAll(conversation.customerUserId)).filter((deal) => deal.conversationId === conversation.id && (deal.status === "proposed" || deal.status === "accepted"));
+  if (live.length >= MAX_LIVE_DIRECT) return `У розмові вже ${MAX_LIVE_DIRECT} відкритих замовлень: завершіть одне, щоб додати нове.`;
+  const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, full, now);
+  await getDb().insert(deals).values({
+    id: deal.id,
+    ownerUserId: conversation.customerUserId,
+    requestId: deal.requestId,
+    responseId: deal.responseId,
+    performerId: deal.performer.id,
+    status: deal.status,
+    data: JSON.stringify(deal),
+    createdAt: now,
+    updatedAt: now,
+  });
+  return deal;
+};
+
+// ───────────── модератор ─────────────
+
+export interface ModeratorDecision {
+  deal: Deal;
+  stage: DealStage;
+  ownerUserId: string;
+  decisionId: string;
+}
+
+/**
+ * Рішення модератора у спорі: машина змінює угоду, запис у журнал лишається назавжди.
+ * Оновлення з перевіркою `updated_at`: якщо угоду в цей час змінили (друга людина
+ * вирішила спір, сторона діяла), нічого не пишемо й просимо оновити сторінку.
+ */
+export const actAsModerator = async (
+  id: string,
+  action: ModeratorAction,
+  stageId: string | undefined,
+  admin: { userId: string; email: string; comment: string },
+  now = Date.now(),
+): Promise<ModeratorDecision | string | null> => {
+  const db = getDb();
+  const [row] = await db.select().from(deals).where(eq(deals.id, id)).limit(1);
+  if (!row) return null;
+  const before = parse(row);
+  const result = applyModeratorAction(before, action, stageId, now);
+  if (typeof result === "string") return result;
+  const target = stageId ? before.stages.find((item) => item.id === stageId) : disputedStage(before);
+  if (!target) return "Етапу не знайдено.";
+  const claimed = await db
+    .update(deals)
+    .set({ status: result.status, data: JSON.stringify(result), updatedAt: now })
+    .where(and(eq(deals.id, id), eq(deals.updatedAt, row.updatedAt)))
+    .returning({ id: deals.id });
+  if (claimed.length === 0) return "Угоду щойно змінили: оновіть сторінку й перегляньте її знову.";
+  const decisionId = `mod_${crypto.randomUUID().slice(0, 10)}`;
+  await db.insert(moderationActions).values({ id: decisionId, dealId: id, stageId: target.id, action, comment: admin.comment, adminUserId: admin.userId, adminEmail: admin.email, createdAt: now });
+  return { deal: result, stage: target, ownerUserId: row.ownerUserId, decisionId };
 };

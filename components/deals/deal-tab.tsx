@@ -2,21 +2,53 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Clock, Loader2, Lock, QrCode, ShieldCheck, Star, Plus, Trash2 } from "@/components/icons";
+import {
+  Check,
+  Clock,
+  Loader2,
+  Lock,
+  QrCode,
+  ShieldCheck,
+  Star,
+  Plus,
+  Trash2,
+} from "@/components/icons";
+import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, proposeDeal, useDeals } from "@/lib/deals/client";
 import { isFop } from "@/lib/deals/fop";
-import { HOLD_DAYS, MAX_STAGES, SAFE_FEE, type Deal, type DealMethod, type DealStage } from "@/lib/deals/types";
-import { currentStage, dealTotal, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import {
+  HOLD_DAYS,
+  MAX_STAGES,
+  SAFE_FEE,
+  type Deal,
+  type DealMethod,
+  type DealStage,
+} from "@/lib/deals/types";
+import {
+  currentStage,
+  dealTotal,
+  feeOf,
+  needsAction,
+  payoutOf,
+  splitIntoStages,
+  validateDraft,
+} from "@/lib/deals/machine";
 import { fetchMyReview, sendReview } from "@/lib/reviews/client";
 import { REVIEW_TEXT_MAX, type Review } from "@/lib/reviews/types";
 import type { OfferResponse } from "@/lib/requests/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
-const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
+const DATE = new Intl.DateTimeFormat("uk-UA", {
+  day: "numeric",
+  month: "long",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const money = (value: number) => `${PRICE.format(value)} ₴`;
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const reduced = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const daysWord = (days: number) => {
   const tens = days % 100;
@@ -28,7 +60,12 @@ const daysWord = (days: number) => {
 
 /** Угода живе й не закрита відмовою чи скасуванням. */
 export const liveDeal = (deals: Deal[], responseId: string) =>
-  deals.find((deal) => deal.responseId === responseId && deal.status !== "declined" && deal.status !== "cancelled");
+  deals.find(
+    (deal) =>
+      deal.responseId === responseId &&
+      deal.status !== "declined" &&
+      deal.status !== "cancelled",
+  );
 
 /**
  * Вкладка «Угода» в чаті з виконавцем. Немає угоди — форма пропозиції (сума,
@@ -47,10 +84,14 @@ export function DealTab({ response }: { response: OfferResponse }) {
 function DealComposer({ response }: { response: OfferResponse }) {
   const fop = isFop(response.performerId);
   const [method, setMethod] = useState<DealMethod>(fop ? "safe" : "direct");
-  const [amount, setAmount] = useState(response.price ? String(response.price) : "");
+  const [amount, setAmount] = useState(
+    response.price ? String(response.price) : "",
+  );
   const [days, setDays] = useState(String(response.days));
   /** Етапи, які людина правила руками; null — рахуємо з суми й терміну. */
-  const [custom, setCustom] = useState<{ title: string; amount: string; days: string }[] | null>(null);
+  const [custom, setCustom] = useState<
+    { title: string; amount: string; days: string }[] | null
+  >(null);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,29 +100,83 @@ function DealComposer({ response }: { response: OfferResponse }) {
   const daysNumber = Number(days) || 0;
 
   const stages = useMemo(() => {
-    if (method === "direct") return amountNumber > 0 && daysNumber > 0 ? [{ title: "Робота", amount: amountNumber, days: daysNumber }] : [];
-    if (custom) return custom.map((stage) => ({ title: stage.title, amount: Number(stage.amount.replace(/\s/g, "")) || 0, days: Number(stage.days) || 0 }));
-    return amountNumber > 0 && daysNumber > 0 ? splitIntoStages(amountNumber, daysNumber) : [];
+    if (method === "direct")
+      return amountNumber > 0 && daysNumber > 0
+        ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
+        : [];
+    if (custom)
+      return custom.map((stage) => ({
+        title: stage.title,
+        amount: Number(stage.amount.replace(/\s/g, "")) || 0,
+        days: Number(stage.days) || 0,
+      }));
+    return amountNumber > 0 && daysNumber > 0
+      ? splitIntoStages(amountNumber, daysNumber)
+      : [];
   }, [method, custom, amountNumber, daysNumber]);
 
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
   const fee = feeOf(total, method);
-  const performer = { id: response.performerId, name: response.name, photo: response.photo, avatarIndex: response.avatarIndex, specialty: response.specialty, fop };
-  const problem = stages.length ? validateDraft({ requestId: response.requestId, responseId: response.id, performer, method, stages }) : "Вкажіть суму й термін.";
+  const performer = {
+    id: response.performerId,
+    name: response.name,
+    photo: response.photo,
+    avatarIndex: response.avatarIndex,
+    specialty: response.specialty,
+    fop,
+  };
+  const problem = stages.length
+    ? validateDraft({
+        requestId: response.requestId,
+        responseId: response.id,
+        performer,
+        method,
+        stages,
+      })
+    : "Вкажіть суму й термін.";
 
-  const editStage = (index: number, patch: Partial<{ title: string; amount: string; days: string }>) =>
-    setCustom((current) => (current ?? stages.map((stage) => ({ title: stage.title, amount: String(stage.amount), days: String(stage.days) }))).map((stage, i) => (i === index ? { ...stage, ...patch } : stage)));
+  const editStage = (
+    index: number,
+    patch: Partial<{ title: string; amount: string; days: string }>,
+  ) =>
+    setCustom((current) =>
+      (
+        current ??
+        stages.map((stage) => ({
+          title: stage.title,
+          amount: String(stage.amount),
+          days: String(stage.days),
+        }))
+      ).map((stage, i) => (i === index ? { ...stage, ...patch } : stage)),
+    );
 
-  const startCustom = () => setCustom(stages.map((stage) => ({ title: stage.title, amount: String(stage.amount), days: String(stage.days) })));
+  const startCustom = () =>
+    setCustom(
+      stages.map((stage) => ({
+        title: stage.title,
+        amount: String(stage.amount),
+        days: String(stage.days),
+      })),
+    );
 
   const submit = async () => {
     if (problem) return setError(problem);
     setBusy(true);
     setError(null);
     try {
-      await proposeDeal({ requestId: response.requestId, responseId: response.id, performer, method, stages });
+      await proposeDeal({
+        requestId: response.requestId,
+        responseId: response.id,
+        performer,
+        method,
+        stages,
+      });
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не вдалося запропонувати угоду.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Не вдалося запропонувати угоду.",
+      );
     } finally {
       setBusy(false);
     }
@@ -89,43 +184,58 @@ function DealComposer({ response }: { response: OfferResponse }) {
 
   return (
     <div className="deal">
-      <p className="auth-lead">Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець побачить пропозицію й погодиться.</p>
+      <p className="auth-lead">
+        Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець
+        побачить пропозицію й погодиться.
+      </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <div>
-          <label htmlFor="deal-amount" className="pe-label">
-            Сума, ₴
-          </label>
-          <input
+        <Field label="Сума, ₴" htmlFor="deal-amount">
+          <Input
             id="deal-amount"
             inputMode="numeric"
             value={custom && method === "safe" ? String(total) : amount}
             disabled={Boolean(custom) && method === "safe"}
-            onChange={(event) => setAmount(event.target.value.replace(/[^\d\s]/g, ""))}
+            onChange={(event) =>
+              setAmount(event.target.value.replace(/[^\d\s]/g, ""))
+            }
             placeholder="12 500"
-            className="auth-input w-full tabular-nums"
+            className="tabular-nums"
           />
-        </div>
-        <div>
-          <label htmlFor="deal-days" className="pe-label">
-            Термін, днів
-          </label>
-          <input
+        </Field>
+        <Field label="Термін, днів" htmlFor="deal-days">
+          <Input
             id="deal-days"
             inputMode="numeric"
-            value={custom && method === "safe" ? String(stages.reduce((sum, stage) => sum + stage.days, 0)) : days}
+            value={
+              custom && method === "safe"
+                ? String(stages.reduce((sum, stage) => sum + stage.days, 0))
+                : days
+            }
             disabled={Boolean(custom) && method === "safe"}
-            onChange={(event) => setDays(event.target.value.replace(/\D/g, "").slice(0, 3))}
+            onChange={(event) =>
+              setDays(event.target.value.replace(/\D/g, "").slice(0, 3))
+            }
             placeholder="14"
-            className="auth-input w-full tabular-nums"
+            className="tabular-nums"
           />
-        </div>
+        </Field>
       </div>
 
       <fieldset className="deal-methods">
         <legend className="pe-label">Як платити</legend>
-        <label className="deal-method" data-selected={method === "safe" || undefined} data-disabled={!fop || undefined}>
-          <input type="radio" name="method" checked={method === "safe"} disabled={!fop} onChange={() => setMethod("safe")} />
+        <label
+          className="deal-method"
+          data-selected={method === "safe" || undefined}
+          data-disabled={!fop || undefined}
+        >
+          <input
+            type="radio"
+            name="method"
+            checked={method === "safe"}
+            disabled={!fop}
+            onChange={() => setMethod("safe")}
+          />
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
             <ShieldCheck className="size-4 text-[#4d7a5e]" />
             Безпечна угода
@@ -137,13 +247,24 @@ function DealComposer({ response }: { response: OfferResponse }) {
               : "Недоступна: виконавець не ФОП. Безпечна угода лише для виконавців-ФОП."}
           </span>
         </label>
-        <label className="deal-method" data-selected={method === "direct" || undefined}>
-          <input type="radio" name="method" checked={method === "direct"} onChange={() => setMethod("direct")} />
+        <label
+          className="deal-method"
+          data-selected={method === "direct" || undefined}
+        >
+          <input
+            type="radio"
+            name="method"
+            checked={method === "direct"}
+            onChange={() => setMethod("direct")}
+          />
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
             <QrCode className="size-4 text-ink-muted" />
             Прямий переказ за QR
           </span>
-          <span className="deal-method-text">Без комісії, переказ одним платежем на рахунок виконавця. Без гарантії платформи: у спорі гроші ми не повертаємо.</span>
+          <span className="deal-method-text">
+            Без комісії, переказ одним платежем на рахунок виконавця. Без
+            гарантії платформи: у спорі гроші ми не повертаємо.
+          </span>
         </label>
       </fieldset>
 
@@ -152,28 +273,86 @@ function DealComposer({ response }: { response: OfferResponse }) {
           <div className="flex items-center justify-between gap-2">
             <p className="pe-label !mb-0">Етапи</p>
             {custom ? (
-              <button type="button" onClick={() => setCustom(null)} className="auth-link text-[12px]">
+              <button
+                type="button"
+                onClick={() => setCustom(null)}
+                className="auth-link text-[12px]"
+              >
                 Розбити автоматично
               </button>
             ) : (
-              stages.length > 1 && (
-                <button type="button" onClick={startCustom} className="auth-link text-[12px]">
-                  Змінити
-                </button>
-              )
+              <button
+                type="button"
+                onClick={startCustom}
+                className="auth-link text-[12px]"
+              >
+                {stages.length > 1 ? "Змінити" : "Розбити на етапи"}
+              </button>
             )}
           </div>
+          {stages.length === 1 && !custom && (
+            <>
+              <p className="deal-stage-line">
+                <span>{stages[0].title}</span>
+                <span className="tabular-nums">
+                  {money(stages[0].amount)} · {stages[0].days}{" "}
+                  {daysWord(stages[0].days)}
+                </span>
+              </p>
+              <p className="pe-hint">
+                Один етап: гроші заморожуються під усю роботу. Хочете платити
+                частинами, розбийте на кілька етапів.
+              </p>
+            </>
+          )}
           {stages.length > 1 && !custom && (
-            <p className="pe-hint">Холд триває до {HOLD_DAYS} днів, тож довшу роботу ділимо на етапи: кожен оплачується окремо.</p>
+            <p className="pe-hint">
+              Холд триває до {HOLD_DAYS} днів, тож довшу роботу ділимо на етапи:
+              кожен оплачується окремо.
+            </p>
           )}
           {custom
             ? custom.map((stage, index) => (
                 <div key={index} className="deal-stage-edit">
-                  <input aria-label={`Назва етапу ${index + 1}`} value={stage.title} onChange={(event) => editStage(index, { title: event.target.value })} className="auth-input min-w-0 flex-1" />
-                  <input aria-label={`Сума етапу ${index + 1}`} inputMode="numeric" value={stage.amount} onChange={(event) => editStage(index, { amount: event.target.value.replace(/[^\d\s]/g, "") })} className="auth-input w-[88px] tabular-nums" />
-                  <input aria-label={`Днів в етапі ${index + 1}`} inputMode="numeric" value={stage.days} onChange={(event) => editStage(index, { days: event.target.value.replace(/\D/g, "").slice(0, 3) })} className="auth-input w-[52px] tabular-nums" />
+                  <Input
+                    aria-label={`Назва етапу ${index + 1}`}
+                    value={stage.title}
+                    onChange={(event) =>
+                      editStage(index, { title: event.target.value })
+                    }
+                    className="min-w-0 flex-1"
+                  />
+                  <Input
+                    aria-label={`Сума етапу ${index + 1}`}
+                    inputMode="numeric"
+                    value={stage.amount}
+                    onChange={(event) =>
+                      editStage(index, {
+                        amount: event.target.value.replace(/[^\d\s]/g, ""),
+                      })
+                    }
+                    className="w-[88px] tabular-nums"
+                  />
+                  <Input
+                    aria-label={`Днів в етапі ${index + 1}`}
+                    inputMode="numeric"
+                    value={stage.days}
+                    onChange={(event) =>
+                      editStage(index, {
+                        days: event.target.value.replace(/\D/g, "").slice(0, 3),
+                      })
+                    }
+                    className="w-[52px] tabular-nums"
+                  />
                   {custom.length > 1 && (
-                    <button type="button" onClick={() => setCustom(custom.filter((_, i) => i !== index))} aria-label={`Прибрати етап ${index + 1}`} className="auth-icon-button shrink-0">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustom(custom.filter((_, i) => i !== index))
+                      }
+                      aria-label={`Прибрати етап ${index + 1}`}
+                      className="auth-icon-button shrink-0"
+                    >
                       <Trash2 className="size-4" />
                     </button>
                   )}
@@ -189,7 +368,16 @@ function DealComposer({ response }: { response: OfferResponse }) {
                 </p>
               ))}
           {custom && custom.length < MAX_STAGES && (
-            <button type="button" onClick={() => setCustom([...custom, { title: `Етап ${custom.length + 1}`, amount: "", days: "" }])} className="auth-link inline-flex items-center gap-1 text-[12px]">
+            <button
+              type="button"
+              onClick={() =>
+                setCustom([
+                  ...custom,
+                  { title: `Етап ${custom.length + 1}`, amount: "", days: "" },
+                ])
+              }
+              className="auth-link inline-flex items-center gap-1 text-[12px]"
+            >
               <Plus className="size-3.5" />
               Додати етап
             </button>
@@ -222,7 +410,12 @@ function DealComposer({ response }: { response: OfferResponse }) {
       </dl>
 
       <label className="feed-check items-start">
-        <input type="checkbox" checked={agree} onChange={(event) => setAgree(event.target.checked)} className="mt-0.5" />
+        <input
+          type="checkbox"
+          checked={agree}
+          onChange={(event) => setAgree(event.target.checked)}
+          className="mt-0.5"
+        />
         <span className="text-[12px] leading-snug text-ink-muted">
           {method === "safe"
             ? "Розумію: гроші заморожуються на картці до підтвердження, а спір має закінчитися до кінця холду."
@@ -235,11 +428,20 @@ function DealComposer({ response }: { response: OfferResponse }) {
           {error}
         </p>
       )}
-      <button type="button" onClick={() => void submit()} disabled={busy || !agree || Boolean(problem && !error && stages.length === 0)} className="auth-primary">
+      <button
+        type="button"
+        onClick={() => void submit()}
+        disabled={
+          busy || !agree || Boolean(problem && !error && stages.length === 0)
+        }
+        className="auth-primary"
+      >
         {busy && <Loader2 className="size-4 animate-spin" />}
         Запропонувати угоду
       </button>
-      {problem && agree && !error && stages.length > 0 && <p className="pe-hint text-[#a4513c]">{problem}</p>}
+      {problem && agree && !error && stages.length > 0 && (
+        <p className="pe-hint text-[#a4513c]">{problem}</p>
+      )}
     </div>
   );
 }
@@ -254,9 +456,10 @@ const STAGE_LABEL: Record<DealStage["status"], string> = {
   delivered: "Здано, чекає вашого підтвердження",
   released: "Виплачено",
   disputed: "Спір",
+  refunded: "Кошти повернено",
 };
 
-function DealView({ deal }: { deal: Deal }) {
+export function DealView({ deal }: { deal: Deal }) {
   const ref = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -268,13 +471,21 @@ function DealView({ deal }: { deal: Deal }) {
 
   useLayoutEffect(() => {
     if (!ref.current || reduced()) return;
-    const tween = gsap.fromTo(ref.current, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" });
+    const tween = gsap.fromTo(
+      ref.current,
+      { opacity: 0, y: 8 },
+      { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" },
+    );
     return () => {
       tween.kill();
     };
   }, [deal.status]);
 
-  const run = async (action: Parameters<typeof dealAction>[1], target?: DealStage, simulate?: "declined") => {
+  const run = async (
+    action: Parameters<typeof dealAction>[1],
+    target?: DealStage,
+    simulate?: "declined",
+  ) => {
     setBusy(action);
     setError(null);
     try {
@@ -283,7 +494,11 @@ function DealView({ deal }: { deal: Deal }) {
       setConfirmRelease(null);
       return true;
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не вдалося виконати дію.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Не вдалося виконати дію.",
+      );
       return false;
     } finally {
       setBusy(null);
@@ -295,23 +510,81 @@ function DealView({ deal }: { deal: Deal }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[15px] font-semibold text-ink">
-            Угода {deal.number}
-            <span className="ml-2 text-[13px] font-normal tabular-nums text-ink-muted">{money(total)}</span>
+            {deal.title ? `${deal.title} · ` : "Угода "}
+            {deal.number}
+            <span className="ml-2 text-[13px] font-normal tabular-nums text-ink-muted">
+              {money(total)}
+            </span>
           </p>
-          <p className="mt-0.5 text-[12px] text-ink-muted">{deal.method === "safe" ? "Безпечна угода" : "Прямий переказ за QR"}</p>
+          <p className="mt-0.5 text-[12px] text-ink-muted">
+            {deal.method === "safe" ? "Безпечна угода" : "Прямий переказ за QR"}
+          </p>
         </div>
-        <span className="deal-chip" data-tone={deal.status === "completed" ? "done" : todo ? "todo" : "wait"}>
+        <span
+          className="deal-chip"
+          data-tone={
+            deal.status === "completed" ? "done" : todo ? "todo" : "wait"
+          }
+        >
           {deal.status === "proposed" && "Чекаємо відповіді"}
           {deal.status === "completed" && "Завершено"}
-          {deal.status === "accepted" && (deal.disputed ? "Спір" : todo ? "Потрібна ваша дія" : "В роботі")}
+          {deal.status === "accepted" &&
+            (deal.disputed ? "Спір" : todo ? "Потрібна ваша дія" : "В роботі")}
         </span>
       </div>
 
-      {deal.status === "proposed" && (
+      {deal.description && (
+        <p className="text-[13px] leading-snug text-ink/85">
+          {deal.description}
+        </p>
+      )}
+
+      {deal.status === "proposed" && deal.proposedBy === "performer" && (
+        <div className="deal-wait" data-incoming>
+          <div className="grid w-full gap-2">
+            <p>
+              {deal.performer.name} пропонує умови: {money(total)}
+              {deal.stages.length === 1
+                ? `, ${deal.stages[0].days} ${daysWord(deal.stages[0].days)}`
+                : `, ${deal.stages.length} ${deal.stages.length < 5 ? "етапи" : "етапів"}`}
+              .
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void run("accept")}
+                className="auth-primary"
+                style={{ width: "auto", minHeight: 36, padding: "0 16px" }}
+              >
+                Прийняти умови
+              </button>
+              <button
+                type="button"
+                disabled={busy !== null}
+                onClick={() => void run("decline")}
+                className="auth-link text-[13px]"
+              >
+                Відхилити
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deal.status === "proposed" && deal.proposedBy !== "performer" && (
         <div className="deal-wait">
           <Loader2 className="size-4 animate-spin text-ink-muted" />
-          <p>Чекаємо, поки {deal.performer.name} погодиться. Зазвичай це кілька хвилин.</p>
-          <button type="button" disabled={busy === "cancel"} onClick={() => void run("cancel")} className="auth-link text-[12px]">
+          <p>
+            Чекаємо, поки {deal.performer.name} погодиться. Зазвичай це кілька
+            хвилин.
+          </p>
+          <button
+            type="button"
+            disabled={busy === "cancel"}
+            onClick={() => void run("cancel")}
+            className="auth-link text-[12px]"
+          >
             Скасувати пропозицію
           </button>
         </div>
@@ -322,8 +595,18 @@ function DealView({ deal }: { deal: Deal }) {
           {deal.stages.map((item, index) => {
             const active = item.id === stage?.id && deal.status === "accepted";
             return (
-              <li key={item.id} data-state={item.status} data-active={active || undefined}>
-                <span className="deal-dot">{item.status === "released" ? <Check className="size-3" /> : index + 1}</span>
+              <li
+                key={item.id}
+                data-state={item.status}
+                data-active={active || undefined}
+              >
+                <span className="deal-dot">
+                  {item.status === "released" ? (
+                    <Check className="size-3" />
+                  ) : (
+                    index + 1
+                  )}
+                </span>
                 <div className="min-w-0 flex-1">
                   <p className="flex items-baseline justify-between gap-2 text-[13px] font-semibold text-ink">
                     <span className="truncate">{item.title}</span>
@@ -331,7 +614,9 @@ function DealView({ deal }: { deal: Deal }) {
                       {money(item.amount)} · {item.days} {daysWord(item.days)}
                     </span>
                   </p>
-                  <p className="text-[12px] text-ink-muted">{STAGE_LABEL[item.status]}</p>
+                  <p className="text-[12px] text-ink-muted">
+                    {STAGE_LABEL[item.status]}
+                  </p>
 
                   {active && (
                     <StageActions
@@ -402,19 +687,39 @@ function StageActions({
   if (stage.status === "pending" && safe) {
     return checkout ? (
       <div className="deal-box">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">Monobank · тестовий режим</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+          Monobank · тестовий режим
+        </p>
         <p className="mt-1 text-[13px] text-ink">
-          Заморожуємо <strong className="tabular-nums">{money(stage.amount)}</strong> на вашій картці на {HOLD_DAYS} днів. Гроші не списуються, поки ви не підтвердите роботу.
+          Заморожуємо{" "}
+          <strong className="tabular-nums">{money(stage.amount)}</strong> на
+          вашій картці на {HOLD_DAYS} днів. Гроші не списуються, поки ви не
+          підтвердите роботу.
         </p>
         <div className="mt-3 grid gap-2">
-          <button type="button" disabled={busy === "fund"} onClick={() => void onFund()} className="offer-primary">
+          <button
+            type="button"
+            disabled={busy === "fund"}
+            onClick={() => void onFund()}
+            className="offer-primary"
+          >
             {busy === "fund" && <Loader2 className="size-4 animate-spin" />}
             Заморозити (тест)
           </button>
-          <button type="button" disabled={busy === "fund"} onClick={() => void onFund("declined")} className="offer-secondary">
+          <button
+            type="button"
+            disabled={busy === "fund"}
+            onClick={() => void onFund("declined")}
+            className="offer-secondary"
+          >
             Імітувати відмову банку
           </button>
-          <button type="button" disabled={busy === "fund"} onClick={onCancelCheckout} className="auth-link text-[12px]">
+          <button
+            type="button"
+            disabled={busy === "fund"}
+            onClick={onCancelCheckout}
+            className="auth-link text-[12px]"
+          >
             Назад
           </button>
         </div>
@@ -428,24 +733,33 @@ function StageActions({
   }
 
   if (stage.status === "pending") {
-    return <QrBlock deal={deal} stage={stage} busy={busy === "claim_paid"} onClaim={onClaim} />;
+    return (
+      <QrBlock
+        deal={deal}
+        stage={stage}
+        busy={busy === "claim_paid"}
+        onClaim={onClaim}
+      />
+    );
   }
 
   if (stage.status === "claimed") {
     return (
-      <p className="deal-note">
+      <div className="deal-note">
         <Loader2 className="size-3.5 animate-spin" />
         Виконавець підтверджує, що гроші дійшли.
-      </p>
+      </div>
     );
   }
 
   if (stage.status === "funded") {
     return (
-      <p className="deal-note">
+      <div className="deal-note">
         <Clock className="size-3.5" />
-        {safe && stage.holdUntil ? `Кошти заморожено до ${DATE.format(new Date(stage.holdUntil))}. Виконавець працює.` : "Оплату підтверджено, виконавець працює."}
-      </p>
+        {safe && stage.holdUntil
+          ? `Кошти заморожено до ${DATE.format(new Date(stage.holdUntil))}. Виконавець працює.`
+          : "Оплату підтверджено, виконавець працює."}
+      </div>
     );
   }
 
@@ -454,14 +768,28 @@ function StageActions({
       return (
         <div className="deal-box">
           <p className="text-[13px] text-ink">
-            {safe ? `Виплатити ${money(payoutOf(stage.amount, "safe"))} виконавцю?` : "Підтвердити, що роботу прийнято?"} Скасувати це не вийде.
+            {safe
+              ? `Виплатити ${money(payoutOf(stage.amount, "safe"))} виконавцю?`
+              : "Підтвердити, що роботу прийнято?"}{" "}
+            Скасувати це не вийде.
           </p>
           <div className="mt-2 flex gap-2">
-            <button type="button" disabled={busy === "release"} onClick={() => void onRelease()} className="offer-primary flex-1">
-              {busy === "release" && <Loader2 className="size-4 animate-spin" />}
+            <button
+              type="button"
+              disabled={busy === "release"}
+              onClick={() => void onRelease()}
+              className="offer-primary flex-1"
+            >
+              {busy === "release" && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
               Так, все добре
             </button>
-            <button type="button" onClick={onCancelRelease} className="offer-secondary">
+            <button
+              type="button"
+              onClick={onCancelRelease}
+              className="offer-secondary"
+            >
               Ні
             </button>
           </div>
@@ -475,7 +803,12 @@ function StageActions({
           {safe ? "Підтвердити й виплатити" : "Прийняти роботу"}
         </button>
         {safe && (
-          <button type="button" disabled={busy === "dispute"} onClick={() => void onDispute()} className="offer-secondary">
+          <button
+            type="button"
+            disabled={busy === "dispute"}
+            onClick={() => void onDispute()}
+            className="offer-secondary"
+          >
             Є претензії
           </button>
         )}
@@ -485,41 +818,83 @@ function StageActions({
 
   if (stage.status === "disputed") {
     return (
-      <p className="deal-note deal-note-warn">
+      <div className="deal-note deal-note-warn">
         <ShieldCheck className="size-3.5" />
-        Спір відкрито. Кошти лишаються замороженими, модератор прочитає чат і зв'яжеться з вами протягом доби.
-      </p>
+        Спір відкрито. Кошти лишаються замороженими, модератор прочитає чат і
+        зв'яжеться з вами протягом доби.
+      </div>
     );
   }
   return null;
 }
 
 /** Деталі переказу з QR (за стандартом НБУ, тут умовний) і «Я оплатив». */
-function QrBlock({ deal, stage, busy, onClaim }: { deal: Deal; stage: DealStage; busy: boolean; onClaim: () => Promise<boolean> }) {
-  const cells = useMemo(() => qrCells(`${deal.number}${stage.id}`), [deal.number, stage.id]);
+function QrBlock({
+  deal,
+  stage,
+  busy,
+  onClaim,
+}: {
+  deal: Deal;
+  stage: DealStage;
+  busy: boolean;
+  onClaim: () => Promise<boolean>;
+}) {
+  const cells = useMemo(
+    () => qrCells(`${deal.number}${stage.id}`),
+    [deal.number, stage.id],
+  );
   const last4 = (Math.abs(hashCode(deal.performer.id)) % 9000) + 1000;
   return (
     <div className="deal-box">
       <div className="flex gap-3">
-        <svg viewBox="0 0 25 25" className="deal-qr" role="img" aria-label="Тестовий QR для переказу" shapeRendering="crispEdges">
+        <svg
+          viewBox="0 0 25 25"
+          className="deal-qr"
+          role="img"
+          aria-label="Тестовий QR для переказу"
+          shapeRendering="crispEdges"
+        >
           <rect width="25" height="25" fill="#fff" />
           {cells.map(([x, y]) => (
-            <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="#1f2a2e" />
+            <rect
+              key={`${x}-${y}`}
+              x={x}
+              y={y}
+              width="1"
+              height="1"
+              fill="#1f2a2e"
+            />
           ))}
         </svg>
         <dl className="min-w-0 flex-1 text-[12px] leading-snug">
           <dt className="text-ink-muted">Отримувач</dt>
-          <dd className="truncate font-medium text-ink">{deal.performer.name}</dd>
+          <dd className="truncate font-medium text-ink">
+            {deal.performer.name}
+          </dd>
           <dt className="mt-1.5 text-ink-muted">Рахунок</dt>
-          <dd className="font-medium tabular-nums text-ink">UA•• •••• •••• •••• •••• {last4}</dd>
+          <dd className="font-medium tabular-nums text-ink">
+            UA•• •••• •••• •••• •••• {last4}
+          </dd>
           <dt className="mt-1.5 text-ink-muted">Сума</dt>
-          <dd className="font-semibold tabular-nums text-ink">{money(stage.amount)}</dd>
+          <dd className="font-semibold tabular-nums text-ink">
+            {money(stage.amount)}
+          </dd>
           <dt className="mt-1.5 text-ink-muted">Призначення</dt>
           <dd className="text-ink">Оплата за роботу, угода {deal.number}</dd>
         </dl>
       </div>
-      <p className="pe-hint mt-2">Тестовий QR: у бойовому режимі тут QR за стандартом НБУ, який відкриє застосунок будь-якого українського банку. Реквізити бачите лише ви в цьому чаті.</p>
-      <button type="button" disabled={busy} onClick={() => void onClaim()} className="offer-primary mt-3 w-full">
+      <p className="pe-hint mt-2">
+        Тестовий QR: у бойовому режимі тут QR за стандартом НБУ, який відкриє
+        застосунок будь-якого українського банку. Реквізити бачите лише ви в
+        цьому чаті.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void onClaim()}
+        className="offer-primary mt-3 w-full"
+      >
         {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
       </button>
     </div>
@@ -528,7 +903,8 @@ function QrBlock({ deal, stage, busy, onClaim }: { deal: Deal; stage: DealStage;
 
 const hashCode = (value: string) => {
   let result = 0;
-  for (let index = 0; index < value.length; index++) result = (Math.imul(result, 31) + value.charCodeAt(index)) | 0;
+  for (let index = 0; index < value.length; index++)
+    result = (Math.imul(result, 31) + value.charCodeAt(index)) | 0;
   return result;
 };
 
@@ -541,19 +917,22 @@ const qrCells = (seed: string): [number, number][] => {
     return state;
   };
   const finder = (ox: number, oy: number) => {
-    for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
-      const edge = x === 0 || y === 0 || x === 6 || y === 6;
-      const core = x >= 2 && x <= 4 && y >= 2 && y <= 4;
-      if (edge || core) cells.push([ox + x, oy + y]);
-    }
+    for (let y = 0; y < 7; y++)
+      for (let x = 0; x < 7; x++) {
+        const edge = x === 0 || y === 0 || x === 6 || y === 6;
+        const core = x >= 2 && x <= 4 && y >= 2 && y <= 4;
+        if (edge || core) cells.push([ox + x, oy + y]);
+      }
   };
   finder(0, 0);
   finder(18, 0);
   finder(0, 18);
-  for (let y = 0; y < 25; y++) for (let x = 0; x < 25; x++) {
-    const inFinder = (x < 8 && y < 8) || (x > 16 && y < 8) || (x < 8 && y > 16);
-    if (!inFinder && next() % 100 < 48) cells.push([x, y]);
-  }
+  for (let y = 0; y < 25; y++)
+    for (let x = 0; x < 25; x++) {
+      const inFinder =
+        (x < 8 && y < 8) || (x > 16 && y < 8) || (x < 8 && y > 16);
+      if (!inFinder && next() % 100 < 48) cells.push([x, y]);
+    }
   return cells;
 };
 
@@ -561,7 +940,9 @@ const qrCells = (seed: string): [number, number][] => {
 // Відгук про роботу
 
 function ReviewForm({ deal }: { deal: Deal }) {
-  const [existing, setExisting] = useState<Review | null | undefined>(undefined);
+  const [existing, setExisting] = useState<Review | null | undefined>(
+    undefined,
+  );
   const [stars, setStars] = useState(0);
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
@@ -583,13 +964,19 @@ function ReviewForm({ deal }: { deal: Deal }) {
   if (existing) {
     return (
       <div className="deal-box">
-        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-[#4d7a5e]">
+        <div className="flex items-center gap-1.5 text-[13px] font-semibold text-[#4d7a5e]">
           <Check className="size-4" />
           Дякуємо за відгук
-        </p>
+        </div>
         <Stars value={existing.stars} />
-        {existing.text && <p className="mt-1.5 text-[12px] leading-snug text-ink">{existing.text}</p>}
-        <p className="pe-hint mt-1.5">Його побачать інші замовники в профілі виконавця.</p>
+        {existing.text && (
+          <p className="mt-1.5 text-[12px] leading-snug text-ink">
+            {existing.text}
+          </p>
+        )}
+        <p className="pe-hint mt-1.5">
+          Його побачать інші замовники в профілі виконавця.
+        </p>
       </div>
     );
   }
@@ -602,7 +989,11 @@ function ReviewForm({ deal }: { deal: Deal }) {
     try {
       setExisting(await sendReview(deal.id, stars, text));
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не вдалося надіслати відгук.");
+      setError(
+        reason instanceof ApiError
+          ? reason.message
+          : "Не вдалося надіслати відгук.",
+      );
     } finally {
       setBusy(false);
     }
@@ -611,8 +1002,16 @@ function ReviewForm({ deal }: { deal: Deal }) {
   return (
     <div className="deal-box">
       <p className="text-[14px] font-semibold text-ink">Як пройшла робота?</p>
-      <p className="pe-hint">Оцінка й відгук потрапляють у профіль {deal.performer.name}. Їх бачать усі замовники.</p>
-      <div className="mt-2 flex gap-1" role="radiogroup" aria-label="Оцінка" onMouseLeave={() => setHover(0)}>
+      <p className="pe-hint">
+        Оцінка й відгук потрапляють у профіль {deal.performer.name}. Їх бачать
+        усі замовники.
+      </p>
+      <div
+        className="mt-2 flex gap-1"
+        role="radiogroup"
+        aria-label="Оцінка"
+        onMouseLeave={() => setHover(0)}
+      >
         {[1, 2, 3, 4, 5].map((value) => (
           <button
             key={value}
@@ -632,7 +1031,7 @@ function ReviewForm({ deal }: { deal: Deal }) {
       <label htmlFor={`review-${deal.id}`} className="sr-only">
         Відгук
       </label>
-      <textarea
+      <Textarea
         id={`review-${deal.id}`}
         ref={textRef}
         value={text}
@@ -640,14 +1039,19 @@ function ReviewForm({ deal }: { deal: Deal }) {
         onChange={(event) => setText(event.target.value)}
         rows={3}
         placeholder="Що сподобалось, що можна покращити (необов'язково)"
-        className="auth-input mt-2 w-full resize-y py-2.5 leading-snug"
+        className="mt-2 resize-y"
       />
       {error && (
         <p role="alert" className="auth-error mt-1">
           {error}
         </p>
       )}
-      <button type="button" disabled={busy} onClick={() => void submit()} className="offer-primary mt-2 w-full">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void submit()}
+        className="offer-primary mt-2 w-full"
+      >
         {busy && <Loader2 className="size-4 animate-spin" />}
         Надіслати відгук
       </button>
@@ -657,9 +1061,22 @@ function ReviewForm({ deal }: { deal: Deal }) {
 
 export function Stars({ value, size = 14 }: { value: number; size?: number }) {
   return (
-    <span className="inline-flex gap-0.5" role="img" aria-label={`${value} з 5`}>
+    <span
+      className="inline-flex gap-0.5"
+      role="img"
+      aria-label={`${value} з 5`}
+    >
       {[1, 2, 3, 4, 5].map((index) => (
-        <Star key={index} width={size} height={size} className={index <= Math.round(value) ? "fill-brand text-brand" : "text-[#a7bcc0]"} />
+        <Star
+          key={index}
+          width={size}
+          height={size}
+          className={
+            index <= Math.round(value)
+              ? "fill-brand text-brand"
+              : "text-[#a7bcc0]"
+          }
+        />
       ))}
     </span>
   );

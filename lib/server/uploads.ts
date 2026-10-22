@@ -5,6 +5,7 @@
 // випадковий UUID, тож їх можна кешувати назавжди.
 
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { logServer } from "@/lib/telemetry/log";
 
 export const PHOTO_MAX_BYTES = 300_000;
 export const PHOTO_PREFIX = "photos/";
@@ -32,9 +33,15 @@ export const photoKeyPrefix = (userId: string) => `${PHOTO_PREFIX}${userId}/`;
 /** Кладе фото в R2 і повертає публічну адресу виду /api/uploads/photos/<user>/<uuid>.jpg. */
 export const putPhoto = async (userId: string, bytes: Uint8Array): Promise<{ url: string } | string> => {
   if (bytes.length === 0) return "Порожній файл.";
-  if (bytes.length > PHOTO_MAX_BYTES) return "Фото завелике: до 300 КБ.";
+  if (bytes.length > PHOTO_MAX_BYTES) {
+    logServer({ level: "warn", event: "upload_rejected", message: "Фото завелике", detail: { reason: "too_large", bytes: bytes.length } });
+    return "Фото завелике: до 300 КБ.";
+  }
   const type = sniffImage(bytes);
-  if (!type) return "Фото має бути JPEG, PNG або WebP.";
+  if (!type) {
+    logServer({ level: "warn", event: "upload_rejected", message: "Невідомий формат", detail: { reason: "format", bytes: bytes.length, head: [...bytes.slice(0, 4)].map((byte) => byte.toString(16).padStart(2, "0")).join("") } });
+    return "Фото має бути JPEG, PNG або WebP.";
+  }
   const key = `${photoKeyPrefix(userId)}${crypto.randomUUID()}.${type.ext}`;
   await getBucket().put(key, bytes, { httpMetadata: { contentType: type.mime, cacheControl: "public, max-age=31536000, immutable" } });
   return { url: `${UPLOAD_URL_PREFIX}${key}` };
@@ -61,4 +68,23 @@ export const keyFromUrl = (url: string, userId?: string): string | null => {
 export const deleteByUrl = async (url: string, userId: string) => {
   const key = keyFromUrl(url, userId);
   if (key) await getBucket().delete(key);
+};
+
+// ───────────── фото в чаті (приватні) ─────────────
+
+export const CHAT_PHOTO_MAX_BYTES = 600_000;
+export const CHAT_PHOTOS_PER_MESSAGE = 5;
+/** Скільки фото вміщує одна розмова: далі лише нові за видалення старих, поки що просто стеля. */
+export const CHAT_PHOTOS_PER_CONVERSATION = 200;
+export const CHAT_PHOTO_BYTES_PER_CONVERSATION = 60_000_000;
+
+/** Кладе фото чату в R2 під приватний префікс. Повертає ключ, тип і розмір або текст відмови. */
+export const putChatPhoto = async (conversationId: string, bytes: Uint8Array): Promise<{ key: string; mime: string; bytes: number } | string> => {
+  if (bytes.length === 0) return "Порожній файл.";
+  if (bytes.length > CHAT_PHOTO_MAX_BYTES) return "Фото завелике: воно має стиснутися до 600 КБ.";
+  const type = sniffImage(bytes);
+  if (!type) return "Фото має бути JPEG, PNG або WebP.";
+  const key = `chat/${conversationId}/${crypto.randomUUID()}.${type.ext}`;
+  await getBucket().put(key, bytes, { httpMetadata: { contentType: type.mime, cacheControl: "private, max-age=31536000, immutable" } });
+  return { key, mime: type.mime, bytes: bytes.length };
 };

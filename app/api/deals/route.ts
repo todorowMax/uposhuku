@@ -9,6 +9,11 @@ import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
 import { findRequest } from "@/lib/server/request-repo";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
+import { notifyLater } from "@/lib/server/notify";
+import { addSystemMessage } from "@/lib/server/chat-repo";
+import { dealNotice } from "@/lib/telegram/notices";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
@@ -59,6 +64,10 @@ export async function POST(request: Request) {
   if (!draft.performer.id || !draft.responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
   const result = await proposeDeal(user.id, draft);
   if (typeof result === "string") return problem(400, "Угоду не створено", result);
+  notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: "proposed" }));
+  serverEvent(EVENTS.dealCreated, { deal_id: result.id, kind: result.method, stages: result.stages.length }, user.id, "/api/deals");
   pushUser(userOfPerformer(result.performer.id), { t: "deal", requestId: result.requestId });
+  const performerUser = userOfPerformer(result.performer.id);
+  if (performerUser) await addSystemMessage(user.id, performerUser, `Угоду ${result.number} запропоновано`, result.id);
   return Response.json({ deal: result }, { status: 201 });
 }

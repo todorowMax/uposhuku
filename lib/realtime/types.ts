@@ -17,6 +17,8 @@ export type RealtimeEvent =
   /** Хтось вийшов в мережу або з неї: оновлюємо значок «онлайн». */
   | { t: "presence" }
   /** Співрозмовник набирає повідомлення в розмові. */
-  | { t: "typing"; conversationId: string };
+  | { t: "typing"; conversationId: string }
+  /** Telegram підключено чи відключено: сайт оновлює рядок у налаштуваннях сповіщень. */
+  | { t: "telegram" };
 
 export type RealtimeType = RealtimeEvent["t"];

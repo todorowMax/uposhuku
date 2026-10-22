@@ -28,3 +28,28 @@ export const resizeToSquareJpegDataUrl = async (file: File, side = 320, quality 
     bitmap.close();
   }
 };
+
+/**
+ * Фото для чату: довга сторона до `maxSide`, WebP (де браузер не вміє, JPEG).
+ * Телефонне фото 3–5 МБ стає 150–300 КБ; дрібні картинки не збільшуємо.
+ */
+export const compressForChat = async (file: File, maxSide = 1600, quality = 0.8): Promise<Blob> => {
+  const bitmap = await decodeImage(file);
+  try {
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("canvas недоступний");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const toBlob = (type: string) => new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+    // Safari мовчки віддає PNG на запит WebP: тоді беремо JPEG.
+    const webp = await toBlob("image/webp");
+    const blob = webp && webp.type === "image/webp" ? webp : await toBlob("image/jpeg");
+    if (!blob) throw new Error("не вдалося стиснути");
+    return blob;
+  } finally {
+    bitmap.close();
+  }
+};

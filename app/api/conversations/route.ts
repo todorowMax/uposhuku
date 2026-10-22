@@ -31,6 +31,6 @@ export async function POST(request: Request) {
     pushUser(known.userId, { t: "message", conversationId: conversation.id });
     return Response.json({ conversation: { id: conversation.id, performerId, role: "customer" as const } }, { status: 201 });
   } catch (error) {
-    return failure(error);
+    return failure(error, request);
   }
 }

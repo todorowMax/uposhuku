@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { applyAction, applyModeratorAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
@@ -153,5 +153,97 @@ describe("угода з виконавцем-акаунтом", () => {
   it("не можна підтвердити оплату, якої замовник не позначав", () => {
     const deal = applyPerformerAction(createDeal("d4", real, NOW), "accept", undefined, NOW + 1) as Deal;
     expect(applyPerformerAction(deal, "confirm_paid", undefined, NOW + 2)).toMatch(/ще не позначив/);
+  });
+});
+
+describe("умови з розмови: виставляє виконавець", () => {
+  const performerProposed = (): Deal => ({ ...createDeal("deal_dir1", { ...draft(), proposedBy: "performer", title: "Лендинг" }, 0), proposedBy: "performer" });
+
+  it("замовник приймає й відхиляє, виконавець чекає й може відкликати", () => {
+    const deal = performerProposed();
+    expect(needsAction(deal)).toBe("answer");
+    expect(performerNeeds(deal)).toBeNull();
+    const accepted = applyAction(deal, "accept", undefined, 1) as Deal;
+    expect(accepted.status).toBe("accepted");
+    expect((applyAction(deal, "decline", undefined, 1) as Deal).status).toBe("declined");
+    expect((applyPerformerAction(deal, "withdraw", undefined, 1) as Deal).status).toBe("cancelled");
+  });
+
+  it("свої умови сам не приймаєш: виконавець не відповідає на власну пропозицію, замовник не скасовує чужу", () => {
+    const deal = performerProposed();
+    expect(applyPerformerAction(deal, "accept", undefined, 1)).toMatch(/відповідає замовник/);
+    expect(applyAction(deal, "cancel", undefined, 1)).toMatch(/відхилити/);
+  });
+
+  it("для звичайної угоди від замовника відкликання й прийняття замовником недоступні", () => {
+    const deal = createDeal("deal_cust", draft(), 0);
+    expect(applyPerformerAction(deal, "withdraw", undefined, 1)).toMatch(/свою пропозицію/);
+    expect(applyAction(deal, "accept", undefined, 1)).toMatch(/приймає виконавець/);
+    expect(performerNeeds(deal)).toBe("answer");
+  });
+});
+
+describe("рішення модератора у спорі", () => {
+  const disputed = (stages = [{ title: "Робота", amount: 10000, days: 7 }]): Deal => {
+    let deal = accepted(draft({ stages }));
+    deal = applyAction(deal, "fund", undefined, T0 + 4000) as Deal;
+    deal = act(deal, "deliver", T0 + 5000);
+    return applyAction(deal, "dispute", undefined, T0 + 6000) as Deal;
+  };
+
+  it("спір запам'ятовує, коли відкрито", () => {
+    expect(disputed().stages[0].disputedAt).toBe(new Date(T0 + 6000).toISOString());
+  });
+
+  it("виплата: етап виплачено, остання угода завершується", () => {
+    const done = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
+    expect(done.stages[0]).toMatchObject({ status: "released", releasedAt: new Date(T0 + 9000).toISOString() });
+    expect(done.status).toBe("completed");
+    expect(done.disputed).toBe(false);
+  });
+
+  it("виплата середнього етапу пускає угоду далі", () => {
+    const deal = disputed([{ title: "А", amount: 5000, days: 5 }, { title: "Б", amount: 5000, days: 5 }]);
+    const done = applyModeratorAction(deal, "release", undefined, T0 + 9000) as Deal;
+    expect(done.status).toBe("accepted");
+    expect(currentStage(done)!.id).toBe(deal.stages[1].id);
+    expect(needsAction(done)).toBe("fund");
+  });
+
+  it("повернення замовнику: етап «повернено», угода закрита, спору немає", () => {
+    const done = applyModeratorAction(disputed(), "refund", undefined, T0 + 9000) as Deal;
+    expect(done.stages[0]).toMatchObject({ status: "refunded", refundedAt: new Date(T0 + 9000).toISOString() });
+    expect(done.status).toBe("cancelled");
+    expect(done.disputed).toBe(false);
+    expect(needsAction(done)).toBeNull();
+  });
+
+  it("доопрацювання: етап знову в роботі, здачі нема, холд той самий", () => {
+    const deal = disputed();
+    const done = applyModeratorAction(deal, "rework", undefined, T0 + 9000) as Deal;
+    expect(done.stages[0].status).toBe("funded");
+    expect(done.stages[0].deliveredAt).toBeUndefined();
+    expect(done.stages[0].holdUntil).toBe(deal.stages[0].holdUntil);
+    expect(done.stages[0].reworkAt).toBe(new Date(T0 + 9000).toISOString());
+    expect(done.disputed).toBe(false);
+    expect(performerNeeds(done)).toBe("deliver");
+    // Після доопрацювання виконавець здає знову, і спір можна відкрити вдруге.
+    const again = applyAction(act(done, "deliver", T0 + 10_000), "dispute", undefined, T0 + 11_000) as Deal;
+    expect(again.disputed).toBe(true);
+  });
+
+  it("доопрацювання неможливе, коли холд збіг", () => {
+    const deal = disputed();
+    const late = Date.parse(deal.stages[0].holdUntil!) + 1000;
+    expect(applyModeratorAction(deal, "rework", undefined, late)).toMatch(/Холд уже збіг/);
+    expect(applyModeratorAction(deal, "release", undefined, late)).not.toBeTypeOf("string");
+  });
+
+  it("працює лише з етапом у спорі", () => {
+    const funded = applyAction(accepted(), "fund", undefined, T0 + 4000) as Deal;
+    expect(applyModeratorAction(funded, "release", undefined, T0 + 5000)).toMatch(/не в спорі/);
+    expect(applyModeratorAction(disputed(), "release", "nope", T0 + 5000)).toMatch(/не в спорі/);
+    const done = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
+    expect(applyModeratorAction(done, "refund", undefined, T0 + 9500)).toMatch(/не в спорі/);
   });
 });
