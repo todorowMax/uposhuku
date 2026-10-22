@@ -5,7 +5,7 @@
 // ФОП, тож тут вони мають збігатися з документами, а в тексті сторінок їх
 // не дублюємо: підставляємо через {плейсхолдери}.
 
-import { HOLD_DAYS, MAX_STAGES, SAFE_FEE } from "@/lib/deals/types";
+import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE } from "@/lib/deals/types";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
 export const SERVICE_NAME = "Findlyfy";
@@ -24,6 +24,14 @@ export const OPERATOR = {
  */
 export const CONTACT_EMAIL = "hello@findlyfy.com";
 
+/** Телефон Оператора для реквізитів оферти безпечної угоди (вимога банку до договору). */
+export const CONTACT_PHONE = "+34 656 940 473";
+
+/** Скільки робочих днів замовник перевіряє здану роботу, інакше етап вважається прийнятим. */
+export const REVIEW_DAYS = 3;
+/** Скільки робочих днів сторони домовляються самі, перш ніж відкрити спір. */
+export const DISPUTE_TALK_DAYS = 2;
+
 /**
  * Безпечну угоду (холд і виплата виконавцю через Monobank) не вмикаємо до
  * письмових відповідей банку. Поки прапорець вимкнено, оферта й умови про неї
@@ -37,6 +45,7 @@ export const UPDATED = {
   terms: "17 жовтня 2026 року",
   privacy: "17 жовтня 2026 року",
   contacts: "17 жовтня 2026 року",
+  safeDealOffer: "22 жовтня 2026 року",
 } as const;
 
 const money = (value: number) => new Intl.NumberFormat("uk-UA").format(value).replace(/ /g, " ");
@@ -53,6 +62,10 @@ export const LEGAL_VALUES: Record<string, string> = {
   holdDays: String(HOLD_DAYS),
   maxStages: String(MAX_STAGES),
   fee: String(Math.round(SAFE_FEE * 100)),
+  minDeal: money(MIN_DEAL),
+  maxDeal: money(MAX_DEAL),
+  reviewDays: String(REVIEW_DAYS),
+  disputeTalkDays: String(DISPUTE_TALK_DAYS),
 };
 
 /** Підставляє значення в текст. Невідомий плейсхолдер лишається видно, щоб тест його впіймав. */
