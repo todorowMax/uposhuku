@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "open-next.config.ts",
+    "worker/**/*.{ts,js}",
+    "scripts/**/*.{ts,mjs}",
+    "vitest*.config.{ts,mts}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": ["config/agent-rules/**"],
+  "ignoreDependencies": ["cloudflare"],
+  "ignoreExportsUsedInFile": true
+}

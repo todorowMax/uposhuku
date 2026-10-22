@@ -23,6 +23,8 @@ jobs:
       # Не `npm ci`: лок-файл збирається на macOS і не містить платформенних пакетів вкладених
       # копій esbuild для Linux, тож `ci` падає. `install` лише добирає їх, версії лишаються з лока.
       - run: npm install --no-audit --no-fund
+      # Лінт: помилки валять збірку, а число попереджень не може зростати (храповик у lint:ci).
+      - run: npm run lint:ci
       # Типи: `next-env.d.ts` і `cloudflare-env.d.ts` у репозиторії або генеруються збіркою.
       - run: npm run typecheck
       # Тести репозиторіїв піднімають справжні D1 і R2 у пам'яті (wrangler getPlatformProxy).

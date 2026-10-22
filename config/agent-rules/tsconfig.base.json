@@ -1,0 +1,6 @@
+{
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "isolatedModules": true
+  }
+}

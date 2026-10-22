@@ -26,6 +26,7 @@ export default function Error({ error, reset }: { error: Error & { digest?: stri
           <button type="button" onClick={reset} className="auth-primary auth-secondary px-5" style={{ border: 0 }}>
             Спробувати ще раз
           </button>
+          {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- full reload resets the client tree after a render crash */}
           <a href="/" className="auth-secondary px-5">
             На карту
           </a>

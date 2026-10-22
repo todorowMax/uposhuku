@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "open-next.config.ts",
+    "worker/**/*.{ts,js}",
+    "scripts/**/*.{ts,mjs}",
+    "public/sw.js",
+    "vitest*.config.{ts,mts}",
+    "tests/**/*.{ts,tsx}"
+  ],
+  "ignore": ["config/agent-rules/**"],
+  "ignoreDependencies": ["@next/eslint-plugin-next", "eslint-plugin-check-file", "eslint-plugin-import", "eslint-plugin-jsx-a11y", "eslint-plugin-react", "eslint-plugin-react-hooks", "eslint-plugin-sonarjs", "typescript-eslint"],
+  "ignoreExportsUsedInFile": true
+}

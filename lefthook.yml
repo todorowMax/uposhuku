@@ -1,0 +1,31 @@
+# agent-rules lint 1.0.0: vendored copy, do not edit; update with agent-rules/scripts/sync.mjs --apply
+# Git hooks for projects that follow the agent-rules profile (copy to the project root as lefthook.yml).
+#
+# Why this split:
+#   pre-commit  runs only what finishes in a few seconds on the staged files: strict ESLint and
+#               Stylelint, errors on the lines you are committing (scripts/lint-staged-strict.mjs).
+#               Every rule group is an error there, even in a project whose config is `legacy`,
+#               but old lines are not checked: they stay warnings under the CI ratchet. A hook that
+#               takes longer gets bypassed with --no-verify, and a bypassed hook checks nothing.
+#   pre-push    runs the type check, which needs the whole project (tsc) and takes tens of seconds,
+#               so it waits for the push, not every commit.
+#   CI          runs everything again: `lint:ci` (the warning ratchet), typecheck and the unit tests.
+#               Unit tests are not in a git hook: they are the slowest check, CI repeats them anyway,
+#               and the agent edit hook plus `npm test` before "done" (DONE-1) cover local use.
+#
+# New code is held to errors here and by the agent edit hook; old code is under the CI ratchet
+# (RULES-3). Skip once with LEFTHOOK=0 git commit ... when you must.
+#
+# Install: `npm i` (the lefthook package runs `lefthook install`; it skips that when CI is set).
+# A project that already uses husky keeps it and adds the same two commands to its hook instead.
+
+pre-commit:
+  commands:
+    strict-on-staged-lines:
+      glob: "*.{ts,tsx,mts,js,jsx,mjs,css}"
+      run: node config/agent-rules/scripts/lint-staged-strict.mjs
+
+pre-push:
+  commands:
+    typecheck:
+      run: npm run typecheck
