@@ -4,17 +4,36 @@
 // «зараз» передаємо ззовні, тож усе перевіряється тестами. Дії замовника й
 // виконавця; гроші підтверджуватиме вебхук банку.
 
-import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "./types";
+import { quoteStage } from "./price";
+import {
+  HOLD_DAYS,
+  HOLD_RESERVE_DAYS,
+  MAX_DEAL,
+  MAX_DIRECT_DEAL,
+  MAX_STAGE_AMOUNT,
+  MAX_STAGE_DAYS,
+  MAX_STAGES,
+  MIN_DEAL,
+  SAFE_FEE,
+  type CardKind,
+  type Deal,
+  type DealAction,
+  type DealDraft,
+  type DealStage,
+  type ModeratorAction,
+  type PerformerAction,
+} from "./types";
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
 export const dealTotal = (deal: Pick<Deal, "stages">) => deal.stages.reduce((sum, stage) => sum + stage.amount, 0);
 
-/** Комісія платформи з суми: лише для безпечної угоди, у гривнях. */
+/** Винагорода платформи від ціни виконавця: лише для безпечної угоди, у гривнях. Платить замовник понад ціну. */
 export const feeOf = (amount: number, method: Deal["method"]) => (method === "safe" ? Math.round(amount * SAFE_FEE) : 0);
 
-export const payoutOf = (amount: number, method: Deal["method"]) => amount - feeOf(amount, method);
+/** Виконавець отримує ціну повністю: комісії платформи й банку лягають на замовника, див. lib/deals/price.ts. */
+export const payoutOf = (amount: number) => amount;
 
 /** Помилка у чернетці угоди або null. Текст — для людини. */
 export const validateDraft = (draft: DealDraft): string | null => {
@@ -25,11 +44,15 @@ export const validateDraft = (draft: DealDraft): string | null => {
     if (!stage.title.trim()) return "Назвіть кожен етап.";
     if (!Number.isFinite(stage.amount) || stage.amount < 1) return "Вкажіть суму кожного етапу.";
     if (!Number.isFinite(stage.days) || stage.days < 1) return "Вкажіть термін кожного етапу в днях.";
-    // Холд тримається до 9 днів: довший етап банк не втримає, його треба ділити.
-    if (draft.method === "safe" && stage.days > HOLD_DAYS) return `Етап довший за ${HOLD_DAYS} днів: розділіть його, холд триває до ${HOLD_DAYS} днів.`;
+    // Холд тримається до HOLD_DAYS днів, і частину лишаємо на перевірку й можливий спір: довший етап ділимо.
+    if (draft.method === "safe" && stage.days > MAX_STAGE_DAYS) {
+      return `Етап довший за ${MAX_STAGE_DAYS} днів: розділіть його. Холд триває ${HOLD_DAYS} днів, ${HOLD_RESERVE_DAYS} із них лишаємо на перевірку й можливий спір.`;
+    }
+    if (draft.method === "safe" && stage.amount > MAX_STAGE_AMOUNT) return `Етап безпечної угоди не більший за ${MAX_STAGE_AMOUNT.toLocaleString("uk-UA")} ₴: розділіть його.`;
   }
   const total = draft.stages.reduce((sum, stage) => sum + stage.amount, 0);
-  if (total < MIN_DEAL || total > MAX_DEAL) return `Сума угоди від ${MIN_DEAL} до ${MAX_DEAL} ₴.`;
+  const maxTotal = draft.method === "safe" ? MAX_DEAL : MAX_DIRECT_DEAL;
+  if (total < MIN_DEAL || total > maxTotal) return `Сума угоди від ${MIN_DEAL} до ${maxTotal.toLocaleString("uk-UA")} ₴.`;
   return null;
 };
 
@@ -37,8 +60,8 @@ export const validateDraft = (draft: DealDraft): string | null => {
  * Розділити суму й термін на етапи так, щоб кожен вкладався в холд: для
  * довгої роботи — кілька етапів порівну, залишок копійок — в останньому.
  */
-export const splitIntoStages = (amount: number, days: number, hold = HOLD_DAYS): { title: string; amount: number; days: number }[] => {
-  const count = Math.min(MAX_STAGES, Math.max(1, Math.ceil(days / hold)));
+export const splitIntoStages = (amount: number, days: number, hold = MAX_STAGE_DAYS, cap = MAX_STAGE_AMOUNT): { title: string; amount: number; days: number }[] => {
+  const count = Math.min(MAX_STAGES, Math.max(1, Math.ceil(days / hold), Math.ceil(amount / cap)));
   const baseAmount = Math.floor(amount / count);
   const baseDays = Math.floor(days / count);
   return Array.from({ length: count }, (_, index) => {
@@ -71,7 +94,7 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
 export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status !== "released");
 
 /** Замовник щось робить з угодою. Повертає нову угоду або текст помилки. */
-export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number): Deal | string => {
+export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number, options: { card?: CardKind } = {}): Deal | string => {
   // Умови виставив виконавець: замовник їх приймає або відхиляє.
   if (action === "accept" || action === "decline") {
     if (deal.proposedBy !== "performer") return "Цю пропозицію приймає виконавець.";
@@ -93,7 +116,8 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
   switch (action) {
     case "fund":
       if (deal.method !== "safe" || stage.status !== "pending") return "Заморозити кошти зараз не можна.";
-      updated = { ...stage, status: "funded", fundedAt: iso(now), holdUntil: iso(now + HOLD_DAYS * DAY) };
+      // Тип картки не передали (старий клієнт): рахуємо за вищою ставкою, щоб виконавець не лишився внакладі.
+      updated = { ...stage, status: "funded", fundedAt: iso(now), holdUntil: iso(now + HOLD_DAYS * DAY), payment: quoteStage(stage.amount, options.card ?? "foreign") };
       break;
     case "claim_paid":
       if (deal.method !== "direct" || stage.status !== "pending") return "Позначити оплату зараз не можна.";
@@ -167,7 +191,7 @@ export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageI
       updated = { ...stage, status: "refunded", refundedAt: iso(now) };
       break;
     case "rework": {
-      // Банк тримає холд не довше 9 днів: коли він збіг, повертати роботу вже нема на чому.
+      // Банк тримає холд не довше HOLD_DAYS днів: коли він збіг, повертати роботу вже нема на чому.
       if (stage.holdUntil && Date.parse(stage.holdUntil) <= now) return "Холд уже збіг: оберіть виплату або повернення коштів.";
       const { deliveredAt: _delivered, ...rest } = stage;
       updated = { ...rest, status: "funded", reworkAt: iso(now) };

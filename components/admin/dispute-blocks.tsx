@@ -2,6 +2,7 @@
 
 import { DECISION_LABEL, type DecisionLogRow, type DisputeParty } from "@/lib/admin/types";
 import { feeOf, payoutOf, dealTotal } from "@/lib/deals/machine";
+import { formatKop } from "@/lib/deals/price";
 import type { Deal, DealStage } from "@/lib/deals/types";
 import { formatDay, formatMoney, formatStamp, holdLeft, STAGE_STATE } from "@/lib/admin/format";
 
@@ -60,19 +61,25 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
       </ol>
       <dl className="adm-facts">
         <div>
-          <dt>Сума угоди</dt>
+          <dt>Ціна виконавця</dt>
           <dd>{formatMoney(dealTotal(deal))}</dd>
         </div>
         {deal.method === "safe" && (
           <>
             <div>
-              <dt>Комісія платформи</dt>
+              <dt>Винагорода платформи</dt>
               <dd>{formatMoney(deal.stages.reduce((sum, stage) => sum + feeOf(stage.amount, deal.method), 0))}</dd>
             </div>
             <div>
-              <dt>Виконавцю після комісії</dt>
-              <dd>{formatMoney(deal.stages.reduce((sum, stage) => sum + payoutOf(stage.amount, deal.method), 0))}</dd>
+              <dt>Виконавцю</dt>
+              <dd>{formatMoney(deal.stages.reduce((sum, stage) => sum + payoutOf(stage.amount), 0))}</dd>
             </div>
+            {deal.stages.some((stage) => stage.payment) && (
+              <div>
+                <dt>Сплатив замовник (з комісією банку)</dt>
+                <dd>{formatKop(deal.stages.reduce((sum, stage) => sum + (stage.payment?.total ?? 0), 0))}</dd>
+              </div>
+            )}
           </>
         )}
         <div>

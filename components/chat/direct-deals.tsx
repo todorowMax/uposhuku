@@ -15,6 +15,7 @@ import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
 import { isFop } from "@/lib/deals/fop";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { formatKop, rateLabel, totalRange } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
   SAFE_FEE,
@@ -54,7 +55,7 @@ export function DirectDeals({
 /**
  * Форма умов: назва замовлення, опис, сума, термін, спосіб оплати. Етапи рахуємо
  * самі (довгу роботу ділимо під холд). Платить завжди замовник; виконавець отримує
- * суму за мінусом комісії безпечної угоди.
+ * свою ціну повністю, а замовник у безпечній угоді доплачує комісії платформи й банку.
  */
 export function TermsForm({
   conversation,
@@ -101,6 +102,7 @@ export function TermsForm({
           stages,
         });
   const fee = feeOf(amountNumber, method);
+  const payRange = useMemo(() => totalRange(stages.map((stage) => stage.amount)), [stages]);
 
   const submit = async () => {
     if (problem) return setError(problem);
@@ -216,7 +218,7 @@ export function TermsForm({
           </span>
           <span className="deal-method-text">
             {fop
-              ? `Гроші заморожуємо на картці замовника й віддаємо виконавцю після підтвердження. До ${HOLD_DAYS} днів на етап. Комісія ${Math.round(SAFE_FEE * 100)}%.`
+              ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію платформи ${Math.round(SAFE_FEE * 100)}% і комісію банку.`
               : "Недоступна: виконавець не ФОП."}
           </span>
         </label>
@@ -242,13 +244,29 @@ export function TermsForm({
       {amountNumber > 0 && (
         <dl className="deal-summary">
           <div>
-            <dt>Платить замовник</dt>
+            <dt>Вартість роботи (отримає виконавець)</dt>
             <dd className="tabular-nums">{money(amountNumber)}</dd>
           </div>
-          <div>
-            <dt>Виконавець отримає</dt>
-            <dd className="tabular-nums">{money(amountNumber - fee)}</dd>
-          </div>
+          {method === "safe" && (
+            <>
+              <div>
+                <dt>Комісія платформи, {Math.round(SAFE_FEE * 100)}%</dt>
+                <dd className="tabular-nums">{money(fee)}</dd>
+              </div>
+              <div>
+                <dt>Комісія банку</dt>
+                <dd>
+                  {rateLabel("ua")} або {rateLabel("foreign")} залежно від картки
+                </dd>
+              </div>
+              <div>
+                <dt>Замовник заплатить</dt>
+                <dd className="tabular-nums">
+                  {formatKop(payRange.ua)} – {formatKop(payRange.foreign)}
+                </dd>
+              </div>
+            </>
+          )}
           {stages.length > 1 && (
             <div>
               <dt>Етапів</dt>

@@ -1028,7 +1028,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
               <span>
                 {MONEY.format(dealTotal(deal))} ₴
                 {deal.method === "safe"
-                  ? `, вам ${MONEY.format(payoutOf(dealTotal(deal), "safe"))} ₴`
+                  ? `, вам ${MONEY.format(payoutOf(dealTotal(deal)))} ₴ повністю`
                   : ""}
               </span>
             </p>

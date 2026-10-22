@@ -62,7 +62,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return problem(402, "Кошти не заморожено", "Банк відхилив операцію. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
   }
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
-  const result = await actOnDeal(user.id, (await params).id, action, stageId);
+  // Тип картки обирає замовник при заморожуванні: від нього залежить комісія банку в сумі до оплати.
+  const card = body?.card === "ua" || body?.card === "foreign" ? body.card : undefined;
+  const result = await actOnDeal(user.id, (await params).id, action, stageId, Date.now(), { card });
   if (result === null) return problem(404, "Угоду не знайдено");
   if (typeof result === "string") return problem(409, "Дію не виконано", result);
   if (action === "fund" || action === "claim_paid") serverEvent(EVENTS.dealPaid, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");

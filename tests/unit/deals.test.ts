@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { applyAction, applyModeratorAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
-import type { Deal, DealDraft } from "@/lib/deals/types";
+import { quoteStage, splitShares, totalRange } from "@/lib/deals/price";
+import { ACQUIRING_RATE, HOLD_DAYS, MAX_STAGE_AMOUNT, MAX_STAGE_DAYS, type Deal, type DealDraft } from "@/lib/deals/types";
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
 const performer = { id: "p1", name: "Юлія", avatarIndex: 1, specialty: "Дизайнерка", fop: true };
@@ -19,15 +20,20 @@ const accepted = (d = draft()): Deal => act(createDeal("deal-abcd", d, T0), "acc
 describe("правила угоди", () => {
   it("комісія лише в безпечній угоді, 5%", () => {
     expect(feeOf(10000, "safe")).toBe(500);
-    expect(payoutOf(10000, "safe")).toBe(9500);
     expect(feeOf(10000, "direct")).toBe(0);
-    expect(payoutOf(10000, "direct")).toBe(10000);
+    // Виконавець отримує ціну повністю: комісії лягають на замовника.
+    expect(payoutOf(10000)).toBe(10000);
   });
 
-  it("безпечна угода — лише ФОП, етап не довший за холд 9 днів, прямий — одним платежем", () => {
+  it("безпечна угода — лише ФОП, етап не довший за холд мінус запас, не більший за ліміт, прямий — одним платежем", () => {
     expect(validateDraft(draft())).toBeNull();
     expect(validateDraft(draft({ performer: { ...performer, fop: false } }))).toMatch(/ФОП/);
-    expect(validateDraft(draft({ stages: [{ title: "Все", amount: 10000, days: 20 }] }))).toMatch(/розділіть/);
+    expect(validateDraft(draft({ stages: [{ title: "Все", amount: 10000, days: MAX_STAGE_DAYS + 1 }] }))).toMatch(/розділіть/);
+    expect(validateDraft(draft({ stages: [{ title: "Все", amount: 10000, days: MAX_STAGE_DAYS }] }))).toBeNull();
+    expect(validateDraft(draft({ stages: [{ title: "Все", amount: MAX_STAGE_AMOUNT + 1, days: 5 }] }))).toMatch(/розділіть/);
+    expect(validateDraft(draft({ stages: [{ title: "Все", amount: MAX_STAGE_AMOUNT, days: 5 }] }))).toBeNull();
+    // Прямий переказ повз банк-еквайр: ліміту етапу немає.
+    expect(validateDraft(draft({ method: "direct", stages: [{ title: "Все", amount: 500_000, days: 5 }] }))).toBeNull();
     expect(validateDraft(draft({ method: "direct", stages: [{ title: "А", amount: 500, days: 3 }, { title: "Б", amount: 500, days: 3 }] }))).toMatch(/одним платежем/);
     expect(validateDraft(draft({ method: "direct", performer: { ...performer, fop: false }, stages: [{ title: "Все", amount: 5000, days: 40 }] }))).toBeNull();
     expect(validateDraft(draft({ stages: [{ title: "", amount: 500, days: 3 }] }))).toMatch(/Назвіть/);
@@ -35,12 +41,17 @@ describe("правила угоди", () => {
   });
 
   it("довгу роботу ділить на етапи, що вкладаються в холд, без втрати копійки", () => {
-    const stages = splitIntoStages(10001, 20);
+    const stages = splitIntoStages(10001, 60);
     expect(stages).toHaveLength(3);
     expect(stages.reduce((sum, stage) => sum + stage.amount, 0)).toBe(10001);
-    expect(stages.reduce((sum, stage) => sum + stage.days, 0)).toBe(20);
-    expect(stages.every((stage) => stage.days <= 9)).toBe(true);
+    expect(stages.reduce((sum, stage) => sum + stage.days, 0)).toBe(60);
+    expect(stages.every((stage) => stage.days <= MAX_STAGE_DAYS)).toBe(true);
     expect(splitIntoStages(5000, 5)).toEqual([{ title: "Робота", amount: 5000, days: 5 }]);
+    // Великий бюджет ділиться ще й за лімітом етапу, навіть коли термін короткий.
+    const big = splitIntoStages(250_000, 10);
+    expect(big).toHaveLength(3);
+    expect(big.every((stage) => stage.amount <= MAX_STAGE_AMOUNT)).toBe(true);
+    expect(big.reduce((sum, stage) => sum + stage.amount, 0)).toBe(250_000);
   });
 });
 
@@ -51,13 +62,14 @@ describe("шлях безпечної угоди", () => {
     expect(act(deal, "accept", T0 + 3000).status).toBe("accepted");
   });
 
-  it("заморожування → здано → виплата → угода завершена; холд на 9 днів", () => {
+  it("заморожування → здано → виплата → угода завершена; холд на HOLD_DAYS днів, розбивка оплати збережена", () => {
     let deal = accepted();
     expect(needsAction(deal)).toBe("fund");
-    deal = applyAction(deal, "fund", undefined, T0 + 5000) as Deal;
+    deal = applyAction(deal, "fund", undefined, T0 + 5000, { card: "ua" }) as Deal;
     const stage = currentStage(deal)!;
     expect(stage.status).toBe("funded");
-    expect(Date.parse(stage.holdUntil!) - Date.parse(stage.fundedAt!)).toBe(9 * 86_400_000);
+    expect(Date.parse(stage.holdUntil!) - Date.parse(stage.fundedAt!)).toBe(HOLD_DAYS * 86_400_000);
+    expect(stage.payment).toMatchObject({ card: "ua", price: 1_000_000, fee: 50_000, total: 1_063_830 });
     expect(needsAction(deal)).toBeNull();
     deal = act(deal, "deliver", T0 + 15_000);
     expect(currentStage(deal)!.status).toBe("delivered");
@@ -245,5 +257,42 @@ describe("рішення модератора у спорі", () => {
     expect(applyModeratorAction(disputed(), "release", "nope", T0 + 5000)).toMatch(/не в спорі/);
     const done = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
     expect(applyModeratorAction(done, "refund", undefined, T0 + 9500)).toMatch(/не в спорі/);
+  });
+});
+
+describe("до оплати: ціна виконавця + комісія платформи + комісія банку", () => {
+  it("українська картка: 10 000 ₴ → 10 638,30 ₴, виконавцю рівно 10 000", () => {
+    const quote = quoteStage(10_000, "ua");
+    expect(quote).toEqual({ card: "ua", price: 1_000_000, fee: 50_000, bankFee: 13_830, total: 1_063_830 });
+    expect(quote.price + quote.fee + quote.bankFee).toBe(quote.total);
+  });
+
+  it("закордонна картка дорожча: 10 000 ₴ → 10 714,29 ₴", () => {
+    expect(quoteStage(10_000, "foreign")).toMatchObject({ bankFee: 21_429, total: 1_071_429 });
+  });
+
+  it("комісії банку вистачає на ставку: після її утримання виконавцю лишається ціна", () => {
+    for (const card of ["ua", "foreign"] as const) {
+      for (const price of [100, 333, 1999.5, 10_000, 99_999, 100_000]) {
+        const quote = quoteStage(price, card);
+        const bankTakes = Math.round(quote.total * ACQUIRING_RATE[card]);
+        const { performer, platform } = splitShares(quote);
+        expect(performer + platform).toBe(quote.total);
+        // Банк утримує свою комісію з частки виконавця (до копійки округлення).
+        expect(performer - bankTakes).toBeGreaterThanOrEqual(quote.price - 1);
+      }
+    }
+  });
+
+  it("діапазон для кількох етапів і ціна без копійок до копійки", () => {
+    const range = totalRange([10_000, 5_000]);
+    expect(range.ua).toBe(quoteStage(10_000, "ua").total + quoteStage(5_000, "ua").total);
+    expect(range.foreign).toBeGreaterThan(range.ua);
+  });
+
+  it("без типу картки рахуємо за вищою ставкою, щоб виконавець не лишився внакладі", () => {
+    const deal = accepted();
+    const funded = applyAction(deal, "fund", undefined, T0 + 5000) as Deal;
+    expect(currentStage(funded)!.payment?.card).toBe("foreign");
   });
 });

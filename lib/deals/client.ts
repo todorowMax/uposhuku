@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/auth/client";
 import { createStore, useStore } from "@/lib/store";
 import { startPolling } from "@/lib/realtime/client";
 import { useActiveRequest } from "@/lib/requests/offers";
-import type { Deal, DealAction, DealDraft } from "./types";
+import type { CardKind, Deal, DealAction, DealDraft } from "./types";
 
 /** Угоди за id запиту. */
 export const dealsStore = createStore<Record<string, Deal[]>>({});
@@ -56,10 +56,10 @@ export const proposeDeal = async (draft: DealDraft) => {
   return deal;
 };
 
-export const dealAction = async (deal: Deal, action: DealAction, stageId?: string, simulate?: "declined") => {
+export const dealAction = async (deal: Deal, action: DealAction, stageId?: string, simulate?: "declined", card?: CardKind) => {
   const { deal: next } = await call<{ deal: Deal }>(`/api/deals/${encodeURIComponent(deal.id)}`, {
     method: "POST",
-    body: JSON.stringify({ action, stageId, simulate }),
+    body: JSON.stringify({ action, stageId, simulate, card }),
   });
   replace(next);
   return next;

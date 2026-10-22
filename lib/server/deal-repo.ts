@@ -6,7 +6,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { deals, moderationActions } from "@/db/schema";
 import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft } from "@/lib/deals/machine";
-import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
+import { DIRECT_RESPONSE_ID, directRequestId, type CardKind, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
 import { getDb } from "./db";
 
@@ -46,10 +46,10 @@ export const proposeDeal = async (userId: string, draft: DealDraft, now = Date.n
   return deal;
 };
 
-export const actOnDeal = async (userId: string, id: string, action: DealAction, stageId: string | undefined, now = Date.now()): Promise<Deal | string | null> => {
+export const actOnDeal = async (userId: string, id: string, action: DealAction, stageId: string | undefined, now = Date.now(), options: { card?: CardKind } = {}): Promise<Deal | string | null> => {
   const deal = (await readAll(userId)).find((item) => item.id === id);
   if (!deal) return null;
-  const result = applyAction(deal, action, stageId, now);
+  const result = applyAction(deal, action, stageId, now, options);
   if (typeof result === "string") return result;
   await write(userId, result, now);
   return result;

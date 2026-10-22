@@ -1,8 +1,8 @@
 // lib/deals/types.ts
 //
 // Угода між замовником і виконавцем, домовлена в чаті. Два способи оплати,
-// як у плані: «безпечна угода» (гроші заморожуються до підтвердження, до 9
-// днів на етап, комісія платформи, лише для виконавців-ФОП) і «прямий
+// як у плані: «безпечна угода» (гроші заморожуються до підтвердження, холд до
+// 30 днів, комісія платформи, лише для виконавців-ФОП) і «прямий
 // переказ за QR» (без комісії й без гарантії платформи).
 
 export type DealMethod = "safe" | "direct";
@@ -21,7 +21,7 @@ export interface DealStage {
   title: string;
   /** Сума етапу, ₴. */
   amount: number;
-  /** На скільки днів етап; для safe не більше HOLD_DAYS. */
+  /** На скільки днів етап; для safe не більше MAX_STAGE_DAYS (решта холду йде на перевірку й спір). */
   days: number;
   status: StageStatus;
   claimedAt?: string;
@@ -36,6 +36,24 @@ export interface DealStage {
   reworkAt?: string;
   /** Коли банк скасує холд, якщо його не фіналізовано. Лише safe. */
   holdUntil?: string;
+  /** Що замовник заморозив: розбивка суми на момент оплати. Лише safe, з моменту funded. */
+  payment?: StagePayment;
+}
+
+/** Тип картки замовника: від нього залежить комісія банку за приймання платежу. */
+export type CardKind = "ua" | "foreign";
+
+/** Розбивка оплати етапу, у копійках. total = price + fee + bankFee. */
+export interface StagePayment {
+  card: CardKind;
+  /** Ціна виконавця: стільки він отримує повністю. */
+  price: number;
+  /** Винагорода платформи, SAFE_FEE від ціни. */
+  fee: number;
+  /** Комісія банку за приймання платежу, закладена в суму замовника. */
+  bankFee: number;
+  /** Скільки замовник платить і заморожує. */
+  total: number;
 }
 
 export type DealStatus = "proposed" | "accepted" | "completed" | "declined" | "cancelled";
@@ -81,12 +99,26 @@ export type ModeratorAction = "release" | "refund" | "rework";
 /** Дії виконавця: прийняти чи відхилити пропозицію, підтвердити, що гроші отримано, здати етап. */
 export type PerformerAction = "accept" | "decline" | "confirm_paid" | "deliver" | "withdraw";
 
-export const HOLD_DAYS = 9;
-/** Комісія платформи з безпечної угоди, частка. Прямий переказ — без комісії. */
+/** Холд, який банк увімкнув нам (домовленість 22.10.2026). Стандартний холд monobank 9 днів. */
+export const HOLD_DAYS = 30;
+/** Скільки робочих днів замовник перевіряє здану роботу; мовчання після цього — приймання. */
+export const REVIEW_DAYS = 3;
+/** Календарних днів холду, які лишаємо на перевірку (REVIEW_DAYS робочих) і можливий спір. */
+export const HOLD_RESERVE_DAYS = 6;
+/** Найдовший етап безпечної угоди: холд мінус запас на перевірку й спір. */
+export const MAX_STAGE_DAYS = HOLD_DAYS - HOLD_RESERVE_DAYS;
+/** Комісія платформи з безпечної угоди, частка від ціни виконавця. Прямий переказ — без комісії. */
 export const SAFE_FEE = 0.05;
+/** Комісія банку за приймання платежу: частка від суми, яку платить замовник. Тарифи банку на 22.10.2026. */
+export const ACQUIRING_RATE: Record<CardKind, number> = { ua: 0.013, foreign: 0.02 };
 export const MAX_STAGES = 6;
 export const MIN_DEAL = 100;
-export const MAX_DEAL = 1_000_000;
+/** Ліміт на один етап безпечної угоди, ₴ (ціна виконавця). Домовленість з банком 22.10.2026. */
+export const MAX_STAGE_AMOUNT = 100_000;
+/** Сума безпечної угоди не більша за етапи, помножені на ліміт етапу. */
+export const MAX_DEAL = MAX_STAGES * MAX_STAGE_AMOUNT;
+/** Прямий переказ іде повз банк-еквайр, тож ліміту етапу немає. */
+export const MAX_DIRECT_DEAL = 1_000_000;
 
 export interface DealDraft {
   requestId: string;
