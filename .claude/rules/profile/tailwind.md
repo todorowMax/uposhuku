@@ -1,0 +1,13 @@
+---
+paths: ["**/*.{css,tsx}", "**/tailwind.config.*", "**/lib/utils.ts"]
+trigger: editing Tailwind classes, the @theme block or class merging
+---
+# Tailwind
+
+- TW-1. One theme definition: a single `@theme` block (Tailwind v4; in a v3 project the one `tailwind.config` theme) that references the token file, which `AGENTS.md` names; no second `tailwind.config` theme and no second `@theme` or shadcn bridge that overrides it. Why: three theme sources made `rounded-lg` render 10px instead of the 16px token in Demo. Check: review. Example: ukoshiku/app/globals.css
+- TW-2. Never give a standard scale name (`text-4xl`, `rounded-lg`) a value that breaks the scale order or the meaning; custom sizes get semantic names (`text-display`, `text-title`). Why: Demo's `text-4xl` was smaller than `text-3xl`. Check: review (compare built utilities with tokens).
+- TW-3. No arbitrary values anywhere, primitives included (`w-[437px]`, `text-[11px]`, `rounded-[22px]`): every value that is needed becomes a token in `@theme` (Tailwind v4: `@theme` plus `@utility` in CSS; v3: `tailwind.config`). A class combination that repeats becomes a named utility (`@utility` in v4). Only variant selectors stay allowed: `data-[state=open]:`, `aria-*`, `group-*`, `peer-*`. Why: every `[…]` is a value the design system does not know, and Demo spread 74 of them. Check: ESLint `no-restricted-syntax` as error on arbitrary values (variant selectors excluded); legacy code runs it as a warning under the ratchet (RULES-3). Example: ukoshiku/eslint.config.mjs
+- TW-7. Layout containers are named utilities on tokens, not repeated class strings: for example `section-contained` (max width, centred, side gutter) and `section-full` (full width), both defined once with `@utility`. Why: page width and gutter then change in one place. Check: review. Example: ukoshiku/app/globals.css
+- TW-4. Every radius, size, colour and z-index that `DESIGN.md` names exists in the token file and in Tailwind under that name, and the reverse; changing what a visible value renders is a separate PR with before/after screenshots. Why: "cards are 22px" with no token made everyone write `rounded-[22px]`. Check: review.
+- TW-5. Every colour, font, size, shadow and animation in the theme is used; grep each key and delete the unused. Why: 18 entries of a starter template sat unused in Demo's config and passed for the palette. Check: review.
+- TW-6. Custom `@theme` or `@utility` names (`text-body`, `rounded-card`, `z-modal`) are also listed in the `extendTailwindMerge` config next to `cn()` and covered by a unit test. Why: unknown names are read as colours and `cn("text-ink", "text-body")` silently drops one. Check: unit test `cn.test.ts`. Example: ukoshiku/tests/unit/cn.test.ts

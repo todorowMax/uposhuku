@@ -1,0 +1,13 @@
+---
+paths: ["**/*.{css,tsx,ts}"]
+trigger: adding or changing animation, transitions or motion
+---
+# Motion
+
+- COMP-7. All new animation is GSAP: layout and shared-element transitions use GSAP Flip, scroll scenes use ScrollTrigger; no new imports of `motion` or `framer-motion`, and Motion is removed area by area, each area in one pass. Simple hover states and one-off reveals stay in CSS (MOT-6). Why: two libraries stayed side by side indefinitely (Demo: 13 files on Motion, 1 on GSAP). Check: ESLint `no-restricted-imports` for `motion`, `motion/react` and `framer-motion`: error for new code, warning for legacy under the ratchet (RULES-3); `knip`. Example: ukoshiku/lib/gsap.ts
+- MOT-1. Animate `transform` and `opacity` only (and colour for hover); never `width`, `height`, `top` or `left`. Why: those trigger layout and paint on every frame. Check: review.
+- MOT-2. Durations, easings and the exit/enter split are tokens (`--ease-out`, `--dur-fast`); UI transitions stay under 300 ms, exits are shorter than entrances, and no per-component hand-made `cubic-bezier`. Why: ad-hoc curves give ten different feelings in one app. Check: review. Example: ukoshiku/app/globals.css
+- MOT-3. Respect `prefers-reduced-motion` for every animation: remove movement and scaling, keep fades. Why: motion causes the discomfort, not the fact of a transition; a blanket 0 ms removes useful cues too. Check: review. Example: ukoshiku/docs/design/MOTION.md
+- MOT-4. Motion explains a change that would otherwise be invisible; do not animate keyboard-repeated actions, things the user has just created, or anything for decoration on frequent interactions. Enter from `scale(0.95)` or more, never `scale(0)`. Why: decorative motion on frequent actions slows people down. Check: review.
+- MOT-5. Late-arriving content must not move what is already on screen; fix it with a fixed layout, not an animation. Why: a modal that grew upward when data arrived made the photo jump. Check: review.
+- MOT-6. Simple one-off reveals and hover states stay in CSS; a heavy library is imported dynamically at the leaf that uses it, never in a shared chunk. Why: CSS runs off the main thread, and GSAP is about 38 kB gzip that most pages never need. Check: review, build output. Example: ukoshiku/lib/gsap.ts
