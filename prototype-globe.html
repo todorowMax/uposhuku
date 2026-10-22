@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Прототип: глобус і чат</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+<style>
+:root{
+  --surface-0:#f5f4ef;--surface-1:#efeee8;--surface-2:#ffffff;
+  --text-primary:#1f1e1c;--text-secondary:#5f5e5a;--text-muted:#888780;
+  --border:rgba(0,0,0,.12);--border-strong:rgba(0,0,0,.2);
+  --bg-accent:#e6f1fb;--text-accent:#185fa5;--border-accent:#85b7eb;
+  --bg-success:#eaf3de;--text-success:#3b6d11;--text-danger:#a32d2d;
+  --radius:8px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --surface-0:#1a1a19;--surface-1:#222220;--surface-2:#2a2a28;
+    --text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;
+    --border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.22);
+    --bg-accent:#0c447c;--text-accent:#b5d4f4;--border-accent:#185fa5;
+    --bg-success:#27500a;--text-success:#c0dd97;--text-danger:#f09595;
+  }
+}
+:root[data-theme="dark"]{
+  --surface-0:#1a1a19;--surface-1:#222220;--surface-2:#2a2a28;
+  --text-primary:#f1efe8;--text-secondary:#b4b2a9;--text-muted:#888780;
+  --border:rgba(255,255,255,.12);--border-strong:rgba(255,255,255,.22);
+  --bg-accent:#0c447c;--text-accent:#b5d4f4;--border-accent:#185fa5;
+  --bg-success:#27500a;--text-success:#c0dd97;--text-danger:#f09595;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface-0);color:var(--text-primary);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:720px;margin:0 auto;padding:24px 16px}
+button{font:inherit;color:var(--text-primary);background:transparent;border:0.5px solid var(--border-strong);border-radius:var(--radius);cursor:pointer}
+button:hover{background:var(--surface-1)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.ts{fill:var(--text-secondary);font-size:12px}
+#wrap{position:relative;background:var(--surface-1);border-radius:12px;overflow:hidden}
+#chat{position:absolute;left:50%;top:14px;transform:translate(-50%,-10px);width:min(440px,88%);background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:12px;padding:10px 12px;opacity:0;pointer-events:none;transition:opacity .4s,transform .4s}
+#chat.on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+#q{width:100%;border:none;background:transparent;resize:none;font:inherit;font-size:14px;color:var(--text-primary);outline:none;padding:0}
+#hint{position:absolute;left:50%;top:14px;transform:translateX(-50%);font-size:13px;color:var(--text-secondary);background:var(--surface-2);border:0.5px solid var(--border);border-radius:var(--radius);padding:6px 12px;transition:opacity .3s;white-space:nowrap;pointer-events:none}
+.card{background:var(--surface-2);border:0.5px solid var(--border);border-radius:12px;padding:8px 12px}
+.sb{font-size:12px;padding:4px 10px}
+</style>
+</head>
+<body>
+<main>
+<h1 class="sr-only">Прототип: глобус, на якому Україна піднімається при наведенні, по кліку наближається, зверху з'являється чат, а після публікації запиту на карті з'являються білдери, які відгукнулися.</h1>
+<div id="wrap">
+<svg id="svg" viewBox="0 0 680 420" width="100%" style="display:block;touch-action:none;cursor:grab"><path id="sph"/><path id="grat"/><path id="land"/><g id="side"></g><path id="top"/><g id="lift"><g id="lines"></g><g id="pts"></g><g id="req" style="display:none"><circle id="rq1" r="8" fill="none" stroke="#D85A30" stroke-width="2"><animate attributeName="r" values="8;20;8" dur="1.8s" repeatCount="indefinite"/><animate attributeName="stroke-opacity" values="0.9;0;0.9" dur="1.8s" repeatCount="indefinite"/></circle><circle id="rq2" r="7" fill="#D85A30"/></g></g></svg>
+<div id="hint">Наведи на Україну і натисни</div>
+<div id="chat">
+<textarea id="q" rows="2" placeholder="Що потрібно зробити? Наприклад: мілплер для фітнес-клубу"></textarea>
+<div id="sum" style="display:none;font-size:13px;color:var(--text-primary);line-height:1.5"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+<span style="font-size:12px;color:var(--text-muted)"><i class="ti ti-map-pin" aria-hidden="true"></i> Київ, Україна</span>
+<button id="pub" class="sb">Опублікувати <i class="ti ti-arrow-up" aria-hidden="true"></i></button>
+</div>
+<div id="err" style="font-size:12px;color:var(--text-danger)"></div>
+</div>
+</div>
+<div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:8px 0 6px">
+<button id="gl" class="sb"><i class="ti ti-world" aria-hidden="true"></i> Весь світ</button>
+<button id="zi" class="sb" aria-label="Наблизити"><i class="ti ti-plus" aria-hidden="true"></i></button>
+<button id="zo" class="sb" aria-label="Віддалити"><i class="ti ti-minus" aria-hidden="true"></i></button>
+<span id="st" style="font-size:13px;color:var(--text-secondary);margin-left:6px">Перетягуй, щоб крутити глобус</span>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+<span><svg width="12" height="11"><polygon points="6,0 12,11 0,11" fill="#1D9E75" fill-opacity="0.45" stroke="#1D9E75"/></svg> білдер</span>
+<span><svg width="12" height="11"><polygon points="6,1 11,10 1,10" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="2 2"/></svg> запрошений</span>
+<span><svg width="12" height="11"><polygon points="6,0 12,11 0,11" fill="#1D9E75"/></svg> відгукнувся</span>
+<span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#D85A30"/></svg> активний запит</span>
+<span><svg width="10" height="10"><circle cx="5" cy="5" r="4" fill="#888780" fill-opacity="0.6"/></svg> закритий запит</span>
+</div>
+<div id="cards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px"></div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script>
+const $=id=>document.getElementById(id),svg=d3.select("#svg");
+// Контур України намальовано вручну і спрощено. Для продукту потрібні межі з позицією України (Крим — Україна).
+const ring=[[23.6,51.5],[24.4,51.9],[25.5,51.9],[26.6,51.8],[27.7,51.6],[28.7,51.4],[29.6,51.5],[30.6,51.3],[31.2,52.05],[32.2,52.1],[33.2,52.35],[34.1,51.95],[34.4,51.25],[35.4,50.9],[36.3,50.3],[37.4,50.4],[38.2,50.0],[39.2,49.9],[40.1,49.6],[40.0,48.9],[39.7,48.0],[38.9,47.8],[38.2,47.1],[37.5,47.05],[36.8,46.7],[35.8,46.6],[35.0,46.25],[34.8,46.15],[35.2,45.7],[35.9,45.4],[36.6,45.4],[35.5,45.05],[34.4,44.6],[33.5,44.45],[33.3,45.2],[32.5,45.35],[33.0,45.8],[33.6,46.1],[32.8,46.1],[32.0,46.4],[31.5,46.55],[30.75,46.45],[30.3,46.05],[29.7,45.3],[29.0,45.4],[28.2,45.45],[28.6,45.9],[28.9,46.45],[29.9,46.45],[30.1,46.8],[29.6,47.4],[29.2,47.95],[28.2,48.2],[27.5,48.45],[26.6,48.25],[25.8,47.95],[24.9,47.72],[23.8,47.95],[22.9,47.95],[22.15,48.4],[22.55,49.05],[22.7,49.5],[23.5,50.4],[24.1,50.85],[23.6,51.5]];
+const UA={type:"Feature",geometry:{type:"Polygon",coordinates:[ring]}};
+if(d3.geoArea(UA)>2*Math.PI)UA.geometry.coordinates=[ring.slice().reverse()];
+const proj=d3.geoOrthographic().clipAngle(90).precision(0.3),path=d3.geoPath(proj),grat=d3.geoGraticule10();
+let rot=[-25,-38,0],sc=185,tr=[340,212],land=null,sel=false,hov=false,lift=0,tx=0,ty=0,ttx=0,tty=0,dirty=true,anim=null,pubd=false,timers=[];
+const L=7;for(let i=0;i<L;i++)d3.select("#side").append("path").attr("style","fill:var(--border-accent)");
+d3.select("#sph").attr("style","fill:var(--surface-2);stroke:var(--border)");
+d3.select("#grat").attr("style","fill:none;stroke:var(--border);stroke-width:0.5");
+d3.select("#land").attr("style","fill:var(--text-muted);fill-opacity:0.3");
+// Демо-дані: білдери і запити розкидані навколо міст (у продукті — зсув на сервері, не точні координати).
+let s=5;const rnd=()=>{s=(s*9301+49297)%233280;return s/233280};
+const cities=[["Київ",30.52,50.45,10],["Львів",24.03,49.84,6],["Харків",36.23,49.99,4],["Дніпро",35.05,48.46,4],["Одеса",30.73,46.48,4],["Вінниця",28.47,49.23,2],["Івано-Франківськ",24.71,48.92,2],["Полтава",34.55,49.59,2],["Черкаси",32.06,49.44,1],["Житомир",28.66,50.25,1]];
+const P=[];cities.forEach(c=>{for(let i=0;i<c[3];i++)P.push({c:c[0],ll:[c[1]+(rnd()-.5)*0.9,c[2]+(rnd()-.5)*0.5],t:"b",st:""});for(let i=0;i<Math.ceil(c[3]/3);i++)P.push({c:c[0],ll:[c[1]+(rnd()-.5)*1,c[2]+(rnd()-.5)*0.6],t:rnd()<.6?"x":"r"})});
+const nB=P.filter(p=>p.t=="b").length,nR=P.filter(p=>p.t=="r").length,nX=P.filter(p=>p.t=="x").length;
+const RS=[["Олена К.","Київ","MealMate · живий, 1.2k юзерів",94,4],["Дарина М.","Львів","Бот запису для 3 клінік",88,7],["Андрій П.","Київ","FitPlate · Telegram Mini App",81,2],["Максим Л.","Дніпро","Магазин кави: НП + Checkbox",72,1],["Ірина С.","Одеса","KetoWeek · рецепти",69,9]];
+const KY=[30.52,50.45],labs=[["Київ",30.52,50.45],["Львів",24.03,49.84],["Харків",36.23,49.99],["Дніпро",35.05,48.46],["Одеса",30.73,46.48]];
+const pl=n=>n%10==1&&n%100!=11?"відгук":(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20))?"відгуки":"відгуків";
+function render(){proj.rotate(rot).scale(sc).translate(tr);
+d3.select("#sph").attr("d",path({type:"Sphere"}));d3.select("#grat").attr("d",path(grat));if(land)d3.select("#land").attr("d",path(land));
+const d=path(UA)||"";d3.selectAll("#side path").attr("d",d);d3.select("#top").attr("d",d);
+const cen=[-rot[0],-rot[1]];let h="",ln="";const rq=proj(KY);
+if(sel){P.forEach(p=>{if(d3.geoDistance(p.ll,cen)>1.5)return;const [x,y]=proj(p.ll);
+if(p.t=="b"){const t=`${x},${y-6} ${x+6},${y+5} ${x-6},${y+5}`;
+if(p.st=="resp"){h+=`<polygon points="${t}" fill="#1D9E75" stroke="#1D9E75" stroke-width="1.5"/>`;ln+=`<line x1="${x}" y1="${y}" x2="${rq[0]}" y2="${rq[1]}" stroke="#1D9E75" stroke-opacity="0.55" stroke-width="1.2"/>`}
+else if(p.st=="inv")h+=`<polygon points="${t}" fill="none" stroke="#1D9E75" stroke-width="1.5" stroke-dasharray="2 2"/>`;
+else h+=`<polygon points="${t}" fill="#1D9E75" fill-opacity="${pubd?0.12:0.45}" stroke="#1D9E75" stroke-opacity="${pubd?0.2:0.8}"/>`}
+else if(p.t=="x")h+=`<circle cx="${x}" cy="${y}" r="4" fill="#888780" fill-opacity="${pubd?0.15:0.55}"/>`;
+else h+=`<circle cx="${x}" cy="${y}" r="4" fill="#D85A30" fill-opacity="${pubd?0.2:0.85}"/>`});
+labs.forEach(l=>{if(d3.geoDistance([l[1],l[2]],cen)>1.5)return;const [x,y]=proj([l[1],l[2]]);h+=`<text class="ts" x="${x}" y="${y+20}" text-anchor="middle">${l[0]}</text>`})}
+$("pts").innerHTML=h;$("lines").innerHTML=ln;
+if(rq){["rq1","rq2"].forEach(i=>{$(i).setAttribute("cx",rq[0]);$(i).setAttribute("cy",rq[1])})}
+dirty=false}
+let lastOn=null;
+function frame(t){if(anim){const k=Math.min(1,(t-anim.t0)/anim.d),e=d3.easeCubicInOut(k);rot=anim.ir(e);sc=anim.s0*Math.pow(anim.s1/anim.s0,e);tr=anim.it(e);dirty=true;if(k>=1){const cb=anim.cb;anim=null;cb&&cb()}}
+lift+=((sel?9:hov?6:0)-lift)*0.15;tx+=(ttx-tx)*0.12;ty+=(tty-ty)*0.12;
+const on=hov||sel;if(on!==lastOn){d3.select("#top").attr("style",on?"fill:var(--bg-accent);stroke:var(--text-accent);stroke-width:1":"fill:var(--text-muted);fill-opacity:0.5;stroke:var(--text-muted);stroke-width:0.5");lastOn=on}
+d3.select("#side").attr("opacity",Math.min(1,lift/3));
+const ox=tx,oy=-lift+ty;d3.selectAll("#side path").attr("transform",(_,i)=>`translate(${ox*i/L},${oy*i/L})`);
+d3.select("#top").attr("transform",`translate(${ox},${oy})`);d3.select("#lift").attr("transform",`translate(${ox},${oy})`);
+if(dirty)render();requestAnimationFrame(frame)}
+function hit(x,y){const p=proj.invert([x-tx,y+lift-ty]);return !!(p&&isFinite(p[0])&&d3.geoDistance(p,[-rot[0],-rot[1]])<1.55&&d3.geoContains(UA,p))}
+function go(r,s2,t2,d,cb){const r0=rot.slice();r0[0]=((r0[0]+180)%360+360)%360-180;anim={t0:performance.now(),d,ir:d3.interpolate(r0,r),s0:sc,s1:s2,it:d3.interpolate(tr.slice(),t2),cb}}
+svg.on("mousemove",e=>{const [mx,my]=d3.pointer(e);const c=path.centroid(UA);if(!sel){hov=hit(mx,my);$("hint").textContent=hov?`Україна · ${nB} білдерів · ${nR} активних запитів`:"Наведи на Україну і натисни"}
+svg.style("cursor",hov&&!sel?"pointer":"grab");if((hov||sel)&&isFinite(c[0])){ttx=(mx-c[0])*0.02;tty=(my-c[1])*0.015}else{ttx=0;tty=0}});
+svg.on("mouseleave",()=>{hov=false;ttx=0;tty=0});
+let moved=0,downHit=false;
+svg.call(d3.drag().container(function(){return this}).on("start",e=>{moved=0;downHit=hit(e.x,e.y)}).on("drag",e=>{moved+=Math.abs(e.dx)+Math.abs(e.dy);if(anim)return;const k=55/sc;rot=[rot[0]+e.dx*k,Math.max(-85,Math.min(85,rot[1]-e.dy*k)),0];dirty=true}).on("end",()=>{if(moved<5&&downHit&&!sel)pick()}));
+function pick(){sel=true;hov=false;$("hint").style.opacity=0;d3.select("#land").transition().duration(600).style("fill-opacity",0.1);
+$("st").textContent=`Україна · ${nB} білдерів · ${nR} активних запитів · ${nX} закрито за тиждень`;dirty=true;go([-31.3,-48.6,0],2000,[340,268],1300,()=>$("chat").classList.add("on"))}
+$("gl").onclick=()=>{sel=false;$("chat").classList.remove("on");$("hint").style.opacity=1;d3.select("#land").transition().duration(600).style("fill-opacity",0.3);$("st").textContent="Перетягуй, щоб крутити глобус";dirty=true;go([-25,-38,0],185,[340,212],1100)};
+$("zi").onclick=()=>go(rot.slice(),Math.min(5000,sc*1.4),tr.slice(),400);
+$("zo").onclick=()=>go(rot.slice(),Math.max(150,sc/1.4),tr.slice(),400);
+function cards(g){$("cards").innerHTML=[...g].sort((a,b)=>b[3]-a[3]).map(x=>`<div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:13px;font-weight:500">${x[0]}</span><span style="font-size:11px;color:var(--text-muted)">${x[1]} · за ${x[4]} хв</span></div><p style="font-size:12px;color:var(--text-secondary);margin:2px 0 4px">Робив: ${x[2]}</p><span style="font-size:11px;padding:2px 8px;border-radius:var(--radius);background:var(--bg-success);color:var(--text-success)">Збіг ${x[3]}</span></div>`).join("")}
+function reset(){timers.forEach(clearTimeout);timers=[];pubd=false;P.forEach(p=>p.st="");$("req").style.display="none";$("q").value="";$("q").style.display="";$("sum").style.display="none";$("pub").innerHTML='Опублікувати <i class="ti ti-arrow-up" aria-hidden="true"></i>';$("cards").innerHTML="";$("st").textContent=`Україна · ${nB} білдерів · ${nR} активних запитів · ${nX} закрито за тиждень`;dirty=true}
+$("pub").onclick=()=>{if(pubd){reset();return}const v=$("q").value.trim();if(!v){$("err").textContent="Напиши, що потрібно зробити";return}
+pubd=true;$("err").textContent="";$("q").style.display="none";$("sum").style.display="block";$("sum").textContent=`«${v}» · 0 відгуків`;$("pub").textContent="Новий запит";$("req").style.display="";
+const used=new Set(),inv=[];RS.forEach(r=>{const p=P.find(p=>p.t=="b"&&p.c==r[1]&&!used.has(p));used.add(p);p.st="inv";inv.push(p)});
+P.filter(p=>p.t=="b"&&!used.has(p)&&rnd()<0.3).slice(0,5).forEach(p=>p.st="inv");
+$("st").textContent="Знайшли білдерів, які робили схоже · надіслали в Telegram";dirty=true;
+const order=RS.map((r,i)=>i).sort((a,b)=>RS[a][4]-RS[b][4]),got=[];
+order.forEach((i,j)=>timers.push(setTimeout(()=>{inv[i].st="resp";got.push(RS[i]);dirty=true;cards(got);$("sum").textContent=`«${v}» · ${got.length} ${pl(got.length)}`},1300*(j+1))))};
+$("q").addEventListener("input",()=>$("err").textContent="");
+$("q").addEventListener("keydown",e=>{if(e.key=="Enter"&&!e.shiftKey){e.preventDefault();$("pub").click()}});
+d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json").then(w=>{land=topojson.feature(w,w.objects.land);dirty=true}).catch(()=>{});
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
