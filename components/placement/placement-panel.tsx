@@ -13,6 +13,7 @@ import { TIER_NAMES, TIER_PX } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
@@ -20,7 +21,7 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
 
 type Step = "choose" | "checkout" | "processing" | "done" | "failed";
 const CHOICES = [
-  { tier: 2, name: "Старт", description: "Невеликий маркер — і вас уже видно на мапі." },
+  { tier: 2, name: "Старт", description: "Невеликий маркер, і вас уже видно на мапі." },
   { tier: 4, name: "Професійний", description: "Помітніший маркер і більше шансів отримати замовлення." },
   { tier: 6, name: "Топ", description: "Найбільший маркер: вас помітять першими." },
 ] as const;
@@ -127,6 +128,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   // Ціни залежать від інших, тож перед вибором беремо свіжі.
   useEffect(() => {
     void loadPlacement();
+    track(EVENTS.placementOpened);
   }, []);
 
   const others = useMemo(() => performers.filter((person) => !person.mine), [performers]);
@@ -223,7 +225,10 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
           const size = Math.round(TIER_PX[tier - 1] * 1.6);
           return (
             <label key={tier} className="place-tier" data-selected={chosen || undefined} data-owned={owned || undefined} data-current={tier === current || undefined}>
-              <input type="radio" name="tier" value={tier} checked={chosen} disabled={owned} onChange={() => setSelected(tier)} />
+              <input type="radio" name="tier" value={tier} checked={chosen} disabled={owned} onChange={() => {
+                  track(EVENTS.placementTierSelected, { tier, price: needed(tier) });
+                  setSelected(tier);
+                }} />
               <span className="place-tier-preview" aria-hidden="true">
                 <span
                   className="place-dot"

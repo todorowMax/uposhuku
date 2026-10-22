@@ -12,6 +12,7 @@ import { placementOpenStore, placementStore } from "@/lib/placement/client";
 import { TIER_NAMES } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { feedCollapsedStore, useIsPerformer } from "@/lib/requests/side-panel";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
 /**
  * Акаунт по центру знизу, щоб угорі лишалось лише поле запиту.
@@ -75,7 +76,14 @@ export function AccountButton() {
           <UserRound className="size-4" />
           <span>Увійти</span>
         </button>
-        <button type="button" onClick={() => authFlowStore.set({ mode: "performer" })} className="account-login account-performer">
+        <button
+          type="button"
+          onClick={() => {
+            track(EVENTS.performerCtaClicked, { from: "guest" });
+            authFlowStore.set({ mode: "performer" });
+          }}
+          className="account-login account-performer"
+        >
           <MapPinned className="size-4" />
           <span className="account-performer-short">На мапу</span>
           <span className="account-performer-full">Зʼявитися на мапі</span>
@@ -155,6 +163,7 @@ export function AccountButton() {
             role="menuitem"
             onClick={() => {
               setOpen(false);
+              track(EVENTS.performerCtaClicked, { from: "menu" });
               profileEditorStore.set(true);
             }}
             className="account-menu-item"
@@ -194,6 +203,7 @@ export function AccountButton() {
           type="button"
           onClick={() => {
             setOpen(false);
+            track(EVENTS.performerCtaClicked, { from: "banner" });
             profileEditorStore.set(true);
           }}
           className="account-login account-performer"

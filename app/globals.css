@@ -1219,6 +1219,12 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
 }
 
+/* Багаторядкове поле: вертикальні відступи й міжрядковий інтервал, щоб текст не липнув до рамки. */
+.auth-input.auth-textarea {
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+
 .auth-input[aria-invalid="true"] {
   border-color: #c0705a;
 }
@@ -1823,7 +1829,8 @@ html[data-glass] .offers-panel {
 
 @media (min-width: 1024px) {
   .offers-tab {
-    top: 56px;
+    /* По центру ряду «Мої запити», а не по верхньому краю картки. */
+    top: 68px;
     right: 24px;
     bottom: auto;
     left: auto;
@@ -4023,13 +4030,19 @@ select.auth-input[data-empty] {
   position: relative;
   display: flex;
   flex-direction: column;
-  height: min(350px, calc(100dvh - 240px));
-  min-height: 170px;
-  padding-inline: 36px;
+  /* Висота за вмістом (84px рядок, крок 72px), але не вище за межу: 2 людини не тягнуть порожній список. */
+  height: min(350px, calc(100dvh - 240px), calc(var(--rows, 3) * 72px + 40px));
+  padding: 8px 36px 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
+  scroll-padding-top: 8px;
   scrollbar-width: none;
+  mask-image: linear-gradient(to bottom, #000, #000 88%, transparent);
+}
+
+/* Згасання зверху з'являється, коли верхні рядки вже прогорнули. */
+.group-preview-list[data-scrolled="true"] {
   mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
 }
 
@@ -4037,10 +4050,9 @@ select.auth-input[data-empty] {
   display: none;
 }
 
-.group-preview-list::before,
 .group-preview-list::after {
   content: "";
-  flex: 0 0 var(--stack-edge, 130px);
+  flex: 0 0 var(--stack-edge, 0px);
 }
 
 .group-preview-list > li {
@@ -4049,7 +4061,7 @@ select.auth-input[data-empty] {
   height: 84px;
   transform: scale(var(--stack-scale, 0.88));
   opacity: var(--stack-opacity, 0.72);
-  scroll-snap-align: center;
+  scroll-snap-align: start;
   transition: transform 160ms ease-out, opacity 160ms ease-out;
 }
 
@@ -5251,8 +5263,8 @@ html[data-map-ready] .map-skeleton {
   display: flex;
   flex-direction: column;
   width: min(420px, calc(100vw - 32px));
-  height: min(560px, calc(100dvh - 32px));
-  padding: 14px 16px;
+  height: min(640px, calc(100dvh - 32px));
+  padding: 0;
   border-radius: 24px;
   background: #ffffff;
   color: var(--ink);
@@ -5263,7 +5275,186 @@ html[data-map-ready] .map-skeleton {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  padding: 14px 16px 8px;
+}
+
+/*
+  Вікно-месенджер має два розміри. Компактний: вузька панель, одна колонка (список або
+  діалог), карта поруч лишається видна. Розгорнутий: двоколонковий месенджер. Вужче 760px
+  розгорнутий означає «на весь екран», колонка завжди одна.
+*/
+.inbox-split {
+  flex-direction: row;
+}
+
+.inbox-side {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.inbox-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding-bottom: 14px;
+}
+
+.inbox-panel[data-view="thread"] .inbox-side,
+.inbox-panel[data-view="list"] .inbox-main {
+  display: none;
+}
+
+.inbox-empty {
+  margin: auto;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.inbox-row[data-active] {
+  background: rgb(16 45 55 / 7%);
+}
+
+.inbox-panel[data-size="wide"] {
+  width: min(1040px, calc(100vw - 32px));
+  height: calc(100dvh - 32px);
+}
+
+@media (min-width: 760px) {
+  .inbox-panel[data-size="wide"] .inbox-side,
+  .inbox-panel[data-size="wide"] .inbox-main {
+    display: flex;
+  }
+
+  .inbox-panel[data-size="wide"] .inbox-side {
+    flex: 0 0 320px;
+    border-right: 1px solid rgb(16 45 55 / 8%);
+  }
+
+  .inbox-panel[data-size="wide"] .inbox-back,
+  .inbox-panel[data-size="wide"] .inbox-close-list,
+  .inbox-panel[data-size="wide"] .inbox-side .inbox-expand {
+    display: none;
+  }
+}
+
+@media (max-width: 759px) {
+  /* Телефон: компактний — шторка знизу, розгорнутий — на весь екран; над клавіатурою. */
+  .inbox-panel {
+    right: 8px;
+    bottom: calc(8px + var(--kb, 0px));
+    left: 8px;
+    width: auto;
+    height: min(78dvh, 640px, calc(var(--vvh, 100dvh) - 16px));
+  }
+
+  /* Розгорнутий на телефоні: справжній повний екран, з урахуванням вирізу й нижньої смуги iPhone. */
+  .inbox-panel[data-size="wide"] {
+    inset: 0 0 var(--kb, 0px) 0;
+    width: auto;
+    height: auto;
+    max-height: var(--vvh, 100dvh);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 0;
+  }
+
+  .inbox-panel[data-size="wide"] .inbox-main {
+    padding-bottom: 10px;
+  }
+}
+
+/* Подія в стрічці: по центру, без бульбашки. */
+.dm-system {
+  align-self: center;
+  max-width: 90%;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(16 45 55 / 6%);
+  font-size: 12px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.dm-system time {
+  margin-left: 8px;
+  opacity: 0.7;
+}
+
+/* Шапка розмови: що обговорюємо; розгортається у випадайку. */
+.inbox-orders {
+  margin: 0 16px 8px;
+  border-radius: 14px;
+  background: #f3f7f8;
+}
+
+.inbox-orders-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.inbox-orders-line {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+}
+
+.inbox-orders-line strong {
+  overflow: hidden;
+  max-width: 100%;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-orders-line span {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.inbox-orders-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--brand-solid);
+}
+
+.inbox-orders-chevron {
+  transition: transform 200ms var(--ease-out, ease);
+}
+
+.inbox-orders[data-open] .inbox-orders-chevron {
+  transform: rotate(180deg);
+}
+
+.inbox-orders-body {
+  max-height: min(42dvh, 380px);
+  overflow-y: auto;
+  padding: 0 12px 10px;
+}
+
+.inbox-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inbox-orders-list li {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #ffffff;
 }
 
 .inbox-header h2 {
@@ -5277,6 +5468,17 @@ html[data-map-ready] .map-skeleton {
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
+  padding: 0 8px 12px;
+}
+
+.inbox-main > .inbox-thread {
+  margin: 4px 0 8px;
+  padding: 0 16px;
+}
+
+.inbox-main > :is(.dm-input-row, .dm-warn) {
+  margin-left: 16px;
+  margin-right: 16px;
 }
 
 .inbox-row {
@@ -5637,11 +5839,11 @@ html[data-map-ready] .map-skeleton {
 
 .ui-sheet {
   position: fixed;
-  inset: auto 0 0 0;
+  inset: auto 0 var(--kb, 0px) 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  max-height: 80dvh;
+  max-height: min(80dvh, calc(var(--vvh, 100dvh) - 16px));
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: 20px 20px 0 0;
   background: #ffffff;
@@ -5658,7 +5860,7 @@ html[data-map-ready] .map-skeleton {
 }
 
 .ui-sheet-picker {
-  height: 75dvh;
+  height: min(75dvh, calc(var(--vvh, 100dvh) - 16px));
 }
 
 .ui-sheet-picker .ui-command {
@@ -5726,8 +5928,37 @@ html[data-map-ready] .map-skeleton {
   animation: consent-in 220ms var(--ease-out-quint);
 }
 
+.consent-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.consent-cookie {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-top: 2px;
+  transform-origin: 50% 60%;
+  animation: consent-cookie-in 600ms var(--ease-out-quint) 120ms both;
+}
+
+@keyframes consent-cookie-in {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-cookie {
+    animation: none;
+  }
+}
+
 .consent-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
 }
 
@@ -5793,4 +6024,1034 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
+}
+
+/* Фото в чаті: у бульбашці й чернетка перед надсиланням. */
+.dm-photos {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dm-photos[data-count="1"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.dm-photos img {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.dm-staged {
+  display: flex;
+  gap: 8px;
+  margin: 0 16px 8px;
+  overflow-x: auto;
+}
+
+.dm-staged li {
+  position: relative;
+  flex: none;
+}
+
+.dm-staged img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.dm-staged li[data-pending] img {
+  opacity: 0.45;
+}
+
+.dm-staged button {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.dm-attach {
+  display: grid;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.dm-attach:hover:not(:disabled) {
+  background: rgb(16 45 55 / 8%);
+  color: var(--ink);
+}
+
+.dm-attach:disabled {
+  opacity: 0.4;
+}
+
+/*
+  iOS Safari наближає сторінку, коли фокус потрапляє в поле зі шрифтом менше 16px, і не
+  повертає назад: звідси «все зумиться» і зрізані краї панелей. На сенсорних екранах поля
+  завжди 16px, а вигляд тримаємо розмірами й відступами.
+*/
+@media (pointer: coarse) {
+  :is(input, textarea, select, [cmdk-input]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]) {
+    font-size: 16px;
+  }
+}
+
+/*
+  Телефон: нижні плаваючі кнопки не наїжджають одна на одну й на картки.
+  «Пропозиції» чи «Запити для вас» ліворуч, «Повідомлення» кружечком праворуч;
+  поки відкрита картка виконавця чи запиту, обидві ховаємо.
+*/
+@media (max-width: 639px) {
+  .offers-tab,
+  .inbox-button {
+    bottom: 94px;
+  }
+
+  .offers-tab {
+    left: 12px;
+    max-width: calc(100% - 12px - 56px - 12px);
+    overflow: hidden;
+    translate: none;
+  }
+
+  .inbox-button {
+    position: absolute;
+    right: 12px;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+
+  .inbox-button .inbox-label {
+    display: none;
+  }
+
+  .inbox-button .inbox-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+  }
+
+  body:has(.performer-card, .request-map-card) :is(.offers-tab, .inbox-button) {
+    display: none;
+  }
+}
+
+/* «Про сервіс» на телефоні: панель на всю ширину над нижньою панеллю, а не від кнопки. */
+.legend-panel[data-phone] {
+  position: fixed;
+  z-index: 70;
+  right: 12px;
+  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 68px);
+  left: 12px;
+  width: auto;
+  max-height: calc(100dvh - 140px);
+}
+
+/* Порожня розмова: підказка, що писати першим повідомленням. */
+.inbox-hint {
+  margin: auto;
+  max-width: 320px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+/* Фільтри списку розмов: чипи з лічильником; активний темний. */
+.inbox-filters {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.inbox-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.inbox-filter {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgb(16 45 55 / 6%);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.inbox-filter span {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.inbox-filter[aria-selected="true"] {
+  background: var(--ink);
+  color: #ffffff;
+}
+
+.inbox-offer-tag {
+  align-self: flex-start;
+  margin-top: 2px;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 11px;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-orders-add {
+  justify-self: start;
+  padding: 6px 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand-solid);
+}
+
+.terms-form {
+  display: grid;
+  gap: 12px;
+}
+
+/* Аккордеон замовлень не стискує переписку в нуль: їй завжди лишається місце. */
+.inbox-main > .inbox-thread {
+  flex: 1 1 140px;
+  min-height: 140px;
+}
+
+/*
+  Аккордеон замовлень по висоті контенту: коротка форма займає стільки, скільки їй треба,
+  а вільне місце віддає переписці. Довгий вміст росте до всієї вільної висоти й скролиться,
+  але внизу завжди лишається смужка чату (мінімум 104px) і поле вводу. Дотик до смужки чи
+  поля згортає аккордеон.
+*/
+.inbox-orders[data-open] {
+  display: flex;
+  flex: 0 1 auto;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.inbox-orders[data-open] .inbox-orders-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.inbox-main:has(.inbox-orders[data-open]) > .inbox-thread {
+  flex: 1 1 104px;
+  min-height: 104px;
+}
+
+/* Кілька замовлень з однією людиною: кожне окремою білою карткою, між ними видно проміжок. */
+.inbox-orders-body .deal {
+  padding: 12px;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(16 45 55 / 8%);
+}
+
+.inbox-orders-body .grid {
+  gap: 10px;
+}
+
+/* Розкритий аккордеон щільно прилягає до смужки чату, без зайвого повітря між ними. */
+.inbox-orders[data-open] {
+  margin-bottom: 0;
+}
+
+.inbox-main:has(.inbox-orders[data-open]) > .inbox-thread {
+  margin-top: 0;
+  padding-top: 6px;
+}
+
+/* Індикатор завантаження переписки. */
+.inbox-loading {
+  display: grid;
+  margin: auto;
+  place-items: center;
+  color: var(--ink-muted);
+}
+
+/* Фото з чату: кнопка-прев'ю й повноекранний перегляд з крестиком. */
+.dm-photo {
+  display: block;
+  padding: 0;
+  cursor: zoom-in;
+}
+
+.photo-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: rgb(5 14 18 / 88%);
+  animation: photo-viewer-in 180ms ease-out;
+}
+
+.photo-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+.photo-viewer-close {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 16%);
+  color: #ffffff;
+  transition: background-color 150ms;
+}
+
+.photo-viewer-close:hover {
+  background: rgb(255 255 255 / 28%);
+}
+
+@keyframes photo-viewer-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ───────── Адмінка спорів (/admin) ───────── */
+
+.adm-page {
+  min-height: 100dvh;
+  background: #eef1f1;
+  color: var(--ink);
+}
+
+.adm-bar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+  border-bottom: 1px solid rgb(66 116 132 / 30%);
+  background: rgb(238 241 241 / 92%);
+  backdrop-filter: blur(8px);
+}
+
+.adm-brand {
+  flex: none;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.adm-brand span {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.adm-bar-side {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+}
+
+.adm-who {
+  overflow: hidden;
+  max-width: 34vw;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+.adm-bar-link {
+  flex: none;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.adm-main {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 20px 16px max(56px, env(safe-area-inset-bottom));
+}
+
+.adm-title {
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.adm-head {
+  display: grid;
+  gap: 10px;
+}
+
+.adm-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-chips .deal-chip,
+.adm-item-foot .deal-chip {
+  font-size: 12px;
+}
+
+.deal-chip[data-tone="late"] {
+  background: #f6dcd4;
+  color: #8f3a22;
+}
+
+.adm-num {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+
+.adm-jump {
+  width: fit-content;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.adm-tabs {
+  display: flex;
+  width: fit-content;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 14px;
+  background: rgb(66 116 132 / 12%);
+}
+
+.adm-tabs a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.adm-tabs a[data-active] {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgb(48 68 64 / 14%);
+}
+
+.adm-tabs b {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-muted);
+}
+
+.adm-empty {
+  padding: 28px 18px;
+  border-radius: 18px;
+  border: 1px dashed rgb(66 116 132 / 50%);
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.adm-list {
+  display: grid;
+  gap: 10px;
+}
+
+.adm-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgb(66 116 132 / 40%);
+  background: #fff;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.adm-item:hover {
+  border-color: #427484;
+  box-shadow: 0 6px 18px -10px rgb(48 68 64 / 30%);
+}
+
+.adm-item:focus-visible,
+.adm-jump:focus-visible,
+.adm-chat-scroll:focus-visible {
+  outline: 2px solid #427484;
+  outline-offset: 2px;
+}
+
+.adm-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.adm-item-title {
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.adm-item-sum {
+  flex: none;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-item-meta {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.adm-item-meta .adm-num {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+
+.adm-item-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.adm-item-when {
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+/* Картка спору: на телефоні одна колонка в порядку читання, на широкому екрані переписка ліворуч. */
+.adm-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "deal" "parties" "chat" "decision" "log";
+}
+
+@media (min-width: 960px) {
+  .adm-grid {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-areas:
+      "chat deal"
+      "chat decision"
+      "chat parties"
+      "chat log";
+    grid-template-rows: auto auto auto 1fr;
+    align-items: start;
+  }
+
+  .adm-chat {
+    position: sticky;
+    top: 70px;
+    max-height: calc(100dvh - 90px);
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.adm-card {
+  min-width: 0;
+  scroll-margin-top: 64px;
+  padding: 16px;
+  border-radius: 20px;
+  border: 1px solid rgb(66 116 132 / 40%);
+  background: #fff;
+}
+
+.adm-h2 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.adm-muted {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.adm-terms {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f3f6f6;
+}
+
+.adm-terms-title {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.adm-terms-text {
+  font-size: 13.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.adm-stages {
+  display: grid;
+  gap: 8px;
+}
+
+.adm-stage {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgb(66 116 132 / 28%);
+}
+
+.adm-stage[data-state="disputed"] {
+  border-color: #d89a82;
+  background: #fdf6f2;
+}
+
+.adm-stage-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.adm-stage-title {
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.adm-stage-sum {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.adm-stage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.adm-stage-times {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.adm-stage-times:empty {
+  display: none;
+}
+
+.adm-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.adm-facts dt,
+.adm-party-facts dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.adm-facts dd,
+.adm-party-facts dd {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.adm-parties {
+  display: grid;
+  gap: 12px;
+}
+
+.adm-party {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f3f6f6;
+}
+
+.adm-party-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adm-avatar {
+  display: grid;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--hover-blue);
+  object-fit: cover;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ocean);
+}
+
+.adm-party-role {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.adm-party-name {
+  font-size: 16px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.adm-party-facts {
+  display: grid;
+  gap: 6px;
+}
+
+.adm-party-facts > div {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.adm-party-facts dd {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.adm-party-bio {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.adm-chat-scroll {
+  min-height: 0;
+  border-radius: 14px;
+}
+
+@media (min-width: 960px) {
+  .adm-chat-scroll {
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column-reverse;
+    overscroll-behavior: contain;
+  }
+}
+
+.adm-msgs {
+  display: grid;
+  gap: 10px;
+}
+
+.adm-msg {
+  display: grid;
+  gap: 4px;
+  width: min(100%, 520px);
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #f3f6f6;
+}
+
+.adm-msg[data-from="performer"] {
+  justify-self: end;
+  background: #e4eef0;
+}
+
+.adm-msg-who {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.adm-msg-who time,
+.adm-sys time {
+  font-weight: 400;
+}
+
+.adm-msg-text {
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.adm-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+}
+
+.adm-photos img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #dfe6e6;
+}
+
+.adm-sys {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgb(66 116 132 / 10%);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.adm-sys[data-this] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.adm-log {
+  display: grid;
+  gap: 12px;
+}
+
+.adm-log li {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgb(66 116 132 / 25%);
+}
+
+.adm-log li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.adm-log-head {
+  font-size: 13px;
+}
+
+.adm-log-text {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* RadioGroup (components/ui/radio-group.tsx) */
+.ui-radio-group {
+  display: grid;
+  gap: 8px;
+}
+
+.ui-radio-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #a7bcc0;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 150ms, background-color 150ms, box-shadow 150ms;
+}
+
+.ui-radio-card:hover {
+  background: #f7fafa;
+}
+
+.ui-radio-card:has([data-state="checked"]) {
+  border-color: #427484;
+  background: #f1f7f8;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 12%);
+}
+
+.ui-radio-card:has(:focus-visible) {
+  outline: 2px solid #427484;
+  outline-offset: 2px;
+}
+
+.ui-radio-item {
+  position: relative;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 999px;
+  border: 1.5px solid #6c8a93;
+  background: #fff;
+}
+
+.ui-radio-dot {
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: var(--brand-solid);
+}
+
+.ui-radio-title {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.ui-radio-hint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+/* AlertDialog (components/ui/alert-dialog.tsx) */
+.ui-alert-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgb(3 9 13 / 45%);
+  animation: ui-alert-fade 160ms ease-out;
+}
+
+.ui-alert {
+  position: fixed;
+  z-index: 101;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  gap: 10px;
+  width: min(420px, calc(100vw - 32px));
+  padding: 20px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 24px 60px -12px rgb(3 9 13 / 45%);
+  transform: translate(-50%, -50%);
+  animation: ui-alert-in 200ms var(--ease-out-quint);
+}
+
+@media (max-width: 560px) {
+  .ui-alert {
+    top: auto;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    animation-name: ui-alert-up;
+  }
+}
+
+.ui-alert-title {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ui-alert-text {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-muted);
+}
+
+.ui-alert-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+@keyframes ui-alert-fade {
+  from { opacity: 0; }
+}
+
+@keyframes ui-alert-in {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); }
+}
+
+@keyframes ui-alert-up {
+  from { opacity: 0; transform: translate(-50%, 16px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-alert,
+  .ui-alert-overlay {
+    animation: none;
+  }
 }

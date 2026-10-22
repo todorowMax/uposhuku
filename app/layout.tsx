@@ -24,6 +24,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: "#03090d",
   viewportFit: "cover",
+  // Клавіатура зменшує область сторінки, а не лише перекриває її: нижні панелі лишаються над нею.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

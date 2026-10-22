@@ -19,6 +19,7 @@ import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
 type Step = "email" | "code" | "publishing" | "failed";
 
@@ -54,6 +55,13 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
   const startedRef = useRef(false);
 
   useEffect(() => setMounted(true), []);
+
+  // З чого почали: запит (publish), кнопка «Увійти» (login) чи «Я виконавець» (performer).
+  useEffect(() => {
+    track(EVENTS.authStarted, { from: mode === "publish" ? "request" : mode === "performer" ? "performer" : "account" });
+    // Один раз за відкриття панелі.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const close = () => {
     if (step !== "publishing") authFlowStore.set(null);
@@ -132,8 +140,10 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
       setDigits(emptyCode(result.codeLength));
       setCooldown(RESEND_SECONDS);
       setStep("code");
+      track(EVENTS.authCodeSent);
       window.setTimeout(() => codeRef.current?.focus(), 60);
     } catch (reason) {
+      track(EVENTS.authFailed, { method: "email", reason: "send" });
       setError(reason instanceof ApiError ? reason.message : "Не вдалося надіслати код.");
     } finally {
       setBusy(false);
@@ -151,6 +161,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
         if (mode === "performer") profileEditorStore.set(true);
       }
     } catch (reason) {
+      track(EVENTS.authFailed, { method: "email", reason: "code" });
       setError(reason instanceof ApiError ? reason.message : "Не вдалося перевірити код.");
       setDigits(emptyCode(digits.length));
       codeRef.current?.focus();
@@ -209,7 +220,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
             <>
               <p className="auth-lead">
                 {mode === "publish"
-                  ? "Підтвердіть пошту або увійдіть через Google — і ми почнемо шукати виконавця для вашого проєкту."
+                  ? "Підтвердіть пошту або увійдіть через Google, і ми почнемо шукати виконавця для вашого проєкту."
                   : mode === "performer"
                     ? "Створіть профіль, і замовники знайдуть вас на карті. Пошта й код з листа, без пароля."
                     : "Пошта й код з листа, без пароля. Нова адреса створює новий акаунт."}

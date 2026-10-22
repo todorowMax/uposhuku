@@ -19,6 +19,6 @@ export async function POST(request: Request) {
     const result: EmailStartResult = { sent: true, mock: Boolean(dev), codeLength: dev ? dev.code.length : 6, ...(dev && !dev.private ? { hint: dev.code } : {}) };
     return Response.json(result);
   } catch (error) {
-    return failure(error);
+    return failure(error, request);
   }
 }

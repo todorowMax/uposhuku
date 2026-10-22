@@ -33,6 +33,6 @@ export async function GET(request: Request) {
     response.cookies.set("vm_google_state", JSON.stringify({ state, next }), { httpOnly: true, sameSite: "lax", secure: isProduction(), path: "/api/auth/google", maxAge: 600 });
     return response;
   } catch (error) {
-    return failure(error);
+    return failure(error, request);
   }
 }

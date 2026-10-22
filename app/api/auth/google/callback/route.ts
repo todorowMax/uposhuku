@@ -7,6 +7,8 @@ import { loginWithGoogle } from "@/lib/server/auth";
 import { readVar } from "@/lib/server/env";
 import { failure } from "@/lib/server/route";
 import { googleConfigured, safeNext } from "@/lib/server/google";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -41,11 +43,12 @@ export async function GET(request: Request) {
     if (!infoResponse.ok || !info.sub || !info.email || !info.email_verified) {
       return problem(400, "Вхід через Google не вдався", "Google не підтвердив вашу пошту.");
     }
-    await loginWithGoogle({ googleId: info.sub, email: info.email, name: info.name ?? null, picture: info.picture ?? null });
+    const user = await loginWithGoogle({ googleId: info.sub, email: info.email, name: info.name ?? null, picture: info.picture ?? null });
+    serverEvent(EVENTS.authCompleted, { method: "google" }, (user as { id?: string } | undefined)?.id ?? null, "/api/auth/google/callback");
     const response = NextResponse.redirect(new URL(safeNext(saved.next), url.origin));
     response.cookies.delete({ name: "vm_google_state", path: "/api/auth/google" });
     return response;
   } catch (error) {
-    return failure(error);
+    return failure(error, request);
   }
 }
