@@ -22,6 +22,48 @@
       "when": 1791217838273,
       "tag": "0002_tan_fenris",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791584268907,
+      "tag": "0003_wise_glorian",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791625396353,
+      "tag": "0004_kind_quasimodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791625718199,
+      "tag": "0005_fixed_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1792326149546,
+      "tag": "0006_magenta_thing",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1792326416533,
+      "tag": "0007_tearful_omega_sentinel",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792407587656,
+      "tag": "0008_organic_enchantress",
+      "breakpoints": true
     }
   ]
 }

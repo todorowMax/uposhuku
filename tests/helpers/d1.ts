@@ -8,18 +8,27 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPlatformProxy } from "wrangler";
 
-export const useTestD1 = async () => {
-  const proxy = await getPlatformProxy<{ DB: D1Database; UPLOADS: R2Bucket }>({ environment: "development", persist: false });
-  const db = proxy.env.DB;
-  const dir = join(process.cwd(), "db/migrations");
+const applyMigrations = async (db: D1Database, dir: string) => {
   for (const file of readdirSync(dir).filter((name) => name.endsWith(".sql")).sort()) {
+    // drizzle розділяє запити маркером, власні міграції kit мають по одному-два запити, розділених «;».
     for (const statement of readFileSync(join(dir, file), "utf8").split("--> statement-breakpoint")) {
-      if (statement.trim()) await db.prepare(statement).run();
+      for (const part of statement.split(/;\s*\n/)) {
+        if (part.trim()) await db.prepare(part).run();
+      }
     }
   }
+};
+
+export const useTestD1 = async () => {
+  const proxy = await getPlatformProxy<{ DB: D1Database; UPLOADS: R2Bucket; TELEMETRY_DB: D1Database }>({ environment: "development", persist: false });
+  const db = proxy.env.DB;
+  await applyMigrations(db, join(process.cwd(), "db/migrations"));
+  // Телеметрія живе в окремій базі зі своїми міграціями (kit/telemetry).
+  await applyMigrations(proxy.env.TELEMETRY_DB, join(process.cwd(), "kit/telemetry/migrations"));
   (globalThis as { __TEST_D1?: D1Database }).__TEST_D1 = db;
+  (globalThis as { __TEST_TELEMETRY_D1?: D1Database }).__TEST_TELEMETRY_D1 = proxy.env.TELEMETRY_DB;
   (globalThis as { __TEST_R2?: R2Bucket }).__TEST_R2 = proxy.env.UPLOADS;
-  return { db, close: () => proxy.dispose() };
+  return { db, telemetry: proxy.env.TELEMETRY_DB, close: () => proxy.dispose() };
 };
 
 /** Сторонній користувач для зовнішніх ключів: id → рядок у users. */

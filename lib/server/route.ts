@@ -1,11 +1,13 @@
 // lib/server/route.ts
 import { problem } from "@/lib/api/problem";
+import { logServerError } from "@/lib/telemetry/log";
 import { AuthError } from "./auth";
 
-/** Помилки входу відповідаємо як problem+json; усе інше — 500 без подробиць назовні. */
-export const failure = (error: unknown) => {
+/** Помилки входу відповідаємо як problem+json; усе інше — 500 без подробиць назовні й із записом у журнал. */
+export const failure = (error: unknown, request?: Request) => {
   if (error instanceof AuthError) return problem(error.status, error.title, error.detail, error.type);
   console.error(error);
+  logServerError(error, request);
   return problem(500, "Щось пішло не так", "Спробуйте ще раз трохи згодом.");
 };
 

@@ -37,6 +37,12 @@ interface CloudflareEnv {
   CHANNEL_DELAY_MIN?: string;
   /** Токен для внутрішніх викликів cron → /api/internal/tick. Секрет. */
   INTERNAL_TOKEN?: string;
+  /** Пошти адміністраторів через кому: єдиний доступ до /admin і /api/admin. Без значення адмінки немає. */
+  ADMIN_EMAILS?: string;
+  /** Хости, з яких доступна адмінка, через кому (напр. прихований піддомен). Задано: на решті хостів 404. Не задано: на проді адмінки немає. Не в git, секретом. */
+  ADMIN_HOSTS?: string;
+  /** "1": пускати в адмінку й після тестового входу (код 000000). Лише локально, у .dev.vars. */
+  ADMIN_DEV_LOGIN?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
 }
