@@ -28,6 +28,8 @@ export default function SafeDealOfferPage() {
           ["Оператор", OPERATOR.entity],
           ["РНОКПП", OPERATOR.taxId],
           ["Адреса", OPERATOR.address],
+          ["Розрахунковий рахунок (IBAN)", OPERATOR.iban],
+          ["Банк", "АТ «УНІВЕРСАЛ БАНК» (monobank)"],
           ["Пошта", CONTACT_EMAIL],
           ["Телефон", CONTACT_PHONE],
         ]}

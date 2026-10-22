@@ -5,7 +5,7 @@
 // ФОП, тож тут вони мають збігатися з документами, а в тексті сторінок їх
 // не дублюємо: підставляємо через {плейсхолдери}.
 
-import { HOLD_DAYS, MAX_DEAL, MAX_STAGES, MIN_DEAL, SAFE_FEE } from "@/lib/deals/types";
+import { HOLD_DAYS, MAX_DEAL, MAX_STAGE_AMOUNT, MAX_STAGES, MIN_DEAL, REVIEW_DAYS, SAFE_FEE } from "@/lib/deals/types";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
 export const SERVICE_NAME = "Findlyfy";
@@ -16,6 +16,8 @@ export const OPERATOR = {
   fullName: "Тодоров Максим Олександрович",
   taxId: "3593211091",
   address: "Україна, Київська обл., Броварський р-н, с. Погреби, вул. Молодіжна, буд. 6А",
+  /** Гривневий IBAN розрахункового рахунку ФОП у monobank, на який банк зараховує оплати. */
+  iban: "UA473220010000026007320087756",
 } as const;
 
 /**
@@ -27,8 +29,6 @@ export const CONTACT_EMAIL = "hello@findlyfy.com";
 /** Телефон Оператора для реквізитів оферти безпечної угоди (вимога банку до договору). */
 export const CONTACT_PHONE = "+34 656 940 473";
 
-/** Скільки робочих днів замовник перевіряє здану роботу, інакше етап вважається прийнятим. */
-export const REVIEW_DAYS = 3;
 /** Скільки робочих днів сторони домовляються самі, перш ніж відкрити спір. */
 export const DISPUTE_TALK_DAYS = 2;
 
@@ -64,6 +64,7 @@ export const LEGAL_VALUES: Record<string, string> = {
   fee: String(Math.round(SAFE_FEE * 100)),
   minDeal: money(MIN_DEAL),
   maxDeal: money(MAX_DEAL),
+  maxStage: money(MAX_STAGE_AMOUNT),
   reviewDays: String(REVIEW_DAYS),
   disputeTalkDays: String(DISPUTE_TALK_DAYS),
 };
