@@ -10,10 +10,19 @@ export function useButtonIconAnimation(controls: IconControls, iconRef: RefObjec
     const button = iconRef.current?.closest("button");
     if (!button) return;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const start = () => {
-      if (!reducedMotion.matches) void controls.start("animate");
+    // Кнопку можуть прибрати, поки вона в фокусі: браузер шле focusout уже після
+    // розмонтування, і framer-motion кидає помилку. Анімація іконки того не варта.
+    const run = (definition: string) => {
+      try {
+        void controls.start(definition);
+      } catch {
+        // Іконки вже немає.
+      }
     };
-    const stop = () => void controls.start("normal");
+    const start = () => {
+      if (!reducedMotion.matches) run("animate");
+    };
+    const stop = () => run("normal");
     button.addEventListener("pointerenter", start);
     button.addEventListener("pointerleave", stop);
     button.addEventListener("focusin", start);

@@ -4,10 +4,13 @@
 // супутників, показати назви. Клієнт імпортує модуль разом із полем запиту,
 // щоб HMR не залишав посилання на застарілий окремий чанк словника.
 
-import { TAGS_BY_ID } from "./dictionary";
+import { TAGS, TAGS_BY_ID, TAG_GROUPS } from "./dictionary";
+
+export { TAGS, TAG_GROUPS };
 
 export { detectTagMentions, type TagMention } from "./detect";
 export { suggestTags, type TagSuggestion } from "./suggest";
+export { searchTags, type TagHit } from "./search";
 
 export const tagLabel = (id: string): string => TAGS_BY_ID.get(id)?.label ?? id;
 export { matchProfiles } from "./match";

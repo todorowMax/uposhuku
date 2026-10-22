@@ -9,6 +9,12 @@ import { CITIES } from "@/lib/map/cities";
 import { withTags } from "@/lib/requests/derive-tags";
 import { pushGlobal } from "@/lib/server/realtime";
 import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type RequestDraft } from "@/lib/requests/types";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
+import { recordUnknownTerms } from "@/lib/server/tag-term-repo";
+import { telemetryConfig } from "@/lib/telemetry/server";
+import { notifyLater } from "@/lib/server/notify";
+import { notifyMatchingPerformers } from "@/lib/server/notify-matching";
 
 const MAX_TAGS = 30;
 const MAX_FILES = 10;
@@ -27,6 +33,8 @@ const parseDraft = (body: Record<string, unknown> | null): RequestDraft | string
     budget,
     deadline: isDeadline(body?.deadline) ? body.deadline : null,
     cityId,
+    // Типово показуємо; людина може вимкнути галочкою у формі.
+    channelOptIn: body?.channelOptIn !== false,
     tags: withTags(
       text,
       sentTags
@@ -47,6 +55,12 @@ export async function POST(request: Request) {
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const created = await createRequest(user.id, draft);
+  // Слова, яких словник не знає, лічимо без зв'язку з людиною: звідти росте словник. Після відповіді, помилка не страшна.
+  const counting = recordUnknownTerms(draft.text);
+  if (telemetryConfig.waitUntil) telemetryConfig.waitUntil(counting);
+  else void counting;
+  notifyMatchingPerformers(created, user.id);
+  serverEvent(EVENTS.requestPublished, { request_id: created.id, tags: created.tags.length, has_budget: Boolean(created.budget), remote: !created.cityId }, user.id, "/api/requests");
   pushGlobal({ t: "feed" });
   return Response.json({ request: created }, { status: 201 });
 }

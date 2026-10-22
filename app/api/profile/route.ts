@@ -9,6 +9,8 @@ import { deleteProfile, getProfile, saveProfile } from "@/lib/server/profile-rep
 import { pushGlobal } from "@/lib/server/realtime";
 import { deleteByUrl, keyFromUrl, putPhotoFromDataUrl } from "@/lib/server/uploads";
 import { parseProfile } from "@/lib/profile/validate";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
 
 export async function GET() {
   const user = await getSessionUser();
@@ -32,6 +34,9 @@ export async function PUT(request: Request) {
     return problem(400, "Профіль не збережено", "Фото не знайдено. Завантажте його ще раз.");
   }
   const saved = await saveProfile(user.id, profile);
+  serverEvent(EVENTS.profileSaved, { published: saved.published, tags: saved.tags.length, manual_tags: saved.manualTags.length, works: saved.works.length, has_location: Boolean(saved.location) }, user.id, "/api/profile");
+  // Уперше опублікований: до цього профіль був чернеткою чи його не було.
+  if (saved.published && !previous?.published) serverEvent(EVENTS.profilePublished, undefined, user.id, "/api/profile");
   // Попереднє фото більше не потрібне: прибираємо з R2, щоб не копити сміття.
   if (previous?.photo && previous.photo !== saved.photo) await deleteByUrl(previous.photo, user.id);
   pushGlobal({ t: "map" });

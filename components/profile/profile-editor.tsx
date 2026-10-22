@@ -7,6 +7,7 @@ import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { LocationPicker } from "@/components/profile/location-picker";
 import { PhotoField } from "@/components/profile/photo-field";
 import { TagChips } from "@/components/profile/tag-chips";
+import { TagPicker } from "@/components/tags/tag-picker";
 import { TaggedField } from "@/components/profile/tagged-field";
 import { WorkEditor } from "@/components/profile/work-editor";
 import { ApiError, sessionStore } from "@/lib/auth/client";
@@ -17,14 +18,16 @@ import { loadPlacement, placementOpenStore, placementStore } from "@/lib/placeme
 import { MIN_PAYMENT } from "@/lib/placement/pricing";
 import { profileEditorStore, profileStore, saveMyProfile } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
-import { PROFILE_LIMITS, emptyProfile, missingForPublish, profileTags, provenTags, type Profile, type ProfileWork } from "@/lib/profile/types";
+import { PROFILE_LIMITS, emptyProfile, emptyWork, missingForPublish, profileTags, provenTags, type Profile, type ProfileWork } from "@/lib/profile/types";
 import { useTagging } from "@/lib/tags/use-tagging";
 import { useStore } from "@/lib/store";
+import { EVENTS, track } from "@/lib/telemetry/track";
+import { useProposals } from "@/lib/tags/proposals-client";
 
 const CITY_OPTIONS = [...CITIES].sort((a, b) => a.name.localeCompare(b.name, "uk"));
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-const newWork = (): ProfileWork => ({ id: `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title: "", description: "", url: "", tags: [] });
+const newWork = (): ProfileWork => emptyWork(`w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`);
 
 /** Те, що людина змінює: без часу збереження, щоб порівнювати «було — стало». */
 const snapshot = (profile: Profile) => JSON.stringify({ ...profile, updatedAt: "" });
@@ -46,6 +49,9 @@ export function ProfileEditor() {
 
   useEffect(() => {
     void loadPlacement();
+    track(EVENTS.profileEditorOpened, { has_profile: Boolean(stored) });
+    // Один раз за відкриття редактора.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [name, setName] = useState(stored?.name ?? userName);
@@ -65,7 +71,8 @@ export function ProfileEditor() {
   const initialSnapshot = useRef<string | null>(null);
 
   // Спеціальність і «Про себе» — один текст для тегів; підкреслюємо лише в «Про себе».
-  const tagging = useTagging(`${specialty}\n${bio}`, stored?.tags ?? []);
+  const proposals = useProposals("profile");
+  const tagging = useTagging(`${specialty}\n${bio}`, { tags: stored?.tags, manual: stored?.manualTags, hidden: stored?.hiddenTags }, { maxTags: PROFILE_LIMITS.tags, maxManual: PROFILE_LIMITS.manualTags, context: "profile" });
   const bioOffset = specialty.length + 1;
   const bioMentions = tagging.mentions
     .filter((mention) => mention.start >= bioOffset)
@@ -80,11 +87,13 @@ export function ProfileEditor() {
       specialty,
       bio,
       tags: tagging.tags,
+      manualTags: tagging.manual,
+      hiddenTags: tagging.hidden,
       works,
       photo,
       published: stored?.published ?? false,
     }),
-    [name, cityId, location, specialty, bio, tagging.tags, works, photo, stored?.published]
+    [name, cityId, location, specialty, bio, tagging.tags, tagging.manual, tagging.hidden, works, photo, stored?.published]
   );
   const proven = useMemo(() => provenTags(draft), [draft]);
   const allTags = useMemo(() => profileTags(draft), [draft]);
@@ -123,7 +132,8 @@ export function ProfileEditor() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") requestClose();
+      // Escape у випадайці вибору тегу закриває лише її (подію позначено як оброблену).
+      if (event.key === "Escape" && !event.defaultPrevented) requestClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -309,8 +319,25 @@ export function ProfileEditor() {
                 labelOf={tagging.labelOf}
                 onRemove={tagging.remove}
                 onAdd={tagging.add}
-                emptyHint="Розкажіть про себе вище, і теги з'являться тут самі. Нічого не знайшлося? Опишіть конкретніше: що саме робите."
-              />
+                emptyHint="Розкажіть про себе вище, і теги з'являться тут самі. Або додайте їх вручну."
+                pending={proposals.items}
+                onRemovePending={(id) => {
+                  const item = proposals.items.find((proposal) => proposal.id === id);
+                  if (item) void proposals.remove(item);
+                }}
+              >
+                <TagPicker
+                  context="profile"
+                  selected={tagging.tags}
+                  auto={tagging.auto}
+                  suggestions={tagging.suggestions}
+                  labelOf={tagging.labelOf}
+                  onToggle={tagging.toggle}
+                  onPropose={proposals.propose}
+                  limitReached={tagging.manualFull}
+                  limitHint={`Вручну можна додати до ${PROFILE_LIMITS.manualTags} тегів. Теги з тексту в цей ліміт не входять.`}
+                />
+              </TagChips>
               <p className="pe-hint">Галочка стоїть біля тегів, які підтверджує ваша робота. З такими тегами вас покажуть вище.</p>
             </section>
 

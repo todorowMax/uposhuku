@@ -77,7 +77,9 @@ export const patchMapRequest = (id: string, change: (item: FeedItem) => FeedItem
 };
 
 /** Які запити лишити під вибраний фільтр. */
-export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter): MapRequest[] => {
+export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter, tags: readonly string[] = []): MapRequest[] => {
+  // Теги з пошуку звужують запити за точним збігом: у запитів теги зі словника, словник тут не вантажимо.
+  if (tags.length) items = items.filter((item) => item.tags.some((tag) => tags.includes(tag.id)));
   if (filter === "matched") return items.filter((item) => item.matchedTags > 0 && !item.own);
   if (filter === "urgent") return items.filter((item) => item.deadline === "Терміново, до 3 днів" || item.deadline === "Протягом тижня");
   if (filter === "budget") return items.filter((item) => item.budget);

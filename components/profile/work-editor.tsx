@@ -3,9 +3,11 @@
 import { useEffect } from "react";
 import { Trash2 } from "@/components/icons";
 import { TagChips } from "@/components/profile/tag-chips";
+import { TagPicker } from "@/components/tags/tag-picker";
 import { TaggedField } from "@/components/profile/tagged-field";
 import { useTagging } from "@/lib/tags/use-tagging";
 import { PROFILE_LIMITS, type ProfileWork } from "@/lib/profile/types";
+import { useProposals } from "@/lib/tags/proposals-client";
 
 /**
  * Одна робота: назва, що зроблено, посилання. Теги розбираємо з назви й
@@ -26,17 +28,22 @@ export function WorkEditor({
 }) {
   // Назва й опис — один текст для тегів; підкреслюємо лише в описі.
   const titleLength = work.title.length + 1;
-  const tagging = useTagging(`${work.title}\n${work.description}`, work.tags, 6);
+  const proposals = useProposals("work", work.id);
+  const tagging = useTagging(`${work.title}\n${work.description}`, { tags: work.tags, manual: work.manualTags, hidden: work.hiddenTags }, { suggestionLimit: 6, maxTags: PROFILE_LIMITS.workTags, maxManual: PROFILE_LIMITS.workManualTags, context: "work" });
   const descriptionMentions = tagging.mentions
     .filter((mention) => mention.start >= titleLength)
     .map((mention) => ({ ...mention, start: mention.start - titleLength, end: mention.end - titleLength }));
 
-  const joined = tagging.tags.join(",");
+  // Теги, ручні й приховані вертаємо в роботу одним ключем, щоб не гнатися за власним оновленням.
+  const signature = JSON.stringify([tagging.tags, tagging.manual, tagging.hidden]);
   useEffect(() => {
-    if (joined !== work.tags.join(",")) onChange({ tags: joined ? joined.split(",") : [] });
+    if (!tagging.engine) return;
+    if (signature !== JSON.stringify([work.tags, work.manualTags, work.hiddenTags])) {
+      onChange({ tags: tagging.tags, manualTags: tagging.manual, hiddenTags: tagging.hidden });
+    }
     // work міняється разом із тегами, інакше ефект би гнався за власним оновленням.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [joined]);
+  }, [signature, tagging.engine]);
 
   const id = `work-${work.id}`;
   return (
@@ -100,8 +107,26 @@ export function WorkEditor({
           labelOf={tagging.labelOf}
           onRemove={tagging.remove}
           onAdd={tagging.add}
-          emptyHint="Опишіть, що зроблено, і ми самі знайдемо теги цієї роботи."
-        />
+          emptyHint="Опишіть, що зроблено, і ми самі знайдемо теги цієї роботи. Або додайте їх вручну."
+          pending={proposals.items}
+          onRemovePending={(id) => {
+            const item = proposals.items.find((proposal) => proposal.id === id);
+            if (item) void proposals.remove(item);
+          }}
+        >
+          <TagPicker
+            context="work"
+            title="Теги роботи"
+            selected={tagging.tags}
+            auto={tagging.auto}
+            suggestions={tagging.suggestions}
+            labelOf={tagging.labelOf}
+            onToggle={tagging.toggle}
+            onPropose={proposals.propose}
+            limitReached={tagging.manualFull}
+            limitHint={`Вручну можна додати до ${PROFILE_LIMITS.workManualTags} тегів роботи. Теги з тексту в цей ліміт не входять.`}
+          />
+        </TagChips>
       </div>
     </fieldset>
   );

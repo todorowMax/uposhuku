@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Plus, X } from "@/components/icons";
 
 interface TagRowProps {
@@ -11,6 +11,8 @@ interface TagRowProps {
   labelOf: (id: string) => string;
   onRemove: (id: string) => void;
   onAdd: (id: string) => void;
+  /** Стоїть після рядка завжди, навіть коли чипи не влізли: «+ Додати тег». */
+  action?: ReactNode;
 }
 
 const GAP = 6;
@@ -23,7 +25,7 @@ const GAP = 6;
  * Скільки чипів влазить, міряємо на невидимій копії рядка: ширина чипа
  * залежить від назви, і вгадувати її з кількості літер ненадійно.
  */
-export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagRowProps) {
+export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd, action }: TagRowProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -81,7 +83,7 @@ export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagR
     };
   }, [open]);
 
-  if (items.length === 0) return null;
+  if (items.length === 0) return action ? <div className="tag-row-line">{action}</div> : null;
   const hidden = items.length - fit;
 
   const chip = (item: (typeof items)[number], measuring = false) =>
@@ -116,7 +118,8 @@ export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagR
     );
 
   return (
-    <div className="relative">
+    <div className="tag-row-line">
+    <div className="relative min-w-0 flex-1">
       <div ref={rowRef} className="tag-row" aria-label="Теги запиту">
         {items.slice(0, fit).map((item) => chip(item))}
         {hidden > 0 && (
@@ -153,6 +156,8 @@ export function TagRow({ selected, suggestions, labelOf, onRemove, onAdd }: TagR
           )}
         </div>
       )}
+    </div>
+    {action}
     </div>
   );
 }

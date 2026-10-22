@@ -13,14 +13,22 @@ import { buildMapStyle } from "@/lib/maplibre/style";
 type Point = { lat: number; lng: number };
 
 const UKRAINE_VIEW = { center: [31.2, 48.9] as [number, number], zoom: 5.2 };
-const BOUNDS: [[number, number], [number, number]] = [[21.5, 43.8], [41.2, 53]];
+const BOUNDS: [[number, number], [number, number]] = [
+  [21.5, 43.8],
+  [41.2, 53],
+];
 
 const pickStyle = () => {
   const style = buildMapStyle(window.location.origin);
-  return { ...style, projection: { type: "mercator" as const }, sky: undefined,
+  return {
+    ...style,
+    projection: { type: "mercator" as const },
+    sky: undefined,
     layers: [
       // Назви вулиць тут потрібні раніше, ніж на головній.
-      ...style.layers.map((layer) => (layer.id === "street-names" ? { ...layer, minzoom: 13 } : layer)),
+      ...style.layers.map((layer) =>
+        layer.id === "street-names" ? { ...layer, minzoom: 13 } : layer,
+      ),
       ...PLACE_LABEL_LAYERS,
     ],
   };
@@ -84,8 +92,13 @@ export function LocationPicker({
     mapRef.current = map;
     map.dragRotate.disable();
     map.touchZoomRotate.disableRotation();
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("click", (event) => setDraft({ lat: event.lngLat.lat, lng: event.lngLat.lng }));
+    map.addControl(
+      new maplibregl.NavigationControl({ showCompass: false }),
+      "top-right",
+    );
+    map.on("click", (event) =>
+      setDraft({ lat: event.lngLat.lat, lng: event.lngLat.lng }),
+    );
     return () => {
       markerRef.current?.remove();
       markerRef.current = null;
@@ -106,7 +119,13 @@ export function LocationPicker({
       return;
     }
     if (!markerRef.current) {
-      const pin = new maplibregl.Marker({ element: marker(), draggable: true, anchor: "bottom" }).setLngLat([draft.lng, draft.lat]).addTo(map);
+      const pin = new maplibregl.Marker({
+        element: marker(),
+        draggable: true,
+        anchor: "bottom",
+      })
+        .setLngLat([draft.lng, draft.lat])
+        .addTo(map);
       pin.on("dragend", () => {
         const { lat, lng } = pin.getLngLat();
         setDraft({ lat, lng });
@@ -126,44 +145,78 @@ export function LocationPicker({
   }, [onClose]);
 
   const near = draft ? nearestCity(draft as GeoPoint) : null;
-  const changed = (draft?.lat ?? null) !== (initial?.lat ?? null) || (draft?.lng ?? null) !== (initial?.lng ?? null);
+  const changed =
+    (draft?.lat ?? null) !== (initial?.lat ?? null) ||
+    (draft?.lng ?? null) !== (initial?.lng ?? null);
   const removing = !draft && Boolean(initial);
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Точка на карті" className="loc-overlay">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Точка на карті"
+      className="loc-overlay"
+    >
       <header className="pe-header">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[18px] font-semibold text-ink">Де вас показувати</h2>
-          <p className="mt-0.5 text-[12px] text-ink-muted">Наблизьте карту й торкніться місця. Точку можна перетягнути.</p>
+          <h2 className="text-[18px] font-semibold text-ink">
+            Де вас показувати
+          </h2>
+          <p className="mt-0.5 text-[12px] text-ink-muted">
+            Наблизьте карту й торкніться місця. Точку можна перетягнути.
+          </p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Закрити без збереження" className="auth-icon-button shrink-0">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Закрити без збереження"
+          className="auth-icon-button shrink-0"
+        >
           <X className="size-5" />
         </button>
       </header>
 
       <div className="loc-map-wrap">
         <div ref={containerRef} className="loc-map" />
-        {failed && <p className="loc-fail">Карта не завантажилась. Закрийте вікно й оберіть місто зі списку.</p>}
-        {!draft && !failed && <p className="loc-hint">Торкніться карти, щоб поставити точку</p>}
+        {failed && (
+          <p className="loc-fail">
+            Карта не завантажилась. Закрийте вікно й оберіть місто зі списку.
+          </p>
+        )}
+        {!draft && !failed && (
+          <p className="loc-hint">Торкніться карти, щоб поставити точку</p>
+        )}
       </div>
 
       <footer className="loc-footer">
-        <p className="loc-note">
+        <div className="loc-note">
           <MapPin className="size-4 shrink-0" />
           {draft && near ? (
             <span>
-              {draft.lat.toFixed(3)}, {draft.lng.toFixed(3)} · найближче місто: {near.city.name}. Точку побачать усі, тож ставте її приблизно, а не біля дверей.
+              {draft.lat.toFixed(3)}, {draft.lng.toFixed(3)} · найближче місто:{" "}
+              {near.city.name}. Точку побачать усі, тож ставте її приблизно, а
+              не біля дверей.
             </span>
           ) : (
             <span>Без точки ми поставимо вас біля центру вашого міста.</span>
           )}
-        </p>
+        </div>
         <div className="loc-actions">
-          <button type="button" onClick={() => onConfirm(draft)} disabled={!changed} className="auth-primary">
+          <button
+            type="button"
+            onClick={() => onConfirm(draft)}
+            disabled={!changed}
+            className="auth-primary"
+          >
             <Check className="size-4" />
             {removing ? "Прибрати точку" : "Підтвердити"}
           </button>
-          <button type="button" onClick={() => setDraft(null)} disabled={!draft} className="auth-secondary">
+          <button
+            type="button"
+            onClick={() => setDraft(null)}
+            disabled={!draft}
+            className="auth-secondary"
+          >
             <Eraser className="size-4" />
             Зняти точку
           </button>

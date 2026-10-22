@@ -8,7 +8,12 @@ import { getSessionUser } from "@/lib/server/auth";
 import { canRespond, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
 import { pushGlobal, pushUser } from "@/lib/server/realtime";
-import { requestOwner } from "@/lib/server/request-repo";
+import { requestBrief, requestOwner } from "@/lib/server/request-repo";
+import { EVENTS } from "@/lib/telemetry/events";
+import { serverEvent } from "@/lib/telemetry/log";
+import { notifyLater } from "@/lib/server/notify";
+import { addSystemMessage } from "@/lib/server/chat-repo";
+import { offerNotice } from "@/lib/telegram/notices";
 
 /** Замовник бачить відгук одразу, а всі — лічильник відгуків у стрічці. */
 const notifyOffer = async (requestId: string) => {
@@ -32,7 +37,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const value = parseResponse(await readJson(request));
   if (typeof value === "string") return problem(400, "Відгук не надіслано", value);
   const saved = await saveResponse(auth.user.id, id, value);
+  serverEvent(EVENTS.responseSent, { request_id: id, has_price: value.price !== null && value.price !== undefined }, auth.user.id, "/api/feed/response");
+  serverEvent(EVENTS.offerReceived, { request_id: id }, (await requestOwner(id))?.userId ?? null, "/api/feed/response");
   await notifyOffer(id);
+  // Замовнику в Telegram, якщо він не на сайті.
+  const brief = await requestBrief(id);
+  if (brief) {
+    notifyLater(brief.userId, offerNotice({ requestId: id, requestText: brief.text, price: value.price ?? null, days: value.days }));
+    const title = brief.text.length > 40 ? `${brief.text.slice(0, 39).trimEnd()}…` : brief.text;
+    const terms = [value.price ? `${value.price} ₴` : "ціна після обговорення", `${value.days} дн.`].join(", ");
+    await addSystemMessage(brief.userId, auth.user.id, `Відгук на «${title}»: ${terms}`, id);
+  }
   return Response.json({ response: saved });
 }
 

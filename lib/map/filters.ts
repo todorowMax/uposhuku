@@ -26,6 +26,12 @@ export const toggleIn = (store: Store<readonly string[]>, id: string) => {
 /** Зняти всі вибори у фільтрі. */
 export const clearFilter = (store: Store<readonly string[]>) => store.set(NONE);
 
+/**
+ * Теги, вибрані у «Фільтрах» пошуком по словнику. Для підбору зливаються з
+ * тегами запиту в один список, тож пошук і фільтр працюють однаково.
+ */
+export const filterTags = createStore<readonly string[]>(NONE);
+
 /** Лише ті, хто онлайн зараз. */
 export const onlineFilter = createStore(false);
 

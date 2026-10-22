@@ -25,13 +25,14 @@ import { TIER_PX } from "@/lib/placement/tiers";
 import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer, PlacementTier } from "@/lib/map/types";
-import { cityFilter, groupFilter, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
+import { cityFilter, filterTags, groupFilter, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
 import { isChromium } from "@/lib/ui/glass";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore, hoveredOfferStore, offersMapStore, useActiveRequest } from "@/lib/requests/offers";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { justPublishedStore, profileEditorStore } from "@/lib/profile/client";
 import { placementOpenStore } from "@/lib/placement/client";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
@@ -545,6 +546,7 @@ export default function MapLibreScene() {
   /** Теги з поля запиту: карта лишає лише тих, хто під них підходить. */
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
   const matches = useStore(tagMatches);
+  const pickedTags = useStore(filterTags);
   const performers = usePerformers();
   const activeRequest = useActiveRequest();
   const mapOffers = useStore(offersMapStore);
@@ -713,6 +715,23 @@ export default function MapLibreScene() {
     document.addEventListener("visibilitychange", onVisibility);
 
     map.on("load", async () => {
+      // Атрибуція OSM лишається, але згорнута в позначку ⓘ: MapLibre розкриває її на всю ширину,
+      // щойно з'являються джерела з авторами, тож згортаємо один раз при першому розкритті.
+      const attribution = map.getContainer().querySelector<HTMLElement>(".maplibregl-ctrl-attrib");
+      if (attribution) {
+        const collapse = () => {
+          if (!attribution.classList.contains("maplibregl-compact-show") && !attribution.hasAttribute("open")) return false;
+          attribution.classList.remove("maplibregl-compact-show");
+          attribution.removeAttribute("open");
+          return true;
+        };
+        if (!collapse()) {
+          const observer = new MutationObserver(() => {
+            if (collapse()) observer.disconnect();
+          });
+          observer.observe(attribution, { attributes: true, attributeFilter: ["class", "open"] });
+        }
+      }
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
         traceWanted = true;
         startTrace();
@@ -935,6 +954,7 @@ export default function MapLibreScene() {
       flyToRef.current = flyTo;
 
       const expandCluster = async (feature: MapGeoJSONFeature) => {
+        track(EVENTS.groupClicked, { size: Number(feature.properties?.point_count) || 0 });
         setSelectedId(null);
         mapSelectedRequest.set(null);
         const clusterId = feature.properties?.cluster_id as number;
@@ -942,6 +962,8 @@ export default function MapLibreScene() {
         flyTo(map, (feature.geometry as Point).coordinates as [number, number], zoom + 0.3, 620);
       };
       const selectPerson = (feature: MapGeoJSONFeature | undefined) => {
+        const tier = Number(feature?.properties?.tier);
+        track(EVENTS.markerClicked, Number.isFinite(tier) && tier > 0 ? { tier } : {});
         mapSelectedRequest.set(null);
         setSelectedId((feature?.properties?.id as string) ?? null);
         setCardNotice(null);
@@ -1437,9 +1459,11 @@ export default function MapLibreScene() {
   useEffect(() => {
     if (!ready) return;
     let cancelled = false;
+    // Теги запиту й теги з «Фільтрів» — один список для підбору.
+    const wanted = [...new Set([...requestTags, ...pickedTags])];
     void (async () => {
-      const matched = requestTags.length
-        ? (await import("@/lib/tags/engine")).matchProfiles(requestTags, performers)
+      const matched = wanted.length
+        ? (await import("@/lib/tags/engine")).matchProfiles(wanted, performers)
         : null;
       if (cancelled) return;
       tagMatches.set(matched?.size ? matched : null);
@@ -1447,7 +1471,7 @@ export default function MapLibreScene() {
     return () => {
       cancelled = true;
     };
-  }, [ready, requestTags, performers]);
+  }, [ready, requestTags, pickedTags, performers]);
 
   // На мапі виконавців також показуємо власні відкриті запити замовника.
   useEffect(() => {
@@ -1466,12 +1490,12 @@ export default function MapLibreScene() {
   useEffect(() => {
     const map = mapRef.current;
     if (!ready || !map) return;
-    const filtered = mode === "requests" ? applyRequestFilter(requestState.items, requestFilter) : [];
+    const filtered = mode === "requests" ? applyRequestFilter(requestState.items, requestFilter, pickedTags) : [];
     const focused = hoveredFeedRequest && filtered.some((item) => item.id === hoveredFeedRequest && item.point)
       ? filtered.filter((item) => item.id === hoveredFeedRequest)
       : filtered;
     (map.getSource("requests-map") as GeoJSONSource | undefined)?.setData(requestFeatures(focused));
-  }, [ready, mode, requestState.items, requestFilter, hoveredFeedRequest]);
+  }, [ready, mode, requestState.items, requestFilter, pickedTags, hoveredFeedRequest]);
 
   useEffect(() => {
     requestLensControlRef.current.hide(true);
@@ -1730,13 +1754,17 @@ export default function MapLibreScene() {
     const top = clamp(box.top + box.height / 2 - height / 2, topEdge, Math.max(topEdge, bounds.height - height - 16));
     panel.style.left = `${Math.round(left)}px`;
     panel.style.top = `${Math.round(top)}px`;
+    // Стопка росте від верху: першим стоїть той, чий маркер більший. Порожнього місця над ним нема,
+    // а нижній відступ потрібен лише довгому списку, щоб останній теж міг стати нагору.
     const items = [...list.querySelectorAll<HTMLElement>("li")];
     if (items.length) {
-      const edge = Math.max(0, (list.clientHeight - items[0].offsetHeight) / 2);
-      list.style.setProperty("--stack-edge", `${edge}px`);
-      const middle = items[Math.floor((items.length - 1) / 2)];
+      const first = items[0];
+      const last = items[items.length - 1];
+      list.style.setProperty("--stack-edge", "0px");
+      const fits = last.offsetTop + last.offsetHeight + 20 <= list.clientHeight;
+      list.style.setProperty("--stack-edge", `${fits ? 0 : Math.max(0, list.clientHeight - first.offsetHeight - 28)}px`);
       list.style.scrollSnapType = "none";
-      list.scrollTop = middle.offsetTop - edge;
+      list.scrollTop = 0;
       updateGroupStack();
     }
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1752,16 +1780,16 @@ export default function MapLibreScene() {
     };
   }, [groupPreview]);
 
-  /** Центрований рядок виростає, сусідні відступають у глибину при прокрутці. */
+  /** Верхній рядок виростає, наступні відступають у глибину; при прокрутці «верхнім» стає наступний. */
   const updateGroupStack = () => {
     const list = groupListRef.current;
     if (!list) return;
-    const center = list.scrollTop + list.clientHeight / 2;
-    const positions = [...list.querySelectorAll<HTMLElement>("li")].map((item) => ({
-      item,
-      distance: Math.abs(item.offsetTop + item.offsetHeight / 2 - center) / Math.max(item.offsetHeight - 6, 1),
-    }));
-    for (const { item, distance } of positions) {
+    const items = [...list.querySelectorAll<HTMLElement>("li")];
+    if (!items.length) return;
+    const focus = list.scrollTop + items[0].offsetTop + items[0].offsetHeight / 2;
+    list.dataset.scrolled = String(list.scrollTop > 2);
+    for (const item of items) {
+      const distance = Math.abs(item.offsetTop + item.offsetHeight / 2 - focus) / Math.max(item.offsetHeight - 6, 1);
       item.style.setProperty("--stack-scale", String(Math.max(0.76, 1 - distance * 0.095)));
       item.style.setProperty("--stack-opacity", String(Math.max(0.26, 1 - distance * 0.27)));
       item.style.zIndex = String(Math.max(0, 20 - Math.round(distance * 4)));
@@ -1889,7 +1917,7 @@ export default function MapLibreScene() {
           }}
         >
           <p className="group-preview-title">{groupTitle(groupPreview)}</p>
-          <ul ref={groupListRef} className="group-preview-list" onScroll={updateGroupStack} aria-label="Виконавці й запити у групі">
+          <ul ref={groupListRef} className="group-preview-list" style={{ "--rows": groupPreview.members.length + groupPreview.requests.length } as React.CSSProperties} onScroll={updateGroupStack} aria-label="Виконавці й запити у групі">
             {groupPreview.members.map((performer) => {
               return (
                 <li key={performer.id}>
@@ -1900,7 +1928,8 @@ export default function MapLibreScene() {
                     onFocus={(event) => {
                       const list = groupListRef.current;
                       const item = event.currentTarget.parentElement;
-                      if (list && item) list.scrollTo({ top: item.offsetTop - (list.clientHeight - item.offsetHeight) / 2, behavior: reduced() ? "auto" : "smooth" });
+                      const firstItem = list?.querySelector("li");
+                      if (list && item && firstItem) list.scrollTo({ top: item.offsetTop - firstItem.offsetTop, behavior: reduced() ? "auto" : "smooth" });
                     }}
                   >
                     <span

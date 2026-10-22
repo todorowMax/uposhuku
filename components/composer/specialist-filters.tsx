@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { gsap } from "gsap";
 import { ListChecks, Plus, SlidersHorizontal, X } from "@/components/icons";
 import { allPerformersStore, applyRequestFilter, mapModeStore, mapRequestsStore, requestFilterStore, type RequestFilter } from "@/lib/feed/map-requests";
 import { feedCollapsedStore } from "@/lib/requests/side-panel";
@@ -49,6 +50,8 @@ export function SpecialistFilters({
   const pickedTags = useStore(filterTags);
   const performers = usePerformers();
   const [open, setOpen] = useState(false);
+  // Панель лишається в DOM, поки програється анімація закриття.
+  const [present, setPresent] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
   const mode = useStore(mapModeStore);
   const allPerformers = useStore(allPerformersStore);
@@ -68,6 +71,10 @@ export function SpecialistFilters({
     const gone = selectedGroups.filter((id) => !groups.some((item) => item.id === id));
     for (const id of gone) toggleIn(groupFilter, id);
   }, [groups, selectedGroups]);
+
+  useEffect(() => {
+    if (open) setPresent(true);
+  }, [open]);
 
   // Панель закривається кліком повз неї й Escape.
   useEffect(() => {
@@ -157,13 +164,15 @@ export function SpecialistFilters({
       </button>
       )}
 
-      {open && mode === "performers" && (
+      {present && mode === "performers" && (
         <FilterPanel
           groupChips={groupChips}
           pool={pool}
           shown={shown}
           allPerformers={allPerformers}
+          open={open}
           onClose={() => setOpen(false)}
+          onExited={() => setPresent(false)}
         />
       )}
     </div>
@@ -175,14 +184,54 @@ function FilterPanel({
   pool,
   shown,
   allPerformers,
+  open,
   onClose,
+  onExited,
 }: {
   groupChips: React.ReactNode;
   pool: Performer[];
   shown: number;
   allPerformers: boolean;
+  /** false: програємо закриття, а потім просимо прибрати панель (onExited). */
+  open: boolean;
   onClose: () => void;
+  onExited: () => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const exitedRef = useRef(onExited);
+  exitedRef.current = onExited;
+
+  // Розкривається від кнопки «Фільтри» (праворуч угорі): панель трохи виростає, блоки з'являються по черзі.
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!open || !panel) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    gsap.killTweensOf(panel);
+    gsap.killTweensOf(panel.children);
+    gsap.set(panel, { transformOrigin: "100% 0" });
+    const timeline = gsap.timeline({ defaults: { ease: "power3.out" } });
+    timeline.fromTo(panel, { opacity: 0, y: -12, scale: 0.96 }, { opacity: 1, y: 0, scale: 1, duration: 0.36, clearProps: "opacity,transform" }, 0);
+    timeline.fromTo(panel.children, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.32, stagger: 0.05, clearProps: "opacity,transform" }, 0.08);
+    return () => {
+      timeline.kill();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) return;
+    const panel = panelRef.current;
+    if (!panel || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      exitedRef.current();
+      return;
+    }
+    gsap.killTweensOf(panel);
+    gsap.killTweensOf(panel.children);
+    const tween = gsap.to(panel, { opacity: 0, y: -8, scale: 0.98, duration: 0.18, ease: "power2.in", onComplete: () => exitedRef.current() });
+    return () => {
+      tween.kill();
+    };
+  }, [open]);
+
   const selectedCities = useStore(cityFilter);
   const online = useStore(onlineFilter);
   const matches = useStore(tagMatches);
@@ -217,7 +266,7 @@ function FilterPanel({
   };
 
   return (
-    <div role="dialog" aria-label="Усі фільтри" className="filter-panel glass-panel">
+    <div ref={panelRef} role="dialog" aria-label="Усі фільтри" className="filter-panel glass-panel" style={open ? undefined : { pointerEvents: "none" }}>
       <section>
         <h3 className="filter-panel-title">Спеціалісти</h3>
         <div className="filter-panel-chips">{groupChips}</div>

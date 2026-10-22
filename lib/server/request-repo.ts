@@ -36,7 +36,7 @@ export const createRequest = async (userId: string, draft: RequestDraft): Promis
   const db = getDb();
   const id = `req_${crypto.randomUUID().slice(0, 8)}`;
   const statements = [
-    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", createdAt: Date.now() }),
+    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: Date.now() }),
     ...(draft.tags.length ? [db.insert(requestTags).values(draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index))] : []),
     ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
   ];
@@ -67,6 +67,12 @@ export const listOthersOpen = async (exceptUserId: string) =>
 /** Чи відкритий запит існує і чий він: потрібно для відгуків. */
 export const requestOwner = async (id: string) => {
   const [row] = await getDb().select({ userId: requests.userId, status: requests.status }).from(requests).where(eq(requests.id, id)).limit(1);
+  return row ?? null;
+};
+
+/** Коротко про запит для сповіщень: автор і текст. */
+export const requestBrief = async (id: string) => {
+  const [row] = await getDb().select({ userId: requests.userId, text: requests.text, status: requests.status, budget: requests.budget, cityId: requests.cityId }).from(requests).where(eq(requests.id, id)).limit(1);
   return row ?? null;
 };
 

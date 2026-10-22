@@ -11,7 +11,12 @@ export interface ProfileWork {
   /** Що зроблено, для кого, чим: з цього розбираємо теги роботи. */
   description: string;
   url: string;
+  /** Підсумок: знайдені в тексті й додані вручну, без прихованих. */
   tags: string[];
+  /** Додані людиною пошуком чи сірою «+», яких може й не бути в тексті. */
+  manualTags: string[];
+  /** Знайдені в тексті, але прибрані людиною: з тексту не повертаються. */
+  hiddenTags: string[];
 }
 
 export interface Profile {
@@ -23,8 +28,12 @@ export interface Profile {
   specialty: string;
   /** «Про себе» вільним текстом. */
   bio: string;
-  /** Заявлені теги з «Про себе» й спеціальності, у тому вигляді, як людина їх залишила. */
+  /** Підсумкові заявлені теги: з «Про себе» й спеціальності та додані вручну, без прихованих. */
   tags: string[];
+  /** З них додані вручну (пошуком, сірою «+»). */
+  manualTags: string[];
+  /** Знайдені в тексті, але прибрані людиною. */
+  hiddenTags: string[];
   works: ProfileWork[];
   /** Фото квадратом, JPEG як data URL. */
   photo: string;
@@ -44,6 +53,13 @@ export const PROFILE_LIMITS = {
   /** Фото стискаємо в браузері до ~320px, тож понад це — вже не наше. */
   photoBytes: 200_000,
   minTags: 2,
+  /** Усього заявлених тегів профілю, з тексту й вручну разом. */
+  tags: 30,
+  /** З них вручну: інакше можна дописати собі все підряд і вилізти в кожному запиті. */
+  manualTags: 15,
+  /** Усього тегів однієї роботи. */
+  workTags: 15,
+  workManualTags: 5,
 } as const;
 
 /** Усі теги профілю: спершу заявлені, далі з робіт; без повторів. */
@@ -75,8 +91,12 @@ export const emptyProfile = (name = ""): Profile => ({
   specialty: "",
   bio: "",
   tags: [],
+  manualTags: [],
+  hiddenTags: [],
   works: [],
   photo: "",
   published: false,
   updatedAt: new Date(0).toISOString(),
 });
+
+export const emptyWork = (id: string): ProfileWork => ({ id, title: "", description: "", url: "", tags: [], manualTags: [], hiddenTags: [] });

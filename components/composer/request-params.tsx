@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarClock, MapPin, Wallet, X } from "@/components/icons";
+import { CalendarClock, MapPin, Send, Wallet, X } from "@/components/icons";
 import { CITIES } from "@/lib/map/cities";
 import { DEADLINES, type Deadline } from "@/lib/requests/types";
+import { useChannelEnabled } from "@/lib/telegram/channel-client";
 
 export interface RequestParamsValue {
   budget: number | null;
@@ -11,9 +12,11 @@ export interface RequestParamsValue {
   cityId: string | null;
   /** «Віддалено» обрано явно: відрізняємо від «не вказано». */
   remote: boolean;
+  /** Показати запит у публічному Telegram-каналі. */
+  channel: boolean;
 }
 
-export const EMPTY_PARAMS: RequestParamsValue = { budget: null, deadline: null, cityId: null, remote: false };
+export const EMPTY_PARAMS: RequestParamsValue = { budget: null, deadline: null, cityId: null, remote: false, channel: true };
 
 const CITY_OPTIONS = [...CITIES].sort((a, b) => a.name.localeCompare(b.name, "uk"));
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -28,6 +31,7 @@ type Open = "budget" | "deadline" | "city" | null;
  */
 export function RequestParams({ value, onChange }: { value: RequestParamsValue; onChange: (value: RequestParamsValue) => void }) {
   const [open, setOpen] = useState<Open>(null);
+  const channelEnabled = useChannelEnabled();
   const [budgetText, setBudgetText] = useState(value.budget ? String(value.budget) : "");
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -73,6 +77,21 @@ export function RequestParams({ value, onChange }: { value: RequestParamsValue; 
       })}
       {chip("deadline", <CalendarClock className="size-3.5 shrink-0" />, "Термін", value.deadline ? DEADLINES[value.deadline] : null, () => set({ deadline: null }))}
       {chip("city", <MapPin className="size-3.5 shrink-0" />, "Де", place, () => set({ cityId: null, remote: false }))}
+      {channelEnabled && (
+        <span className="param-chip" data-filled={value.channel || undefined}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={value.channel}
+            onClick={() => set({ channel: !value.channel })}
+            className="param-chip-main"
+            title="Покажемо запит у нашому Telegram-каналі без ваших контактів. Відгукнутися можна лише на сайті."
+          >
+            <Send className="size-3.5 shrink-0" />
+            <span className="param-chip-label">{value.channel ? "У Telegram-каналі" : "Не в каналі"}</span>
+          </button>
+        </span>
+      )}
 
       {open === "budget" && (
         <div className="param-pop" role="dialog" aria-label="Бюджет">

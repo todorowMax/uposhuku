@@ -17,6 +17,7 @@ import { setRequestTags } from "@/lib/map/request-tags";
 import { setMapMode } from "@/lib/feed/map-requests";
 import { Attachments, type Attachment } from "@/components/composer/attachments";
 import { TagRow } from "@/components/composer/tag-row";
+import { TagPicker } from "@/components/tags/tag-picker";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
 import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/components/composer/request-params";
 import { AuthPanel } from "@/components/auth/auth-panel";
@@ -28,11 +29,16 @@ import { loadDraft, saveDraft } from "@/lib/requests/draft";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 import * as tagEngine from "@/lib/tags/engine";
+import { EVENTS, track } from "@/lib/telemetry/track";
+import { trackTagAdded, trackTagRemoved, type TagAddSource } from "@/lib/telemetry/tag-events";
+import { proposeTag } from "@/lib/tags/proposals-client";
 
 /** Скільки файлів можна прикріпити до запиту. */
 const MAX_FILES = 10;
 /** Скільки сірих пропозицій показуємо поруч із тегами запиту. */
 const MAX_SUGGESTIONS = 6;
+/** Скільки тегів людина може додати вручну до тих, що з тексту. */
+const MAX_MANUAL_TAGS = 10;
 
 /** Скільки рядків поле показує, перш ніж почати прокручуватися всередині. */
 const MAX_ROWS = 5;
@@ -77,6 +83,8 @@ export function RequestComposer() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const filesRef = useRef<Attachment[]>([]);
   const phaseTimerRef = useRef<number | null>(null);
+  const focusTracked = useRef(false);
+  const tagsTracked = useRef(false);
   filesRef.current = files;
   const wide = inputPhase !== "closed" && !narrowing;
   const expanded = inputPhase === "opening" || inputPhase === "open" || inputPhase === "closing";
@@ -92,6 +100,10 @@ export function RequestComposer() {
   };
 
   const openInput = () => {
+    if (!focusTracked.current) {
+      focusTracked.current = true;
+      track(EVENTS.composerFocused);
+    }
     if (inputPhase === "open" || inputPhase === "opening") return;
     clearPhaseTimer();
     setNarrowing(false);
@@ -132,7 +144,10 @@ export function RequestComposer() {
   useEffect(() => {
     if (inputPhase === "closed") return;
     const onPointer = (event: PointerEvent) => {
-      if (!formRef.current?.contains(event.target as Node)) closeInput();
+      const target = event.target as Element;
+      // Вибір тегу відкривається поза формою (портал), але це ще наше поле.
+      if (target.closest?.('[data-slot="popover-content"], [data-slot="sheet-content"]')) return;
+      if (!formRef.current?.contains(target)) closeInput();
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
@@ -159,6 +174,13 @@ export function RequestComposer() {
     [selected, dismissed]
   );
 
+  // Перший раз, коли з тексту з'явився тег: чи розуміє словник, що пишуть люди.
+  useEffect(() => {
+    if (tagsTracked.current || mentions.length === 0) return;
+    tagsTracked.current = true;
+    track(EVENTS.composerTagsDetected, { tags: mentions.length });
+  }, [mentions]);
+
   // Карта відсіює виконавців за тегами запиту. Із затримкою: поки слово
   // недописане, тег може з'явитися й зникнути, а карта не має смикатися.
   const activeTags = activeRequest?.status === "open" ? activeRequest.tags.map((tag) => tag.id).join(",") : "";
@@ -179,12 +201,30 @@ export function RequestComposer() {
   }, []);
 
   const removeTag = (id: string) => {
+    const mention = mentions.find((item) => item.tagId === id);
+    trackTagRemoved("request", id, mention ? "auto" : "manual", mention ? text.slice(mention.start, mention.end) : undefined);
     setDismissed((current) => [...current, id]);
     setAdded((current) => current.filter((tag) => tag !== id));
   };
-  const addTag = (id: string) => {
-    setAdded((current) => [...current, id]);
+  const addTag = (id: string, source: TagAddSource = "suggestion") => {
+    trackTagAdded("request", id, source);
+    setAdded((current) => (current.includes(id) ? current : [...current, id]));
     setDismissed((current) => current.filter((tag) => tag !== id));
+  };
+  const manualFull = added.length >= MAX_MANUAL_TAGS;
+  /** Для пікера: тег є — знімаємо, нема — додаємо; `false`, коли ручних уже забагато. */
+  const toggleTag = (id: string) => {
+    if (selected.includes(id)) {
+      removeTag(id);
+      return true;
+    }
+    if (mentions.some((mention) => mention.tagId === id)) {
+      addTag(id, "picker");
+      return true;
+    }
+    if (manualFull) return false;
+    addTag(id, "picker");
+    return true;
   };
 
   // Прев'ю зображень живуть як blob-посилання: звільняємо, коли файл прибрали.
@@ -276,9 +316,11 @@ export function RequestComposer() {
       budget: params.budget,
       deadline: params.deadline,
       cityId: params.cityId,
+      channelOptIn: params.channel,
     };
     saveDraft(draft, true);
     setMenuOpen(false);
+    track(EVENTS.requestSubmitClicked, { tags: draft.tags.length, has_budget: Boolean(draft.budget), has_city: Boolean(draft.cityId), files: draft.files.length });
     authFlowStore.set({ mode: "publish" });
   };
 
@@ -311,7 +353,8 @@ export function RequestComposer() {
     else inputRef.current?.focus();
   };
 
-  const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0;
+  // Навіть коли тегів ще нема, під текстом стоїть «+ Додати тег».
+  const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0 || text.trim() !== "";
 
   useLayoutEffect(() => {
     const form = formRef.current;
@@ -325,7 +368,9 @@ export function RequestComposer() {
       // Беремо кінцеву висоту textarea й відступів, а не їхні проміжні
       // значення під час CSS-переходу: інакше контейнер змінює ціль на льоту.
       const fieldHeight = Number.parseFloat(inputRef.current?.style.height ?? "") || 40;
-      const height = 12 + 10 + fieldHeight + 40 + 6 + (trayHeight ? trayHeight + 6 : 0);
+      // Ряд дій на телефоні двоповерховий (чипи, потім «+» і «Знайти»): беремо справжню висоту, а не 40px.
+      const actionsHeight = Math.max(40, form.querySelector<HTMLElement>(".composer-actions")?.offsetHeight ?? 40);
+      const height = 12 + 10 + fieldHeight + actionsHeight + 6 + (trayHeight ? trayHeight + 6 : 0);
       form.style.height = `${Math.max(58, Math.ceil(height))}px`;
     };
     measure();
@@ -366,6 +411,19 @@ export function RequestComposer() {
               labelOf={tagEngine.tagLabel}
               onRemove={removeTag}
               onAdd={addTag}
+              action={
+                <TagPicker
+                  context="request"
+                  title="Теги запиту"
+                  selected={selected}
+                  suggestions={suggestions}
+                  labelOf={tagEngine.tagLabel}
+                  onToggle={toggleTag}
+                  onPropose={session.status === "user" ? (value) => proposeTag(value, "request") : undefined}
+                  limitReached={manualFull}
+                  limitHint={`Вручну можна додати до ${MAX_MANUAL_TAGS} тегів. Теги з тексту в цей ліміт не входять.`}
+                />
+              }
             />
           </div>
         )}

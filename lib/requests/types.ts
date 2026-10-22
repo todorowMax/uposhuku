@@ -36,6 +36,8 @@ export interface RequestDraft {
   deadline?: Deadline | null;
   /** Місто замовника; null — «Віддалено» або не вказано. */
   cityId?: string | null;
+  /** Можна показати запит у публічному Telegram-каналі (без контактів). Типово так. */
+  channelOptIn?: boolean;
 }
 
 export interface PublishedRequest extends RequestDraft {

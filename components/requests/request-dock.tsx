@@ -155,7 +155,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
           : phase === "negotiating"
             ? "Чекаємо на відповідь виконавця"
             : offers > 0
-              ? "Є пропозиції — час обрати виконавця"
+              ? "Є пропозиції: час обрати виконавця"
               : "Очікуємо на перші пропозиції";
   const ordered = [...requests].sort((a, b) => {
     if (a.status !== b.status) return a.status === "open" ? -1 : 1;

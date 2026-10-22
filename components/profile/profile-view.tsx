@@ -2,8 +2,14 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
-import { Check, Loader2, MapPin, MessageSquareText, X } from "@/components/icons";
-import { DirectChatPanel } from "@/components/profile/direct-chat";
+import {
+  Check,
+  Loader2,
+  MapPin,
+  MessageSquareText,
+  X,
+} from "@/components/icons";
+import { inboxOpenStore } from "@/components/chat/inbox-panel";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { Stars } from "@/components/deals/deal-tab";
 import { avatarBackground } from "@/lib/map/avatar-style";
@@ -13,18 +19,28 @@ import { performerStats } from "@/lib/map/stats";
 import type { Performer } from "@/lib/map/types";
 import { placementOpenStore } from "@/lib/placement/client";
 import { TIER_NAMES, isPromoted } from "@/lib/placement/tiers";
-import { sessionStore } from "@/lib/auth/client";
+import { authFlowStore, sessionStore } from "@/lib/auth/client";
 import { useCloseProfile } from "@/lib/profile/navigation";
-import { directChatOpenStore, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
+import {
+  savePending,
+  useDialog,
+  useDialogSync,
+} from "@/lib/requests/direct-chat";
 import { profileEditorStore } from "@/lib/profile/client";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import type { Profile } from "@/lib/profile/types";
 import { fetchReviews } from "@/lib/reviews/client";
 import { type Review } from "@/lib/reviews/types";
 import { useStore } from "@/lib/store";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
-const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", year: "numeric" });
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const DATE = new Intl.DateTimeFormat("uk-UA", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+const reduced = () =>
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const reviewsWord = (count: number) => {
   const tens = count % 100;
@@ -46,15 +62,29 @@ const useViewedPerformer = (id: string | null, initial: Performer | null) => {
     setFailed(false);
     if (!id || onMap || initial) return;
     let cancelled = false;
-    void fetch(`/api/performers/${encodeURIComponent(id)}`, { cache: "no-store" })
+    void fetch(`/api/performers/${encodeURIComponent(id)}`, {
+      cache: "no-store",
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("not found");
-        return (await response.json()) as { profile: Profile; tier: number; userId: string; stats?: Performer["stats"]; online?: boolean };
+        return (await response.json()) as {
+          profile: Profile;
+          tier: number;
+          userId: string;
+          stats?: Performer["stats"];
+          online?: boolean;
+        };
       })
       .then(({ profile, tier, userId, stats, online }) => {
         if (cancelled) return;
-        const performer = profileToPerformer({ ...profile, published: true, updatedAt: "" }, userId, 0, tier as Performer["tier"]);
-        if (performer) setRemote({ ...performer, stats, online: Boolean(online) });
+        const performer = profileToPerformer(
+          { ...profile, published: true, updatedAt: "" },
+          userId,
+          0,
+          tier as Performer["tier"],
+        );
+        if (performer)
+          setRemote({ ...performer, stats, online: Boolean(online) });
         else setFailed(true);
       })
       .catch(() => !cancelled && setFailed(true));
@@ -73,51 +103,77 @@ const useViewedPerformer = (id: string | null, initial: Performer | null) => {
  * Малює сторінка /p/[id]; `initial` і `initialLabels` приходять із сервера,
  * щоб у першому HTML уже був текст профілю.
  */
-export function ProfileView({ id, initial, initialLabels = {} }: { id: string; initial: Performer | null; initialLabels?: Record<string, string> }) {
+export function ProfileView({
+  id,
+  initial,
+  initialLabels = {},
+}: {
+  id: string;
+  initial: Performer | null;
+  initialLabels?: Record<string, string>;
+}) {
   const close = useCloseProfile();
   const session = useStore(sessionStore);
   const { performer: found, failed } = useViewedPerformer(id, initial);
   const mineId = session.status === "user" ? `me-${session.user.id}` : null;
   const mine = Boolean(found && (found.mine || found.id === mineId));
-  const performer = useMemo(() => (found ? { ...found, mine } : null), [found, mine]);
+  const performer = useMemo(
+    () => (found ? { ...found, mine } : null),
+    [found, mine],
+  );
   const overlayRef = useRef<HTMLDivElement>(null);
-  const composeButtonRef = useRef<HTMLButtonElement>(null);
-  /** Панель «Описати задачу» / чат відкрита. */
-  const [composing, setComposing] = useState(false);
   const dialog = useDialog(id);
   // Чи є вже розмова з цим виконавцем-акаунтом: від цього залежить напис кнопки.
   useDialogSync(id, true);
-  const openRequest = useStore(directChatOpenStore);
   const [labels, setLabels] = useState<Record<string, string>>(initialLabels);
-  const [reviews, setReviews] = useState<{ list: Review[]; average: number | null } | null>(null);
+  const [reviews, setReviews] = useState<{
+    list: Review[];
+    average: number | null;
+  } | null>(null);
+
+  useEffect(() => {
+    track(EVENTS.performerProfileOpened, { from: "profile_page" });
+  }, []);
 
   useLayoutEffect(() => {
     if (!overlayRef.current || reduced()) return;
-    const tween = gsap.fromTo(overlayRef.current, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" });
+    const tween = gsap.fromTo(
+      overlayRef.current,
+      { opacity: 0, y: 16 },
+      { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" },
+    );
     return () => {
       tween.kill();
     };
   }, []);
 
-  // Гість увійшов, і його чат створено: відкриваємо його без кнопки.
-  useEffect(() => {
-    if (openRequest !== id || !performer || performer.mine) return;
-    directChatOpenStore.set(null);
-    setComposing(true);
-  }, [openRequest, id, performer]);
+  /** «Описати задачу»: гість спершу входить, далі розмова з цим виконавцем відкривається в месенджері. */
+  const contact = () => {
+    track(EVENTS.chatOpened, { from: "profile" });
+    if (session.status !== "user") {
+      savePending(id, "");
+      authFlowStore.set({ mode: "login" });
+      close();
+      return;
+    }
+    inboxOpenStore.set({ conversationId: null, performerId: id });
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !composing) close();
+      if (event.key === "Escape") close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [close, composing]);
+  }, [close]);
 
   useEffect(() => {
     let cancelled = false;
     void fetchReviews(id)
-      .then(({ reviews: list, average }) => !cancelled && setReviews({ list, average }))
+      .then(
+        ({ reviews: list, average }) =>
+          !cancelled && setReviews({ list, average }),
+      )
       .catch(() => !cancelled && setReviews({ list: [], average: null }));
     return () => {
       cancelled = true;
@@ -130,24 +186,52 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
     if (!joined) return;
     let cancelled = false;
     void import("@/lib/tags/engine").then((engine) => {
-      if (!cancelled) setLabels(Object.fromEntries(joined.split(",").map((tag) => [tag, engine.tagLabel(tag)])));
+      if (!cancelled)
+        setLabels(
+          Object.fromEntries(
+            joined.split(",").map((tag) => [tag, engine.tagLabel(tag)]),
+          ),
+        );
     });
     return () => {
       cancelled = true;
     };
   }, [joined]);
 
-  const stats = useMemo(() => (performer ? performerStats(performer) : null), [performer]);
-  const city = performer ? CITIES.find((item) => item.id === performer.cityId)?.name : undefined;
-  const proven = useMemo(() => new Set(performer?.works.flatMap((work) => work.tags ?? []) ?? []), [performer]);
+  const stats = useMemo(
+    () => (performer ? performerStats(performer) : null),
+    [performer],
+  );
+  const city = performer
+    ? CITIES.find((item) => item.id === performer.cityId)?.name
+    : undefined;
+  const proven = useMemo(
+    () => new Set(performer?.works.flatMap((work) => work.tags ?? []) ?? []),
+    [performer],
+  );
 
   return (
-    <div ref={overlayRef} role="dialog" aria-modal="true" aria-label={performer ? `Профіль: ${performer.name}` : "Профіль виконавця"} className="pe-overlay">
+    <div
+      ref={overlayRef}
+      role="dialog"
+      aria-modal="true"
+      aria-label={
+        performer ? `Профіль: ${performer.name}` : "Профіль виконавця"
+      }
+      className="pe-overlay"
+    >
       <header className="pe-header">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[18px] font-semibold text-ink">{performer?.name ?? "Профіль виконавця"}</h1>
+          <h1 className="truncate text-[18px] font-semibold text-ink">
+            {performer?.name ?? "Профіль виконавця"}
+          </h1>
         </div>
-        <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button shrink-0">
+        <button
+          type="button"
+          onClick={close}
+          aria-label="Закрити"
+          className="auth-icon-button shrink-0"
+        >
           <X className="size-5" />
         </button>
       </header>
@@ -155,48 +239,81 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
       <div className="pe-scroll">
         {!performer ? (
           <div className="grid place-items-center py-24 text-[13px] text-ink-muted">
-            {failed ? <p>Профіль не знайдено. Можливо, виконавець зняв його з карти.</p> : <Loader2 className="size-6 animate-spin" />}
+            {failed ? (
+              <p>Профіль не знайдено. Можливо, виконавець зняв його з карти.</p>
+            ) : (
+              <Loader2 className="size-6 animate-spin" />
+            )}
           </div>
         ) : (
           <div className="pv-layout">
             <section className="pe-section pv-head">
-              <div className="pv-photo" role="img" aria-label={`Фото ${performer.name}`} style={avatarBackground(performer)} />
+              <div
+                className="pv-photo"
+                role="img"
+                aria-label={`Фото ${performer.name}`}
+                style={avatarBackground(performer)}
+              />
               <div className="min-w-0 flex-1">
-                <p className="text-[20px] font-semibold leading-tight text-ink">{performer.name}</p>
-                <p className="mt-1 text-[14px] text-ink-muted">{performer.specialty}</p>
-                <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
+                <p className="text-[20px] font-semibold leading-tight text-ink">
+                  {performer.name}
+                </p>
+                <p className="mt-1 text-[14px] text-ink-muted">
+                  {performer.specialty}
+                </p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
                   {city && (
                     <span className="inline-flex items-center gap-1">
                       <MapPin className="size-3.5" />
                       {city}
                     </span>
                   )}
-                  {isPromoted(performer.tier) && <span className="offer-promoted">Просування</span>}
+                  {isPromoted(performer.tier) && (
+                    <span className="offer-promoted">Просування</span>
+                  )}
                   <span>Розміщення: {TIER_NAMES[performer.tier]}</span>
-                </p>
+                </div>
               </div>
             </section>
 
             <section className="pe-section" aria-label="Цифри">
               <div className="grid grid-cols-3 divide-x divide-[#b8c4c7]/55 text-center">
                 <div>
-                  <p className="text-[18px] font-semibold text-ink">{stats?.months} міс.</p>
-                  <p className="mt-0.5 text-[11px] text-ink-muted">на платформі</p>
+                  <p className="text-[18px] font-semibold text-ink">
+                    {stats?.months} міс.
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-ink-muted">
+                    на платформі
+                  </p>
                 </div>
                 <div>
-                  <p className="text-[18px] font-semibold text-ink">{stats?.orders}</p>
+                  <p className="text-[18px] font-semibold text-ink">
+                    {stats?.orders}
+                  </p>
                   <p className="mt-0.5 text-[11px] text-ink-muted">замовлень</p>
                 </div>
                 <div>
-                  <p className="text-[18px] font-semibold text-ink">{reviews?.average ? `★ ${reviews.average}` : `★ ${stats?.rating}`}</p>
+                  <p className="text-[18px] font-semibold text-ink">
+                    {reviews?.average
+                      ? `★ ${reviews.average}`
+                      : `★ ${stats?.rating}`}
+                  </p>
                   <p className="mt-0.5 text-[11px] text-ink-muted">рейтинг</p>
                 </div>
               </div>
             </section>
 
             <section className="pe-section">
-              <PerformerAbout performer={performer} onOpenWork={() => {}} full />
-              {!performer.bio && performer.works.length === 0 && <p className="text-[13px] text-ink-muted">Виконавець ще не додав опис і роботи.</p>}
+              <PerformerAbout
+                performer={performer}
+                onOpenWork={() => {}}
+                full
+              />
+              {!performer.bio && performer.works.length === 0 && (
+                <p className="text-[13px] text-ink-muted">
+                  Виконавець ще не додав опис і роботи.
+                </p>
+              )}
             </section>
 
             {tags.length > 0 && (
@@ -207,12 +324,22 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
                 <div className="flex flex-wrap gap-1.5">
                   {tags.map((tag) => (
                     <span key={tag} className="auth-draft-tag">
-                      {proven.has(tag) && <Check className="mr-1 size-3 text-brand" aria-label="Підтверджено роботою" />}
+                      {proven.has(tag) && (
+                        <Check
+                          className="mr-1 size-3 text-brand"
+                          aria-label="Підтверджено роботою"
+                        />
+                      )}
                       {labels[tag] ?? tag}
                     </span>
                   ))}
                 </div>
-                {proven.size > 0 && <p className="pe-hint">Галочка стоїть біля тегів, які підтверджує робота в портфоліо.</p>}
+                {proven.size > 0 && (
+                  <p className="pe-hint">
+                    Галочка стоїть біля тегів, які підтверджує робота в
+                    портфоліо.
+                  </p>
+                )}
               </section>
             )}
 
@@ -224,25 +351,42 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
                 {reviews?.average && (
                   <span className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
                     <Stars value={reviews.average} />
-                    <span className="font-semibold tabular-nums text-ink">{reviews.average.toFixed(1)}</span>· {reviews.list.length} {reviewsWord(reviews.list.length)}
+                    <span className="font-semibold tabular-nums text-ink">
+                      {reviews.average.toFixed(1)}
+                    </span>
+                    · {reviews.list.length} {reviewsWord(reviews.list.length)}
                   </span>
                 )}
               </div>
-              {!reviews && <Loader2 className="size-5 animate-spin text-ink-muted" />}
+              {!reviews && (
+                <Loader2 className="size-5 animate-spin text-ink-muted" />
+              )}
               {reviews && reviews.list.length === 0 && (
-                <p className="text-[13px] leading-relaxed text-ink-muted">Відгуків поки немає. Їх лишають замовники після завершеної угоди, тож накрутити неможливо.</p>
+                <p className="text-[13px] leading-relaxed text-ink-muted">
+                  Відгуків поки немає. Їх лишають замовники після завершеної
+                  угоди, тож накрутити неможливо.
+                </p>
               )}
               <ul className="grid gap-3">
                 {reviews?.list.map((review) => (
                   <li key={review.id} className="pv-review">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-semibold text-ink">{review.author}</p>
-                      <time dateTime={review.createdAt} className="text-[11px] text-ink-muted">
+                      <p className="text-[13px] font-semibold text-ink">
+                        {review.author}
+                      </p>
+                      <time
+                        dateTime={review.createdAt}
+                        className="text-[11px] text-ink-muted"
+                      >
                         {DATE.format(new Date(review.createdAt))}
                       </time>
                     </div>
                     <Stars value={review.stars} size={13} />
-                    {review.text && <p className="mt-1.5 text-[13px] leading-snug text-ink/90">{review.text}</p>}
+                    {review.text && (
+                      <p className="mt-1.5 text-[13px] leading-snug text-ink/90">
+                        {review.text}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -277,34 +421,14 @@ export function ProfileView({ id, initial, initialLabels = {} }: { id: string; i
               </button>
             </>
           ) : (
-            <button
-              ref={composeButtonRef}
-              type="button"
-              className="auth-primary"
-              style={composing ? { visibility: "hidden" } : undefined}
-              aria-haspopup="dialog"
-              onClick={() => setComposing(true)}
-            >
+            <button type="button" className="auth-primary" onClick={contact}>
               <MessageSquareText className="size-4" />
-              {dialog ? "Відкрити чат" : `Описати задачу для ${performer.name.split(" ")[0]}`}
+              {dialog
+                ? "Відкрити чат"
+                : `Описати задачу для ${performer.name.split(" ")[0]}`}
             </button>
           )}
         </footer>
-      )}
-
-      {performer && composing && (
-        <DirectChatPanel
-          performer={performer}
-          getOrigin={() => composeButtonRef.current?.getBoundingClientRect() ?? null}
-          onClose={() => {
-            setComposing(false);
-            composeButtonRef.current?.focus();
-          }}
-          onLeaveToAuth={() => {
-            setComposing(false);
-            close();
-          }}
-        />
       )}
     </div>
   );

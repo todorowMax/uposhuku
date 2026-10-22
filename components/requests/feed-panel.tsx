@@ -1,10 +1,11 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
 import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
 import { applyRequestFilter, hoveredFeedRequestStore, mapRequestsStore, requestFilterStore } from "@/lib/feed/map-requests";
+import { filterTags } from "@/lib/map/filters";
 import { sendResponse, useFeed, withdrawResponse } from "@/lib/feed/client";
 import { RESPONSE_LIMITS, type FeedItem, type MyResponse } from "@/lib/feed/types";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
@@ -14,6 +15,7 @@ import { TIER_NAMES } from "@/lib/placement/tiers";
 import type { PlacementTier } from "@/lib/map/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { useStore } from "@/lib/store";
+import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -52,8 +54,9 @@ export function FeedPanel() {
   const { loading, error, items: allItems, pending, reveal, patch } = useFeed(active);
   const mapState = useStore(mapRequestsStore);
   const filter = useStore(requestFilterStore);
+  const pickedTags = useStore(filterTags);
   // Список слухається тих самих чипів, що й карта; без даних карти показуємо все.
-  const allowed = mapState.loaded && filter !== "all" ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter).map((item) => item.id)) : null;
+  const allowed = mapState.loaded && (filter !== "all" || pickedTags.length > 0) ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter, pickedTags).map((item) => item.id)) : null;
   const items = allowed ? allItems.filter((item) => allowed.has(item.id)) : allItems;
   const others = mapState.items.filter((item) => !item.own);
   const noCity = mapState.loaded ? others.filter((item) => !item.point).length : 0;
@@ -89,6 +92,14 @@ export function FeedPanel() {
       tween.kill();
     };
   }, [items]);
+
+  // Виконавець відкрив стрічку: скільки запитів і скільки з них під його теги.
+  const feedShown = active && !collapsed && !loading;
+  useEffect(() => {
+    if (feedShown) track(EVENTS.feedOpened, { count: allItems.length, matched: allItems.filter((item) => item.matchedTags > 0).length });
+    // Рахуємо відкриття стрічки, а не кожен новий запит у ній.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [feedShown]);
 
   if (!active) return null;
   const total = allItems.length + pending.length;

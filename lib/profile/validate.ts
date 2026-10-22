@@ -4,15 +4,29 @@
 // розумних межах. Теги — лише ті, що є у словнику, решту відкидаємо.
 
 import { CITIES } from "@/lib/map/cities";
+import { combineTags } from "@/lib/tags/combine";
+import { detectTags } from "@/lib/tags/detect";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { PROFILE_LIMITS, emptyProfile, missingForPublish, type Profile, type ProfileWork } from "./types";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-const tags = (value: unknown): string[] =>
-  Array.isArray(value)
-    ? [...new Set(value.filter((id): id is string => typeof id === "string" && TAGS_BY_ID.has(id)))].slice(0, 40)
-    : [];
+const knownTags = (value: unknown, max: number): string[] =>
+  Array.isArray(value) ? [...new Set(value.filter((id): id is string => typeof id === "string" && TAGS_BY_ID.has(id)))].slice(0, max) : [];
+
+/**
+ * Теги поля рахує сервер, а не клієнт: з тексту (як це робить поле), плюс
+ * додані вручну, мінус прибрані. Список `tags` з тіла запиту ігноруємо,
+ * тож через API не дописати собі теги повз текст і ліміти.
+ */
+const resolveTags = (text: string, body: Record<string, unknown>, limits: { total: number; manual: number }) => {
+  const auto = detectTags(text);
+  const manualTags = knownTags(body.manualTags, limits.manual);
+  const detected = new Set(auto);
+  // Прихований тег має сенс, лише поки він знаходиться в тексті; ручний сильніший.
+  const hiddenTags = knownTags(body.hiddenTags, limits.total).filter((id) => detected.has(id) && !manualTags.includes(id));
+  return { tags: combineTags({ auto, manual: manualTags, hidden: hiddenTags, max: limits.total }), manualTags, hiddenTags };
+};
 
 const work = (value: unknown, index: number): ProfileWork | null => {
   if (!value || typeof value !== "object") return null;
@@ -20,12 +34,14 @@ const work = (value: unknown, index: number): ProfileWork | null => {
   const url = text(raw.url, PROFILE_LIMITS.url);
   // Лише http(s): посилання потім потрапить у href.
   if (url && !/^https?:\/\//i.test(url)) return null;
+  const title = text(raw.title, PROFILE_LIMITS.workTitle);
+  const description = text(raw.description, PROFILE_LIMITS.workDescription);
   return {
     id: text(raw.id, 40) || `work-${index}`,
-    title: text(raw.title, PROFILE_LIMITS.workTitle),
-    description: text(raw.description, PROFILE_LIMITS.workDescription),
+    title,
+    description,
     url,
-    tags: tags(raw.tags),
+    ...resolveTags(`${title}\n${description}`, raw, { total: PROFILE_LIMITS.workTags, manual: PROFILE_LIMITS.workManualTags }),
   };
 };
 
@@ -55,14 +71,16 @@ export const parseProfile = (body: Record<string, unknown> | null): Profile | st
   const rawWorks = Array.isArray(body.works) ? body.works.slice(0, PROFILE_LIMITS.works) : [];
   const works = rawWorks.map(work);
   if (works.includes(null)) return "Посилання на роботу має починатися з http:// або https://.";
+  const specialty = text(body.specialty, PROFILE_LIMITS.specialty);
+  const bio = text(body.bio, PROFILE_LIMITS.bio);
   const profile: Profile = {
     ...emptyProfile(),
     name: text(body.name, PROFILE_LIMITS.name),
     cityId,
     location: point,
-    specialty: text(body.specialty, PROFILE_LIMITS.specialty),
-    bio: text(body.bio, PROFILE_LIMITS.bio),
-    tags: tags(body.tags),
+    specialty,
+    bio,
+    ...resolveTags(`${specialty}\n${bio}`, body, { total: PROFILE_LIMITS.tags, manual: PROFILE_LIMITS.manualTags }),
     works: works as ProfileWork[],
     photo,
     published: body.published === true,
