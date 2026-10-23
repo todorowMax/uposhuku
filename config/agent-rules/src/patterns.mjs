@@ -14,3 +14,10 @@ export const ARBITRARY_PROPERTY = String.raw`(^|\s)([a-z-]+:)*\[[a-z-]+:[^\]\s]+
 
 // CSS-2, FORM-2: the Tailwind colour palette (`text-slate-500`, `bg-red-600/50`) instead of tokens.
 export const TAILWIND_PALETTE = String.raw`(^|\s)([a-z-]+:)*(text|bg|border|ring|fill|stroke|from|via|to|outline|decoration|divide|accent|caret|placeholder|shadow)-(${PALETTE})-[0-9]{2,3}(\x2F[0-9]+)?(\s|$)`;
+
+// MOT-2: a hand-written easing curve in a string (inline style, class name, arbitrary value).
+export const CUBIC_BEZIER = String.raw`cubic-bezier\(`;
+
+// MOT-1: a Tailwind transition list that names width, height, top or left (`transition-[width]`,
+// `md:transition-[opacity,height]`). Whole words only, so `border-left-color` passes.
+export const LAYOUT_TRANSITION = String.raw`(^|\s)([a-z-]+:)*transition-\[([^\]\s]*[,_])?((min-|max-)?(width|height)|top|left)([,_][^\]\s]*)?\]`;

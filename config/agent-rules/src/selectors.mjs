@@ -1,6 +1,6 @@
 // agent-rules lint 1.0.0: vendored copy, do not edit; update with agent-rules/scripts/sync.mjs --apply
 // no-restricted-syntax selector groups. Rule IDs in the messages refer to agent-rules/rules.
-import { ARBITRARY_PROPERTY, ARBITRARY_VALUE, TAILWIND_PALETTE } from "./patterns.mjs";
+import { ARBITRARY_PROPERTY, ARBITRARY_VALUE, CUBIC_BEZIER, LAYOUT_TRANSITION, TAILWIND_PALETTE } from "./patterns.mjs";
 
 const ARBITRARY_MESSAGE =
   "TW-3, CSS-10: no arbitrary values. Use a theme token, or add one to @theme / @utility in the token CSS.";
@@ -65,4 +65,14 @@ export const e2eLocators = [
   },
 ];
 
-export const presentational = [...inlineStyle, ...tailwindClasses];
+// MOT-2, MOT-1: easing curves are tokens; transitions stay on transform and opacity.
+const BEZIER_MESSAGE = "MOT-2: no hand-written cubic-bezier(); use an easing token (--ease-out) or add one to the token CSS.";
+const LAYOUT_MESSAGE = "MOT-1: do not transition width, height, top or left; animate transform and opacity.";
+export const motionTokens = [
+  { selector: `Literal[value=/${CUBIC_BEZIER}/]`, message: BEZIER_MESSAGE },
+  { selector: `TemplateElement[value.raw=/${CUBIC_BEZIER}/]`, message: BEZIER_MESSAGE },
+  { selector: `Literal[value=/${LAYOUT_TRANSITION}/]`, message: LAYOUT_MESSAGE },
+  { selector: `TemplateElement[value.raw=/${LAYOUT_TRANSITION}/]`, message: LAYOUT_MESSAGE },
+];
+
+export const presentational = [...inlineStyle, ...tailwindClasses, ...motionTokens];

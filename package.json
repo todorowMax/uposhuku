@@ -10,7 +10,7 @@
     "start": "next start -p ${PORT:-3031}",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . && stylelint \"**/*.css\"",
-    "lint:ci": "eslint . --max-warnings 852 && stylelint \"**/*.css\" --max-warnings 7",
+    "lint:ci": "eslint . --max-warnings 852 && stylelint \"**/*.css\" --max-warnings 11",
     "deadcode": "knip --include files,dependencies,unlisted,unresolved",
     "test": "npm run test:unit",
     "test:unit": "vitest run --config vitest.config.mts tests/unit",

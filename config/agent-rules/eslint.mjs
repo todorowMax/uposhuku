@@ -8,7 +8,7 @@
 import { a11yBlock } from "./src/a11y.mjs";
 import {
   codeRules, e2eBlock, fileNameBlock, hooksBlock, ignoreBlock, nextBlocks, pageBlock, parserBlocks, productBlocks, testFileBlock,
-  reactBlocks, typedBlock, typescriptRules,
+  reactBlocks, typedBlock, typescriptRules, yupAllowedBlock,
 } from "./src/blocks.mjs";
 import { normalizeOptions } from "./src/options.mjs";
 
@@ -28,6 +28,7 @@ export const createConfig = (options) => {
     typescriptRules(o),
     ...productBlocks(o),
     pageBlock(o),
+    yupAllowedBlock(o),
     e2eBlock(o),
     fileNameBlock(o),
     testFileBlock(o),

@@ -13,19 +13,35 @@
 #               Unit tests are not in a git hook: they are the slowest check, CI repeats them anyway,
 #               and the agent edit hook plus `npm test` before "done" (DONE-1) cover local use.
 #
+# The ratchet (scripts/ratchet.mjs, RULES-3) tightens itself: pre-commit lowers the `--max-warnings`
+# numbers of `lint:ci` in package.json when the real warning count dropped and stages package.json
+# (never raises a number); pre-push fails when a count is above its baseline. The step lints the whole
+# project (several seconds), so it runs only when staged files are code or CSS and after the fast strict
+# check. `stage_fixed: true` does not help here (lefthook 2.2 re-stages only files that were already
+# staged), hence the script's own `--stage`. Remove the pre-commit step, keep the pre-push one, if the
+# few seconds bother you.
+#
 # New code is held to errors here and by the agent edit hook; old code is under the CI ratchet
 # (RULES-3). Skip once with LEFTHOOK=0 git commit ... when you must.
 #
 # Install: `npm i -D lefthook` (its postinstall runs `lefthook install`). In CI set LEFTHOOK=0.
-# A project that already uses husky keeps it and adds the same two commands to its hook instead.
+# A project that already uses husky keeps it and adds the same commands to its hook instead (ROLLOUT.md).
 
 pre-commit:
+  piped: true # sequential by priority; a failed strict check skips the slower ratchet step
   commands:
     strict-on-staged-lines:
+      priority: 1
       glob: "*.{ts,tsx,js,jsx,mjs,css}"
       run: node config/agent-rules/scripts/lint-staged-strict.mjs
+    ratchet-update:
+      priority: 2
+      glob: "*.{ts,tsx,js,jsx,mjs,css}"
+      run: node config/agent-rules/scripts/ratchet.mjs --update --stage
 
 pre-push:
   commands:
     typecheck:
       run: npm run typecheck
+    ratchet-check:
+      run: node config/agent-rules/scripts/ratchet.mjs --check

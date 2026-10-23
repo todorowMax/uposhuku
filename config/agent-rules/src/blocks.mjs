@@ -8,7 +8,7 @@ import reactPlugin from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 import sonarjs from "eslint-plugin-sonarjs";
 import tseslint from "typescript-eslint";
-import { motionPatterns, pageStatePaths } from "./imports.mjs";
+import { motionPatterns, pageStatePaths, yupPaths } from "./imports.mjs";
 import { severityFor } from "./options.mjs";
 import * as selectors from "./selectors.mjs";
 
@@ -80,7 +80,8 @@ export const codeRules = (o) => ({
     "max-params": ["warn", 3],
     "max-lines": ["warn", { max: 400, skipBlankLines: true, skipComments: true }],
     // COMP-7: no motion or framer-motion imports.
-    "no-restricted-imports": [severityFor(o.legacy, "imports"), { patterns: motionPatterns }],
+    // FORM-3: yup only in validation/ and tests (the override block follows in yupAllowedBlock).
+    "no-restricted-imports": [severityFor(o.legacy, "imports"), { patterns: motionPatterns, paths: yupPaths }],
     // ARCH-9 everywhere; the product, ui, e2e blocks below repeat it with their own groups.
     ...restricted(severityFor(o.legacy, "syntax"), selectors.classInheritance),
   },
@@ -173,9 +174,15 @@ export const pageBlock = (o) => ({
   rules: {
     "no-restricted-imports": [
       severityFor(o.legacy, "imports"),
-      { patterns: motionPatterns, paths: pageStatePaths },
+      { patterns: motionPatterns, paths: [...pageStatePaths, ...yupPaths] },
     ],
   },
+});
+
+// FORM-3: validation/ folders and tests may import yup; the other import rules stay.
+export const yupAllowedBlock = (o) => ({
+  files: ["**/validation/**/*.{ts,tsx}", `${o.testsDir}/**/*.{ts,tsx,js,jsx,mjs}`, "**/*.{test,spec}.{ts,tsx}"],
+  rules: { "no-restricted-imports": [severityFor(o.legacy, "imports"), { patterns: motionPatterns }] },
 });
 
 // TEST-1: e2e locators.

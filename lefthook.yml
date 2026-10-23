@@ -13,6 +13,11 @@
 #               Unit tests are not in a git hook: they are the slowest check, CI repeats them anyway,
 #               and the agent edit hook plus `npm test` before "done" (DONE-1) cover local use.
 #
+# Ratchet (RULES-3): pre-commit lowers the `--max-warnings` numbers of `lint:ci` in package.json when the real
+# count dropped and stages package.json (`ratchet.mjs --update --stage`, never raises a number; about 6 s here,
+# only when staged files are code or CSS, after the strict check); pre-push fails when a count is above its
+# baseline (`--check`). lefthook's `stage_fixed` would not stage package.json, hence the script's own `--stage`.
+#
 # New code is held to errors here and by the agent edit hook; old code is under the CI ratchet
 # (RULES-3). Skip once with LEFTHOOK=0 git commit ... when you must.
 #
@@ -20,12 +25,20 @@
 # A project that already uses husky keeps it and adds the same two commands to its hook instead.
 
 pre-commit:
+  piped: true # sequential by priority; a failed strict check skips the slower ratchet step
   commands:
     strict-on-staged-lines:
+      priority: 1
       glob: "*.{ts,tsx,mts,js,jsx,mjs,css}"
       run: node config/agent-rules/scripts/lint-staged-strict.mjs
+    ratchet-update:
+      priority: 2
+      glob: "*.{ts,tsx,mts,js,jsx,mjs,css}"
+      run: node config/agent-rules/scripts/ratchet.mjs --update --stage
 
 pre-push:
   commands:
     typecheck:
       run: npm run typecheck
+    ratchet-check:
+      run: node config/agent-rules/scripts/ratchet.mjs --check

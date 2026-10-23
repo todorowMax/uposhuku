@@ -16,3 +16,13 @@ export const pageStatePaths = [
     message: "COMP-1: move client state into a component and its use-*.ts hook.",
   },
 ];
+
+// FORM-3: Yup schemas live in validation/ (one file per form); everywhere else imports the schema,
+// not the library. Type-only imports (`import type { InferType } from "yup"`) stay allowed.
+export const yupPaths = [
+  {
+    name: "yup",
+    allowTypeImports: true,
+    message: "FORM-3: define Yup schemas in validation/ (one file per form) and import the schema from there.",
+  },
+];
