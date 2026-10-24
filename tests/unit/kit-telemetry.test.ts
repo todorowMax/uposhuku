@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { fingerprint, forgetUser, hit, HOUR, insertEvents, logEvent, normalizeMessage, parseUserAgent, sanitizeProps, serialize, topFrame, trackServer, type KitServerConfig } from "@/kit/telemetry/core";
 import { createReportRoute, REPORT_LIMITS } from "@/kit/telemetry/next/report-route";
 import { useTestD1 } from "../helpers/d1";
@@ -118,6 +118,9 @@ describe("лічильники", () => {
 
 describe("роут звітів із браузера", () => {
   beforeEach(clean);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   const post = (route: ReturnType<typeof createReportRoute>, body: unknown, headers: Record<string, string> = {}) =>
     route.POST(new Request("https://app.test/api/k/r", { method: "POST", body: typeof body === "string" ? body : JSON.stringify(body), headers: { "content-type": "application/json", "cf-connecting-ip": "1.2.3.4", ...headers } }));
 
@@ -148,6 +151,9 @@ describe("роут звітів із браузера", () => {
   });
 
   it("гість: 21-й звіт за годину відсікається", async () => {
+    // Вікно ліміту — година; без фіксованого часу тест падає, коли серія перетинає межу години.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-01-01T12:30:00Z"));
     const route = createReportRoute(config());
     const outcomes: unknown[] = [];
     for (let i = 0; i < REPORT_LIMITS.ip + 1; i++) outcomes.push(((await (await post(route, { event: "e", message: `m${i}` })).json()) as { throttled?: boolean }).throttled);
