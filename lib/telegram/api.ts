@@ -14,16 +14,18 @@ const API = "https://api.telegram.org";
 const TIMEOUT_MS = 10_000;
 
 export class TelegramError extends Error {
-  constructor(
-    readonly method: string,
-    /** Код Bot API (400, 403, 429…); 0 — мережа чи тайм-аут. */
-    readonly code: number,
-    description: string,
-    /** Скільки секунд Telegram просить зачекати (429). */
-    readonly retryAfter?: number
-  ) {
+  readonly method: string;
+  /** Код Bot API (400, 403, 429…); 0 — мережа чи тайм-аут. */
+  readonly code: number;
+  /** Скільки секунд Telegram просить зачекати (429). */
+  readonly retryAfter?: number;
+
+  constructor(method: string, code: number, description: string, retryAfter?: number) {
     super(`Telegram ${method}: ${code} ${description}`);
     this.name = "TelegramError";
+    this.method = method;
+    this.code = code;
+    this.retryAfter = retryAfter;
   }
 
   /** Людина заблокувала бота чи видалила чат: писати їй більше не можна. */

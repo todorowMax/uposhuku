@@ -28,13 +28,17 @@ const MAX_STARTS = 8;
 const MAX_FAILS = 8;
 
 export class AuthError extends Error {
-  constructor(
-    readonly status: number,
-    readonly title: string,
-    readonly detail: string,
-    readonly type = "about:blank",
-  ) {
+  readonly status: number;
+  readonly title: string;
+  readonly detail: string;
+  readonly type: string;
+
+  constructor(status: number, title: string, detail: string, type = "about:blank") {
     super(detail);
+    this.status = status;
+    this.title = title;
+    this.detail = detail;
+    this.type = type;
   }
 }
 
