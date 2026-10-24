@@ -9,7 +9,7 @@
 
 ## Стек
 
-Той самий, що в mealcart: Next.js 15 (App Router), React 19, TypeScript
+Той самий, що в mealcart: Next.js 16 (App Router), React 19, TypeScript
 strict, Tailwind v4, OpenNext на Cloudflare Workers. Карта:
 [MapLibre GL](https://maplibre.org/) у проєкції глобуса.
 

@@ -8,7 +8,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 ## Stack
 
-- Next.js 15 App Router, React 19, TypeScript strict. Runs on Cloudflare Workers through OpenNext
+- Next.js 16 App Router (Turbopack), React 19, TypeScript strict. Runs on Cloudflare Workers through OpenNext
   (`worker/index.ts` wraps the OpenNext worker and adds WebSockets on a Durable Object).
 - Tailwind CSS v4, configured in CSS: the tokens and the `@theme inline` block live in
   `app/globals.css`. There is no `tailwind.config`.
@@ -18,6 +18,9 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   (`kit/telemetry`), R2 for uploads. Validation: zod.
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
 - Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
+- `@next/eslint-plugin-next` stays on 15.x (`^15.5.28`) on purpose: the shared lint config in
+  `config/agent-rules` reads `nextPlugin.flatConfig`, which the 16.x plugin removed. Bump it after
+  agent-rules uses `configs["core-web-vitals"]` and the vendored copy is synced.
 
 ## Choices the profile leaves to the project (RULES-5)
 

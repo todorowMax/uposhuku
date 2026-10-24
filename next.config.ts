@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   // Значок dev-режиму Next лягає на кнопку акаунта або масштабу: вимикаємо.
   devIndicators: false,
+  // З Next 16.2 `next dev` сам дописує блок у AGENTS.md, коли бачить агента. Єдине джерело правил
+  // тут AGENTS.md (RULES-1), тож вимикаємо.
+  agentRules: false,
 };
 
 // `next dev` бачить біндинги Cloudflare (D1, R2). Локальна D1 лежить у
