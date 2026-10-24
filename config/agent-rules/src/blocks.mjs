@@ -9,6 +9,7 @@ import reactHooks from "eslint-plugin-react-hooks";
 import sonarjs from "eslint-plugin-sonarjs";
 import tseslint from "typescript-eslint";
 import { motionPatterns, pageStatePaths, yupPaths } from "./imports.mjs";
+import { coreWebVitals } from "./next-plugin.mjs";
 import { severityFor } from "./options.mjs";
 import * as selectors from "./selectors.mjs";
 
@@ -31,7 +32,7 @@ export const ignoreBlock = (o) => ({ ignores: [...IGNORES, ...o.ignores] });
 
 // Next.js rules and the jsx-a11y set that eslint-config-next enables (DS-7, FORM-4).
 export const nextBlocks = () => [
-  nextPlugin.flatConfig.coreWebVitals,
+  coreWebVitals(nextPlugin),
   {
     files: ["**/*.{jsx,tsx}"],
     plugins: { "jsx-a11y": jsxA11y },

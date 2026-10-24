@@ -18,9 +18,8 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   (`kit/telemetry`), R2 for uploads. Validation: zod.
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
 - Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
-- `@next/eslint-plugin-next` stays on 15.x (`^15.5.28`) on purpose: the shared lint config in
-  `config/agent-rules` reads `nextPlugin.flatConfig`, which the 16.x plugin removed. Bump it after
-  agent-rules uses `configs["core-web-vitals"]` and the vendored copy is synced.
+- `@next/eslint-plugin-next` follows the Next major (`^16.4.3`); the shared lint config in
+  `config/agent-rules` reads both the 15.x and the 16.x plugin shape.
 
 ## Choices the profile leaves to the project (RULES-5)
 
