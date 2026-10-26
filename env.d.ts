@@ -37,6 +37,8 @@ interface CloudflareEnv {
   CHANNEL_DELAY_MIN?: string;
   /** Токен для внутрішніх викликів cron → /api/internal/tick. Секрет. */
   INTERNAL_TOKEN?: string;
+  /** Токен еквайрингу Monobank: тестовий з api.monobank.ua або бойовий з кабінету web.monobank.ua. Секрет. */
+  MONOBANK_TOKEN?: string;
   /** Пошти адміністраторів через кому: єдиний доступ до /admin і /api/admin. Без значення адмінки немає. */
   ADMIN_EMAILS?: string;
   /** Хости, з яких доступна адмінка, через кому (напр. прихований піддомен). Задано: на решті хостів 404. Не задано: на проді адмінки немає. Не в git, секретом. */

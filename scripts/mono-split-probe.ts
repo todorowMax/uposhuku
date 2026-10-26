@@ -43,7 +43,14 @@ const fail = (message: string): never => {
   process.exit(1);
 };
 
-const call = async (label: string, method: "GET" | "POST", path: string, body?: unknown): Promise<Call> => {
+interface CallSpec {
+  method: "GET" | "POST";
+  path: string;
+  body?: unknown;
+}
+
+const call = async (label: string, spec: CallSpec): Promise<Call> => {
+  const { method, path, body } = spec;
   const headers: Record<string, string> = { "X-Token": TOKEN ?? "", "X-Cms": CMS };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   let status = 0;
@@ -137,13 +144,13 @@ const variants = (performer: string, platform: string): Variant[] => {
 const probe = async () => {
   console.log(`Сервер: ${BASE}\nX-Cms: ${CMS}`);
 
-  const details = await call("Дані мерчанта (перевірка токена)", "GET", "/api/merchant/details");
+  const details = await call("Дані мерчанта (перевірка токена)", { method: "GET", path: "/api/merchant/details" });
   show(details);
   if (details.status === 403) fail("\nТокен не підійшов (403). Візьміть тестовий токен на https://api.monobank.ua/.");
 
-  const receivers = await call("Список отримувачів розщеплення", "GET", "/api/merchant/split-receiver/list");
+  const receivers = await call("Список отримувачів розщеплення", { method: "GET", path: "/api/merchant/split-receiver/list" });
   show(receivers);
-  const submerchants = await call("Список субмерчантів", "GET", "/api/merchant/submerchant/list");
+  const submerchants = await call("Список субмерчантів", { method: "GET", path: "/api/merchant/submerchant/list" });
   show(submerchants);
 
   const found = [...receiverIds(receivers.response), ...receiverIds(submerchants.response)];
@@ -156,13 +163,13 @@ const probe = async () => {
 
   const created: { label: string; invoiceId?: string; pageUrl?: string; status: number; note: string }[] = [];
   for (const variant of variants(performer, platform)) {
-    const entry = await call(variant.label, "POST", "/api/merchant/invoice/create", variant.body);
+    const entry = await call(variant.label, { method: "POST", path: "/api/merchant/invoice/create", body: variant.body });
     show(entry);
     const response = (entry.response ?? {}) as { invoiceId?: string; pageUrl?: string; errText?: string; errCode?: string };
     const note = entry.status === 200 ? "створено" : (response.errText ?? response.errCode ?? JSON.stringify(entry.response)).toString().slice(0, 120);
     created.push({ label: variant.label, invoiceId: response.invoiceId, pageUrl: response.pageUrl, status: entry.status, note });
     if (entry.status === 200 && response.invoiceId) {
-      show(await call(`Статус після створення (${variant.label.slice(0, 1)})`, "GET", `/api/merchant/invoice/status?invoiceId=${response.invoiceId}`));
+      show(await call(`Статус після створення (${variant.label.slice(0, 1)})`, { method: "GET", path: `/api/merchant/invoice/status?invoiceId=${response.invoiceId}` }));
     }
   }
 
@@ -184,19 +191,42 @@ const probe = async () => {
   save();
 };
 
-const [command = "probe", id, amountArg] = process.argv.slice(2);
+const [command = "probe", id, amountArg, mode] = process.argv.slice(2);
+
+/** Корзина 95/5 для часткової фіналізації чи повернення: у розщепленого рахунку без неї банк відхиляє іншу суму. */
+const splitItems = async (amount: number) => {
+  const list = await call("Отримувачі для корзини", { method: "GET", path: "/api/merchant/split-receiver/list" });
+  const ids = receiverIds(list.response);
+  const performer = process.env.MONO_RECEIVER_PERFORMER ?? ids[0];
+  const platform = process.env.MONO_RECEIVER_PLATFORM ?? ids[1] ?? ids[0];
+  if (!performer || !platform) fail("Немає отримувачів для корзини: задайте MONO_RECEIVER_PERFORMER і MONO_RECEIVER_PLATFORM.");
+  const fee = Math.round(amount * 0.05);
+  return [item("Робота виконавця", amount - fee, performer), item("Комісія платформи", fee, platform)];
+};
+
+const parseAmount = (value: string | undefined): number | undefined => {
+  if (!value) return undefined;
+  const amount = Number(value);
+  if (!Number.isInteger(amount) || amount <= 0) fail("Сума має бути цілим числом копійок.");
+  return amount;
+};
+
+/** Команди над одним рахунком. Третім аргументом «split» додаємо корзину 95/5 на цю суму. */
+const invoiceCommand = async (name: string, invoiceId: string, amount: number | undefined): Promise<Call> => {
+  if (name === "status") return call("Статус рахунку", { method: "GET", path: `/api/merchant/invoice/status?invoiceId=${invoiceId}` });
+  if (name === "remove") return call("Інвалідація рахунку", { method: "POST", path: "/api/merchant/invoice/remove", body: { invoiceId } });
+  if (name !== "finalize" && name !== "cancel") return fail(`Невідома команда «${name}». Є: probe, status, finalize, cancel, remove.`);
+  const items = mode === "split" && amount ? await splitItems(amount) : undefined;
+  const label = name === "finalize" ? "Фіналізація холду" : "Скасування оплати";
+  const body = { invoiceId, ...(amount ? { amount } : {}), ...(items ? { items } : {}) };
+  return call(label, { method: "POST", path: `/api/merchant/invoice/${name}`, body });
+};
 
 const main = async () => {
   if (!TOKEN) fail("Задайте MONO_TEST_TOKEN (тестовий токен з https://api.monobank.ua/).");
   if (command === "probe") return probe();
   if (!id) fail(`Команді «${command}» потрібен invoiceId.`);
-  const amount = amountArg ? Number(amountArg) : undefined;
-  if (amountArg && (!Number.isInteger(amount) || (amount as number) <= 0)) fail("Сума має бути цілим числом копійок.");
-  if (command === "status") show(await call("Статус рахунку", "GET", `/api/merchant/invoice/status?invoiceId=${id}`));
-  else if (command === "finalize") show(await call("Фіналізація холду", "POST", "/api/merchant/invoice/finalize", { invoiceId: id, ...(amount ? { amount } : {}) }));
-  else if (command === "cancel") show(await call("Скасування оплати", "POST", "/api/merchant/invoice/cancel", { invoiceId: id, ...(amount ? { amount } : {}) }));
-  else if (command === "remove") show(await call("Інвалідація рахунку", "POST", "/api/merchant/invoice/remove", { invoiceId: id }));
-  else fail(`Невідома команда «${command}». Є: probe, status, finalize, cancel, remove.`);
+  show(await invoiceCommand(command, id, parseAmount(amountArg)));
   save();
 };
 

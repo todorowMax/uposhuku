@@ -22,6 +22,10 @@ CHANNEL_DELAY_MIN=20
 # openssl rand -hex 32: захищає /api/internal/tick, який викликає cron воркера.
 INTERNAL_TOKEN=
 
+# Токен еквайрингу Monobank для безпечної угоди. Локально й на dev: тестовий з https://api.monobank.ua/ (гроші не рухаються).
+# На проді: бойовий з кабінету web.monobank.ua, `wrangler secret put MONOBANK_TOKEN --env production`.
+MONOBANK_TOKEN=
+
 # Пошти адміністраторів через кому: доступ до /admin і /api/admin (розбір спорів). Без значення адмінки немає.
 # На dev і проді: `wrangler secret put ADMIN_EMAILS --env development|production`. Вхід як адмін: лише через Google або
 # пошту з реальним листом; де код входу відомий усім (000000), пошта не доказ.
