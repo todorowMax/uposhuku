@@ -478,3 +478,6 @@ export const channelPosts = sqliteTable(
   },
   (table) => [index("channel_posts_status_idx").on(table.status, table.postedAt)]
 );
+
+// Платежі безпечної угоди винесено окремо: файл схеми не має перевищувати ліміт рядків.
+export * from "./schema-payments";
