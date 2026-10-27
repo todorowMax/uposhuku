@@ -40,6 +40,7 @@
     "tags:resolve": "tsx scripts/tags-resolve.ts",
     "tg:setup": "tsx scripts/telegram-setup.ts",
     "mono:probe": "tsx scripts/mono-split-probe.ts",
+    "uapay:probe": "tsx scripts/uapay-probe.ts",
     "db:seed:local": "tsx scripts/seed-dev.ts && wrangler d1 execute DB --local --env development --file .cache/seed.sql",
     "db:seed:development": "tsx scripts/seed-dev.ts && wrangler d1 execute DB --remote --env development --file .cache/seed.sql",
     "db:unseed:local": "tsx scripts/seed-dev.ts --clean && wrangler d1 execute DB --local --env development --file .cache/seed.sql",

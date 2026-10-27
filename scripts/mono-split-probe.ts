@@ -13,6 +13,9 @@
 //   MONO_TEST_TOKEN=... npm run mono:probe -- finalize <id> [копійки]
 //   MONO_TEST_TOKEN=... npm run mono:probe -- cancel <id> [копійки]
 //   MONO_TEST_TOKEN=... npm run mono:probe -- remove <id>
+//   MONO_TOKEN=... npm run mono:probe -- check               лише читання: токен, отримувачі розщеплення, субмерчанти (годиться й для бойового токена)
+//
+// Усе, що створює рахунки чи рухає гроші, працює лише з тестовим токеном: скрипт перевіряє, що мерчант тестовий.
 //
 // Необов'язково: MONO_RECEIVER_PERFORMER і MONO_RECEIVER_PLATFORM (splitReceiverId
 // виконавця й нашого ФОП), MONO_BASE_URL (за замовчуванням https://api.monobank.ua).
@@ -47,11 +50,13 @@ interface CallSpec {
   method: "GET" | "POST";
   path: string;
   body?: unknown;
+  /** Токен для цього виклику; без нього береться MONO_TEST_TOKEN. */
+  token?: string;
 }
 
 const call = async (label: string, spec: CallSpec): Promise<Call> => {
-  const { method, path, body } = spec;
-  const headers: Record<string, string> = { "X-Token": TOKEN ?? "", "X-Cms": CMS };
+  const { method, path, body, token } = spec;
+  const headers: Record<string, string> = { "X-Token": token ?? TOKEN ?? "", "X-Cms": CMS };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   let status = 0;
   let response: unknown;
@@ -222,8 +227,30 @@ const invoiceCommand = async (name: string, invoiceId: string, amount: number | 
   return call(label, { method: "POST", path: `/api/merchant/invoice/${name}`, body });
 };
 
+/** Лише читання: чий токен (тестовий чи бойовий), які отримувачі й субмерчанти підключено. Безпечно для бойового токена. */
+const check = async () => {
+  const token = process.env.MONO_TOKEN ?? TOKEN;
+  if (!token) fail("Задайте MONO_TOKEN (бойовий) або MONO_TEST_TOKEN (тестовий).");
+  const details = await call("Дані мерчанта", { method: "GET", path: "/api/merchant/details", token });
+  show(details);
+  const merchantId = (details.response as { merchantId?: string } | null)?.merchantId ?? "";
+  console.log(`\nТокен: ${merchantId.startsWith("test_") ? "ТЕСТОВИЙ" : "БОЙОВИЙ"}`);
+  show(await call("Отримувачі розщеплення (split-receiver/list)", { method: "GET", path: "/api/merchant/split-receiver/list", token }));
+  show(await call("Субмерчанти (submerchant/list)", { method: "GET", path: "/api/merchant/submerchant/list", token }));
+  save();
+};
+
+/** Усе, що створює рахунки чи рухає гроші, дозволене лише на тестовому мерчанті. */
+const requireTestMerchant = async () => {
+  const details = await call("Перевірка, що токен тестовий", { method: "GET", path: "/api/merchant/details" });
+  const merchantId = (details.response as { merchantId?: string } | null)?.merchantId ?? "";
+  if (!merchantId.startsWith("test_")) fail("Цей токен не тестовий. Створення рахунків і рух грошей скрипт дозволяє лише на тестовому мерчанті.");
+};
+
 const main = async () => {
+  if (command === "check") return check();
   if (!TOKEN) fail("Задайте MONO_TEST_TOKEN (тестовий токен з https://api.monobank.ua/).");
+  await requireTestMerchant();
   if (command === "probe") return probe();
   if (!id) fail(`Команді «${command}» потрібен invoiceId.`);
   show(await invoiceCommand(command, id, parseAmount(amountArg)));
