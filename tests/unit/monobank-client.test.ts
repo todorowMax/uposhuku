@@ -47,6 +47,12 @@ describe("клієнт Monobank", () => {
     expect(lastCall().body).not.toHaveProperty("redirectUrl");
   });
 
+  it("позиція корзини без розщеплення (розміщення на карті) проходить без splitReceiverId", async () => {
+    fetchMock.mockImplementation(() => respond(200, { invoiceId: "inv3", pageUrl: "p" }));
+    await createInvoice({ amount: 10_000, reference: "pin_1", destination: "d", webHookUrl: "w", hold: false, basketOrder: [{ name: "Розміщення", qty: 1, sum: 10_000, code: "placement" }] });
+    expect(lastCall().body.merchantPaymInfo.basketOrder).toEqual([{ name: "Розміщення", qty: 1, sum: 10_000, code: "placement" }]);
+  });
+
   it("статус: розбирає відповідь банку, ігнорує зайві поля", async () => {
     fetchMock.mockImplementation(() => respond(200, { invoiceId: "inv1", status: "hold", amount: 10000, modifiedDate: "2026-10-26T21:21:18Z", payMethod: "pan", paymentInfo: { fee: 131, rrn: "x" } }));
     const status = await getInvoiceStatus("inv1");

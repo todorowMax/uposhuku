@@ -22,7 +22,8 @@ CHANNEL_DELAY_MIN=20
 # openssl rand -hex 32: захищає /api/internal/tick, який викликає cron воркера.
 INTERNAL_TOKEN=
 
-# Токен еквайрингу Monobank для безпечної угоди. Локально й на dev: тестовий з https://api.monobank.ua/ (гроші не рухаються).
+# Токен еквайрингу Monobank: термінал без розщеплення, оплата розміщення на карті; безпечна угода піде тим самим вебхуком.
+# На dev тестовий токен з https://api.monobank.ua/ (гроші не рухаються).
 # На проді: бойовий з кабінету web.monobank.ua, `wrangler secret put MONOBANK_TOKEN --env production`.
 MONOBANK_TOKEN=
 

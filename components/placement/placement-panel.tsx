@@ -7,19 +7,21 @@ import { ApiError, sessionStore } from "@/lib/auth/client";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import type { Performer, PlacementTier } from "@/lib/map/types";
-import { loadPlacement, payForPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
+import { loadPlacement, placementOpenStore, placementStore, startPlacementPayment } from "@/lib/placement/client";
 import { MAX_PAYMENT, MIN_PAYMENT, TIER_FLOOR, tierFor } from "@/lib/placement/pricing";
 import { TIER_NAMES, TIER_PX } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
+import { Button } from "@/components/ui/button";
+import { usePlacementReturn, type PlacementReturn } from "./use-placement-return";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-type Step = "choose" | "checkout" | "processing" | "done" | "failed";
+type Step = "choose" | "checkout" | "processing" | "failed";
 const CHOICES = [
   { tier: 2, name: "Старт", description: "Невеликий маркер, і вас уже видно на мапі." },
   { tier: 4, name: "Професійний", description: "Помітніший маркер і більше шансів отримати замовлення." },
@@ -39,8 +41,15 @@ export function PlacementPanel() {
   const open = useStore(placementOpenStore);
   const session = useStore(sessionStore);
   const profileState = useStore(profileStore);
+  const placement = useStore(placementStore);
+  const { state: returnState, dismiss } = usePlacementReturn();
+  // Панель закрили: результат повернення більше не показуємо.
+  useEffect(() => {
+    if (!open && returnState) dismiss();
+  }, [open, returnState, dismiss]);
   if (!open || session.status !== "user") return null;
   const profile = profileState.status === "ready" ? profileState.profile : null;
+  if (returnState) return <ReturnResult state={returnState} name={profile?.name ?? ""} photo={profile?.photo ?? ""} tier={placement?.tier ?? 1} retry={dismiss} />;
   if (!profile?.published) return <NeedProfile />;
   return <Chooser photo={profile.photo} name={profile.name} />;
 }
@@ -136,16 +145,23 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   const amount = needed(selected);
   const tierAfter = tierFor(total + amount, prices);
 
-  const pay = async (outcome: "success" | "declined") => {
+  // Повернулися назад зі сторінки банку (кнопка «Назад» у браузері): кнопка оплати знову жива.
+  useEffect(() => {
+    const onShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setStep("checkout");
+    };
+    window.addEventListener("pageshow", onShow);
+    return () => window.removeEventListener("pageshow", onShow);
+  }, []);
+
+  const pay = async () => {
     setStep("processing");
     setError(null);
-    // Чесна пауза, як у справжньому банку: видно, що щось відбувається.
-    await new Promise((resolve) => window.setTimeout(resolve, 1100));
     try {
-      await payForPlacement(amount, outcome);
-      setStep("done");
+      const { pageUrl } = await startPlacementPayment(amount);
+      window.location.assign(pageUrl);
     } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не вдалося провести оплату.");
+      setError(reason instanceof ApiError ? reason.message : "Не вдалося створити рахунок.");
       setStep("failed");
     }
   };
@@ -164,7 +180,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
             </li>
           ))}
         </ul>
-        <p className="pe-hint">Квитанції надійдуть на пошту, коли підключимо Monobank.</p>
+        <p className="pe-hint">Квитанцію про оплату надсилає monobank.</p>
       </Shell>
     );
   }
@@ -173,7 +189,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
     return (
       <Shell title="Оплата" back={step === "checkout" ? () => setStep("choose") : undefined}>
         <div className="place-checkout">
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-muted">Monobank · тестовий режим</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Оплата через monobank</p>
           <p className="mt-2 text-[28px] font-semibold tabular-nums text-ink">{PRICE.format(amount)} ₴</p>
           <p className="text-[12px] text-ink-muted">Розміщення на карті, рівень {tierAfter}: {TIER_NAMES[tierAfter]}</p>
         </div>
@@ -183,21 +199,16 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
             Погоджуюсь з <a href="/offer" target="_blank" rel="noreferrer">договором публічної оферти</a> і прошу змінити рівень розміщення одразу після оплати. Розумію, що протягом 14 днів можу попросити повернення коштів.
           </span>
         </label>
-        <p className="auth-mock">Справжня оплата ще не підключена. У бойовому режимі тут відкриється сторінка Monobank, а рівень зміниться після підтвердження банку.</p>
         <div className="grid gap-2">
-          <button type="button" disabled={step === "processing" || !agreed} onClick={() => void pay("success")} className="auth-primary">
+          <Button disabled={step === "processing" || !agreed} onClick={() => void pay()}>
             {step === "processing" && <Loader2 className="size-4 animate-spin" />}
-            {step === "processing" ? "Проводимо платіж…" : "Оплатити (тест)"}
-          </button>
-          <button type="button" disabled={step === "processing" || !agreed} onClick={() => void pay("declined")} className="auth-secondary">
-            Імітувати відмову банку
-          </button>
+            {step === "processing" ? "Переходимо до оплати…" : `Оплатити ${PRICE.format(amount)} ₴`}
+          </Button>
+          <p className="pe-hint">Оплата карткою через monobank. Після оплати рівень оновиться автоматично.</p>
         </div>
       </Shell>
     );
   }
-
-  if (step === "done") return <Done name={name} photo={photo} tier={placement?.tier ?? tierAfter} />;
 
   if (step === "failed") {
     return (
@@ -294,6 +305,37 @@ function PlacementFaces({ people, photo, name }: { people: Performer[]; photo: s
     </div>
   );
 }
+
+const ReturnResult = ({ state, name, photo, tier, retry }: { state: PlacementReturn; name: string; photo: string; tier: PlacementTier; retry: () => void }) => {
+  if (state === "paid") return <Done name={name} photo={photo} tier={tier} />;
+  if (state === "failed") {
+    return (
+      <Shell title="Оплата не пройшла">
+        <p role="alert" className="auth-error">
+          Оплата не пройшла, гроші не списано.
+        </p>
+        <Button onClick={retry}>Спробувати ще раз</Button>
+      </Shell>
+    );
+  }
+  const pending = state === "pending";
+  return (
+    <Shell title={pending ? "Оплату не підтверджено" : "Перевіряємо оплату"}>
+      <p role="status" className="auth-lead">
+        {pending
+          ? "Банк поки не підтвердив оплату. Якщо ви оплатили, рівень оновиться сам за хвилину-дві. Якщо закрили сторінку банку, гроші не списано."
+          : "Чекаємо підтвердження від банку…"}
+      </p>
+      {pending ? (
+        <Button variant="secondary" onClick={retry}>
+          Оплатити ще раз
+        </Button>
+      ) : (
+        <Loader2 className="mx-auto size-5 animate-spin text-ink-muted" aria-hidden="true" />
+      )}
+    </Shell>
+  );
+};
 
 function Done({ name, photo, tier }: { name: string; photo: string; tier: PlacementTier }) {
   const dotRef = useRef<HTMLSpanElement>(null);

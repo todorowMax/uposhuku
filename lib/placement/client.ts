@@ -3,11 +3,11 @@
 // lib/placement/client.ts
 //
 // Розміщення в браузері: скільки сплачено й який рівень, відкрита панель
-// «Стати на карту», оплата. Рівень одразу міняє маркер людини на карті; без оплати маркера на карті немає.
+// «Стати на карту», рахунок на оплату й перевірка його стану. Рівень одразу міняє маркер людини на карті; без оплати маркера на карті немає.
 
 import { ApiError, sessionStore } from "@/lib/auth/client";
 import { createStore } from "@/lib/store";
-import type { PaymentOutcome, Placement } from "./types";
+import type { InvoiceCheck, Placement, PlacementInvoice } from "./types";
 
 export const placementStore = createStore<Placement | null>(null);
 /** Панель «Стати на карту» відкрита. */
@@ -42,18 +42,20 @@ export const loadPlacement = async () => {
   }
 };
 
-/** Оплатити. Рівень на карті міняється одразу після успіху. */
-export const payForPlacement = async (amount: number, simulate?: PaymentOutcome): Promise<Placement> => {
-  const { placement } = await call<{ placement: Placement }>("/api/placement", {
-    method: "POST",
-    body: JSON.stringify({ amount, simulate: simulate === "declined" ? "declined" : undefined }),
-  });
+/** Створює рахунок у Monobank. Далі людину ведемо на `pageUrl`, а рівень міняється, коли банк підтвердить оплату. */
+export const startPlacementPayment = (amount: number): Promise<PlacementInvoice> =>
+  call<PlacementInvoice>("/api/placement", { method: "POST", body: JSON.stringify({ amount }) });
+
+/** Стан рахунку; поки він не фінальний, сервер сам звіряється з банком. */
+export const checkPlacementInvoice = (id: string): Promise<InvoiceCheck> => call<InvoiceCheck>(`/api/placement/invoices/${encodeURIComponent(id)}`);
+
+/** Оплату зараховано: оновлюємо рівень у сховищі й маркер на карті. */
+export const settlePlacement = async (placement: Placement): Promise<void> => {
   placementStore.set(placement);
   // Динамічний імпорт: профіль уже імпортує розміщення, цикл статично не склеїти.
   const { syncMyMarker } = await import("@/lib/profile/client");
   await syncMyMarker();
   tierUpStore.set({ tier: placement.tier, at: Date.now() });
-  return placement;
 };
 
 export const forgetPlacement = () => {

@@ -1,11 +1,12 @@
 // lib/server/placement-repo.ts
 //
 // Оплати розміщення на D1. Рівень не зберігаємо, а рахуємо щоразу: він залежить
-// від того, скільки платять інші. Справжній платіж проходитиме через Monobank і
-// вебхук; поки запис створює тестовий POST /api/placement.
+// від того, скільки платять інші. Справжню оплату зараховує лише рахунок Monobank
+// зі статусом success (placement-invoice-repo); addPayment лишився для сидів і тестів.
 
 import { eq, sql } from "drizzle-orm";
 import { payments } from "@/db/schema";
+import type { PlacementTier } from "@/lib/map/types";
 import { quote, tierFor } from "@/lib/placement/pricing";
 import type { Payment, Placement } from "@/lib/placement/types";
 import { getDb } from "./db";
@@ -28,10 +29,15 @@ export const getPlacement = async (userId: string): Promise<Placement> => {
   return { total, tier: tierFor(total, prices), prices, payments: list };
 };
 
-export const addPayment = async (userId: string, amount: number): Promise<Placement> => {
+/** Рівень людини після того, як до її сум додадуть `amount`. */
+export const tierAfterPayment = async (userId: string, amount: number): Promise<PlacementTier> => {
   const all = await totalsByUser();
-  const total = (all.get(userId) ?? 0) + amount;
-  await getDb().insert(payments).values({ id: `pay_${crypto.randomUUID().slice(0, 8)}`, userId, amount, tierAfter: tierFor(total, quote(othersOf(all, userId))), createdAt: Date.now() });
+  return tierFor((all.get(userId) ?? 0) + amount, quote(othersOf(all, userId)));
+};
+
+export const addPayment = async (userId: string, amount: number): Promise<Placement> => {
+  const tierAfter = await tierAfterPayment(userId, amount);
+  await getDb().insert(payments).values({ id: `pay_${crypto.randomUUID().slice(0, 8)}`, userId, amount, tierAfter, createdAt: Date.now() });
   return getPlacement(userId);
 };
 

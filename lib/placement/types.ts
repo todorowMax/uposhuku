@@ -23,5 +23,16 @@ export interface Placement {
   payments: Payment[];
 }
 
-/** Як закінчився тестовий платіж. Лише в заглушці: справжній приходить вебхуком Monobank. */
-export type PaymentOutcome = "success" | "declined";
+/** Рахунок Monobank, на сторінку оплати якого ведемо людину. */
+export interface PlacementInvoice {
+  id: string;
+  pageUrl: string;
+}
+
+/** Статуси рахунку від банку; фінальні: success, failure, expired, reversed. */
+export type InvoiceStatus = "created" | "processing" | "hold" | "success" | "failure" | "reversed" | "expired";
+
+export interface InvoiceCheck {
+  status: InvoiceStatus;
+  placement: Placement;
+}

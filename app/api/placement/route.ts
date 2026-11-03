@@ -1,15 +1,16 @@
 // /api/placement — розміщення на карті поточної людини.
-// GET — скільки сплачено, рівень, історія; POST {amount, simulate?} — оплатити.
-// Справжня версія: POST створює рахунок у Monobank і повертає посилання на
-// оплату, а рівень змінює лише вебхук з підписом ECDSA.
+// GET — скільки сплачено, рівень, історія; POST {amount} — створити рахунок у Monobank
+// і повернути посилання на оплату. Рівень змінює лише вебхук з підписом ECDSA
+// (/api/monobank/webhook) або звірка статусу (/api/placement/invoices/[id]).
 
 import { problem, readJson } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
-import { addPayment, getPlacement } from "@/lib/server/placement-repo";
-import { pushGlobal } from "@/lib/server/realtime";
+import { createInvoice, MonobankError } from "@/lib/monobank/client";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/tiers";
-import { EVENTS } from "@/lib/telemetry/events";
-import { serverEvent } from "@/lib/telemetry/log";
+import { getSessionUser } from "@/lib/server/auth";
+import { readVar } from "@/lib/server/env";
+import { createPlacementInvoice, newPlacementInvoiceId } from "@/lib/server/placement-invoice-repo";
+import { getPlacement } from "@/lib/server/placement-repo";
+import { logServer } from "@/lib/telemetry/log";
 
 export async function GET() {
   const user = await getSessionUser();
@@ -25,10 +26,27 @@ export async function POST(request: Request) {
   if (!Number.isFinite(amount) || amount < MIN_PAYMENT || amount > MAX_PAYMENT) {
     return problem(400, "Сума не підходить", `Сума від ${MIN_PAYMENT} до ${MAX_PAYMENT} ₴.`);
   }
-  // Тестова відмова, щоб побачити, як виглядає невдала оплата.
-  if (body?.simulate === "declined") return problem(402, "Оплату відхилено", "Банк відхилив платіж. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
-  const placement = await addPayment(user.id, amount);
-  serverEvent(EVENTS.placementPaid, { tier: placement.tier, amount }, user.id, "/api/placement");
-  pushGlobal({ t: "map" });
-  return Response.json({ placement }, { status: 201 });
+  if (!readVar("MONOBANK_TOKEN")) return problem(503, "Оплата тимчасово недоступна", "Оплата тимчасово недоступна. Спробуйте трохи згодом.");
+
+  const origin = new URL(request.url).origin;
+  const id = newPlacementInvoiceId();
+  const sum = amount * 100;
+  try {
+    const invoice = await createInvoice({
+      amount: sum,
+      hold: false,
+      reference: id,
+      destination: "Розміщення на карті Findlyfy",
+      webHookUrl: `${origin}/api/monobank/webhook`,
+      redirectUrl: `${origin}/?placement=${id}`,
+      basketOrder: [{ name: `Розміщення на карті Findlyfy, ${amount} ₴`, qty: 1, sum, code: "placement" }],
+    });
+    await createPlacementInvoice({ id, userId: user.id, amount, invoiceId: invoice.invoiceId });
+    return Response.json({ id, pageUrl: invoice.pageUrl }, { status: 201 });
+  } catch (error) {
+    if (!(error instanceof MonobankError)) throw error;
+    // Текст банку лише в журнал: людині він нічого не скаже.
+    logServer({ level: "error", event: "placement_invoice_failed", message: error.message, detail: { status: error.status, code: error.code }, request });
+    return problem(502, "Банк не відповів", "Банк не відповів. Гроші не списано, спробуйте ще раз за хвилину.");
+  }
 }

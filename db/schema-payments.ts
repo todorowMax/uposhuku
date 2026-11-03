@@ -63,3 +63,25 @@ export const payoutAccounts = sqliteTable(
   },
   (table) => [uniqueIndex("payout_accounts_user_provider_idx").on(table.userId, table.provider)],
 );
+
+/**
+ * Рахунок Monobank за розміщення на карті (звичайний, без холду й розщеплення). Оплату в `payments`
+ * зараховує лише `success` цього рахунку, рівно раз. `modifiedDate` — рядок банку з останньої
+ * прийнятої події: старішу подію ігноруємо, щоб запізнілий вебхук не відкотив статус. Сума в гривнях.
+ */
+export const placementInvoices = sqliteTable(
+  "placement_invoices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id").notNull(),
+    amount: integer("amount").notNull(),
+    status: text("status").notNull(),
+    modifiedDate: text("modified_date"),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [uniqueIndex("placement_invoices_invoice_idx").on(table.invoiceId), index("placement_invoices_user_idx").on(table.userId)],
+);

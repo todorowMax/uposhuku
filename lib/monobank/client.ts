@@ -87,6 +87,9 @@ const request = async <T>(path: string, schema: z.ZodType<T>, init: RequestInit)
   return schema.parse(text ? JSON.parse(text) : {});
 };
 
+/** Позиція корзини рахунку: `splitReceiverId` потрібен лише для розщеплення (безпечна угода); розміщення на карті платиться без нього. */
+export type InvoiceItem = Omit<BasketItem, "splitReceiverId"> & { splitReceiverId?: string };
+
 export interface CreateInvoiceInput {
   /** Сума «до оплати» в копійках; має дорівнювати сумі корзини. */
   amount: number;
@@ -96,7 +99,7 @@ export interface CreateInvoiceInput {
   redirectUrl?: string;
   /** Холд до фіналізації (у нас 30 днів). Без нього списання одразу. */
   hold: boolean;
-  basketOrder: BasketItem[];
+  basketOrder: InvoiceItem[];
 }
 
 export const createInvoice = (input: CreateInvoiceInput): Promise<{ invoiceId: string; pageUrl: string }> =>
