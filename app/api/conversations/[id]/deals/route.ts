@@ -2,6 +2,7 @@
 // Будь-яка сторона; друга приймає чи відхиляє. Тіло: {title, description?, method, stages[]}.
 
 import { problem, readJson } from "@/lib/api/problem";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { isFop } from "@/lib/deals/fop";
 import type { DealMethod } from "@/lib/deals/types";
 import { getSessionUser } from "@/lib/server/auth";
@@ -27,6 +28,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
     const method: DealMethod = body?.method === "safe" ? "safe" : "direct";
+    if (method === "safe" && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
     const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
     const profile = await getProfile(conversation.performerUserId);
     const performerId = conversation.performerId;

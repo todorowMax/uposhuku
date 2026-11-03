@@ -4,6 +4,7 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { isFop } from "@/lib/deals/fop";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
@@ -38,7 +39,10 @@ export async function POST(request: Request) {
 
   const rawPerformer = body?.performer as Record<string, unknown> | undefined;
   const performerId = text(rawPerformer?.id, 60);
-  const method: DealMethod = body?.method === "direct" ? "direct" : "safe";
+  // Поки безпечна угода вимкнена, метод за замовчуванням — прямий переказ, а safe відхиляємо.
+  const fallback: DealMethod = SAFE_DEAL_ENABLED ? "safe" : "direct";
+  const method: DealMethod = body?.method === "safe" || body?.method === "direct" ? body.method : fallback;
+  if (method === "safe" && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
   const photo = typeof rawPerformer?.photo === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(rawPerformer.photo) && rawPerformer.photo.length < 300_000 ? rawPerformer.photo : undefined;
   const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
 

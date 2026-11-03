@@ -4,7 +4,7 @@
 // кажуть людською мовою. Його просить банк перед еквайрингом, на нього веде
 // галочка згоди перед оплатою. Нумерація додається автоматично (numbered).
 
-import { SAFE_DEAL_ENABLED } from "./config";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { type LegalSectionData, visible } from "./types";
 
 export const offerSections = (): LegalSectionData[] =>

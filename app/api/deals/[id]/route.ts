@@ -1,8 +1,9 @@
 // POST /api/deals/:id {action, stageId?, simulate?, as?} — дія з угодою. Замовник:
-// fund (заморозити кошти), claim_paid («я оплатив» за QR), release (прийняти
+// fund (заморозити кошти), claim_paid («я оплатив» після прямого переказу), release (прийняти
 // роботу й виплатити), dispute (спір), cancel (скасувати пропозицію).
 
 import { problem, readJson } from "@/lib/api/problem";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { getSessionUser } from "@/lib/server/auth";
 import { actAsPerformer, actOnDeal, ownerOfDeal } from "@/lib/server/deal-repo";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
@@ -57,6 +58,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const action = ACTIONS.find((item) => item === body?.action);
   if (!action) return problem(400, "Невідома дія");
+  // Заморожування й імітація відмови банку працюють лише з безпечною угодою.
+  if ((action === "fund" || body?.simulate) && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
   // Тестова відмова банку при замороженні, щоб побачити, як це виглядає.
   if (action === "fund" && body?.simulate === "declined") {
     return problem(402, "Кошти не заморожено", "Банк відхилив операцію. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");

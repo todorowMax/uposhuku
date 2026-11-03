@@ -1,10 +1,13 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { buildBasket } from "@/lib/deals/basket";
 import { quoteStage } from "@/lib/deals/price";
 import type { DealDraft } from "@/lib/deals/types";
 import { proposeDeal } from "@/lib/server/deal-repo";
 import { activeStagePayment, createDealPayment, findPaymentByInvoice, forgetPaymentEvent, getPayoutAccount, recordPaymentEvent, savePayoutAccount, updatePayment } from "@/lib/server/payment-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
+
+// Тут перевіряємо саму безпечну угоду, тож вмикаємо прапорець; вимкнений стан покриває safe-deal-flag.test.ts.
+vi.mock("@/lib/deals/flags", () => ({ SAFE_DEAL_ENABLED: true }));
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 let dealId = "";

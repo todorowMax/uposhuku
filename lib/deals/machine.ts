@@ -4,6 +4,7 @@
 // «зараз» передаємо ззовні, тож усе перевіряється тестами. Дії замовника й
 // виконавця; гроші підтверджуватиме вебхук банку.
 
+import { SAFE_DEAL_ENABLED } from "./flags";
 import { quoteStage } from "./price";
 import {
   HOLD_DAYS,
@@ -27,6 +28,9 @@ import {
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
+/** Відповідь на спробу створити безпечну угоду або заморозити кошти, поки функція вимкнена. */
+export const SAFE_DEAL_UNAVAILABLE = "Безпечна угода ще недоступна";
+
 export const dealTotal = (deal: Pick<Deal, "stages">) => deal.stages.reduce((sum, stage) => sum + stage.amount, 0);
 
 /** Винагорода платформи від ціни виконавця: лише для безпечної угоди, у гривнях. Платить замовник понад ціну. */
@@ -38,6 +42,7 @@ export const payoutOf = (amount: number) => amount;
 /** Помилка у чернетці угоди або null. Текст — для людини. */
 export const validateDraft = (draft: DealDraft): string | null => {
   if (draft.stages.length < 1 || draft.stages.length > MAX_STAGES) return `Етапів має бути від 1 до ${MAX_STAGES}.`;
+  if (draft.method === "safe" && !SAFE_DEAL_ENABLED) return SAFE_DEAL_UNAVAILABLE;
   if (draft.method === "safe" && !draft.performer.fop) return "Безпечна угода доступна лише виконавцям-ФОП.";
   if (draft.method === "direct" && draft.stages.length !== 1) return "Прямий переказ іде одним платежем.";
   for (const stage of draft.stages) {
@@ -115,6 +120,7 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
   let updated: DealStage;
   switch (action) {
     case "fund":
+      if (!SAFE_DEAL_ENABLED) return SAFE_DEAL_UNAVAILABLE;
       if (deal.method !== "safe" || stage.status !== "pending") return "Заморозити кошти зараз не можна.";
       // Тип картки не передали (старий клієнт): рахуємо за вищою ставкою, щоб виконавець не лишився внакладі.
       updated = { ...stage, status: "funded", fundedAt: iso(now), holdUntil: iso(now + HOLD_DAYS * DAY), payment: quoteStage(stage.amount, options.card ?? "foreign") };

@@ -13,6 +13,7 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { isFop } from "@/lib/deals/fop";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { formatKop, rateLabel, totalRange } from "@/lib/deals/price";
@@ -198,7 +199,7 @@ export function TermsForm({
         </Field>
       </div>
 
-      <fieldset className="deal-methods">
+      <fieldset className="deal-methods" hidden={!SAFE_DEAL_ENABLED}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
@@ -233,13 +234,19 @@ export function TermsForm({
             onChange={() => setMethod("direct")}
           />
           <span className="text-[14px] font-semibold text-ink">
-            Прямий переказ за QR
+            Прямий переказ
           </span>
           <span className="deal-method-text">
             Без комісії, одним платежем. Без гарантії платформи.
           </span>
         </label>
       </fieldset>
+      {!SAFE_DEAL_ENABLED && (
+        <p className="pe-hint">
+          Оплата прямим переказом, одним платежем: без комісії платформи й без
+          її гарантії.
+        </p>
+      )}
 
       {amountNumber > 0 && (
         <dl className="deal-summary">

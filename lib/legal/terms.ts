@@ -4,7 +4,7 @@
 // сервіс, а не лише про платну послугу. Правила майданчика тут же, окремої
 // сторінки не робимо: їх шукають там, де й умови.
 
-import { SAFE_DEAL_ENABLED } from "./config";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { type LegalSectionData, visible } from "./types";
 
 export const TERMS_INTRO =

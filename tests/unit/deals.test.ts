@@ -1,7 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyAction, applyModeratorAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { quoteStage, splitShares, totalRange } from "@/lib/deals/price";
 import { ACQUIRING_RATE, HOLD_DAYS, MAX_STAGE_AMOUNT, MAX_STAGE_DAYS, type Deal, type DealDraft } from "@/lib/deals/types";
+
+// Тут перевіряємо саму безпечну угоду, тож вмикаємо прапорець; вимкнений стан покриває safe-deal-flag.test.ts.
+vi.mock("@/lib/deals/flags", () => ({ SAFE_DEAL_ENABLED: true }));
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
 const performer = { id: "p1", name: "Юлія", avatarIndex: 1, specialty: "Дизайнерка", fop: true };

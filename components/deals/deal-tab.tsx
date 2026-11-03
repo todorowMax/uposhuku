@@ -13,9 +13,11 @@ import {
   Plus,
   Trash2,
 } from "@/components/icons";
+import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, proposeDeal, useDeals } from "@/lib/deals/client";
+import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { isFop } from "@/lib/deals/fop";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { formatKop, quoteStage, rateLabel, totalRange } from "@/lib/deals/price";
@@ -190,8 +192,9 @@ function DealComposer({ response }: { response: OfferResponse }) {
   return (
     <div className="deal">
       <p className="auth-lead">
-        Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець
-        побачить пропозицію й погодиться.
+        {SAFE_DEAL_ENABLED
+          ? "Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець побачить пропозицію й погодиться."
+          : "Зафіксуйте домовленість: суму й терміни. Виконавець побачить пропозицію й погодиться."}
       </p>
 
       <div className="grid grid-cols-2 gap-2">
@@ -227,7 +230,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         </Field>
       </div>
 
-      <fieldset className="deal-methods">
+      <fieldset className="deal-methods" hidden={!SAFE_DEAL_ENABLED}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
@@ -264,7 +267,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
           />
           <span className="flex items-center gap-2 text-[14px] font-semibold text-ink">
             <QrCode className="size-4 text-ink-muted" />
-            Прямий переказ за QR
+            Прямий переказ
           </span>
           <span className="deal-method-text">
             Без комісії, переказ одним платежем на рахунок виконавця. Без
@@ -272,6 +275,12 @@ function DealComposer({ response }: { response: OfferResponse }) {
           </span>
         </label>
       </fieldset>
+      {!SAFE_DEAL_ENABLED && (
+        <p className="pe-hint">
+          Оплата прямим переказом виконавцю: без комісії платформи й без її
+          гарантії, у спорі гроші ми не повертаємо.
+        </p>
+      )}
 
       {method === "safe" && stages.length > 0 && (
         <div className="deal-stages">
@@ -536,7 +545,7 @@ export function DealView({ deal }: { deal: Deal }) {
             </span>
           </p>
           <p className="mt-0.5 text-[12px] text-ink-muted">
-            {deal.method === "safe" ? "Безпечна угода" : "Прямий переказ за QR"}
+            {deal.method === "safe" ? "Безпечна угода" : "Прямий переказ"}
           </p>
         </div>
         <span
@@ -797,7 +806,7 @@ function StageActions({
 
   if (stage.status === "pending") {
     return (
-      <QrBlock
+      <TransferBlock
         deal={deal}
         stage={stage}
         busy={busy === "claim_paid"}
@@ -891,8 +900,8 @@ function StageActions({
   return null;
 }
 
-/** Деталі переказу з QR (за стандартом НБУ, тут умовний) і «Я оплатив». */
-function QrBlock({
+/** Умови прямого переказу: реквізити виконавець надсилає в чаті, платформа їх не знає. Далі «Я оплатив». */
+const TransferBlock = ({
   deal,
   stage,
   busy,
@@ -902,102 +911,32 @@ function QrBlock({
   stage: DealStage;
   busy: boolean;
   onClaim: () => Promise<boolean>;
-}) {
-  const cells = useMemo(
-    () => qrCells(`${deal.number}${stage.id}`),
-    [deal.number, stage.id],
-  );
-  const last4 = (Math.abs(hashCode(deal.performer.id)) % 9000) + 1000;
-  return (
-    <div className="deal-box">
-      <div className="flex gap-3">
-        <svg
-          viewBox="0 0 25 25"
-          className="deal-qr"
-          role="img"
-          aria-label="Тестовий QR для переказу"
-          shapeRendering="crispEdges"
-        >
-          <rect width="25" height="25" fill="#fff" />
-          {cells.map(([x, y]) => (
-            <rect
-              key={`${x}-${y}`}
-              x={x}
-              y={y}
-              width="1"
-              height="1"
-              fill="#1f2a2e"
-            />
-          ))}
-        </svg>
-        <dl className="min-w-0 flex-1 text-[12px] leading-snug">
-          <dt className="text-ink-muted">Отримувач</dt>
-          <dd className="truncate font-medium text-ink">
-            {deal.performer.name}
-          </dd>
-          <dt className="mt-1.5 text-ink-muted">Рахунок</dt>
-          <dd className="font-medium tabular-nums text-ink">
-            UA•• •••• •••• •••• •••• {last4}
-          </dd>
-          <dt className="mt-1.5 text-ink-muted">Сума</dt>
-          <dd className="font-semibold tabular-nums text-ink">
-            {money(stage.amount)}
-          </dd>
-          <dt className="mt-1.5 text-ink-muted">Призначення</dt>
-          <dd className="text-ink">Оплата за роботу, угода {deal.number}</dd>
-        </dl>
-      </div>
-      <p className="pe-hint mt-2">
-        Тестовий QR: у бойовому режимі тут QR за стандартом НБУ, який відкриє
-        застосунок будь-якого українського банку. Реквізити бачите лише ви в
-        цьому чаті.
-      </p>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => void onClaim()}
-        className="offer-primary mt-3 w-full"
-      >
-        {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
-      </button>
-    </div>
-  );
-}
-
-const hashCode = (value: string) => {
-  let result = 0;
-  for (let index = 0; index < value.length; index++)
-    result = (Math.imul(result, 31) + value.charCodeAt(index)) | 0;
-  return result;
-};
-
-/** Умовний QR: три «мітки» по кутах і щільне поле з хешу. Лише ілюстрація. */
-const qrCells = (seed: string): [number, number][] => {
-  const cells: [number, number][] = [];
-  let state = Math.abs(hashCode(seed)) || 1;
-  const next = () => {
-    state = (Math.imul(state, 1103515245) + 12345) & 0x7fffffff;
-    return state;
-  };
-  const finder = (ox: number, oy: number) => {
-    for (let y = 0; y < 7; y++)
-      for (let x = 0; x < 7; x++) {
-        const edge = x === 0 || y === 0 || x === 6 || y === 6;
-        const core = x >= 2 && x <= 4 && y >= 2 && y <= 4;
-        if (edge || core) cells.push([ox + x, oy + y]);
-      }
-  };
-  finder(0, 0);
-  finder(18, 0);
-  finder(0, 18);
-  for (let y = 0; y < 25; y++)
-    for (let x = 0; x < 25; x++) {
-      const inFinder =
-        (x < 8 && y < 8) || (x > 16 && y < 8) || (x < 8 && y > 16);
-      if (!inFinder && next() % 100 < 48) cells.push([x, y]);
-    }
-  return cells;
-};
+}) => (
+  <div className="deal-box">
+    <dl className="text-xs leading-snug">
+      <dt className="text-ink-muted">Отримувач</dt>
+      <dd className="truncate font-medium text-ink">{deal.performer.name}</dd>
+      <dt className="mt-1.5 text-ink-muted">Сума</dt>
+      <dd className="font-semibold tabular-nums text-ink">
+        {money(stage.amount)}
+      </dd>
+      <dt className="mt-1.5 text-ink-muted">Призначення</dt>
+      <dd className="text-ink">Оплата за роботу, угода {deal.number}</dd>
+    </dl>
+    <p className="pe-hint mt-2">
+      Реквізити для переказу виконавець надсилає в чаті. Платформа не отримує
+      ці гроші й не повертає їх.
+    </p>
+    <Button
+      variant="offer"
+      disabled={busy}
+      onClick={() => void onClaim()}
+      className="mt-3 w-full"
+    >
+      {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
+    </Button>
+  </div>
+);
 
 // ---------------------------------------------------------------------------
 // Відгук про роботу
