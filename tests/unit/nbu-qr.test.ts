@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatQrAmount, NBU_QR_BASE, NBU_QR_VERIFIED, nbuQrLines, nbuQrLink, qrVisible } from "@/lib/deals/nbu-qr";
+import { formatQrAmount, NBU_QR_BASE, nbuQrLines, nbuQrLink } from "@/lib/deals/nbu-qr";
 
 const input = { recipient: "ФОП Іваненко Іван", iban: "ua 213052 990000026001234567890".replace(/ /g, ""), taxCode: "1234 567890", amount: 1500, purpose: "Оплата за роботу, угода #AB12" };
 
@@ -38,13 +38,5 @@ describe("QR за форматом НБУ", () => {
   it("сума з двома знаками", () => {
     expect(formatQrAmount(30)).toBe("UAH30.00");
     expect(formatQrAmount(99.5)).toBe("UAH99.50");
-  });
-});
-
-describe("видимість QR", () => {
-  it("поки формат не перевірено, на проді QR прихований, поза продом видно", () => {
-    expect(NBU_QR_VERIFIED).toBe(false);
-    expect(qrVisible(true)).toBe(false);
-    expect(qrVisible(false)).toBe(true);
   });
 });

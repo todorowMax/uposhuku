@@ -13,12 +13,14 @@ export const metadata: Metadata = {
 // Режим безпечної угоди читається зі змінних воркера під час запиту, тож сторінка не статична.
 export const dynamic = "force-dynamic";
 
-export default function TermsPage() {
-  const safeDeal = safeDealPublic();
+const TermsPage = async () => {
+  const safeDeal = await safeDealPublic();
   return (
     <LegalPage title="Умови користування" updated={UPDATED.terms}>
       <p>{fill(TERMS_INTRO)}</p>
       <LegalSections sections={termsSections(safeDeal)} />
     </LegalPage>
   );
-}
+};
+
+export default TermsPage;

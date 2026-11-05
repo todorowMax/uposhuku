@@ -18,8 +18,8 @@ export const metadata: Metadata = {
 // Режим безпечної угоди читається зі змінних воркера під час запиту, тож сторінка не статична.
 export const dynamic = "force-dynamic";
 
-export default function OfferPage() {
-  const sections = numbered(offerSections(safeDealPublic()));
+const OfferPage = async () => {
+  const sections = numbered(offerSections(await safeDealPublic()));
   return (
     <LegalPage title="Публічна оферта" updated={UPDATED.offer}>
       <p className="font-semibold text-ink">Договір про надання послуги розміщення профілю на карті</p>
@@ -37,4 +37,6 @@ export default function OfferPage() {
       />
     </LegalPage>
   );
-}
+};
+
+export default OfferPage;

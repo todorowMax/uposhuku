@@ -24,6 +24,7 @@ export const RATE_RULES = {
   dealRequisitesRead: { max: 30, windowMs: 10 * MINUTE },
   requisitesWrite: { max: 10, windowMs: 60 * MINUTE },
   requisitesRead: { max: 60, windowMs: 10 * MINUTE },
+  cryptoProof: { max: 10, windowMs: 10 * MINUTE },
   payoutApply: { max: 5, windowMs: 60 * MINUTE },
   releaseCode: { max: 5, windowMs: 60 * MINUTE },
   adminDecision: { max: 30, windowMs: 10 * MINUTE },

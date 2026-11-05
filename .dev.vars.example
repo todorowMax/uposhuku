@@ -36,6 +36,21 @@ MONOBANK_PLATFORM_RECEIVER_ID=
 SAFE_DEAL_MODE=off
 SAFE_DEAL_USERS=
 
+# Прапорці функцій (off | allowlist | on, пошти через кому). Значення, збережене в адмінці (/admin/features), важливіше за ці.
+# Без обох функція вимкнена. Зміна грошових і крипто-прапорців в адмінці потребує коду TOTP.
+CRYPTO_PROOF_MODE=off
+CRYPTO_PROOF_USERS=
+CRYPTO_WALLET_MODE=off
+CRYPTO_WALLET_USERS=
+CRYPTO_ESCROW_MODE=off
+CRYPTO_ESCROW_USERS=
+# QR переказу за форматом НБУ: показувати, лише коли сканування перевірено в банках. Локально можна `on`.
+NBU_QR_MODE=off
+NBU_QR_USERS=
+
+# Ключ TronGrid (необов'язковий): підвищує ліміт запитів при перевірці USDT TRC-20 за хешем. Секрет.
+TRONGRID_API_KEY=
+
 # Ключ шифрування реквізитів виконавців (AES-256-GCM): `openssl rand -base64 32`. Без нього реквізити не зберігаються.
 # На dev і проді: `wrangler secret put REQUISITES_KEY --env development|production`. Не міняти без перешифрування.
 REQUISITES_KEY=

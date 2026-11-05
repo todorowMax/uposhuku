@@ -10,6 +10,7 @@ import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { groupIban, requisitesText } from "@/lib/deals/transfer";
 import { CopyRow } from "./copy-row";
+import { CryptoTransfer } from "./crypto-transfer";
 import { QrImage } from "./qr-image";
 import { useTransferCard } from "./use-transfer-card";
 
@@ -17,12 +18,14 @@ const PRICE = new Intl.NumberFormat("uk-UA");
 
 export const TransferCard = ({
   dealId,
+  requestId,
   dealNumber,
   amount,
   busy,
   onClaim,
 }: {
   dealId: string;
+  requestId: string;
   dealNumber: string;
   amount: number;
   busy: boolean;
@@ -97,6 +100,10 @@ export const TransferCard = ({
 
           {card.qrLink && (
             <QrImage value={card.qrLink} label={`QR-код для переказу ${PRICE.format(amount)} гривень`} />
+          )}
+
+          {state.crypto && (state.requisites.usdtTrc20 || state.requisites.binanceId) && (
+            <CryptoTransfer dealId={dealId} requestId={requestId} requisites={state.requisites} copied={card.copied} onCopy={(key, text) => void card.copy(key, text)} />
           )}
         </div>
       )}

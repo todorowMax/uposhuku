@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parseSafeDealMode, parseSafeDealUsers, safeDealAllowed } from "@/lib/deals/flags";
+import { featureAllowed, parseFeatureMode, parseFeatureUsers } from "@/lib/features/flags";
 import { applyAction, SAFE_DEAL_UNAVAILABLE, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import { legalLinks } from "@/lib/legal/links";
@@ -32,34 +32,34 @@ afterAll(async () => {
 
 describe("режим безпечної угоди", () => {
   it("за замовчуванням і для сміття це off: помилка в змінній не вмикає гроші", () => {
-    for (const raw of [undefined, "", "yes", "ON ?", "true", "1"]) expect(parseSafeDealMode(raw)).toBe("off");
-    expect(parseSafeDealMode(" Allowlist ")).toBe("allowlist");
-    expect(parseSafeDealMode("on")).toBe("on");
+    for (const raw of [undefined, "", "yes", "ON ?", "true", "1"]) expect(parseFeatureMode(raw)).toBe("off");
+    expect(parseFeatureMode(" Allowlist ")).toBe("allowlist");
+    expect(parseFeatureMode("on")).toBe("on");
   });
 
   it("allowlist пускає лише пошти зі списку без урахування регістру й пробілів; off нікого; on всіх", () => {
-    const users = parseSafeDealUsers(" Max@Example.com, ,anna@example.com ");
+    const users = parseFeatureUsers(" Max@Example.com, ,anna@example.com ");
     expect(users).toEqual(["max@example.com", "anna@example.com"]);
-    expect(safeDealAllowed("allowlist", users, "MAX@example.com")).toBe(true);
-    expect(safeDealAllowed("allowlist", users, "other@example.com")).toBe(false);
-    expect(safeDealAllowed("allowlist", users, null)).toBe(false);
-    expect(safeDealAllowed("off", users, "max@example.com")).toBe(false);
-    expect(safeDealAllowed("on", [], "any@example.com")).toBe(true);
+    expect(featureAllowed({ mode: "allowlist", users }, "MAX@example.com")).toBe(true);
+    expect(featureAllowed({ mode: "allowlist", users }, "other@example.com")).toBe(false);
+    expect(featureAllowed({ mode: "allowlist", users }, null)).toBe(false);
+    expect(featureAllowed({ mode: "off", users }, "max@example.com")).toBe(false);
+    expect(featureAllowed({ mode: "on", users: [] }, "any@example.com")).toBe(true);
   });
 
-  it("сервер читає змінні; юридичні тексти бачать безпечну угоду лише в режимі on", () => {
+  it("сервер читає змінні; юридичні тексти бачать безпечну угоду лише в режимі on", async () => {
     delete process.env.SAFE_DEAL_MODE;
-    expect(safeDealMode()).toBe("off");
-    expect(safeDealEnabledFor("max@example.com")).toBe(false);
-    expect(safeDealPublic()).toBe(false);
+    expect(await safeDealMode()).toBe("off");
+    expect(await safeDealEnabledFor("max@example.com")).toBe(false);
+    expect(await safeDealPublic()).toBe(false);
     process.env.SAFE_DEAL_MODE = "allowlist";
     process.env.SAFE_DEAL_USERS = "max@example.com";
-    expect(safeDealEnabledFor("max@example.com")).toBe(true);
-    expect(safeDealEnabledFor("other@example.com")).toBe(false);
-    expect(safeDealPublic()).toBe(false);
+    expect(await safeDealEnabledFor("max@example.com")).toBe(true);
+    expect(await safeDealEnabledFor("other@example.com")).toBe(false);
+    expect(await safeDealPublic()).toBe(false);
     process.env.SAFE_DEAL_MODE = "on";
-    expect(safeDealEnabledFor("other@example.com")).toBe(true);
-    expect(safeDealPublic()).toBe(true);
+    expect(await safeDealEnabledFor("other@example.com")).toBe(true);
+    expect(await safeDealPublic()).toBe(true);
     delete process.env.SAFE_DEAL_MODE;
   });
 });

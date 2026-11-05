@@ -53,7 +53,7 @@ const accountLimit = async (userId: string, amount: number, now: number): Promis
 
 export const startStagePayment = async (input: { user: { id: string; email: string }; dealId: string; origin: string; now?: number }): Promise<PayResult> => {
   const { user, dealId, origin, now = Date.now() } = input;
-  if (!safeDealEnabledFor(user.email)) return fail(409, "Безпечна угода ще недоступна", "Безпечна угода ще недоступна.");
+  if (!(await safeDealEnabledFor(user.email))) return fail(409, "Безпечна угода ще недоступна", "Безпечна угода ще недоступна.");
   const deal = await getDealForOwner(dealId, user.id);
   if (!deal) return fail(404, "Угоду не знайдено", "Угоду не знайдено.");
   if (deal.method !== "safe" || deal.status !== "accepted") return fail(409, "Оплата недоступна", "Оплатити можна лише прийняту безпечну угоду.");

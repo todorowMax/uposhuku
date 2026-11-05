@@ -46,6 +46,7 @@ import {
 import type { Deal, PerformerAction } from "@/lib/deals/types";
 import { mentionsContacts } from "@/lib/chat/contacts";
 import { PAYMENT_HINT, mentionsPaymentDetails } from "@/lib/chat/payment-hints";
+import { CryptoProofNote } from "@/components/deals/crypto-proof-note";
 import { DealTab } from "@/components/deals/deal-tab";
 import { DirectDeals, TermsForm } from "@/components/chat/direct-deals";
 import { offersMapStore } from "@/lib/requests/offers";
@@ -1077,6 +1078,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
                 </button>
               </div>
             )}
+            {needs === "confirm" && deal.method === "direct" && stage && <CryptoProofNote dealId={deal.id} stageId={stage.id} />}
             {needs === "confirm" && (
               <div className="inbox-deal-actions">
                 <button

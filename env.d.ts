@@ -47,6 +47,17 @@ interface CloudflareEnv {
   SAFE_DEAL_MODE?: string;
   /** Пошти через кому, яким доступна безпечна угода в режимі allowlist. */
   SAFE_DEAL_USERS?: string;
+  /** Прапорці функцій: <ІМ'Я>_MODE ("off" | "allowlist" | "on") і <ІМ'Я>_USERS (пошти через кому). Збережене в адмінці важливіше. */
+  CRYPTO_PROOF_MODE?: string;
+  CRYPTO_PROOF_USERS?: string;
+  CRYPTO_WALLET_MODE?: string;
+  CRYPTO_WALLET_USERS?: string;
+  CRYPTO_ESCROW_MODE?: string;
+  CRYPTO_ESCROW_USERS?: string;
+  NBU_QR_MODE?: string;
+  NBU_QR_USERS?: string;
+  /** Ключ TronGrid: необов'язковий, піднімає ліміт запитів. Секрет. */
+  TRONGRID_API_KEY?: string;
   /** Ключ шифрування реквізитів виконавців: base64, 32 байти (`openssl rand -base64 32`). Секрет; без нього реквізити не зберігаються (503). */
   REQUISITES_KEY?: string;
   /** Пошти адміністраторів через кому: єдиний доступ до /admin і /api/admin. Без значення адмінки немає. */

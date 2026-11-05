@@ -97,21 +97,24 @@ describe("GET /api/deals/:id/requisites", () => {
     expect((await body(mine)).requisites?.iban).toBe(IBAN);
   });
 
-  it("qr: true поза продом і false на проді, поки формат НБУ не перевірено", async () => {
+  it("qr керує прапорець nbu_qr: за замовчуванням вимкнено, allowlist лише для пошти зі списку, on для всіх", async () => {
     const deal = await proposeDeal("rr-cust", { requestId: "r2", responseId: "x2", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, { safeEnabled: true });
     if (typeof deal === "string") throw new Error(deal);
     await actAsPerformer("rr-perf", deal.id, "accept", undefined);
     session.user = { id: "rr-cust", email: "rr-cust@example.com" };
     const ask = async () => ((await (await GET_DEAL(new Request("https://findlyfy.test/x"), { params: Promise.resolve({ id: deal.id }) })).json()) as { qr: boolean }).qr;
-    const before = process.env.DEPLOY_ENV;
     try {
-      process.env.DEPLOY_ENV = "development";
-      expect(await ask()).toBe(true);
-      process.env.DEPLOY_ENV = "production";
       expect(await ask()).toBe(false);
+      process.env.NBU_QR_MODE = "allowlist";
+      process.env.NBU_QR_USERS = "other@example.com";
+      expect(await ask()).toBe(false);
+      process.env.NBU_QR_USERS = "RR-CUST@example.com";
+      expect(await ask()).toBe(true);
+      process.env.NBU_QR_MODE = "on";
+      expect(await ask()).toBe(true);
     } finally {
-      if (before === undefined) delete process.env.DEPLOY_ENV;
-      else process.env.DEPLOY_ENV = before;
+      delete process.env.NBU_QR_MODE;
+      delete process.env.NBU_QR_USERS;
     }
   });
 });

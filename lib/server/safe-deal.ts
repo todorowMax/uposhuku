@@ -1,15 +1,15 @@
 // lib/server/safe-deal.ts
 //
-// Рішення про безпечну угоду на сервері: режим і список пошт беремо зі змінних середовища.
+// Рішення про безпечну угоду на сервері: тонка обгортка над прапорцем `safe_deal` (lib/server/features.ts).
 // Нові оплати й нові угоди питають тут; гроші, що вже в русі (вебхук, звірка, виплата), режиму не питають.
 
-import { parseSafeDealMode, parseSafeDealUsers, safeDealAllowed, type SafeDealMode } from "@/lib/deals/flags";
-import { readVar } from "./env";
+import type { FeatureMode } from "@/lib/features/flags";
+import { featureEnabledFor, featureMode } from "./features";
 
-export const safeDealMode = (): SafeDealMode => parseSafeDealMode(readVar("SAFE_DEAL_MODE"));
+export const safeDealMode = (): Promise<FeatureMode> => featureMode("safe_deal");
 
 /** Чи може ця людина створювати безпечні угоди й оплачувати їх. */
-export const safeDealEnabledFor = (email: string | null | undefined): boolean => safeDealAllowed(safeDealMode(), parseSafeDealUsers(readVar("SAFE_DEAL_USERS")), email);
+export const safeDealEnabledFor = (email: string | null | undefined): Promise<boolean> => featureEnabledFor("safe_deal", email);
 
 /** Юридичні тексти показують безпечну угоду лише в режимі `on`. */
-export const safeDealPublic = (): boolean => safeDealMode() === "on";
+export const safeDealPublic = async (): Promise<boolean> => (await safeDealMode()) === "on";

@@ -63,3 +63,11 @@ export const notifyMoneyDecision = async (input: { deal: Deal; action: Moderator
     `Модератор ${adminEmail}: ${ACTION_LABEL[action]}${part}, етап на ${stageAmount} ₴ (угода ${deal.number}). Банк: ${bank}.`,
   );
 };
+
+/** Лист власнику про зміну грошового чи крипто-прапорця: що, на який режим, хто. Списку пошт у листі немає. */
+export const notifyFeatureChange = async (input: { feature: string; mode: string; users: number; adminEmail: string }): Promise<void> => {
+  const emails = parseAdminEmails(readVar("ADMIN_EMAILS"));
+  if (emails.length === 0) return;
+  const { feature, mode, users, adminEmail } = input;
+  await sendAdminNotice(emails, `Змінено прапорець ${feature}`, `Модератор ${adminEmail} змінив прапорець ${feature}: режим ${mode}, пошт у списку ${users}.`);
+};

@@ -11,14 +11,14 @@ import { validateRequisites, type Requisites } from "@/lib/deals/requisites";
 import { fetchOwnRequisites, saveOwnRequisites, type OwnRequisitesDto } from "@/lib/requisites/client";
 
 export namespace RequisitesFormTypes {
-  export type Fields = { recipient: string; iban: string; taxCode: string; payUrl: string };
+  export type Fields = { recipient: string; iban: string; taxCode: string; payUrl: string; usdtTrc20: string; binanceId: string };
   export type Load = "loading" | "ready" | "error";
 }
 
-const EMPTY: RequisitesFormTypes.Fields = { recipient: "", iban: "", taxCode: "", payUrl: "" };
+const EMPTY: RequisitesFormTypes.Fields = { recipient: "", iban: "", taxCode: "", payUrl: "", usdtTrc20: "", binanceId: "" };
 
 const toFields = (value: Requisites | null | undefined): RequisitesFormTypes.Fields =>
-  value ? { recipient: value.recipient, iban: value.iban, taxCode: value.taxCode, payUrl: value.payUrl ?? "" } : EMPTY;
+  value ? { recipient: value.recipient, iban: value.iban, taxCode: value.taxCode, payUrl: value.payUrl ?? "", usdtTrc20: value.usdtTrc20 ?? "", binanceId: value.binanceId ?? "" } : EMPTY;
 
 const REASON = (reason: unknown, fallback: string) => (reason instanceof ApiError ? reason.message : fallback);
 

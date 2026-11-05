@@ -184,3 +184,38 @@ export const adminTotpState = sqliteTable("admin_totp_state", {
   lastCounter: integer("last_counter").notNull(),
   updatedAt: integer("updated_at").notNull(),
 });
+
+/**
+ * Прапорці функцій, змінені в адмінці: режим (off | allowlist | on) і пошти через кому. Рядок важливіший за
+ * змінні середовища; без рядка діють змінні, без них функція вимкнена. Хто й коли змінив, лишається в рядку.
+ */
+export const featureFlags = sqliteTable("feature_flags", {
+  feature: text("feature").primaryKey(),
+  mode: text("mode").notNull(),
+  users: text("users").notNull().default(""),
+  updatedBy: text("updated_by").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * Підтверджена оплата USDT TRC-20 за хешем транзакції для етапу прямої угоди. Один хеш рахується лише раз
+ * (унікальний індекс). Сума в мінімальних одиницях токена (6 знаків) рядком, щоб не втратити точність.
+ */
+export const cryptoProofs = sqliteTable(
+  "crypto_proofs",
+  {
+    id: text("id").primaryKey(),
+    dealId: text("deal_id")
+      .notNull()
+      .references(() => deals.id, { onDelete: "cascade" }),
+    stageId: text("stage_id").notNull(),
+    txHash: text("tx_hash").notNull(),
+    fromAddress: text("from_address").notNull(),
+    toAddress: text("to_address").notNull(),
+    amountUnits: text("amount_units").notNull(),
+    confirmations: integer("confirmations").notNull(),
+    blockTime: integer("block_time").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("crypto_proofs_hash_idx").on(table.txHash), index("crypto_proofs_deal_idx").on(table.dealId)],
+);

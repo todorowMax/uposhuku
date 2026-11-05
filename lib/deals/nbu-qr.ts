@@ -14,14 +14,7 @@ export interface NbuQrInput {
   purpose: string;
 }
 
-/**
- * Чи перевірено сканування коду в банківських застосунках. Поки false, QR показується лише поза продом
- * (див. `qrVisible`). Перевести в true після живої перевірки в кількох банках.
- */
-export const NBU_QR_VERIFIED = false;
-
-/** QR бачать, якщо формат перевірено або це не прод. */
-export const qrVisible = (production: boolean): boolean => NBU_QR_VERIFIED || !production;
+// Показ коду керує прапорець `nbu_qr` (lib/features/flags.ts): його вмикають, коли сканування перевірено в банках.
 
 export const NBU_QR_BASE = "https://bank.gov.ua/qr/";
 

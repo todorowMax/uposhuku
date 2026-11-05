@@ -56,6 +56,10 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`; CSP лише
   Report-Only (звіти в `/api/csp-report`), HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
   Грошові рішення модератора потребують `ADMIN_TOTP_SECRET`; на проді без нього вони вимкнені.
+- Прапорці функцій (`safe_deal`, `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`): режим `off` | `allowlist` | `on`
+  і список пошт. Значення з таблиці `feature_flags` (сторінка `/admin/features`), інакше зі змінних `<ІМ'Я>_MODE` і
+  `<ІМ'Я>_USERS`, інакше `off`. Чиста логіка в `lib/features`, сервер у `lib/server/features.ts`. Зміна грошових
+  прапорців потребує TOTP.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 

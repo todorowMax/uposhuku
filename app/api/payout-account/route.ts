@@ -14,13 +14,14 @@ import { SecretBoxUnavailableError } from "@/lib/server/secret-box";
 const HEADERS = { "cache-control": "no-store" };
 
 /** Форму виплат показуємо, поки безпечна угода не вимкнена зовсім. */
-const available = () => safeDealMode() !== "off";
+const available = async () => (await safeDealMode()) !== "off";
 
 export const GET = async () => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   try {
-    return Response.json({ available: available(), payout: available() ? await getOwnPayout(user.id) : null }, { headers: HEADERS });
+    const isAvailable = await available();
+    return Response.json({ available: isAvailable, payout: isAvailable ? await getOwnPayout(user.id) : null }, { headers: HEADERS });
   } catch (error) {
     return failure(error);
   }
@@ -29,7 +30,7 @@ export const GET = async () => {
 export const PUT = async (request: Request) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  if (!available()) return problem(409, "Виплати ще недоступні", "Безпечна угода ще не відкрита.");
+  if (!(await available())) return problem(409, "Виплати ще недоступні", "Безпечна угода ще не відкрита.");
   try {
     const limited = await rateLimited("payoutApply", user.id);
     if (limited) return limited;

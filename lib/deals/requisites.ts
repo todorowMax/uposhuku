@@ -4,11 +4,17 @@
 // Номер картки не приймаємо взагалі: це платіжні дані зі своїми вимогами безпеки, а для переказу
 // вистачає IBAN. Посилання на оплату лише https і лише з банківських хостів зі списку.
 
+import { isValidTronAddress } from "@/lib/crypto/tron-address";
+
 export interface Requisites {
   recipient: string;
   iban: string;
   taxCode: string;
   payUrl?: string;
+  /** Адреса USDT у мережі TRON (TRC-20). Лише коли ввімкнено прапорець `crypto_proof`. */
+  usdtTrc20?: string;
+  /** Binance ID (цифри) для переказу всередині Binance. Перевірити оплату на ньому неможливо. */
+  binanceId?: string;
 }
 
 export type RequisitesResult = { ok: true; value: Requisites } | { ok: false; error: string };
@@ -85,6 +91,15 @@ export const normalizePayUrl = (value: string): string | null => {
   }
 };
 
+/** Binance ID: лише цифри, 5–15. */
+export const isValidBinanceId = (value: string): boolean => /^\d{5,15}$/.test(value);
+
+/** Ці поля показуються й зберігаються лише там, де ввімкнено крипто-оплату за хешем. */
+export const withoutCrypto = (value: Requisites): Requisites => {
+  const { usdtTrc20: _usdt, binanceId: _binance, ...rest } = value;
+  return rest;
+};
+
 const str = (value: unknown) => (typeof value === "string" ? value.trim() : "");
 
 /** Перевірити й нормалізувати введення (довільний JSON з тіла запиту). */
@@ -101,9 +116,22 @@ export const validateRequisites = (input: unknown): RequisitesResult => {
   const taxCode = str(raw.taxCode).replace(/\s/g, "");
   if (!isValidTaxCode(taxCode)) return { ok: false, error: "Код РНОКПП (10 цифр) або ЄДРПОУ (8 цифр) вказано невірно." };
 
+  const base: Requisites = { recipient, iban: normalizeIban(ibanInput), taxCode };
+
+  const usdt = str(raw.usdtTrc20);
+  if (usdt) {
+    if (!isValidTronAddress(usdt)) return { ok: false, error: "Адреса USDT некоректна: потрібна адреса мережі TRON (TRC-20), 34 символи, починається з T." };
+    base.usdtTrc20 = usdt;
+  }
+  const binance = str(raw.binanceId).replace(/\s/g, "");
+  if (binance) {
+    if (!isValidBinanceId(binance)) return { ok: false, error: "Binance ID: лише цифри, від 5 до 15." };
+    base.binanceId = binance;
+  }
+
   const payUrlInput = str(raw.payUrl);
-  if (!payUrlInput) return { ok: true, value: { recipient, iban: normalizeIban(ibanInput), taxCode } };
+  if (!payUrlInput) return { ok: true, value: base };
   const payUrl = normalizePayUrl(payUrlInput);
   if (!payUrl) return { ok: false, error: `Посилання на оплату: лише https і лише ${PAY_URL_HOSTS.join(", ")}.` };
-  return { ok: true, value: { recipient, iban: normalizeIban(ibanInput), taxCode, payUrl } };
+  return { ok: true, value: { ...base, payUrl } };
 };

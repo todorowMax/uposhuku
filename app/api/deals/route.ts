@@ -42,7 +42,7 @@ export const POST = async (request: Request) => {
 
   const rawPerformer = body?.performer as Record<string, unknown> | undefined;
   // Безпечна угода лише тим, кому її ввімкнено (SAFE_DEAL_MODE); решті метод за замовчуванням — прямий переказ.
-  const safeEnabled = safeDealEnabledFor(user.email);
+  const safeEnabled = await safeDealEnabledFor(user.email);
   const fallback: DealMethod = safeEnabled ? "safe" : "direct";
   const method: DealMethod = body?.method === "safe" || body?.method === "direct" ? body.method : fallback;
   if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");

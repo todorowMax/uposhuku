@@ -13,7 +13,7 @@ import { transferPurpose } from "@/lib/deals/transfer";
 import { fetchDealRequisites } from "@/lib/requisites/client";
 
 export namespace TransferCardTypes {
-  export type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; message: string } | { kind: "ready"; requisites: Requisites; qr: boolean };
+  export type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; message: string } | { kind: "ready"; requisites: Requisites; qr: boolean; crypto: boolean };
 }
 
 const COPIED_MS = 2000;
@@ -28,7 +28,7 @@ export const useTransferCard = (dealId: string, dealNumber: string, amount: numb
   const toState = useCallback(async (): Promise<TransferCardTypes.State> => {
     try {
       const view = await fetchDealRequisites(dealId);
-      return view.requisites ? { kind: "ready", requisites: view.requisites, qr: view.qr } : { kind: "missing" };
+      return view.requisites ? { kind: "ready", requisites: view.requisites, qr: view.qr, crypto: view.crypto } : { kind: "missing" };
     } catch (reason) {
       return { kind: "error", message: reason instanceof ApiError ? reason.message : "Не вдалося завантажити реквізити." };
     }

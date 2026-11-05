@@ -56,6 +56,12 @@ export const RequisitesSection = () => {
           <dl className="text-xs leading-snug">
             <dt className="text-ink-muted">Рахунок</dt>
             <dd className="font-medium tabular-nums text-ink">{own.mask}</dd>
+            {own.requisites?.usdtTrc20 && (
+              <>
+                <dt className="mt-1.5 text-ink-muted">USDT (TRC-20)</dt>
+                <dd className="break-all font-medium tabular-nums text-ink">{own.requisites.usdtTrc20}</dd>
+              </>
+            )}
           </dl>
           {own.pending && (
             <p className="pe-notice" role="status">
@@ -82,6 +88,16 @@ export const RequisitesSection = () => {
           <Field label="Посилання на оплату" htmlFor="pe-req-url" optional hint={`Лише https і лише ${PAY_URL_HOSTS.join(", ")}.`}>
             <Input id="pe-req-url" type="url" autoComplete="off" value={fields.payUrl} maxLength={500} onChange={(event) => form.setField("payUrl", event.target.value)} onKeyDown={onEnter} />
           </Field>
+          {own?.crypto && (
+            <>
+              <Field label="Адреса USDT (TRC-20)" htmlFor="pe-req-usdt" optional hint="Лише мережа TRON (TRC-20), 34 символи, починається з T. Надсилання в іншу мережу втрачає гроші.">
+                <Input id="pe-req-usdt" autoComplete="off" spellCheck={false} value={fields.usdtTrc20} maxLength={40} className="tabular-nums" onChange={(event) => form.setField("usdtTrc20", event.target.value)} onKeyDown={onEnter} />
+              </Field>
+              <Field label="Binance ID" htmlFor="pe-req-binance" optional hint="Цифри. Оплату на Binance ID сайт перевірити не може: ви підтверджуєте її самі.">
+                <Input id="pe-req-binance" autoComplete="off" inputMode="numeric" value={fields.binanceId} maxLength={15} className="tabular-nums" onChange={(event) => form.setField("binanceId", event.target.value)} onKeyDown={onEnter} />
+              </Field>
+            </>
+          )}
           {own?.requisites && !own.pending && (
             <p className="pe-hint">Зміна набуде чинності через 24 години, а на пошту прийде лист: так ніхто не підмінить рахунок непомітно. Відкриті угоди лишаються зі старими реквізитами.</p>
           )}

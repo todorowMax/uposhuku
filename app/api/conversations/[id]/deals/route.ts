@@ -32,7 +32,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
     const method: DealMethod = body?.method === "safe" ? "safe" : "direct";
-    const safeEnabled = safeDealEnabledFor(user.email);
+    const safeEnabled = await safeDealEnabledFor(user.email);
     if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
     if (conversation.performerUserId === conversation.customerUserId) return problem(400, "Умови не виставлено", SELF_DEAL);
     const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];

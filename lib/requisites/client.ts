@@ -12,6 +12,8 @@ export interface OwnRequisitesDto {
   requisites: Requisites | null;
   mask: string | null;
   pending: { requisites: Requisites; mask: string; effectiveAt: number } | null;
+  /** Чи доступна цій людині оплата USDT: тоді в формі є адреса TRC-20 і Binance ID. */
+  crypto: boolean;
 }
 
 export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt: number };
@@ -19,6 +21,8 @@ export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt:
 export interface DealRequisitesDto {
   requisites: Requisites | null;
   mask: string | null;
+  /** Чи доступна цій людині оплата USDT за хешем (прапорець `crypto_proof`). */
+  crypto: boolean;
   /** Показувати QR: false на проді, поки формат НБУ не перевірено в банках. */
   qr: boolean;
 }

@@ -8,5 +8,5 @@ import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 export const GET = async () => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  return Response.json({ safeDeal: safeDealEnabledFor(user.email) }, { headers: { "cache-control": "no-store" } });
+  return Response.json({ safeDeal: await safeDealEnabledFor(user.email) }, { headers: { "cache-control": "no-store" } });
 };

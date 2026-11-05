@@ -31,17 +31,17 @@ export function LegalPage({ title, updated, children }: { title: string; updated
 }
 
 /** Перехід між документами внизу кожної сторінки. */
-export function LegalNav() {
+export const LegalNav = async () => {
   return (
     <nav aria-label="Документи" className="legal-nav">
-      {legalLinks(safeDealPublic()).map((link) => (
+      {legalLinks(await safeDealPublic()).map((link) => (
         <Link key={link.href} href={link.href}>
           {link.label}
         </Link>
       ))}
     </nav>
   );
-}
+};
 
 /** Дрібна розмітка в текстах: **жирний** і [посилання](/шлях). Більше нічого, щоб не тягнути markdown. */
 function Inline({ text }: { text: string }) {
