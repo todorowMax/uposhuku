@@ -5,3 +5,4 @@
 | 2026-10-24 | [Оновлення Next.js 15 до 16](2026-10-24-next16-upgrade.md) | partly done |
 | 2026-10-26 | [Інтеграція Monobank: холд, сплит, фіналізація, повернення](2026-10-26-monobank-split-integration.md) | in progress |
 | 2026-11-03 | [UX/UI-ревью перед запуском](2026-11-03-prelaunch-ux-review.md) | in progress |
+| 2026-11-04 | [Способы оплаты к запуску: сделка через банк, прямой перевод, крипта](2026-11-04-payments-launch-plan.md) | in progress |
