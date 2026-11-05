@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTACT_EMAIL, fill, LEGAL_VALUES, OPERATOR } from "@/lib/legal/config";
+import { CONTACT_EMAIL, fill, LEGAL_VALUES, OPERATOR, UPDATED } from "@/lib/legal/config";
 import { LEGAL_LINKS } from "@/lib/legal/links";
 import { offerSections } from "@/lib/legal/offer";
 import { PRIVACY_INTRO, privacySections } from "@/lib/legal/privacy";
@@ -62,6 +62,24 @@ describe("правові тексти", () => {
       expect(section.title.startsWith(`${index + 1}. `)).toBe(true);
       section.items.forEach((item, itemIndex) => expect(item.startsWith(`${index + 1}.${itemIndex + 1}. `)).toBe(true));
     });
+  });
+
+  it("політика й умови описують зашифровані реквізити виконавця і кому вони видні", () => {
+    const privacy = privacySections().flatMap((section) => section.items).map(fill).join("\n");
+    expect(privacy).toMatch(/Реквізити виконавця для прямого переказу/);
+    expect(privacy).toMatch(/зашифрован/);
+    expect(privacy).toMatch(/двоє сторін прийнятої угоди/);
+    const terms = termsSections().flatMap((section) => section.items).map(fill).join("\n");
+    expect(terms).toMatch(/зашифрованому вигляді/);
+    expect(terms).toMatch(/24 години/);
+    expect(terms).toMatch(/обмежена вашим банком/);
+    // Раніше стверджували, що реквізитів сервіс не знає: тепер це неправда.
+    expect(`${privacy}\n${terms}`).not.toMatch(/реквізит\S* (?:сервіс|платформа|ми) (?:не знає|не бачить|не зберігає)/i);
+  });
+
+  it("дати оновлення умов і політики відображають зміну про реквізити", () => {
+    expect(UPDATED.terms).toBe("5 листопада 2026 року");
+    expect(UPDATED.privacy).toBe("5 листопада 2026 року");
   });
 
   it("усі внутрішні посилання ведуть на існуючі сторінки", () => {

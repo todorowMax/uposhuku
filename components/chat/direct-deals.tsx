@@ -9,11 +9,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DealView } from "@/components/deals/deal-tab";
+import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
 import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
+import { money } from "@/lib/deals/format";
 import { isFop } from "@/lib/deals/fop";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { formatKop, rateLabel, totalRange } from "@/lib/deals/price";
@@ -25,8 +27,6 @@ import {
 } from "@/lib/deals/types";
 import { startPolling } from "@/lib/realtime/client";
 
-const PRICE = new Intl.NumberFormat("uk-UA");
-const money = (value: number) => `${PRICE.format(value)} ₴`;
 
 /** Угоди цієї розмови для замовника: тримаємо свіжими, поки відкрито. */
 export function DirectDeals({
@@ -73,17 +73,25 @@ export function TermsForm({
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("");
   const [method, setMethod] = useState<DealMethod>(fop ? "safe" : "direct");
+  const [custom, setCustom] = useState<StagesEditorTypes.Edit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const amountNumber = Number(amount.replace(/\s/g, "")) || 0;
   const daysNumber = Number(days) || 0;
+  // Свої етапи є лише в прямому переказі: безпечну угоду ділимо автоматично під холд.
   const stages = useMemo(() => {
+    if (method === "direct" && custom)
+      return custom.map((stage) => ({
+        title: stage.title,
+        amount: Number(stage.amount.replace(/\s/g, "")) || 0,
+        days: Number(stage.days) || 0,
+      }));
     if (amountNumber <= 0 || daysNumber <= 0) return [];
     return method === "direct"
       ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
       : splitIntoStages(amountNumber, daysNumber);
-  }, [method, amountNumber, daysNumber]);
+  }, [method, custom, amountNumber, daysNumber]);
 
   const problem = !title.trim()
     ? "Назвіть замовлення."
@@ -102,7 +110,8 @@ export function TermsForm({
           method,
           stages,
         });
-  const fee = feeOf(amountNumber, method);
+  const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
+  const fee = feeOf(total, method);
   const payRange = useMemo(() => totalRange(stages.map((stage) => stage.amount)), [stages]);
 
   const submit = async () => {
@@ -177,7 +186,8 @@ export function TermsForm({
           <Input
             id="terms-amount"
             inputMode="numeric"
-            value={amount}
+            value={method === "direct" && custom ? String(stages.reduce((sum, stage) => sum + stage.amount, 0)) : amount}
+            disabled={method === "direct" && Boolean(custom)}
             onChange={(event) =>
               setAmount(event.target.value.replace(/[^\d\s]/g, ""))
             }
@@ -189,7 +199,8 @@ export function TermsForm({
           <Input
             id="terms-days"
             inputMode="numeric"
-            value={days}
+            value={method === "direct" && custom ? String(stages.reduce((sum, stage) => sum + stage.days, 0)) : days}
+            disabled={method === "direct" && Boolean(custom)}
             onChange={(event) =>
               setDays(event.target.value.replace(/\D/g, "").slice(0, 3))
             }
@@ -237,22 +248,26 @@ export function TermsForm({
             Прямий переказ
           </span>
           <span className="deal-method-text">
-            Без комісії, одним платежем. Без гарантії платформи.
+            Без комісії, одним платежем або за етапами. Без гарантії платформи.
           </span>
         </label>
       </fieldset>
       {!SAFE_DEAL_ENABLED && (
         <p className="pe-hint">
-          Оплата прямим переказом, одним платежем: без комісії платформи й без
-          її гарантії.
+          Оплата прямим переказом, одним платежем або за етапами: без комісії
+          платформи й без її гарантії.
         </p>
       )}
 
-      {amountNumber > 0 && (
+      {method === "direct" && stages.length > 0 && (
+        <StagesEditor method={method} stages={stages} amount={amountNumber} days={daysNumber} custom={custom} onCustom={setCustom} />
+      )}
+
+      {stages.length > 0 && (
         <dl className="deal-summary">
           <div>
             <dt>Вартість роботи (отримає виконавець)</dt>
-            <dd className="tabular-nums">{money(amountNumber)}</dd>
+            <dd className="tabular-nums">{money(total)}</dd>
           </div>
           {method === "safe" && (
             <>

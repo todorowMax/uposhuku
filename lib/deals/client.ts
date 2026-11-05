@@ -33,6 +33,9 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   return data as T;
 };
 
+/** Той самий запит до API з людськими помилками: для сусідніх клієнтів (реквізити). */
+export { call as callApi };
+
 const put = (requestId: string, deals: Deal[]) => dealsStore.set({ ...dealsStore.get(), [requestId]: deals });
 
 export const loadDeals = async (requestId: string) => {

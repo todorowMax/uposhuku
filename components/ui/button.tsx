@@ -9,6 +9,8 @@ const VARIANTS = {
   primary: "auth-primary",
   secondary: "auth-secondary",
   offer: "offer-primary",
+  link: "auth-link",
+  icon: "auth-icon-button",
 } as const;
 
 export namespace ButtonTypes {

@@ -10,21 +10,20 @@ import {
   QrCode,
   ShieldCheck,
   Star,
-  Plus,
-  Trash2,
 } from "@/components/icons";
+import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
+import { TransferCard } from "@/components/deals/transfer-card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, proposeDeal, useDeals } from "@/lib/deals/client";
+import { daysWord, money } from "@/lib/deals/format";
 import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { isFop } from "@/lib/deals/fop";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { formatKop, quoteStage, rateLabel, totalRange } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
-  MAX_STAGES,
-  MAX_STAGE_DAYS,
   SAFE_FEE,
   type CardKind,
   type Deal,
@@ -45,24 +44,14 @@ import { REVIEW_TEXT_MAX, type Review } from "@/lib/reviews/types";
 import type { OfferResponse } from "@/lib/requests/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 
-const PRICE = new Intl.NumberFormat("uk-UA");
 const DATE = new Intl.DateTimeFormat("uk-UA", {
   day: "numeric",
   month: "long",
   hour: "2-digit",
   minute: "2-digit",
 });
-const money = (value: number) => `${PRICE.format(value)} ₴`;
 const reduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-const daysWord = (days: number) => {
-  const tens = days % 100;
-  const ones = days % 10;
-  if (ones === 1 && tens !== 11) return "день";
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return "дні";
-  return "днів";
-};
 
 /** Угода живе й не закрита відмовою чи скасуванням. */
 export const liveDeal = (deals: Deal[], responseId: string) =>
@@ -95,9 +84,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
   );
   const [days, setDays] = useState(String(response.days));
   /** Етапи, які людина правила руками; null — рахуємо з суми й терміну. */
-  const [custom, setCustom] = useState<
-    { title: string; amount: string; days: string }[] | null
-  >(null);
+  const [custom, setCustom] = useState<StagesEditorTypes.Edit[] | null>(null);
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,19 +93,16 @@ function DealComposer({ response }: { response: OfferResponse }) {
   const daysNumber = Number(days) || 0;
 
   const stages = useMemo(() => {
-    if (method === "direct")
-      return amountNumber > 0 && daysNumber > 0
-        ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
-        : [];
     if (custom)
       return custom.map((stage) => ({
         title: stage.title,
         amount: Number(stage.amount.replace(/\s/g, "")) || 0,
         days: Number(stage.days) || 0,
       }));
-    return amountNumber > 0 && daysNumber > 0
-      ? splitIntoStages(amountNumber, daysNumber)
-      : [];
+    if (amountNumber <= 0 || daysNumber <= 0) return [];
+    return method === "direct"
+      ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
+      : splitIntoStages(amountNumber, daysNumber);
   }, [method, custom, amountNumber, daysNumber]);
 
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
@@ -141,30 +125,6 @@ function DealComposer({ response }: { response: OfferResponse }) {
         stages,
       })
     : "Вкажіть суму й термін.";
-
-  const editStage = (
-    index: number,
-    patch: Partial<{ title: string; amount: string; days: string }>,
-  ) =>
-    setCustom((current) =>
-      (
-        current ??
-        stages.map((stage) => ({
-          title: stage.title,
-          amount: String(stage.amount),
-          days: String(stage.days),
-        }))
-      ).map((stage, i) => (i === index ? { ...stage, ...patch } : stage)),
-    );
-
-  const startCustom = () =>
-    setCustom(
-      stages.map((stage) => ({
-        title: stage.title,
-        amount: String(stage.amount),
-        days: String(stage.days),
-      })),
-    );
 
   const submit = async () => {
     if (problem) return setError(problem);
@@ -202,8 +162,8 @@ function DealComposer({ response }: { response: OfferResponse }) {
           <Input
             id="deal-amount"
             inputMode="numeric"
-            value={custom && method === "safe" ? String(total) : amount}
-            disabled={Boolean(custom) && method === "safe"}
+            value={custom ? String(total) : amount}
+            disabled={Boolean(custom)}
             onChange={(event) =>
               setAmount(event.target.value.replace(/[^\d\s]/g, ""))
             }
@@ -216,11 +176,11 @@ function DealComposer({ response }: { response: OfferResponse }) {
             id="deal-days"
             inputMode="numeric"
             value={
-              custom && method === "safe"
+              custom
                 ? String(stages.reduce((sum, stage) => sum + stage.days, 0))
                 : days
             }
-            disabled={Boolean(custom) && method === "safe"}
+            disabled={Boolean(custom)}
             onChange={(event) =>
               setDays(event.target.value.replace(/\D/g, "").slice(0, 3))
             }
@@ -270,8 +230,8 @@ function DealComposer({ response }: { response: OfferResponse }) {
             Прямий переказ
           </span>
           <span className="deal-method-text">
-            Без комісії, переказ одним платежем на рахунок виконавця. Без
-            гарантії платформи: у спорі гроші ми не повертаємо.
+            Без комісії, переказ на рахунок виконавця: одним платежем або за
+            етапами. Без гарантії платформи: у спорі гроші ми не повертаємо.
           </span>
         </label>
       </fieldset>
@@ -282,122 +242,15 @@ function DealComposer({ response }: { response: OfferResponse }) {
         </p>
       )}
 
-      {method === "safe" && stages.length > 0 && (
-        <div className="deal-stages">
-          <div className="flex items-center justify-between gap-2">
-            <p className="pe-label !mb-0">Етапи</p>
-            {custom ? (
-              <button
-                type="button"
-                onClick={() => setCustom(null)}
-                className="auth-link text-[12px]"
-              >
-                Розбити автоматично
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={startCustom}
-                className="auth-link text-[12px]"
-              >
-                {stages.length > 1 ? "Змінити" : "Розбити на етапи"}
-              </button>
-            )}
-          </div>
-          {stages.length === 1 && !custom && (
-            <>
-              <p className="deal-stage-line">
-                <span>{stages[0].title}</span>
-                <span className="tabular-nums">
-                  {money(stages[0].amount)} · {stages[0].days}{" "}
-                  {daysWord(stages[0].days)}
-                </span>
-              </p>
-              <p className="pe-hint">
-                Один етап: гроші заморожуються під усю роботу. Хочете платити
-                частинами, розбийте на кілька етапів.
-              </p>
-            </>
-          )}
-          {stages.length > 1 && !custom && (
-            <p className="pe-hint">
-              Один етап триває до {MAX_STAGE_DAYS} днів (холд {HOLD_DAYS} днів,
-              решту лишаємо на перевірку), тож довшу роботу ділимо на етапи:
-              кожен оплачується окремо.
-            </p>
-          )}
-          {custom
-            ? custom.map((stage, index) => (
-                <div key={index} className="deal-stage-edit">
-                  <Input
-                    aria-label={`Назва етапу ${index + 1}`}
-                    value={stage.title}
-                    onChange={(event) =>
-                      editStage(index, { title: event.target.value })
-                    }
-                    className="min-w-0 flex-1"
-                  />
-                  <Input
-                    aria-label={`Сума етапу ${index + 1}`}
-                    inputMode="numeric"
-                    value={stage.amount}
-                    onChange={(event) =>
-                      editStage(index, {
-                        amount: event.target.value.replace(/[^\d\s]/g, ""),
-                      })
-                    }
-                    className="w-[88px] tabular-nums"
-                  />
-                  <Input
-                    aria-label={`Днів в етапі ${index + 1}`}
-                    inputMode="numeric"
-                    value={stage.days}
-                    onChange={(event) =>
-                      editStage(index, {
-                        days: event.target.value.replace(/\D/g, "").slice(0, 3),
-                      })
-                    }
-                    className="w-[52px] tabular-nums"
-                  />
-                  {custom.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCustom(custom.filter((_, i) => i !== index))
-                      }
-                      aria-label={`Прибрати етап ${index + 1}`}
-                      className="auth-icon-button shrink-0"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
-                  )}
-                </div>
-              ))
-            : stages.length > 1 &&
-              stages.map((stage, index) => (
-                <p key={index} className="deal-stage-line">
-                  <span>{stage.title}</span>
-                  <span className="tabular-nums">
-                    {money(stage.amount)} · {stage.days} {daysWord(stage.days)}
-                  </span>
-                </p>
-              ))}
-          {custom && custom.length < MAX_STAGES && (
-            <button
-              type="button"
-              onClick={() =>
-                setCustom([
-                  ...custom,
-                  { title: `Етап ${custom.length + 1}`, amount: "", days: "" },
-                ])
-              }
-              className="auth-link inline-flex items-center gap-1 text-[12px]"
-            >
-              <Plus className="size-3.5" />
-              Додати етап
-            </button>
-          )}
-        </div>
+      {stages.length > 0 && (
+        <StagesEditor
+          method={method}
+          stages={stages}
+          amount={amountNumber}
+          days={daysNumber}
+          custom={custom}
+          onCustom={setCustom}
+        />
       )}
 
       <dl className="deal-summary">
@@ -806,9 +659,10 @@ function StageActions({
 
   if (stage.status === "pending") {
     return (
-      <TransferBlock
-        deal={deal}
-        stage={stage}
+      <TransferCard
+        dealId={deal.id}
+        dealNumber={deal.number}
+        amount={stage.amount}
         busy={busy === "claim_paid"}
         onClaim={onClaim}
       />
@@ -899,44 +753,6 @@ function StageActions({
   }
   return null;
 }
-
-/** Умови прямого переказу: реквізити виконавець надсилає в чаті, платформа їх не знає. Далі «Я оплатив». */
-const TransferBlock = ({
-  deal,
-  stage,
-  busy,
-  onClaim,
-}: {
-  deal: Deal;
-  stage: DealStage;
-  busy: boolean;
-  onClaim: () => Promise<boolean>;
-}) => (
-  <div className="deal-box">
-    <dl className="text-xs leading-snug">
-      <dt className="text-ink-muted">Отримувач</dt>
-      <dd className="truncate font-medium text-ink">{deal.performer.name}</dd>
-      <dt className="mt-1.5 text-ink-muted">Сума</dt>
-      <dd className="font-semibold tabular-nums text-ink">
-        {money(stage.amount)}
-      </dd>
-      <dt className="mt-1.5 text-ink-muted">Призначення</dt>
-      <dd className="text-ink">Оплата за роботу, угода {deal.number}</dd>
-    </dl>
-    <p className="pe-hint mt-2">
-      Реквізити для переказу виконавець надсилає в чаті. Платформа не отримує
-      ці гроші й не повертає їх.
-    </p>
-    <Button
-      variant="offer"
-      disabled={busy}
-      onClick={() => void onClaim()}
-      className="mt-3 w-full"
-    >
-      {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
-    </Button>
-  </div>
-);
 
 // ---------------------------------------------------------------------------
 // Відгук про роботу

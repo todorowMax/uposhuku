@@ -35,8 +35,8 @@ export const DISPUTE_TALK_DAYS = 2;
 /** Дати останньої правки кожного документа. */
 export const UPDATED = {
   offer: "17 жовтня 2026 року",
-  terms: "17 жовтня 2026 року",
-  privacy: "17 жовтня 2026 року",
+  terms: "5 листопада 2026 року",
+  privacy: "5 листопада 2026 року",
   contacts: "17 жовтня 2026 року",
   safeDealOffer: "22 жовтня 2026 року",
 } as const;

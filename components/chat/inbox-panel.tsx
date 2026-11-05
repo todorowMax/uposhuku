@@ -45,6 +45,7 @@ import {
 } from "@/lib/deals/machine";
 import type { Deal, PerformerAction } from "@/lib/deals/types";
 import { mentionsContacts } from "@/lib/chat/contacts";
+import { PAYMENT_HINT, mentionsPaymentDetails } from "@/lib/chat/payment-hints";
 import { DealTab } from "@/components/deals/deal-tab";
 import { DirectDeals, TermsForm } from "@/components/chat/direct-deals";
 import { offersMapStore } from "@/lib/requests/offers";
@@ -656,6 +657,7 @@ function Thread({
           Домовляйтеся тут: поза чатом ми не побачимо домовленостей.
         </p>
       )}
+      {mentionsPaymentDetails(draft) && <p className="dm-warn">{PAYMENT_HINT}</p>}
       {photoError && <p className="dm-warn">{photoError}</p>}
       {photos.length > 0 && (
         <ul className="dm-staged">

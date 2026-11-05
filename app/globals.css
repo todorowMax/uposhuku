@@ -2595,11 +2595,14 @@ html[data-glass] .offers-panel {
   color: #7a5a44;
 }
 
+/* QR-код: темне на світлому, щоб його читали банківські застосунки. */
 .deal-qr {
   flex: none;
-  width: 104px;
-  height: 104px;
+  width: 148px;
+  height: 148px;
   border-radius: 8px;
+  background: var(--brand-ink);
+  color: var(--deep);
   box-shadow: 0 0 0 1px rgb(66 116 132 / 70%);
 }
 
