@@ -57,7 +57,7 @@ export const authAttempts = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     /** Що лімітуємо: пошта чи IP. */
     key: text("key").notNull(),
-    kind: text("kind", { enum: ["email_start", "email_verify_fail"] }).notNull(),
+    kind: text("kind", { enum: ["email_start", "email_verify_fail", "rate"] }).notNull(),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [index("auth_attempts_lookup_idx").on(table.key, table.kind, table.createdAt)],

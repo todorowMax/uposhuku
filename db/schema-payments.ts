@@ -65,9 +65,19 @@ export const payoutAccounts = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     provider: text("provider").notNull(),
+    /** Monobank: ІПН ФОП, зашифрований (secret-box, aad = id користувача). Відкритого ІПН у базі немає. */
     taxId: text("tax_id"),
+    /** Маска ІПН для екрана й списку заявок. */
+    taxIdMask: text("tax_id_mask"),
+    /** Назва ФОП, як її вказав виконавець. */
+    fopName: text("fop_name"),
     receiverId: text("receiver_id"),
     status: text("status").notNull(),
+    /** Коли виконавець погодився з офертою безпечної угоди й підтвердив рахунок ФОП у mono. */
+    consentAt: integer("consent_at"),
+    accountConfirmedAt: integer("account_confirmed_at"),
+    /** Остання перевірка в банку (адміністратор). */
+    checkedAt: integer("checked_at"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -138,4 +148,25 @@ export const requisiteReads = sqliteTable(
     createdAt: integer("created_at").notNull(),
   },
   (table) => [index("requisite_reads_deal_idx").on(table.dealId, table.createdAt)],
+);
+
+/**
+ * Код з пошти для приймання етапу від 10 000 ₴ (RELEASE_CODE_FROM). У базі лише SHA-256 від
+ * `userId:dealId:stageId:код`; одна чинна пара на замовника й етап, 5 спроб, 10 хвилин.
+ */
+export const dealReleaseCodes = sqliteTable(
+  "deal_release_codes",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    dealId: text("deal_id").notNull(),
+    stageId: text("stage_id").notNull(),
+    codeHash: text("code_hash").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (table) => [uniqueIndex("deal_release_codes_stage_idx").on(table.userId, table.dealId, table.stageId)],
 );

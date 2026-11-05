@@ -53,6 +53,9 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`.
   Токени: `MONOBANK_TOKEN` (звичайний термінал) і `MONOBANK_SPLIT_TOKEN` (розщеплення), `MONOBANK_PLATFORM_RECEIVER_ID`.
   «Заморожено» і «виплачено» ставить лише підтверджена банком відповідь (`lib/deals/payment-status.ts`).
+- Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`; CSP лише
+  Report-Only (звіти в `/api/csp-report`), HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
+  Грошові рішення модератора потребують `ADMIN_TOTP_SECRET`; на проді без нього вони вимкнені.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
@@ -65,7 +68,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-834 warnings, Stylelint 11. The numbers only go down: fix findings in the files you touch and lower the
+828 warnings, Stylelint 11. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

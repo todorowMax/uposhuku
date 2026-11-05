@@ -53,3 +53,8 @@ ADMIN_EMAILS=
 ADMIN_HOSTS=
 # Лише локально: пускати в адмінку і після тестового входу (код 000000).
 ADMIN_DEV_LOGIN=
+
+# Другий фактор для грошових рішень модератора (виплата, повернення, часткова виплата): секрет TOTP у base32,
+# наприклад `openssl rand 20 | base32`, і додати в застосунок-автентифікатор. На проді без нього ці рішення недоступні.
+# `wrangler secret put ADMIN_TOTP_SECRET --env development|production`.
+ADMIN_TOTP_SECRET=

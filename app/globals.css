@@ -7058,3 +7058,47 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
     animation: none;
   }
 }
+
+/* Checkbox (components/ui/checkbox.tsx) */
+.ui-checkbox-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.ui-checkbox {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--tide);
+  background: var(--brand-ink);
+  color: var(--brand-ink);
+  display: grid;
+  place-items: center;
+}
+
+.ui-checkbox[data-state="checked"] {
+  border-color: var(--brand-solid);
+  background: var(--brand-solid);
+}
+
+.ui-checkbox:focus-visible {
+  outline: 2px solid var(--tide);
+  outline-offset: 2px;
+}
+
+.ui-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-checkbox-mark {
+  display: grid;
+  place-items: center;
+}

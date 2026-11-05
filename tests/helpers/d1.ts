@@ -32,7 +32,9 @@ export const useTestD1 = async () => {
 };
 
 /** Сторонній користувач для зовнішніх ключів: id → рядок у users. */
-export const makeUser = async (db: D1Database, id: string, email = `${id}@example.com`) => {
-  await db.prepare("insert or ignore into users (id, email, created_at) values (?, ?, ?)").bind(id, email, Date.now()).run();
+/** `createdAt` за замовчуванням тепер: тести, яким потрібен «старий» акаунт (ліміт нового), передають свій. */
+export const makeUser = async (db: D1Database, id: string, options: { email?: string; createdAt?: number } = {}) => {
+  const { email = `${id}@example.com`, createdAt = Date.now() } = options;
+  await db.prepare("insert or ignore into users (id, email, created_at) values (?, ?, ?)").bind(id, email, createdAt).run();
   return id;
 };

@@ -10,3 +10,6 @@ export const session = { user: null as { id: string; email: string } | null };
 export const notifyLater = vi.fn();
 export const adminMail = vi.fn();
 export const bank = createFakeBank();
+export const codeMail = vi.fn();
+/** Адміністратор, якого повертає підмінений getAdmin; null: не адмін. */
+export const admin = { user: null as { id: string; email: string } | null };

@@ -6,6 +6,7 @@
 // Durable Object має експортуватися з головного модуля воркера.
 
 import { jwtVerify } from "jose";
+import { securityHeaders } from "../lib/security-headers";
 import { sessionSecret } from "../lib/server/session-secret";
 import { logLater, type KitServerConfig } from "../kit/telemetry/core";
 // @ts-expect-error: файл створює збірка OpenNext (npm run cf:build)
@@ -104,6 +105,7 @@ export default {
     // Поки сайт закритий від пошуківців: усе, що віддає Next, йде з noindex (разом з app/robots.ts).
     const headers = new Headers(response.headers);
     headers.set("X-Robots-Tag", "noindex, nofollow");
+    for (const [name, value] of Object.entries(securityHeaders())) headers.set(name, value);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
 } satisfies ExportedHandler<CloudflareEnv>;

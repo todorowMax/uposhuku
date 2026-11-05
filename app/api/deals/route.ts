@@ -4,6 +4,7 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
+import { rateLimited } from "@/lib/server/rate-limit";
 import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 import { performerFromResponse } from "@/lib/server/deal-parties";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
@@ -18,7 +19,7 @@ import { dealNotice } from "@/lib/telegram/notices";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-export async function GET(request: Request) {
+export const GET = async (request: Request) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   const params = new URL(request.url).searchParams;
@@ -28,11 +29,13 @@ export async function GET(request: Request) {
   }
   const requestId = params.get("requestId") ?? undefined;
   return Response.json({ deals: await listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
-}
+};
 
-export async function POST(request: Request) {
+export const POST = async (request: Request) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const limited = await rateLimited("dealCreate", user.id);
+  if (limited) return limited;
   const body = await readJson(request);
   const requestId = text(body?.requestId, 40);
   if (!(await findRequest(user.id, requestId))) return problem(404, "Запит не знайдено");
@@ -69,4 +72,4 @@ export async function POST(request: Request) {
   const performerUser = userOfPerformer(result.performer.id);
   if (performerUser) await addSystemMessage(user.id, performerUser, `Угоду ${result.number} запропоновано`, result.id);
   return Response.json({ deal: result }, { status: 201 });
-}
+};

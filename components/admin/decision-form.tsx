@@ -32,6 +32,7 @@ export function DecisionForm({ dealId, stageId, stageTitle, amount, method, hold
   const [action, setAction] = useState<ModeratorAction | "">("");
   const [comment, setComment] = useState("");
   const [percent, setPercent] = useState("50");
+  const [totp, setTotp] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,10 @@ export function DecisionForm({ dealId, stageId, stageTitle, amount, method, hold
   const commentError = length > 0 && length < DECISION_COMMENT_MIN ? `Поясніть рішення: хоча б ${DECISION_COMMENT_MIN} символів.` : null;
   const percentNumber = Number(percent);
   const percentValid = Number.isInteger(percentNumber) && percentNumber >= 5 && percentNumber <= 95 && percentNumber % 5 === 0;
-  const ready = action !== "" && length >= DECISION_COMMENT_MIN && length <= DECISION_COMMENT_MAX && (action !== "partial" || percentValid);
+  // Рішення з грошима безпечної угоди підтверджуємо кодом автентифікатора; «на доопрацювання» грошей не рухає.
+  const needsTotp = method === "safe" && action !== "" && action !== "rework";
+  const totpValid = !needsTotp || /^\d{6}$/.test(totp);
+  const ready = action !== "" && totpValid && length >= DECISION_COMMENT_MIN && length <= DECISION_COMMENT_MAX && (action !== "partial" || percentValid);
 
   const submit = async () => {
     if (!ready) return;
@@ -50,7 +54,7 @@ export function DecisionForm({ dealId, stageId, stageTitle, amount, method, hold
       const response = await fetch(`/api/admin/disputes/${dealId}/decision`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action, comment, stageId, ...(action === "partial" ? { percent: percentNumber, confirm: true } : {}) }),
+        body: JSON.stringify({ action, comment, stageId, ...(needsTotp ? { totp } : {}), ...(action === "partial" ? { percent: percentNumber, confirm: true } : {}) }),
       });
       if (!response.ok) {
         const problem = (await response.json().catch(() => null)) as { detail?: string } | null;
@@ -93,6 +97,11 @@ export function DecisionForm({ dealId, stageId, stageTitle, amount, method, hold
       <Field label="Коментар для сторін" htmlFor={`${id}-comment`} hint="Його побачать обидві сторони в розмові, а ми збережемо в журналі." error={commentError}>
         <Textarea id={`${id}-comment`} rows={4} value={comment} maxLength={DECISION_COMMENT_MAX} onChange={(event) => setComment(event.target.value)} placeholder="Що ви побачили в розмові й чому вирішили саме так" aria-invalid={commentError ? true : undefined} />
       </Field>
+      {needsTotp && (
+        <Field label="Код автентифікатора" htmlFor={`${id}-totp`} hint="Шість цифр із застосунку. Потрібен для рішень, що рухають гроші.">
+          <Input id={`${id}-totp`} inputMode="numeric" autoComplete="one-time-code" value={totp} onChange={(event) => setTotp(event.target.value.replace(/\D/g, "").slice(0, 6))} className="tabular-nums" />
+        </Field>
+      )}
       {error && (
         <p role="alert" className="auth-error">
           {error}

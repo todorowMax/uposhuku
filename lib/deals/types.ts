@@ -66,17 +66,20 @@ export interface DealStage {
   payoutError?: string;
 }
 
-/** Тип картки замовника: від нього залежить комісія банку за приймання платежу. */
-export type CardKind = "ua" | "foreign";
+/**
+ * Тип картки в платежі. Нові платежі пишуть `any`: сума однакова для всіх карток. `ua` і `foreign` лишилися від
+ * ранньої моделі, де комісія банку залежала від картки; платежі з ними досі звіряються за старою формулою.
+ */
+export type CardKind = "any" | "ua" | "foreign";
 
-/** Розбивка оплати етапу, у копійках. total = price + fee + bankFee. */
+/** Розбивка оплати етапу, у копійках. total = price + fee + bankFee (у новій моделі bankFee = 0: резерв банку лежить усередині fee). */
 export interface StagePayment {
   card: CardKind;
   /** Ціна виконавця: стільки він отримує повністю. */
   price: number;
-  /** Винагорода платформи, SAFE_FEE від ціни. */
+  /** Комісія сервісу з банківською частиною, COMMISSION_RATE від ціни (lib/deals/price.ts). */
   fee: number;
-  /** Комісія банку за приймання платежу, закладена в суму замовника. */
+  /** Комісія банку, закладена в суму окремо: лише у платежів зі старою моделлю (ua, foreign). */
   bankFee: number;
   /** Скільки замовник платить і заморожує. */
   total: number;
@@ -134,14 +137,10 @@ export const REVIEW_DAYS = 3;
 export const HOLD_RESERVE_DAYS = 6;
 /** Найдовший етап безпечної угоди: холд мінус запас на перевірку й спір. */
 export const MAX_STAGE_DAYS = HOLD_DAYS - HOLD_RESERVE_DAYS;
-/** Комісія платформи з безпечної угоди, частка від ціни виконавця. Прямий переказ — без комісії. */
-export const SAFE_FEE = 0.05;
-/** Комісія банку за приймання платежу: частка від суми, яку платить замовник. Тарифи банку на 22.10.2026. */
-export const ACQUIRING_RATE: Record<CardKind, number> = { ua: 0.013, foreign: 0.02 };
 export const MAX_STAGES = 6;
 export const MIN_DEAL = 100;
-/** Ліміт на один етап безпечної угоди, ₴ (ціна виконавця). Домовленість з банком 22.10.2026. */
-export const MAX_STAGE_AMOUNT = 100_000;
+/** Ліміт на один етап безпечної угоди, ₴ (ціна виконавця). */
+export const MAX_STAGE_AMOUNT = 30_000;
 /** Сума безпечної угоди не більша за етапи, помножені на ліміт етапу. */
 export const MAX_DEAL = MAX_STAGES * MAX_STAGE_AMOUNT;
 /** Прямий переказ іде повз банк-еквайр, тож ліміту етапу немає. */

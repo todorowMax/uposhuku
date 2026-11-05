@@ -9,32 +9,45 @@ import { POST as PAY } from "@/app/api/deals/[id]/pay/route";
 import { POST as ACT } from "@/app/api/deals/[id]/route";
 import { quoteStage } from "@/lib/deals/price";
 import type { Deal } from "@/lib/deals/types";
+import { authAttempts } from "@/db/schema";
+import { getDb } from "@/lib/server/db";
 import { actAsPerformer, getDealForOwner, proposeDeal } from "@/lib/server/deal-repo";
 import { savePayoutAccount } from "@/lib/server/payment-repo";
+import { sealText } from "@/lib/server/secret-box";
 import { makeUser, useTestD1 as openTestD1 } from "./d1";
 import { adminMail, bank, notifyLater, session } from "./money-mocks";
 
 export const OWNER = { id: "dm-owner", email: "dm-owner@example.com" };
-export const PRICE = 10_000;
-export const TOTAL = quoteStage(PRICE, "foreign").total;
+// Менше за поріг коду приймання (RELEASE_CODE_FROM): шлях з кодом перевіряє окремий тест.
+export const PRICE = 9_000;
+export const TOTAL = quoteStage(PRICE).total;
+export const PERF_TAX_ID = "1234567890";
+const KEY = Buffer.alloc(32, 9).toString("base64");
 export const DAY = 86_400_000;
 
 export const initMoneyDb = async () => {
   const ctx = await openTestD1();
-  for (const id of ["dm-owner", "dm-perf", "dm-other", "dm-noaccount"]) await makeUser(ctx.db, id);
-  await savePayoutAccount({ userId: "dm-perf", provider: "monobank", taxId: "1234567890", receiverId: "recv-perf", status: "active" });
+  // Акаунти старші за тиждень: ліміт нового акаунта перевіряється окремим тестом.
+  for (const id of ["dm-owner", "dm-perf", "dm-other", "dm-noaccount"]) await makeUser(ctx.db, id, { createdAt: Date.now() - 30 * DAY });
+  process.env.REQUISITES_KEY = KEY;
+  // ІПН виконавця зашифрований, як у справжній заявці; id отримувача сервер бере зі списку банку (fake-bank), а не з цього запису.
+  await savePayoutAccount({ userId: "dm-perf", provider: "monobank", taxId: await sealText(PERF_TAX_ID, "dm-perf"), receiverId: null, status: "active" });
   return ctx;
 };
 
-const ENV = ["SAFE_DEAL_MODE", "MONOBANK_SPLIT_TOKEN", "MONOBANK_PLATFORM_RECEIVER_ID", "ADMIN_EMAILS"];
+const ENV = ["REQUISITES_KEY", "SAFE_DEAL_MODE", "MONOBANK_SPLIT_TOKEN", "MONOBANK_PLATFORM_RECEIVER_ID", "ADMIN_EMAILS"];
 
-export const setupMoneyEnv = () => {
+export const setupMoneyEnv = async () => {
+  // Лічильники частоти спільні на всю базу тестового файлу: кожен тест починає з чистими.
+  await getDb().delete(authAttempts);
   process.env.SAFE_DEAL_MODE = "on";
   process.env.MONOBANK_SPLIT_TOKEN = "split-token";
   process.env.MONOBANK_PLATFORM_RECEIVER_ID = "recv-platform";
   process.env.ADMIN_EMAILS = "boss@example.com";
   vi.stubGlobal("fetch", bank.fetchMock);
   bank.reset();
+  bank.state.receivers = [{ id: "recv-perf", edrpou: PERF_TAX_ID, name: "ФОП Юлія" }];
+  process.env.REQUISITES_KEY = KEY;
   notifyLater.mockReset();
   adminMail.mockReset();
   session.user = OWNER;
@@ -70,8 +83,8 @@ export const webhook = (invoiceId: string, overrides: Record<string, unknown> = 
 };
 
 /** Оплата доведена до «холд підтверджено банком»: повертає угоду й id рахунку. */
-export const funded = async (): Promise<{ deal: Deal; invoiceId: string }> => {
-  const deal = await newDeal();
+export const funded = async (amount = PRICE): Promise<{ deal: Deal; invoiceId: string }> => {
+  const deal = await newDeal("me-dm-perf", amount);
   const response = await pay(deal.id);
   expect(response.status).toBe(201);
   const invoiceId = [...bank.invoices.keys()].at(-1)!;
@@ -81,8 +94,8 @@ export const funded = async (): Promise<{ deal: Deal; invoiceId: string }> => {
   return { deal, invoiceId };
 };
 
-export const delivered = async () => {
-  const state = await funded();
+export const delivered = async (amount = PRICE) => {
+  const state = await funded(amount);
   await actAsPerformer("dm-perf", state.deal.id, "deliver", undefined);
   return state;
 };

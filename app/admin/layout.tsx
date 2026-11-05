@@ -26,6 +26,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <span className="adm-who" title={admin.email}>
             {admin.email}
           </span>
+          <Link href="/admin/payouts" className="adm-bar-link">
+            Виплати
+          </Link>
           <Link href="/" className="adm-bar-link">
             На карту
           </Link>

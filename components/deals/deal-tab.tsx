@@ -13,7 +13,6 @@ import {
 } from "@/components/icons";
 import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
 import { TransferCard } from "@/components/deals/transfer-card";
-import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, proposeDeal, startPayment, useDeals } from "@/lib/deals/client";
@@ -21,12 +20,12 @@ import { paymentReturnStore } from "@/lib/deals/use-payment-return";
 import { useStore } from "@/lib/store";
 import { daysWord, money } from "@/lib/deals/format";
 import { useSafeDeal } from "@/lib/deals/use-safe-deal";
-import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
-import { formatKop, quoteStage, rateLabel, totalRange } from "@/lib/deals/price";
+import { CommissionRow } from "@/components/deals/commission-row";
+import { ReleaseCodeBox } from "@/components/deals/release-code-box";
+import { releaseNeedsCode } from "@/lib/deals/limits";
+import { COMMISSION_RATE, formatKop, quoteStage, totalOf } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
-  SAFE_FEE,
-  type CardKind,
   type Deal,
   type DealMethod,
   type DealStage,
@@ -110,7 +109,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
 
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
   const fee = feeOf(total, method);
-  const payRange = useMemo(() => totalRange(stages.map((stage) => stage.amount)), [stages]);
+  const payTotal = useMemo(() => totalOf(stages.map((stage) => stage.amount)), [stages]);
   const performer = {
     id: response.performerId,
     name: response.name,
@@ -214,7 +213,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
           </span>
           <span className="deal-method-text">
             {fop
-              ? `Гроші заморожуємо на вашій картці й віддаємо виконавцю, коли ви підтвердите роботу. Виконавець отримує свою ціну повністю, а до оплати додаємо комісію платформи ${Math.round(SAFE_FEE * 100)}% і комісію банку.`
+              ? `Гроші заморожуємо на вашій картці й віддаємо виконавцю, коли ви підтвердите роботу. Виконавець отримує свою ціну повністю, а до оплати додаємо комісію ${Math.round(COMMISSION_RATE * 100)}%.`
               : "Недоступна: виконавець не ФОП. Безпечна угода лише для виконавців-ФОП."}
           </span>
         </label>
@@ -263,18 +262,11 @@ function DealComposer({ response }: { response: OfferResponse }) {
               <dt>Вартість роботи (отримає виконавець)</dt>
               <dd className="tabular-nums">{money(total)}</dd>
             </div>
-            <div>
-              <dt>Комісія платформи, {Math.round(SAFE_FEE * 100)}%</dt>
-              <dd className="tabular-nums">{money(fee)}</dd>
-            </div>
-            <div>
-              <dt>Комісія банку</dt>
-              <dd>{rateLabel("ua")} або {rateLabel("foreign")} залежно від картки</dd>
-            </div>
+            <CommissionRow amount={money(fee)} />
             <div>
               <dt>До оплати</dt>
               <dd className="tabular-nums">
-                {stages.length > 0 ? `${formatKop(payRange.ua)} – ${formatKop(payRange.foreign)}` : "—"}
+                {stages.length > 0 ? formatKop(payTotal) : "—"}
               </dd>
             </div>
           </>
@@ -376,11 +368,11 @@ export function DealView({ deal }: { deal: Deal }) {
   const paymentReturn = useStore(paymentReturnStore);
 
   /** Оплата етапу: рахунок у банку, далі йдемо на його сторінку. Статус «заморожено» поставить сам банк. */
-  const pay = async (card: CardKind) => {
+  const pay = async () => {
     setBusy("fund");
     setError(null);
     try {
-      window.location.assign(await startPayment(deal, card));
+      window.location.assign(await startPayment(deal));
       return true;
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Не вдалося перейти до оплати.");
@@ -392,11 +384,12 @@ export function DealView({ deal }: { deal: Deal }) {
   const run = async (
     action: Parameters<typeof dealAction>[1],
     target?: DealStage,
+    code?: string,
   ) => {
     setBusy(action);
     setError(null);
     try {
-      await dealAction(deal, action, target?.id);
+      await dealAction(deal, action, { stageId: target?.id, code });
       setCheckout(null);
       setConfirmRelease(null);
       return true;
@@ -538,7 +531,7 @@ export function DealView({ deal }: { deal: Deal }) {
                       onClaim={() => run("claim_paid", item)}
                       onAskRelease={() => setConfirmRelease(item)}
                       onCancelRelease={() => setConfirmRelease(null)}
-                      onRelease={() => run("release", item)}
+                      onRelease={(code) => run("release", item, code)}
                       onDispute={() => run("dispute", item)}
                     />
                   )}
@@ -588,17 +581,15 @@ function StageActions({
   confirmRelease: boolean;
   onCheckout: () => void;
   onCancelCheckout: () => void;
-  onFund: (card: CardKind) => Promise<boolean>;
+  onFund: () => Promise<boolean>;
   onClaim: () => Promise<boolean>;
   onAskRelease: () => void;
   onCancelRelease: () => void;
-  onRelease: () => Promise<boolean>;
+  onRelease: (code?: string) => Promise<boolean>;
   onDispute: () => Promise<boolean>;
 }) {
   const safe = deal.method === "safe";
-  // Тип картки обирає замовник: від нього залежить комісія банку, а отже й сума до оплати.
-  const [card, setCard] = useState<CardKind>("ua");
-  const quote = quoteStage(stage.amount, card);
+  const quote = quoteStage(stage.amount);
 
   if (stage.status === "pending" && safe) {
     return checkout ? (
@@ -606,38 +597,12 @@ function StageActions({
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
           Оплата через Monobank
         </p>
-        <p className="pe-label mt-2">Якою карткою платите</p>
-        <RadioGroup
-          value={card}
-          onValueChange={(value) => setCard(value as CardKind)}
-          aria-label="Тип картки"
-        >
-          <RadioCard
-            id={`card-ua-${stage.id}`}
-            value="ua"
-            title="Картка українського банку"
-            hint={`Комісія банку ${rateLabel("ua")}`}
-          />
-          <RadioCard
-            id={`card-foreign-${stage.id}`}
-            value="foreign"
-            title="Картка закордонного банку"
-            hint={`Комісія банку ${rateLabel("foreign")}`}
-          />
-        </RadioGroup>
         <dl className="deal-summary mt-2">
           <div>
             <dt>Вартість роботи</dt>
             <dd className="tabular-nums">{formatKop(quote.price)}</dd>
           </div>
-          <div>
-            <dt>Комісія платформи, {Math.round(SAFE_FEE * 100)}%</dt>
-            <dd className="tabular-nums">{formatKop(quote.fee)}</dd>
-          </div>
-          <div>
-            <dt>Комісія банку, {rateLabel(card)}</dt>
-            <dd className="tabular-nums">{formatKop(quote.bankFee)}</dd>
-          </div>
+          <CommissionRow amount={formatKop(quote.fee)} />
           <div>
             <dt>До оплати</dt>
             <dd className="tabular-nums font-semibold">
@@ -651,13 +616,13 @@ function StageActions({
           вашій картці на {HOLD_DAYS} днів. Гроші не списуються, поки ви не
           підтвердите роботу. Виконавець отримає{" "}
           <span className="tabular-nums">{formatKop(quote.price)}</span>{" "}
-          повністю. Обирайте тип картки чесно: від цього залежить сума.
+          повністю.
         </p>
         <div className="mt-3 grid gap-2">
           <button
             type="button"
             disabled={busy === "fund"}
-            onClick={() => void onFund(card)}
+            onClick={() => void onFund()}
             className="offer-primary"
           >
             {busy === "fund" && <Loader2 className="size-4 animate-spin" />}
@@ -714,6 +679,9 @@ function StageActions({
   }
 
   if (stage.status === "delivered") {
+    if (confirmRelease && safe && releaseNeedsCode(stage.amount)) {
+      return <ReleaseCodeBox dealId={deal.id} amount={money(payoutOf(stage.amount))} busy={busy === "release"} onConfirm={onRelease} onCancel={onCancelRelease} />;
+    }
     if (confirmRelease) {
       return (
         <div className="deal-box">

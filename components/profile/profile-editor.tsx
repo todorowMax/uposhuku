@@ -5,6 +5,7 @@ import { gsap } from "gsap";
 import { Check, Loader2, MapPinned, Plus, X } from "@/components/icons";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { LocationPicker } from "@/components/profile/location-picker";
+import { PayoutSection } from "@/components/payouts/payout-section";
 import { RequisitesSection } from "@/components/requisites/requisites-section";
 import { PhotoField } from "@/components/profile/photo-field";
 import { TagChips } from "@/components/profile/tag-chips";
@@ -366,6 +367,8 @@ export function ProfileEditor() {
             </section>
 
             <RequisitesSection />
+
+            <PayoutSection />
 
             <footer className="pe-footer">
               {confirmClose ? (

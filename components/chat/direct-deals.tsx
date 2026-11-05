@@ -17,10 +17,10 @@ import { loadDeals, useDeals } from "@/lib/deals/client";
 import { useSafeDeal } from "@/lib/deals/use-safe-deal";
 import { money } from "@/lib/deals/format";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
-import { formatKop, rateLabel, totalRange } from "@/lib/deals/price";
+import { CommissionRow } from "@/components/deals/commission-row";
+import { COMMISSION_RATE, formatKop, totalOf } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
-  SAFE_FEE,
   directRequestId,
   type DealMethod,
 } from "@/lib/deals/types";
@@ -113,7 +113,7 @@ export function TermsForm({
         }, safeEnabled);
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
   const fee = feeOf(total, method);
-  const payRange = useMemo(() => totalRange(stages.map((stage) => stage.amount)), [stages]);
+  const payTotal = useMemo(() => totalOf(stages.map((stage) => stage.amount)), [stages]);
 
   const submit = async () => {
     if (problem) return setError(problem);
@@ -231,7 +231,7 @@ export function TermsForm({
           </span>
           <span className="deal-method-text">
             {fop
-              ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію платформи ${Math.round(SAFE_FEE * 100)}% і комісію банку.`
+              ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію ${Math.round(COMMISSION_RATE * 100)}%.`
               : "Недоступна: виконавець не ФОП."}
           </span>
         </label>
@@ -272,20 +272,11 @@ export function TermsForm({
           </div>
           {method === "safe" && (
             <>
-              <div>
-                <dt>Комісія платформи, {Math.round(SAFE_FEE * 100)}%</dt>
-                <dd className="tabular-nums">{money(fee)}</dd>
-              </div>
-              <div>
-                <dt>Комісія банку</dt>
-                <dd>
-                  {rateLabel("ua")} або {rateLabel("foreign")} залежно від картки
-                </dd>
-              </div>
+              <CommissionRow amount={money(fee)} />
               <div>
                 <dt>Замовник заплатить</dt>
                 <dd className="tabular-nums">
-                  {formatKop(payRange.ua)} – {formatKop(payRange.foreign)}
+                  {formatKop(payTotal)}
                 </dd>
               </div>
             </>

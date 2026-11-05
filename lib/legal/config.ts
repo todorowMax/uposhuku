@@ -5,7 +5,8 @@
 // ФОП, тож тут вони мають збігатися з документами, а в тексті сторінок їх
 // не дублюємо: підставляємо через {плейсхолдери}.
 
-import { HOLD_DAYS, MAX_DEAL, MAX_STAGE_AMOUNT, MAX_STAGES, MIN_DEAL, REVIEW_DAYS, SAFE_FEE } from "@/lib/deals/types";
+import { COMMISSION_RATE } from "@/lib/deals/price";
+import { HOLD_DAYS, MAX_DEAL, MAX_STAGE_AMOUNT, MAX_STAGES, MIN_DEAL, REVIEW_DAYS } from "@/lib/deals/types";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
 export const SERVICE_NAME = "Findlyfy";
@@ -38,7 +39,7 @@ export const UPDATED = {
   terms: "5 листопада 2026 року",
   privacy: "5 листопада 2026 року",
   contacts: "17 жовтня 2026 року",
-  safeDealOffer: "22 жовтня 2026 року",
+  safeDealOffer: "5 листопада 2026 року",
 } as const;
 
 const money = (value: number) => new Intl.NumberFormat("uk-UA").format(value).replace(/ /g, " ");
@@ -54,7 +55,7 @@ export const LEGAL_VALUES: Record<string, string> = {
   maxPayment: money(MAX_PAYMENT),
   holdDays: String(HOLD_DAYS),
   maxStages: String(MAX_STAGES),
-  fee: String(Math.round(SAFE_FEE * 100)),
+  fee: String(Math.round(COMMISSION_RATE * 100)),
   minDeal: money(MIN_DEAL),
   maxDeal: money(MAX_DEAL),
   maxStage: money(MAX_STAGE_AMOUNT),

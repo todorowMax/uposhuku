@@ -116,6 +116,12 @@ export const getDealForOwner = async (id: string, ownerUserId: string): Promise<
   return row && row.ownerUserId === ownerUserId ? parse(row) : null;
 };
 
+/** Угода за id без прив'язки до власника: для модератора, якому треба знати спосіб оплати до рішення. */
+export const getDealById = async (id: string): Promise<Deal | null> => {
+  const row = await readRow(id);
+  return row ? parse(row) : null;
+};
+
 /** Замовник угоди: потрібно, щоб сповістити його про дію виконавця. */
 export const ownerOfDeal = async (id: string): Promise<string | null> =>
   (await getDb().select({ ownerUserId: deals.ownerUserId }).from(deals).where(eq(deals.id, id)).limit(1))[0]?.ownerUserId ?? null;

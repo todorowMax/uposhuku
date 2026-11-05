@@ -1,15 +1,16 @@
 // /api/deals/:id/pay — оплата етапу безпечної угоди через Monobank.
-// POST {card?} — замовник отримує pageUrl сторінки банку (холд). Активний неоплачений рахунок використовується повторно.
+// POST — замовник отримує pageUrl сторінки банку (холд). Активний неоплачений рахунок використовується повторно.
 // GET — стан платежу поточного етапу: перепитує банк, доки рахунок не завершено, і віддає угоду. Для повернення з банку на сайт.
 // Статус «заморожено» ставить лише підтвердження банку, ніколи ця відповідь.
 
-import { problem, readJson } from "@/lib/api/problem";
+import { problem } from "@/lib/api/problem";
 import { currentStage } from "@/lib/deals/machine";
 import { getSessionUser } from "@/lib/server/auth";
 import { reconcilePayment } from "@/lib/server/deal-money";
 import { startStagePayment } from "@/lib/server/deal-pay";
 import { getDealForOwner } from "@/lib/server/deal-repo";
 import { activeStagePayment } from "@/lib/server/payment-repo";
+import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 
 const NO_STORE = { "cache-control": "no-store" };
@@ -18,10 +19,9 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   try {
-    const body = await readJson(request);
-    // Тип картки не обирає людина (ітерація 4 прибере вибір); поки рахуємо за вищою ставкою, щоб виконавець не лишився внакладі.
-    const card = body?.card === "ua" ? "ua" : "foreign";
-    const result = await startStagePayment({ user, dealId: (await params).id, card, origin: new URL(request.url).origin });
+    const limited = await rateLimited("dealPay", user.id);
+    if (limited) return limited;
+    const result = await startStagePayment({ user, dealId: (await params).id, origin: new URL(request.url).origin });
     if (!result.ok) return problem(result.status, result.title, result.detail);
     return Response.json({ pageUrl: result.pageUrl, reused: result.reused }, { status: result.reused ? 200 : 201, headers: NO_STORE });
   } catch (error) {

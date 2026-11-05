@@ -55,6 +55,8 @@ interface CloudflareEnv {
   ADMIN_HOSTS?: string;
   /** "1": пускати в адмінку й після тестового входу (код 000000). Лише локально, у .dev.vars. */
   ADMIN_DEV_LOGIN?: string;
+  /** Секрет TOTP модератора (base32, як у автентифікаторах). Секрет. Без нього на проді грошові рішення спорів недоступні. */
+  ADMIN_TOTP_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
 }

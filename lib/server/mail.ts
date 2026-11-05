@@ -66,3 +66,16 @@ export const sendAdminNotice = async (emails: string[], subject: string, text: s
   }
   for (const to of emails) await deliver({ to, subject, text });
 };
+
+/** Лист замовнику з кодом підтвердження приймання етапу (від 10 000 ₴). */
+export const sendReleaseCodeMail = async (email: string, code: string, dealNumber: string) => {
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] код приймання угоди ${dealNumber} для ${email}: ${code}`);
+    return;
+  }
+  await deliver({
+    to: email,
+    subject: `Код підтвердження виплати: ${code}`,
+    text: `Ви приймаєте роботу за угодою ${dealNumber}, після цього гроші підуть виконавцю і повернути їх не можна. Код підтвердження: ${code}\n\nВін діє 10 хвилин. Якщо це не ви, нічого не вводьте й змініть спосіб входу в акаунт.`,
+  });
+};

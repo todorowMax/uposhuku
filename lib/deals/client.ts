@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/auth/client";
 import { createStore, useStore } from "@/lib/store";
 import { startPolling } from "@/lib/realtime/client";
 import { useActiveRequest } from "@/lib/requests/offers";
-import type { CardKind, Deal, DealAction, DealDraft } from "./types";
+import type { Deal, DealAction, DealDraft } from "./types";
 
 /** Угоди за id запиту. */
 export const dealsStore = createStore<Record<string, Deal[]>>({});
@@ -59,18 +59,18 @@ export const proposeDeal = async (draft: DealDraft) => {
   return deal;
 };
 
-export const dealAction = async (deal: Deal, action: DealAction, stageId?: string) => {
+export const dealAction = async (deal: Deal, action: DealAction, extra: { stageId?: string; code?: string } = {}) => {
   const { deal: next } = await call<{ deal: Deal }>(`/api/deals/${encodeURIComponent(deal.id)}`, {
     method: "POST",
-    body: JSON.stringify({ action, stageId }),
+    body: JSON.stringify({ action, stageId: extra.stageId, ...(extra.code ? { code: extra.code } : {}) }),
   });
   replace(next);
   return next;
 };
 
 /** Рахунок на оплату етапу безпечної угоди: сторінка банку, куди веде кнопка «Перейти до оплати». */
-export const startPayment = async (deal: Deal, card: CardKind): Promise<string> => {
-  const { pageUrl } = await call<{ pageUrl: string }>(`/api/deals/${encodeURIComponent(deal.id)}/pay`, { method: "POST", body: JSON.stringify({ card }) });
+export const startPayment = async (deal: Deal): Promise<string> => {
+  const { pageUrl } = await call<{ pageUrl: string }>(`/api/deals/${encodeURIComponent(deal.id)}/pay`, { method: "POST" });
   return pageUrl;
 };
 
@@ -102,3 +102,6 @@ export const useDeals = (requestId: string | null | undefined): Deal[] => {
   const all = useStore(dealsStore);
   return (requestId ? all[requestId] : undefined) ?? EMPTY;
 };
+
+/** Код на пошту замовника для приймання етапу від 10 000 ₴. */
+export const requestReleaseCode = (dealId: string) => call<{ sent: boolean }>(`/api/deals/${encodeURIComponent(dealId)}/release-code`, { method: "POST" });

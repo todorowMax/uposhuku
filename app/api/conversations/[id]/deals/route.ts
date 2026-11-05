@@ -12,6 +12,7 @@ import { proposeDirectDeal, SELF_DEAL } from "@/lib/server/deal-repo";
 import { notifyLater } from "@/lib/server/notify";
 import { getProfile } from "@/lib/server/profile-repo";
 import { pushUser } from "@/lib/server/realtime";
+import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { dealNotice } from "@/lib/telegram/notices";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -19,10 +20,12 @@ import { serverEvent } from "@/lib/telemetry/log";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   try {
+    const limited = await rateLimited("dealCreate", user.id);
+    if (limited) return limited;
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
     const { conversation, role } = access;
@@ -71,4 +74,4 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   } catch (error) {
     return failure(error, request);
   }
-}
+};

@@ -14,7 +14,6 @@ import {
   MAX_STAGE_DAYS,
   MAX_STAGES,
   MIN_DEAL,
-  SAFE_FEE,
   type Deal,
   type DealAction,
   type DealDraft,
@@ -23,6 +22,7 @@ import {
   type PerformerAction,
   type StagePayout,
 } from "./types";
+import { COMMISSION_RATE } from "./price";
 
 const iso = (ms: number) => new Date(ms).toISOString();
 
@@ -31,8 +31,8 @@ export const SAFE_DEAL_UNAVAILABLE = "Безпечна угода ще недо�
 
 export const dealTotal = (deal: Pick<Deal, "stages">) => deal.stages.reduce((sum, stage) => sum + stage.amount, 0);
 
-/** Винагорода платформи від ціни виконавця: лише для безпечної угоди, у гривнях. Платить замовник понад ціну. */
-export const feeOf = (amount: number, method: Deal["method"]) => (method === "safe" ? Math.round(amount * SAFE_FEE) : 0);
+/** Комісія безпечної угоди від ціни виконавця, у гривнях. Платить замовник понад ціну. */
+export const feeOf = (amount: number, method: Deal["method"]) => (method === "safe" ? Math.round(amount * COMMISSION_RATE) : 0);
 
 /** Виконавець отримує ціну повністю: комісії платформи й банку лягають на замовника, див. lib/deals/price.ts. */
 export const payoutOf = (amount: number) => amount;

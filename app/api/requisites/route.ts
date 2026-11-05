@@ -6,6 +6,7 @@ import { validateRequisites } from "@/lib/deals/requisites";
 import { getSessionUser } from "@/lib/server/auth";
 import { sendRequisitesChangeNotice } from "@/lib/server/mail";
 import { getOwnRequisites, saveOwnRequisites } from "@/lib/server/requisites-repo";
+import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { SecretBoxUnavailableError } from "@/lib/server/secret-box";
 import { logServer } from "@/lib/telemetry/log";
@@ -18,6 +19,8 @@ export const GET = async () => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   try {
+    const limited = await rateLimited("requisitesRead", user.id);
+    if (limited) return limited;
     return Response.json(await getOwnRequisites(user.id), { headers: HEADERS });
   } catch (error) {
     return error instanceof SecretBoxUnavailableError ? unavailable() : failure(error);
@@ -27,6 +30,8 @@ export const GET = async () => {
 export const PUT = async (request: Request) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const limited = await rateLimited("requisitesWrite", user.id);
+  if (limited) return limited;
   const checked = validateRequisites(await readJson(request));
   if (!checked.ok) return problem(400, "Реквізити не збережено", checked.error);
   try {

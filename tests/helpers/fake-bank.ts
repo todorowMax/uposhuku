@@ -30,6 +30,8 @@ export const createFakeBank = () => {
     fail: new Map<string, number | "network">(),
     /** Побічний ефект перед відмовою: «хтось інший уже виконує операцію». */
     beforeFail: null as null | ((invoiceId: string) => void),
+    /** Отримувачі розщеплення, якими відповідає split-receiver/list (id, ІПН). */
+    receivers: [] as { id: string; edrpou: string; name: string }[],
   };
   const stamp = () => `2026-11-05T10:${String(Math.floor(++tick / 60)).padStart(2, "0")}:${String(tick % 60).padStart(2, "0")}Z`;
   const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
@@ -43,6 +45,7 @@ export const createFakeBank = () => {
     if (failure) state.beforeFail?.(parsed.searchParams.get("invoiceId") ?? String(body?.invoiceId));
     if (failure === "network") throw new TypeError("fetch failed");
     if (failure) return json(failure, { errCode: "bad", errText: "bank says no" });
+    if (path === "split-receiver/list") return json(200, { list: state.receivers });
     if (path === "invoice/create") {
       const invoiceId = `inv-${++seq}`;
       const merchant = (body?.merchantPaymInfo ?? {}) as { reference?: string };
@@ -85,6 +88,7 @@ export const createFakeBank = () => {
       calls.length = 0;
       state.fail.clear();
       state.beforeFail = null;
+      state.receivers = [];
     },
   };
 };
