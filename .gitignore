@@ -13,3 +13,11 @@ tsconfig.tsbuildinfo
 
 # Воркер MapLibre, копіюється scripts/copy-maplibre-worker.mjs
 /public/maplibre/
+
+# Контракти: власний package.json, збірка й залежності окремо
+/contracts/node_modules/
+/contracts/artifacts/
+/contracts/cache/
+/contracts/types/
+/contracts/coverage/
+/contracts/dist/

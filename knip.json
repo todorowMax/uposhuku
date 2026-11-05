@@ -7,7 +7,7 @@
     "vitest*.config.{ts,mts}",
     "tests/**/*.{ts,tsx}"
   ],
-  "ignore": ["config/agent-rules/**"],
+  "ignore": ["config/agent-rules/**", "contracts/**", "lib/crypto/abi/**"],
   "ignoreDependencies": ["cloudflare"],
   "ignoreExportsUsedInFile": true
 }

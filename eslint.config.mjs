@@ -12,5 +12,5 @@ export default createConfig({
   // imports holds COMP-7: the animated icons in components/icons still import motion (warnings).
   legacy: { syntax: true, imports: true, style: true, types: true, hygiene: true, a11y: true },
   // kit/ is a git subtree of web-kit and is not edited here.
-  ignores: ["kit/**"],
+  ignores: ["kit/**", "contracts/**"],
 });
