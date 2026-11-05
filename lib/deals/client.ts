@@ -59,13 +59,26 @@ export const proposeDeal = async (draft: DealDraft) => {
   return deal;
 };
 
-export const dealAction = async (deal: Deal, action: DealAction, stageId?: string, simulate?: "declined", card?: CardKind) => {
+export const dealAction = async (deal: Deal, action: DealAction, stageId?: string) => {
   const { deal: next } = await call<{ deal: Deal }>(`/api/deals/${encodeURIComponent(deal.id)}`, {
     method: "POST",
-    body: JSON.stringify({ action, stageId, simulate, card }),
+    body: JSON.stringify({ action, stageId }),
   });
   replace(next);
   return next;
+};
+
+/** Рахунок на оплату етапу безпечної угоди: сторінка банку, куди веде кнопка «Перейти до оплати». */
+export const startPayment = async (deal: Deal, card: CardKind): Promise<string> => {
+  const { pageUrl } = await call<{ pageUrl: string }>(`/api/deals/${encodeURIComponent(deal.id)}/pay`, { method: "POST", body: JSON.stringify({ card }) });
+  return pageUrl;
+};
+
+/** Стан оплати поточного етапу за банком (сервер перепитує його). Угоду оновлюємо в сховищі. */
+export const checkPayment = async (dealId: string): Promise<{ status: string | null; deal: Deal }> => {
+  const result = await call<{ status: string | null; deal: Deal }>(`/api/deals/${encodeURIComponent(dealId)}/pay`);
+  replace(result.deal);
+  return result;
 };
 
 /**

@@ -4,6 +4,7 @@
 
 import { and, lt } from "drizzle-orm";
 import { notificationLog } from "@/db/schema";
+import { runDealSweep } from "@/lib/server/deal-sweep";
 import { getDb } from "@/lib/server/db";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
@@ -30,7 +31,12 @@ export async function POST(request: Request) {
     const closed = await closeFinishedPosts(now);
     await pruneTelegram(now);
     await getDb().delete(notificationLog).where(and(lt(notificationLog.createdAt, now - WEEK_MS)));
-    return Response.json({ ok: true, ...posted, closed });
+    // Гроші безпечної угоди йдуть окремо: збій там не зупиняє решту фонових задач, а видно в журналі.
+    const sweep = await runDealSweep(now).catch((error) => {
+      logServer({ level: "error", event: "deal_sweep_crashed", message: error instanceof Error ? error.message : String(error) });
+      return null;
+    });
+    return Response.json({ ok: true, ...posted, closed, sweep });
   } catch (error) {
     logServer({ level: "error", event: "tick_failed", message: error instanceof Error ? error.message : String(error), detail: { stack: error instanceof Error ? error.stack : null } });
     return Response.json({ ok: false }, { status: 500 });

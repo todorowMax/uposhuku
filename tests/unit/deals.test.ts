@@ -1,10 +1,12 @@
-import { describe, expect, it, vi } from "vitest";
-import { applyAction, applyModeratorAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { describe, expect, it } from "vitest";
+import { applyAction, applyModeratorAction, applyPerformerAction, performerNeeds, createDeal, currentStage, dealPhase, feeOf, needsAction, payoutOf, splitIntoStages, validateDraft as validate } from "@/lib/deals/machine";
+import { applyPaymentStatus } from "@/lib/deals/payment-status";
 import { quoteStage, splitShares, totalRange } from "@/lib/deals/price";
 import { ACQUIRING_RATE, HOLD_DAYS, MAX_STAGE_AMOUNT, MAX_STAGE_DAYS, type Deal, type DealDraft } from "@/lib/deals/types";
 
-// Тут перевіряємо саму безпечну угоду, тож вмикаємо прапорець; вимкнений стан покриває safe-deal-flag.test.ts.
-vi.mock("@/lib/deals/flags", () => ({ SAFE_DEAL_ENABLED: true }));
+// Безпечна угода тут увімкнена для людини; режими покриває safe-deal-flag.test.ts. «Заморожено» і «виплачено»
+// ставить лише банк, тож тести підставляють його відповідь через applyPaymentStatus.
+const validateDraft = (draft: DealDraft, safe = true) => validate(draft, safe);
 
 const T0 = Date.parse("2026-10-03T10:00:00Z");
 const performer = { id: "p1", name: "Юлія", avatarIndex: 1, specialty: "Дизайнерка", fop: true };
@@ -16,6 +18,26 @@ const draft = (over: Partial<DealDraft> = {}): DealDraft => ({
   stages: [{ title: "Робота", amount: 10000, days: 7 }],
   ...over,
 });
+
+/** Банк підтвердив холд за суму етапу (картка ua за замовчуванням). */
+const fundByBank = (deal: Deal, at: number, options: { stageId?: string; card?: "ua" | "foreign" } = {}): Deal => {
+  const stage = deal.stages.find((item) => item.id === (options.stageId ?? currentStage(deal)?.id))!;
+  const card = options.card ?? "ua";
+  const total = quoteStage(stage.amount, card).total;
+  const applied = applyPaymentStatus(deal, { stageId: stage.id, bank: { status: "hold", amount: total, at }, ours: { amount: total, card } }, at);
+  if (applied.kind !== "ok") throw new Error(applied.reason);
+  return applied.deal;
+};
+
+/** Банк підтвердив виплату (success) або повернення (reversed) етапу. */
+const settledByBank = (deal: Deal, outcome: { stageId: string; status: "success" | "reversed" }, at: number): Deal => {
+  const { stageId, status } = outcome;
+  const stage = deal.stages.find((item) => item.id === stageId)!;
+  const total = quoteStage(stage.amount, "ua").total;
+  const applied = applyPaymentStatus(deal, { stageId, bank: { status, amount: total }, ours: { amount: total, card: "ua" } }, at);
+  if (applied.kind !== "ok") throw new Error(applied.reason);
+  return applied.deal;
+};
 
 const act = (deal: Deal, action: Parameters<typeof applyPerformerAction>[1], at: number): Deal => applyPerformerAction(deal, action, undefined, at) as Deal;
 const accepted = (d = draft()): Deal => act(createDeal("deal-abcd", d, T0), "accept", T0 + 3000);
@@ -69,7 +91,7 @@ describe("шлях безпечної угоди", () => {
   it("заморожування → здано → виплата → угода завершена; холд на HOLD_DAYS днів, розбивка оплати збережена", () => {
     let deal = accepted();
     expect(needsAction(deal)).toBe("fund");
-    deal = applyAction(deal, "fund", undefined, T0 + 5000, { card: "ua" }) as Deal;
+    deal = fundByBank(deal, T0 + 5000);
     const stage = currentStage(deal)!;
     expect(stage.status).toBe("funded");
     expect(Date.parse(stage.holdUntil!) - Date.parse(stage.fundedAt!)).toBe(HOLD_DAYS * 86_400_000);
@@ -79,16 +101,23 @@ describe("шлях безпечної угоди", () => {
     expect(currentStage(deal)!.status).toBe("delivered");
     expect(needsAction(deal)).toBe("confirm");
     deal = applyAction(deal, "release", undefined, T0 + 20_000) as Deal;
+    // Приймання лише записує намір: «виплачено» ставить банк.
+    expect(currentStage(deal)!.status).toBe("releasing");
+    expect(deal.status).toBe("accepted");
+    expect(applyAction(deal, "release", undefined, T0 + 20_001)).toMatch(/вже виконується/);
+    deal = settledByBank(deal, { stageId: deal.stages[0].id, status: "success" }, T0 + 30_000);
     expect(deal.status).toBe("completed");
+    expect(deal.stages[0].paidAmount).toBe(1_063_830);
     expect(dealPhase([deal])).toBe("done");
   });
 
   it("етапи йдуть по черзі, наступний не починається без попереднього", () => {
     let deal = accepted(draft({ stages: [{ title: "А", amount: 5000, days: 5 }, { title: "Б", amount: 5000, days: 5 }] }));
     expect(applyAction(deal, "fund", deal.stages[1].id, T0)).toMatch(/попередній/);
-    deal = applyAction(deal, "fund", deal.stages[0].id, T0 + 4000) as Deal;
+    deal = fundByBank(deal, T0 + 4000, { stageId: deal.stages[0].id });
     deal = act(deal, "deliver", T0 + 14_000);
     deal = applyAction(deal, "release", deal.stages[0].id, T0 + 20_000) as Deal;
+    deal = settledByBank(deal, { stageId: deal.stages[0].id, status: "success" }, T0 + 21_000);
     expect(deal.status).toBe("accepted");
     expect(currentStage(deal)!.id).toBe(deal.stages[1].id);
     expect(needsAction(deal)).toBe("fund");
@@ -96,7 +125,7 @@ describe("шлях безпечної угоди", () => {
 
   it("спір блокує виплату, відкрити його можна лише в безпечній угоді", () => {
     let deal = accepted();
-    deal = applyAction(deal, "fund", undefined, T0 + 4000) as Deal;
+    deal = fundByBank(deal, T0 + 4000);
     deal = applyAction(deal, "dispute", undefined, T0 + 5000) as Deal;
     expect(deal.disputed).toBe(true);
     expect(needsAction(deal)).toBe("dispute");
@@ -130,7 +159,7 @@ describe("шлях прямого переказу за QR", () => {
 
   it("гарантії платформи немає: спір не відкривається, заморожування недоступне", () => {
     let deal = direct();
-    expect(applyAction(deal, "fund", undefined, T0)).toMatch(/Заморозити/);
+    expect(applyAction(deal, "fund", undefined, T0)).toMatch(/через сторінку банку/);
     deal = applyAction(deal, "claim_paid", undefined, T0 + 5000) as Deal;
     deal = act(deal, "confirm_paid", T0 + 9000);
     expect(applyAction(deal, "dispute", undefined, T0 + 20_000)).toMatch(/прямому переказі/);
@@ -202,7 +231,7 @@ describe("умови з розмови: виставляє виконавець"
 describe("рішення модератора у спорі", () => {
   const disputed = (stages = [{ title: "Робота", amount: 10000, days: 7 }]): Deal => {
     let deal = accepted(draft({ stages }));
-    deal = applyAction(deal, "fund", undefined, T0 + 4000) as Deal;
+    deal = fundByBank(deal, T0 + 4000);
     deal = act(deal, "deliver", T0 + 5000);
     return applyAction(deal, "dispute", undefined, T0 + 6000) as Deal;
   };
@@ -211,24 +240,41 @@ describe("рішення модератора у спорі", () => {
     expect(disputed().stages[0].disputedAt).toBe(new Date(T0 + 6000).toISOString());
   });
 
-  it("виплата: етап виплачено, остання угода завершується", () => {
-    const done = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
-    expect(done.stages[0]).toMatchObject({ status: "released", releasedAt: new Date(T0 + 9000).toISOString() });
+  it("виплата: спершу намір (releasing), «виплачено» і завершення лише після банку", () => {
+    const intent = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
+    expect(intent.stages[0]).toMatchObject({ status: "releasing", payout: { kind: "full" }, revertTo: "disputed" });
+    expect(intent.status).toBe("accepted");
+    const done = settledByBank(intent, { stageId: intent.stages[0].id, status: "success" }, T0 + 9500);
+    expect(done.stages[0]).toMatchObject({ status: "released", releasedAt: new Date(T0 + 9500).toISOString() });
     expect(done.status).toBe("completed");
     expect(done.disputed).toBe(false);
   });
 
+  it("часткова виплата: відсоток кратний 5 і явне підтвердження обов'язкові", () => {
+    const deal = disputed();
+    expect(applyModeratorAction(deal, "partial", undefined, T0 + 9000, { percent: 60 })).toMatch(/необоротна/);
+    expect(applyModeratorAction(deal, "partial", undefined, T0 + 9000, { percent: 62, confirm: true })).toMatch(/кратний 5/);
+    expect(applyModeratorAction(deal, "partial", undefined, T0 + 9000, { percent: 100, confirm: true })).toMatch(/кратний 5/);
+    expect(applyModeratorAction(deal, "partial", undefined, T0 + 9000, { percent: 0, confirm: true })).toMatch(/кратний 5/);
+    const ok = applyModeratorAction(deal, "partial", undefined, T0 + 9000, { percent: 60, confirm: true }) as Deal;
+    expect(ok.stages[0]).toMatchObject({ status: "releasing", payout: { kind: "partial", percent: 60 } });
+  });
+
   it("виплата середнього етапу пускає угоду далі", () => {
     const deal = disputed([{ title: "А", amount: 5000, days: 5 }, { title: "Б", amount: 5000, days: 5 }]);
-    const done = applyModeratorAction(deal, "release", undefined, T0 + 9000) as Deal;
+    const intent = applyModeratorAction(deal, "release", undefined, T0 + 9000) as Deal;
+    const done = settledByBank(intent, { stageId: deal.stages[0].id, status: "success" }, T0 + 9500);
     expect(done.status).toBe("accepted");
     expect(currentStage(done)!.id).toBe(deal.stages[1].id);
     expect(needsAction(done)).toBe("fund");
   });
 
-  it("повернення замовнику: етап «повернено», угода закрита, спору немає", () => {
-    const done = applyModeratorAction(disputed(), "refund", undefined, T0 + 9000) as Deal;
-    expect(done.stages[0]).toMatchObject({ status: "refunded", refundedAt: new Date(T0 + 9000).toISOString() });
+  it("повернення замовнику: спершу refunding, «повернено» і закриття угоди лише після банку", () => {
+    const intent = applyModeratorAction(disputed(), "refund", undefined, T0 + 9000) as Deal;
+    expect(intent.stages[0].status).toBe("refunding");
+    expect(intent.status).toBe("accepted");
+    const done = settledByBank(intent, { stageId: intent.stages[0].id, status: "reversed" }, T0 + 9500);
+    expect(done.stages[0]).toMatchObject({ status: "refunded", refundedAt: new Date(T0 + 9500).toISOString() });
     expect(done.status).toBe("cancelled");
     expect(done.disputed).toBe(false);
     expect(needsAction(done)).toBeNull();
@@ -256,7 +302,7 @@ describe("рішення модератора у спорі", () => {
   });
 
   it("працює лише з етапом у спорі", () => {
-    const funded = applyAction(accepted(), "fund", undefined, T0 + 4000) as Deal;
+    const funded = fundByBank(accepted(), T0 + 4000);
     expect(applyModeratorAction(funded, "release", undefined, T0 + 5000)).toMatch(/не в спорі/);
     expect(applyModeratorAction(disputed(), "release", "nope", T0 + 5000)).toMatch(/не в спорі/);
     const done = applyModeratorAction(disputed(), "release", undefined, T0 + 9000) as Deal;
@@ -294,10 +340,8 @@ describe("до оплати: ціна виконавця + комісія пла
     expect(range.foreign).toBeGreaterThan(range.ua);
   });
 
-  it("без типу картки рахуємо за вищою ставкою, щоб виконавець не лишився внакладі", () => {
-    const deal = accepted();
-    const funded = applyAction(deal, "fund", undefined, T0 + 5000) as Deal;
-    expect(currentStage(funded)!.payment?.card).toBe("foreign");
+  it("«заморожено» без підтвердження банку не ставиться: дія fund нічого не міняє", () => {
+    expect(applyAction(accepted(), "fund", undefined, T0 + 5000)).toMatch(/через сторінку банку/);
   });
 });
 

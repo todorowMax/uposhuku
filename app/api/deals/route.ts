@@ -4,7 +4,7 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
+import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 import { performerFromResponse } from "@/lib/server/deal-parties";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
@@ -38,10 +38,11 @@ export async function POST(request: Request) {
   if (!(await findRequest(user.id, requestId))) return problem(404, "Запит не знайдено");
 
   const rawPerformer = body?.performer as Record<string, unknown> | undefined;
-  // Поки безпечна угода вимкнена, метод за замовчуванням — прямий переказ, а safe відхиляємо.
-  const fallback: DealMethod = SAFE_DEAL_ENABLED ? "safe" : "direct";
+  // Безпечна угода лише тим, кому її ввімкнено (SAFE_DEAL_MODE); решті метод за замовчуванням — прямий переказ.
+  const safeEnabled = safeDealEnabledFor(user.email);
+  const fallback: DealMethod = safeEnabled ? "safe" : "direct";
   const method: DealMethod = body?.method === "safe" || body?.method === "direct" ? body.method : fallback;
-  if (method === "safe" && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
+  if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
   const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
   const responseId = text(body?.responseId, 80);
   if (!text(rawPerformer?.id, 60) || !responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       days: typeof stage?.days === "number" ? Math.round(stage.days) : NaN,
     })),
   };
-  const result = await proposeDeal(user.id, draft);
+  const result = await proposeDeal(user.id, draft, { safeEnabled });
   if (typeof result === "string") return problem(400, "Угоду не створено", result);
   notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: "proposed" }));
   serverEvent(EVENTS.dealCreated, { deal_id: result.id, kind: result.method, stages: result.stages.length }, user.id, "/api/deals");

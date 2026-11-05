@@ -1,9 +1,11 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createDeal } from "@/lib/deals/machine";
+import { applyPaymentStatus } from "@/lib/deals/payment-status";
+import { quoteStage } from "@/lib/deals/price";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import { emptyProfile } from "@/lib/profile/types";
 import { accessibleConversation, addMessage, listConversationOrders, claimableAttachments, findChatAttachment, getOrCreateConversation, listConversations, listMessages, performerKnown, saveChatPhoto } from "@/lib/server/chat-repo";
-import { actAsModerator, actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, proposeDeal, proposeDirectDeal } from "@/lib/server/deal-repo";
+import { actAsModerator, actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, mutateDeal, proposeDeal, proposeDirectDeal } from "@/lib/server/deal-repo";
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
 import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
@@ -11,8 +13,20 @@ import { findDisputeAttachment, getDisputeCard, listDisputes } from "@/lib/serve
 import { allPerformerStats, performerStatsOf } from "@/lib/server/stats-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
-// Тут перевіряємо саму безпечну угоду, тож вмикаємо прапорець; вимкнений стан покриває safe-deal-flag.test.ts.
-vi.mock("@/lib/deals/flags", () => ({ SAFE_DEAL_ENABLED: true }));
+/** «Заморожено» ставить лише банк: у тесті підставляємо його підтвердження холду. */
+const fundByBank = async (dealId: string, at: number) => {
+  const result = await mutateDeal(
+    dealId,
+    (deal) => {
+      const stage = deal.stages[0];
+      const total = quoteStage(stage.amount, "ua").total;
+      const applied = applyPaymentStatus(deal, { stageId: stage.id, bank: { status: "hold", amount: total, at }, ours: { amount: total, card: "ua" } }, at);
+      return applied.kind === "ok" ? applied.deal : "anomaly";
+    },
+    at,
+  );
+  if (typeof result === "string" || result === null) throw new Error(String(result));
+};
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
@@ -121,15 +135,15 @@ const draft = (overrides: Partial<DealDraft> = {}): DealDraft => ({
 
 describe("угоди на D1", () => {
   it("пропонується, зберігається й не дублюється на один відгук", async () => {
-    const deal = await proposeDeal("c1", draft(), 1_000_000);
+    const deal = await proposeDeal("c1", draft(), { safeEnabled: true, now: 1_000_000 });
     expect(typeof deal).toBe("object");
     expect((await listDeals("c1")).map((item) => item.id)).toContain((deal as { id: string }).id);
-    expect(await proposeDeal("c1", draft(), 1_000_000)).toMatch(/уже є угода/);
+    expect(await proposeDeal("c1", draft(), { safeEnabled: true, now: 1_000_000 })).toMatch(/уже є угода/);
     expect(await listDeals("c2")).toEqual([]);
   });
 
   it("дії замовника змінюють угоду, чужа не доступна", async () => {
-    const created = (await proposeDeal("c2", draft({ responseId: "resp_y" }), 5_000_000)) as { id: string };
+    const created = (await proposeDeal("c2", draft({ responseId: "resp_y" }), { safeEnabled: true, now: 5_000_000 })) as { id: string };
     // Поки виконавець не прийняв, платити рано.
     expect(await actOnDeal("c2", created.id, "claim_paid", undefined, 5_000_100)).toMatch(/погодитися/);
     expect(await actOnDeal("c1", created.id, "cancel", undefined)).toBeNull();
@@ -142,7 +156,7 @@ describe("угоди на D1", () => {
 
 describe("угоди з боку виконавця на D1", () => {
   it("виконавець бачить свої угоди, відповідає, і замовник бачить результат", async () => {
-    const created = (await proposeDeal("c1", draft({ responseId: "resp_real", performer: { id: "me-perf", name: "Максим", avatarIndex: 0, specialty: "Розробник", fop: false } }), 9_000_000)) as { id: string };
+    const created = (await proposeDeal("c1", draft({ responseId: "resp_real", performer: { id: "me-perf", name: "Максим", avatarIndex: 0, specialty: "Розробник", fop: false } }), { safeEnabled: true, now: 9_000_000 })) as { id: string };
     // Само по собі нічого не відбувається: угода чекає відповіді виконавця.
     expect((await listDeals("c1")).find((deal) => deal.id === created.id)?.status).toBe("proposed");
     expect((await listDealsForPerformer("perf")).map((deal) => deal.id)).toContain(created.id);
@@ -205,7 +219,7 @@ describe("умови з розмови на D1", () => {
 
   it("виконавець виставляє умови, замовник їх приймає, список показує обидві сторони", async () => {
     const conv = await getOrCreateConversation("c2", "me-perf", "perf");
-    const deal = (await proposeDirectDeal(conv, "performer", draft)) as Deal;
+    const deal = (await proposeDirectDeal(conv, "performer", draft, { safeEnabled: true })) as Deal;
     expect(deal).toMatchObject({ status: "proposed", proposedBy: "performer", title: "Лендинг", conversationId: conv.id });
     const forCustomer = await listConversationOrders(conv, "customer");
     expect(forCustomer[0]).toMatchObject({ title: "Лендинг", needsMe: true, mineProposal: false, direct: true });
@@ -218,9 +232,9 @@ describe("умови з розмови на D1", () => {
 
   it("не приймає порожню назву й більше п'яти відкритих замовлень", async () => {
     const conv = await getOrCreateConversation("c1", "me-perf", "perf");
-    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: " " })).toMatch(/Назвіть/);
-    for (let index = 0; index < 5; index++) expect(typeof (await proposeDirectDeal(conv, "customer", { ...draft, title: `Замовлення ${index}` }))).toBe("object");
-    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: "Шосте" })).toMatch(/відкритих замовлень/);
+    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: " " }, { safeEnabled: true })).toMatch(/Назвіть/);
+    for (let index = 0; index < 5; index++) expect(typeof (await proposeDirectDeal(conv, "customer", { ...draft, title: `Замовлення ${index}` }, { safeEnabled: true }))).toBe("object");
+    expect(await proposeDirectDeal(conv, "customer", { ...draft, title: "Шосте" }, { safeEnabled: true })).toMatch(/відкритих замовлень/);
   });
 });
 
@@ -276,7 +290,7 @@ describe("цифри виконавця з бази", () => {
     expect(await performerStatsOf("stat-perf")).toEqual({ months: 3, orders: 0, rating: null, reviews: 0 });
 
     const performer = { id: "me-stat-perf", name: "Стат", avatarIndex: 0, specialty: "Розробник", fop: false };
-    const created = (await proposeDeal("stat-cust", draft({ responseId: "resp_stat", performer }), 20_000_000)) as { id: string };
+    const created = (await proposeDeal("stat-cust", draft({ responseId: "resp_stat", performer }), { safeEnabled: true, now: 20_000_000 })) as { id: string };
     await actAsPerformer("stat-perf", created.id, "accept", undefined, 20_000_001);
     await actOnDeal("stat-cust", created.id, "claim_paid", undefined, 20_000_002);
     await actAsPerformer("stat-perf", created.id, "confirm_paid", undefined, 20_000_003);
@@ -298,9 +312,9 @@ describe("спори для модератора на D1", () => {
   const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]);
 
   const disputedDeal = async (responseId: string) => {
-    const created = (await proposeDeal("mod-c", draft({ responseId, method: "safe", performer, stages: [{ title: "Сайт", amount: 10000, days: 7 }] }), 40_000_000)) as { id: string };
+    const created = (await proposeDeal("mod-c", draft({ responseId, method: "safe", performer, stages: [{ title: "Сайт", amount: 10000, days: 7 }] }), { safeEnabled: true, now: 40_000_000 })) as { id: string };
     await actAsPerformer("mod-p", created.id, "accept", undefined, 40_000_001);
-    await actOnDeal("mod-c", created.id, "fund", undefined, 40_000_002);
+    await fundByBank(created.id, 40_000_002);
     await actAsPerformer("mod-p", created.id, "deliver", undefined, 40_000_003);
     return (await actOnDeal("mod-c", created.id, "dispute", undefined, 40_000_004)) as Deal;
   };
@@ -314,7 +328,7 @@ describe("спори для модератора на D1", () => {
 
   it("у чергу потрапляють лише угоди зі спором, відкриті з датою, а розв'язані йдуть окремо", async () => {
     const disputed = await disputedDeal("resp_mod_1");
-    await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm", method: "direct", performer: { ...performer, id: "me-other", fop: false } }), 40_000_010);
+    await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm", method: "direct", performer: { ...performer, id: "me-other", fop: false } }), { safeEnabled: true, now: 40_000_010 });
     const { open, resolved } = await listDisputes();
     const row = open.find((item) => item.dealId === disputed.id)!;
     expect(row).toMatchObject({ number: disputed.number, total: 10000, stageTitle: "Сайт", method: "safe", performerName: "Модератор-виконавець", decision: null });
@@ -340,7 +354,7 @@ describe("спори для модератора на D1", () => {
     // Фото віддається лише з розмови цієї угоди, а чужа угода без спору недоступна зовсім.
     expect(await findDisputeAttachment(disputed.id, saved.id)).toMatchObject({ mime: "image/jpeg" });
     expect(await findDisputeAttachment(disputed.id, "att_nope")).toBeNull();
-    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm2" }), 40_000_020)) as { id: string };
+    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm2" }), { safeEnabled: true, now: 40_000_020 })) as { id: string };
     expect(await getDisputeCard(calm.id)).toBeNull();
     expect(await findDisputeAttachment(calm.id, saved.id)).toBeNull();
     expect(await getDisputeCard("deal_missing")).toBeNull();
@@ -349,11 +363,13 @@ describe("спори для модератора на D1", () => {
   it("рішення міняє угоду, пишеться в журнал і виводить спір із черги", async () => {
     const disputed = await disputedDeal("resp_mod_3");
     const done = (await actAsModerator(disputed.id, "release", undefined, admin, 40_100_000)) as { deal: Deal; stage: { title: string }; ownerUserId: string; decisionId: string };
-    expect(done.deal).toMatchObject({ status: "completed", disputed: false });
+    // Рішення записує намір: «виплачено» і завершення угоди ставить лише банк.
+    expect(done.deal).toMatchObject({ status: "accepted", disputed: false });
+    expect(done.deal.stages[0].status).toBe("releasing");
     expect(done.stage.title).toBe("Сайт");
     expect(done.ownerUserId).toBe("mod-c");
     // Угода справді змінена в базі, а не лише у відповіді.
-    expect((await listDeals("mod-c")).find((item) => item.id === disputed.id)?.status).toBe("completed");
+    expect((await listDeals("mod-c")).find((item) => item.id === disputed.id)?.stages[0].status).toBe("releasing");
     const card = (await getDisputeCard(disputed.id))!;
     expect(card.log).toEqual([{ id: done.decisionId, stageId: disputed.stages[0].id, action: "release", comment: admin.comment, adminEmail: admin.email, at: new Date(40_100_000).toISOString() }]);
     expect(card.openStageId).toBeNull();
@@ -365,11 +381,11 @@ describe("спори для модератора на D1", () => {
     expect((await getDisputeCard(disputed.id))!.log).toHaveLength(1);
   });
 
-  it("повернення закриває угоду, а на доопрацюванні спір можна відкрити знову", async () => {
+  it("повернення лише записує намір (угоду закриє банк), а на доопрацюванні спір можна відкрити знову", async () => {
     const refunded = await disputedDeal("resp_mod_4");
     const first = (await actAsModerator(refunded.id, "refund", undefined, { ...admin, comment: "Роботи немає, повертаємо." }, 40_200_000)) as { deal: Deal };
-    expect(first.deal).toMatchObject({ status: "cancelled" });
-    expect(first.deal.stages[0].status).toBe("refunded");
+    expect(first.deal.stages[0].status).toBe("refunding");
+    expect(first.deal.status).toBe("accepted");
 
     const rework = await disputedDeal("resp_mod_5");
     const second = (await actAsModerator(rework.id, "rework", undefined, { ...admin, comment: "Виправте розбіжності з ТЗ." }, 40_300_000)) as { deal: Deal };
@@ -381,7 +397,7 @@ describe("спори для модератора на D1", () => {
 
   it("невідома угода дає null, помилка машини не лишає слідів у журналі", async () => {
     expect(await actAsModerator("deal_missing", "release", undefined, admin)).toBeNull();
-    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm3" }), 40_400_000)) as { id: string };
+    const calm = (await proposeDeal("mod-c", draft({ responseId: "resp_mod_calm3" }), { safeEnabled: true, now: 40_400_000 })) as { id: string };
     expect(await actAsModerator(calm.id, "release", undefined, admin)).toMatch(/не в спорі/);
     expect(await getDisputeCard(calm.id)).toBeNull();
   });

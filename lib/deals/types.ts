@@ -14,7 +14,13 @@ export type DealMethod = "safe" | "direct";
  * Спір розв'язує модератор: released (виплата), refunded (повернення замовнику)
  * або назад у funded (на доопрацювання).
  */
-export type StageStatus = "pending" | "claimed" | "funded" | "delivered" | "released" | "disputed" | "refunded";
+export type StageStatus = "pending" | "claimed" | "funded" | "delivered" | "releasing" | "released" | "disputed" | "refunding" | "refunded";
+
+/**
+ * Що платимо виконавцю з холду: усе або відсоток від його долі (кратний 5). Рішення записане в етапі
+ * до виклику банку, тож вебхук і звірка знають, чим закінчити, навіть якщо процес обірвався.
+ */
+export type StagePayout = { kind: "full" } | { kind: "partial"; percent: number };
 
 export interface DealStage {
   id: string;
@@ -38,6 +44,26 @@ export interface DealStage {
   holdUntil?: string;
   /** Що замовник заморозив: розбивка суми на момент оплати. Лише safe, з моменту funded. */
   payment?: StagePayment;
+  /** releasing: що саме виплачуємо. */
+  payout?: StagePayout;
+  /** Коли етап перейшов у releasing / refunding: від цього моменту sweep чекає 5 хвилин, потім довершує. */
+  releasingAt?: string;
+  refundingAt?: string;
+  /** Чому йде повернення: рішення модератора чи кінець холду без здачі. */
+  refundReason?: "moderator" | "hold_expiry";
+  /** Виплату запустила автоприймання, а не замовник. */
+  autoAccepted?: boolean;
+  /** Мілісекунди останнього виклику банку по виплаті/поверненню: не даємо двом виконавцям викликати одночасно. */
+  attemptAt?: number;
+  /** Скільки реально виплатив банк, у копійках (finalAmount), після success. */
+  paidAmount?: number;
+  /** Один раз сповістили, що холд добігає кінця / що спір чи здача близько до кінця холду. */
+  holdWarnedAt?: string;
+  holdAlertAt?: string;
+  /** Куди повернути етап, якщо банк однозначно відмовив: туди, звідки пішла виплата чи повернення. */
+  revertTo?: "funded" | "delivered" | "disputed";
+  /** Показ для людини: банк відмовив, текст останньої помилки виплати. */
+  payoutError?: string;
 }
 
 /** Тип картки замовника: від нього залежить комісія банку за приймання платежу. */
@@ -91,10 +117,11 @@ export interface Deal {
   proposedBy?: "customer" | "performer";
 }
 
+/** `fund` лишається в типі для старих клієнтів: оплата йде через POST /api/deals/:id/pay, дія нічого не змінює. */
 export type DealAction = "fund" | "claim_paid" | "release" | "dispute" | "cancel" | "accept" | "decline";
 
-/** Рішення модератора у спорі: виплатити виконавцю, повернути замовнику, повернути етап на доопрацювання. */
-export type ModeratorAction = "release" | "refund" | "rework";
+/** Рішення модератора у спорі: виплатити виконавцю, повернути замовнику, повернути етап на доопрацювання, виплатити частину (необоротно). */
+export type ModeratorAction = "release" | "refund" | "rework" | "partial";
 
 /** Дії виконавця: прийняти чи відхилити пропозицію, підтвердити, що гроші отримано, здати етап. */
 export type PerformerAction = "accept" | "decline" | "confirm_paid" | "deliver" | "withdraw";

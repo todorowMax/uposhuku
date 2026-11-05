@@ -5,6 +5,7 @@
 // схема експортується з db/schema.ts, тож drizzle й решта коду бачать її як одну.
 // Посилання на users і deals ліниві (стрілки), тому цикл імпортів безпечний.
 
+import { sql } from "drizzle-orm";
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { deals, users } from "./schema";
 
@@ -29,10 +30,19 @@ export const dealPayments = sqliteTable(
     finalAmount: integer("final_amount"),
     pageUrl: text("page_url").notNull(),
     basket: text("basket").notNull(),
+    /** modifiedDate банку з останньої прийнятої події: старішу ігноруємо, щоб запізнілий вебхук не відкотив статус. */
+    modifiedDate: text("modified_date"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [uniqueIndex("deal_payments_invoice_idx").on(table.provider, table.invoiceId), index("deal_payments_stage_idx").on(table.dealId, table.stageId)],
+  (table) => [
+    uniqueIndex("deal_payments_invoice_idx").on(table.provider, table.invoiceId),
+    index("deal_payments_stage_idx").on(table.dealId, table.stageId),
+    // Не більше одного «живого» рахунку на етап: друга одночасна оплата впирається в цей індекс, а не створює другий рахунок.
+    uniqueIndex("deal_payments_live_stage_idx")
+      .on(table.dealId, table.stageId)
+      .where(sql`${table.status} in ('creating', 'created', 'processing', 'hold', 'success')`),
+  ],
 );
 
 /** Оброблені події вебхуків провайдера: id події не обробляємо вдруге (банк повторює непідтверджене до 3 разів). */

@@ -5,12 +5,15 @@
 
 import { and, eq } from "drizzle-orm";
 import { responses } from "@/db/schema";
-import { isFop } from "@/lib/deals/fop";
 import { performerIdOf, responseAuthor } from "@/lib/deals/parties";
 import type { DealParty } from "@/lib/deals/types";
 import { getDb } from "./db";
 import { getProfile } from "./profile-repo";
 import { SELF_DEAL } from "./deal-repo";
+import { getPayoutAccount } from "./payment-repo";
+
+/** Виконавець може отримувати гроші безпечної угоди: банк підтвердив його рахунок ФОП (payout_accounts.status = active). Клієнту це поле не вірить ніхто. */
+export const hasActivePayout = async (userId: string): Promise<boolean> => (await getPayoutAccount(userId, "monobank"))?.status === "active";
 
 const PHOTO_PATTERN = /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/;
 const PHOTO_MAX = 300_000;
@@ -36,6 +39,6 @@ export const performerFromResponse = async (customerUserId: string, input: { req
     photo: PHOTO_PATTERN.test(profile.photo) && profile.photo.length < PHOTO_MAX ? profile.photo : undefined,
     avatarIndex: 0,
     specialty: profile.specialty,
-    fop: isFop(id),
+    fop: await hasActivePayout(author),
   };
 };

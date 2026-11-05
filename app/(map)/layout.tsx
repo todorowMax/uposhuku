@@ -9,6 +9,7 @@ import { ChromeReveal } from "@/components/map/chrome-reveal";
 import { MapModeSwitch } from "@/components/map/mode-switch";
 import { DeepLinkSync } from "@/components/map/deep-link-sync";
 import { DealSync } from "@/lib/deals/client";
+import { PaymentReturnSync } from "@/lib/deals/use-payment-return";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
 import { RealPerformersSync } from "@/lib/map/performers-sync";
 import { RealtimeSync } from "@/lib/realtime/client";
@@ -37,6 +38,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <ChromeReveal />
       <DeepLinkSync />
       <DealSync />
+      <PaymentReturnSync />
       <MapRequestsSync />
       <RealPerformersSync />
       <RealtimeSync />

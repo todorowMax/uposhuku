@@ -14,9 +14,8 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
+import { useSafeDeal } from "@/lib/deals/use-safe-deal";
 import { money } from "@/lib/deals/format";
-import { isFop } from "@/lib/deals/fop";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { formatKop, rateLabel, totalRange } from "@/lib/deals/price";
 import {
@@ -67,7 +66,9 @@ export function TermsForm({
   onDone: () => void;
   onCancel: () => void;
 }) {
-  const fop = isFop(conversation.performerId);
+  // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
+  const safeEnabled = useSafeDeal();
+  const fop = safeEnabled;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -109,7 +110,7 @@ export function TermsForm({
           },
           method,
           stages,
-        });
+        }, safeEnabled);
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
   const fee = feeOf(total, method);
   const payRange = useMemo(() => totalRange(stages.map((stage) => stage.amount)), [stages]);
@@ -210,7 +211,7 @@ export function TermsForm({
         </Field>
       </div>
 
-      <fieldset className="deal-methods" hidden={!SAFE_DEAL_ENABLED}>
+      <fieldset className="deal-methods" hidden={!safeEnabled}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
@@ -252,7 +253,7 @@ export function TermsForm({
           </span>
         </label>
       </fieldset>
-      {!SAFE_DEAL_ENABLED && (
+      {!safeEnabled && (
         <p className="pe-hint">
           Оплата прямим переказом, одним платежем або за етапами: без комісії
           платформи й без її гарантії.

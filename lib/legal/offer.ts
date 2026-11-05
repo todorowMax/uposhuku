@@ -4,10 +4,10 @@
 // кажуть людською мовою. Його просить банк перед еквайрингом, на нього веде
 // галочка згоди перед оплатою. Нумерація додається автоматично (numbered).
 
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { type LegalSectionData, visible } from "./types";
 
-export const offerSections = (): LegalSectionData[] =>
+/** `safeDeal`: розділ про безпечну угоду показуємо лише коли вона ввімкнена для всіх (SAFE_DEAL_MODE=on). */
+export const offerSections = (safeDeal = false): LegalSectionData[] =>
   visible([
     {
       title: "Загальні положення",
@@ -63,7 +63,7 @@ export const offerSections = (): LegalSectionData[] =>
         "Кошти не повертаються, якщо Оператор заблокував акаунт чи зняв профіль з карти за порушення Умов користування.",
       ],
     },
-    SAFE_DEAL_ENABLED && {
+    safeDeal && {
       title: "Безпечна угода",
       id: "safe-deal",
       items: [

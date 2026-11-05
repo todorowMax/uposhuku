@@ -81,7 +81,7 @@ describe("/api/requisites", () => {
 
 describe("GET /api/deals/:id/requisites", () => {
   it("сторонам прийнятої прямої угоди знімок, стороннім 404", async () => {
-    const deal = await proposeDeal("rr-cust", { requestId: "r", responseId: "x", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] });
+    const deal = await proposeDeal("rr-cust", { requestId: "r", responseId: "x", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, { safeEnabled: true });
     if (typeof deal === "string") throw new Error(deal);
     const ask = (userId: string | null) => {
       session.user = userId ? { id: userId, email: `${userId}@example.com` } : null;
@@ -98,7 +98,7 @@ describe("GET /api/deals/:id/requisites", () => {
   });
 
   it("qr: true поза продом і false на проді, поки формат НБУ не перевірено", async () => {
-    const deal = await proposeDeal("rr-cust", { requestId: "r2", responseId: "x2", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] });
+    const deal = await proposeDeal("rr-cust", { requestId: "r2", responseId: "x2", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, { safeEnabled: true });
     if (typeof deal === "string") throw new Error(deal);
     await actAsPerformer("rr-perf", deal.id, "accept", undefined);
     session.user = { id: "rr-cust", email: "rr-cust@example.com" };

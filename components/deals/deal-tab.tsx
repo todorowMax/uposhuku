@@ -16,10 +16,11 @@ import { TransferCard } from "@/components/deals/transfer-card";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
-import { dealAction, proposeDeal, useDeals } from "@/lib/deals/client";
+import { dealAction, proposeDeal, startPayment, useDeals } from "@/lib/deals/client";
+import { paymentReturnStore } from "@/lib/deals/use-payment-return";
+import { useStore } from "@/lib/store";
 import { daysWord, money } from "@/lib/deals/format";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
-import { isFop } from "@/lib/deals/fop";
+import { useSafeDeal } from "@/lib/deals/use-safe-deal";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { formatKop, quoteStage, rateLabel, totalRange } from "@/lib/deals/price";
 import {
@@ -77,8 +78,10 @@ export function DealTab({ response }: { response: OfferResponse }) {
 // Пропозиція угоди
 
 function DealComposer({ response }: { response: OfferResponse }) {
-  const fop = isFop(response.performerId);
-  const [method, setMethod] = useState<DealMethod>(fop ? "safe" : "direct");
+  // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
+  const safeEnabled = useSafeDeal();
+  const fop = safeEnabled;
+  const [method, setMethod] = useState<DealMethod>("direct");
   const [amount, setAmount] = useState(
     response.price ? String(response.price) : "",
   );
@@ -123,7 +126,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         performer,
         method,
         stages,
-      })
+      }, safeEnabled)
     : "Вкажіть суму й термін.";
 
   const submit = async () => {
@@ -152,7 +155,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
   return (
     <div className="deal">
       <p className="auth-lead">
-        {SAFE_DEAL_ENABLED
+        {safeEnabled
           ? "Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець побачить пропозицію й погодиться."
           : "Зафіксуйте домовленість: суму й терміни. Виконавець побачить пропозицію й погодиться."}
       </p>
@@ -190,7 +193,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         </Field>
       </div>
 
-      <fieldset className="deal-methods" hidden={!SAFE_DEAL_ENABLED}>
+      <fieldset className="deal-methods" hidden={!safeEnabled}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
@@ -235,7 +238,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
           </span>
         </label>
       </fieldset>
-      {!SAFE_DEAL_ENABLED && (
+      {!safeEnabled && (
         <p className="pe-hint">
           Оплата прямим переказом виконавцю: без комісії платформи й без її
           гарантії, у спорі гроші ми не повертаємо.
@@ -334,10 +337,19 @@ const STAGE_LABEL: Record<DealStage["status"], string> = {
   claimed: "Перевіряємо оплату",
   funded: "В роботі",
   delivered: "Здано, чекає вашого підтвердження",
+  releasing: "Виплата виконується, чекаємо підтвердження банку",
   released: "Виплачено",
   disputed: "Спір",
+  refunding: "Повернення виконується, чекаємо підтвердження банку",
   refunded: "Кошти повернено",
 };
+
+const RETURN_NOTE = {
+  checking: "Перевіряємо оплату в банку…",
+  held: "Банк підтвердив: кошти заморожено.",
+  failed: "Оплату не завершено. Гроші не списано, можна спробувати ще раз.",
+  pending: "Банк ще обробляє оплату. Статус оновиться сам, коли він підтвердить.",
+} as const;
 
 export function DealView({ deal }: { deal: Deal }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -361,16 +373,30 @@ export function DealView({ deal }: { deal: Deal }) {
     };
   }, [deal.status]);
 
+  const paymentReturn = useStore(paymentReturnStore);
+
+  /** Оплата етапу: рахунок у банку, далі йдемо на його сторінку. Статус «заморожено» поставить сам банк. */
+  const pay = async (card: CardKind) => {
+    setBusy("fund");
+    setError(null);
+    try {
+      window.location.assign(await startPayment(deal, card));
+      return true;
+    } catch (reason) {
+      setError(reason instanceof ApiError ? reason.message : "Не вдалося перейти до оплати.");
+      setBusy(null);
+      return false;
+    }
+  };
+
   const run = async (
     action: Parameters<typeof dealAction>[1],
     target?: DealStage,
-    simulate?: "declined",
-    card?: CardKind,
   ) => {
     setBusy(action);
     setError(null);
     try {
-      await dealAction(deal, action, target?.id, simulate, card);
+      await dealAction(deal, action, target?.id);
       setCheckout(null);
       setConfirmRelease(null);
       return true;
@@ -508,7 +534,7 @@ export function DealView({ deal }: { deal: Deal }) {
                       confirmRelease={confirmRelease?.id === item.id}
                       onCheckout={() => setCheckout(item)}
                       onCancelCheckout={() => setCheckout(null)}
-                      onFund={(card, simulate) => run("fund", item, simulate, card)}
+                      onFund={pay}
                       onClaim={() => run("claim_paid", item)}
                       onAskRelease={() => setConfirmRelease(item)}
                       onCancelRelease={() => setConfirmRelease(null)}
@@ -521,6 +547,12 @@ export function DealView({ deal }: { deal: Deal }) {
             );
           })}
         </ol>
+      )}
+
+      {paymentReturn?.dealId === deal.id && (
+        <p role="status" className="deal-note">
+          {RETURN_NOTE[paymentReturn.state]}
+        </p>
       )}
 
       {error && (
@@ -556,7 +588,7 @@ function StageActions({
   confirmRelease: boolean;
   onCheckout: () => void;
   onCancelCheckout: () => void;
-  onFund: (card: CardKind, simulate?: "declined") => Promise<boolean>;
+  onFund: (card: CardKind) => Promise<boolean>;
   onClaim: () => Promise<boolean>;
   onAskRelease: () => void;
   onCancelRelease: () => void;
@@ -572,7 +604,7 @@ function StageActions({
     return checkout ? (
       <div className="deal-box">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
-          Monobank · тестовий режим
+          Оплата через Monobank
         </p>
         <p className="pe-label mt-2">Якою карткою платите</p>
         <RadioGroup
@@ -614,7 +646,7 @@ function StageActions({
           </div>
         </dl>
         <p className="mt-2 text-[13px] text-ink">
-          Заморожуємо{" "}
+          Ви перейдете на сторінку банку й заморозите{" "}
           <strong className="tabular-nums">{formatKop(quote.total)}</strong> на
           вашій картці на {HOLD_DAYS} днів. Гроші не списуються, поки ви не
           підтвердите роботу. Виконавець отримає{" "}
@@ -629,15 +661,7 @@ function StageActions({
             className="offer-primary"
           >
             {busy === "fund" && <Loader2 className="size-4 animate-spin" />}
-            Заморозити {formatKop(quote.total)} (тест)
-          </button>
-          <button
-            type="button"
-            disabled={busy === "fund"}
-            onClick={() => void onFund(card, "declined")}
-            className="offer-secondary"
-          >
-            Імітувати відмову банку
+            Оплатити {formatKop(quote.total)}
           </button>
           <button
             type="button"
@@ -724,6 +748,11 @@ function StageActions({
     }
     return (
       <div className="mt-2 flex flex-wrap gap-2">
+        {stage.payoutError && (
+          <p role="alert" className="auth-error w-full">
+            {stage.payoutError}
+          </p>
+        )}
         <button type="button" onClick={onAskRelease} className="offer-primary">
           <Check className="size-4" />
           {safe ? "Підтвердити й виплатити" : "Прийняти роботу"}
@@ -738,6 +767,17 @@ function StageActions({
             Є претензії
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (stage.status === "releasing" || stage.status === "refunding") {
+    return (
+      <div className="deal-note" role="status">
+        <Loader2 className="size-3.5 animate-spin" />
+        {stage.status === "releasing"
+          ? "Виплату передано в банк. «Виплачено» з'явиться, щойно банк її підтвердить."
+          : "Повернення передано в банк. «Кошти повернено» з'явиться, щойно банк його підтвердить."}
       </div>
     );
   }

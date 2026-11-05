@@ -2,10 +2,9 @@
 //
 // Правила угоди: що можна з нею робити. Чисті функції без часу всередині:
 // «зараз» передаємо ззовні, тож усе перевіряється тестами. Дії замовника й
-// виконавця; гроші підтверджуватиме вебхук банку.
+// виконавця. Гроші безпечної угоди ці функції самі не рухають і «заморожено» чи «виплачено» не ставлять:
+// вони лише записують намір (releasing, refunding), а підсумок приносить банк (lib/deals/payment-status.ts).
 
-import { SAFE_DEAL_ENABLED } from "./flags";
-import { quoteStage } from "./price";
 import {
   HOLD_DAYS,
   HOLD_RESERVE_DAYS,
@@ -16,19 +15,18 @@ import {
   MAX_STAGES,
   MIN_DEAL,
   SAFE_FEE,
-  type CardKind,
   type Deal,
   type DealAction,
   type DealDraft,
   type DealStage,
   type ModeratorAction,
   type PerformerAction,
+  type StagePayout,
 } from "./types";
 
-const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
 
-/** Відповідь на спробу створити безпечну угоду або заморозити кошти, поки функція вимкнена. */
+/** Відповідь на спробу створити безпечну угоду чи оплатити її, коли функція для людини вимкнена. */
 export const SAFE_DEAL_UNAVAILABLE = "Безпечна угода ще недоступна";
 
 export const dealTotal = (deal: Pick<Deal, "stages">) => deal.stages.reduce((sum, stage) => sum + stage.amount, 0);
@@ -40,9 +38,9 @@ export const feeOf = (amount: number, method: Deal["method"]) => (method === "sa
 export const payoutOf = (amount: number) => amount;
 
 /** Помилка у чернетці угоди або null. Текст — для людини. */
-export const validateDraft = (draft: DealDraft): string | null => {
+export const validateDraft = (draft: DealDraft, safeEnabled: boolean): string | null => {
   if (draft.stages.length < 1 || draft.stages.length > MAX_STAGES) return `Етапів має бути від 1 до ${MAX_STAGES}.`;
-  if (draft.method === "safe" && !SAFE_DEAL_ENABLED) return SAFE_DEAL_UNAVAILABLE;
+  if (draft.method === "safe" && !safeEnabled) return SAFE_DEAL_UNAVAILABLE;
   if (draft.method === "safe" && !draft.performer.fop) return "Безпечна угода доступна лише виконавцям-ФОП.";
   for (const stage of draft.stages) {
     if (!stage.title.trim()) return "Назвіть кожен етап.";
@@ -94,11 +92,24 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
   stages: draft.stages.map((stage, index) => ({ id: `${id}-s${index + 1}`, ...stage, title: stage.title.trim(), status: "pending" })),
 });
 
+const revertPoint = (stage: DealStage): NonNullable<DealStage["revertTo"]> => (stage.status === "disputed" ? "disputed" : stage.status === "funded" ? "funded" : "delivered");
+
+/** Етап переходить у releasing: гроші ще не виплачено, виплату виконає банк за цим наміром. */
+const startPayout = (stage: DealStage, payout: StagePayout, now: number): DealStage => {
+  const { payoutError: _error, ...rest } = stage;
+  return { ...rest, status: "releasing", payout, releasingAt: iso(now), revertTo: revertPoint(stage) };
+};
+
+const startRefund = (stage: DealStage, reason: NonNullable<DealStage["refundReason"]>, now: number): DealStage => {
+  const { payoutError: _error, ...rest } = stage;
+  return { ...rest, status: "refunding", refundingAt: iso(now), refundReason: reason, revertTo: revertPoint(stage) };
+};
+
 /** Етап, на якому зараз угода: перший не виплачений. */
 export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status !== "released");
 
 /** Замовник щось робить з угодою. Повертає нову угоду або текст помилки. */
-export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number, options: { card?: CardKind } = {}): Deal | string => {
+export const applyAction = (deal: Deal, action: DealAction, stageId: string | undefined, now: number): Deal | string => {
   // Умови виставив виконавець: замовник їх приймає або відхиляє.
   if (action === "accept" || action === "decline") {
     if (deal.proposedBy !== "performer") return "Цю пропозицію приймає виконавець.";
@@ -119,18 +130,17 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
   let updated: DealStage;
   switch (action) {
     case "fund":
-      if (!SAFE_DEAL_ENABLED) return SAFE_DEAL_UNAVAILABLE;
-      if (deal.method !== "safe" || stage.status !== "pending") return "Заморозити кошти зараз не можна.";
-      // Тип картки не передали (старий клієнт): рахуємо за вищою ставкою, щоб виконавець не лишився внакладі.
-      updated = { ...stage, status: "funded", fundedAt: iso(now), holdUntil: iso(now + HOLD_DAYS * DAY), payment: quoteStage(stage.amount, options.card ?? "foreign") };
-      break;
+      // «Заморожено» ставить лише банк (холд на рахунку), а не клік: оплата йде через POST /api/deals/:id/pay.
+      return "Оплата безпечної угоди йде через сторінку банку: натисніть «Перейти до оплати».";
     case "claim_paid":
       if (deal.method !== "direct" || stage.status !== "pending") return "Позначити оплату зараз не можна.";
       updated = { ...stage, status: "claimed", claimedAt: iso(now) };
       break;
     case "release":
+      if (stage.status === "releasing") return "Виплата вже виконується: банк підтвердить її найближчим часом.";
       if (stage.status !== "delivered") return "Виконавець ще не здав цей етап.";
-      updated = { ...stage, status: "released", releasedAt: iso(now) };
+      // Безпечна угода: «виплачено» ставить банк. Тут лише записуємо намір виплатити все.
+      updated = deal.method === "safe" ? startPayout(stage, { kind: "full" }, now) : { ...stage, status: "released", releasedAt: iso(now) };
       break;
     case "dispute":
       if (stage.status !== "delivered" && stage.status !== "funded") return "Спір можна відкрити, коли кошти заморожено або етап здано.";
@@ -177,29 +187,66 @@ export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageI
 /** Етап, який зараз у спорі. */
 export const disputedStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status === "disputed");
 
+/** Крок виплати частини: доля виконавця й платформи ріжуться на 20 частин (lib/deals/basket.ts). */
+export const PARTIAL_STEP = 5;
+
+/** Відсоток часткової виплати або текст помилки: кратний кроку, строго між 0 і 100. */
+export const checkPartialPercent = (percent: unknown): number | string => {
+  if (typeof percent !== "number" || !Number.isInteger(percent)) return "Вкажіть відсоток цілим числом.";
+  if (percent <= 0 || percent >= 100 || percent % PARTIAL_STEP !== 0) return `Відсоток від ${PARTIAL_STEP} до ${100 - PARTIAL_STEP}, кратний ${PARTIAL_STEP}. Для повної виплати чи повернення оберіть інше рішення.`;
+  return percent;
+};
+
+/** Додатковий вхід рішення модератора. `partial` потребує відсотка й явного підтвердження: виплата необоротна. */
+export interface ModeratorOptions {
+  percent?: number;
+  confirm?: boolean;
+}
+
+const startPartial = (deal: Deal, stage: DealStage, options: ModeratorOptions, now: number): DealStage | string => {
+  if (deal.method !== "safe") return "Часткова виплата можлива лише в безпечній угоді.";
+  const percent = checkPartialPercent(options.percent);
+  if (typeof percent === "string") return percent;
+  if (options.confirm !== true) return "Часткова виплата необоротна: підтвердіть її окремо.";
+  return startPayout(stage, { kind: "partial", percent }, now);
+};
+
+/** Банк тримає холд не довше HOLD_DAYS днів: коли він збіг, повертати роботу вже нема на чому. */
+const startRework = (stage: DealStage, now: number): DealStage | string => {
+  if (stage.holdUntil && Date.parse(stage.holdUntil) <= now) return "Холд уже збіг: оберіть виплату або повернення коштів.";
+  const { deliveredAt: _delivered, ...rest } = stage;
+  return { ...rest, status: "funded", reworkAt: iso(now) };
+};
+
 /**
- * Модератор вирішує спір на етапі. Гроші тут не рухаються (оплата ще не підключена):
- * рішення лише змінює стан угоди, а виплату чи повернення банк виконає окремо.
- * - release: етап виплачено виконавцю, угода йде далі або завершується;
- * - refund: кошти повертаються замовнику, угода закривається (статус «скасовано»);
- * - rework: етап повертається виконавцю на доопрацювання, холд лишається той самий.
+ * Модератор вирішує спір на етапі. Рішення лише записує намір, гроші рухає банк, а підсумок
+ * («виплачено», «повернено») приходить від нього:
+ * - release: етап переходить у releasing (виплатити все);
+ * - partial: releasing із відсотком; банк не дає повернути виплачену частину, тому потрібен confirm: true;
+ * - refund: етап переходить у refunding, угоду закриє підтвердження банку;
+ * - rework: етап повертається виконавцю на доопрацювання, холд лишається той самий, гроші не рухаються.
  */
-export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageId: string | undefined, now: number): Deal | string => {
+export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageId: string | undefined, now: number, options: ModeratorOptions = {}): Deal | string => {
   const stage = stageId ? deal.stages.find((item) => item.id === stageId) : disputedStage(deal);
   if (!stage || stage.status !== "disputed") return "Цей етап не в спорі.";
   let updated: DealStage;
   switch (action) {
     case "release":
-      updated = { ...stage, status: "released", releasedAt: iso(now) };
+      updated = deal.method === "safe" ? startPayout(stage, { kind: "full" }, now) : { ...stage, status: "released", releasedAt: iso(now) };
       break;
+    case "partial": {
+      const started = startPartial(deal, stage, options, now);
+      if (typeof started === "string") return started;
+      updated = started;
+      break;
+    }
     case "refund":
-      updated = { ...stage, status: "refunded", refundedAt: iso(now) };
+      updated = deal.method === "safe" ? startRefund(stage, "moderator", now) : { ...stage, status: "refunded", refundedAt: iso(now) };
       break;
     case "rework": {
-      // Банк тримає холд не довше HOLD_DAYS днів: коли він збіг, повертати роботу вже нема на чому.
-      if (stage.holdUntil && Date.parse(stage.holdUntil) <= now) return "Холд уже збіг: оберіть виплату або повернення коштів.";
-      const { deliveredAt: _delivered, ...rest } = stage;
-      updated = { ...rest, status: "funded", reworkAt: iso(now) };
+      const reworked = startRework(stage, now);
+      if (typeof reworked === "string") return reworked;
+      updated = reworked;
       break;
     }
     default:
@@ -207,8 +254,23 @@ export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageI
   }
   const stages = deal.stages.map((item) => (item.id === updated.id ? updated : item));
   const completed = stages.every((item) => item.status === "released");
-  const status = action === "refund" ? "cancelled" : completed ? "completed" : deal.status;
+  const status = updated.status === "refunded" ? "cancelled" : completed ? "completed" : deal.status;
   return { ...deal, stages, disputed: stages.some((item) => item.status === "disputed"), status };
+};
+
+/** Автоприймання: замовник мовчить після терміну перевірки, виплачуємо все. Лише безпечна угода, лише етап «здано». */
+export const applyAutoAccept = (deal: Deal, stageId: string, now: number): Deal | string => {
+  const stage = deal.stages.find((item) => item.id === stageId);
+  if (deal.method !== "safe" || deal.status !== "accepted" || stage?.status !== "delivered") return "Автоприймання тут не застосовне.";
+  const updated = { ...startPayout(stage, { kind: "full" }, now), autoAccepted: true };
+  return { ...deal, stages: deal.stages.map((item) => (item.id === stageId ? updated : item)) };
+};
+
+/** Холд добігає кінця, а виконавець нічого не здав: скасовуємо холд, гроші повертаються замовнику (оферта, п. 9). */
+export const applyHoldExpiryRefund = (deal: Deal, stageId: string, now: number): Deal | string => {
+  const stage = deal.stages.find((item) => item.id === stageId);
+  if (deal.method !== "safe" || deal.status !== "accepted" || stage?.status !== "funded") return "Скасування холду тут не застосовне.";
+  return { ...deal, stages: deal.stages.map((item) => (item.id === stageId ? startRefund(stage, "hold_expiry", now) : item)) };
 };
 
 /** Чого від виконавця чекає угода зараз: для підказки й кнопок у його вхідних. */
@@ -242,4 +304,17 @@ export const needsAction = (deal: Deal): "answer" | "fund" | "pay" | "confirm" |
   if (stage.status === "pending") return deal.method === "safe" ? "fund" : "pay";
   if (stage.status === "delivered") return "confirm";
   return null;
+};
+
+/**
+ * Банк однозначно відмовив у виплаті чи поверненні, гроші на місці: етап повертається туди, звідки пішов,
+ * з текстом для людини. Без `releasing`/`refunding` нічого не робимо.
+ */
+export const revertPayout = (deal: Deal, stageId: string, message: string): Deal | string => {
+  const stage = deal.stages.find((item) => item.id === stageId);
+  if (!stage || (stage.status !== "releasing" && stage.status !== "refunding")) return "Етап уже не чекає виплати.";
+  const { payout: _payout, releasingAt: _releasing, refundingAt: _refunding, refundReason: _reason, autoAccepted: _auto, attemptAt: _attempt, revertTo, ...rest } = stage;
+  const back: DealStage = { ...rest, status: revertTo ?? "delivered", payoutError: message };
+  const stages = deal.stages.map((item) => (item.id === stageId ? back : item));
+  return { ...deal, stages, disputed: stages.some((item) => item.status === "disputed") };
 };

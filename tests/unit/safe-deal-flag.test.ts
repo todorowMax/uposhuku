@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
-import { isFop } from "@/lib/deals/fop";
+import { parseSafeDealMode, parseSafeDealUsers, safeDealAllowed } from "@/lib/deals/flags";
 import { applyAction, SAFE_DEAL_UNAVAILABLE, validateDraft } from "@/lib/deals/machine";
 import type { Deal, DealDraft } from "@/lib/deals/types";
-import { LEGAL_LINKS } from "@/lib/legal/links";
+import { legalLinks } from "@/lib/legal/links";
 import { proposeDeal } from "@/lib/server/deal-repo";
+import { safeDealEnabledFor, safeDealMode, safeDealPublic } from "@/lib/server/safe-deal";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
-// Прапорець вимкнено (так і є в коді): безпечної угоди немає ні на сервері, ні в ФОП-статусі, ні в списку документів.
+// Режим безпечної угоди: off (типово), allowlist, on. Чиста машина отримує рішення параметром, сервер читає змінні.
 
 const performer = { id: "me-flag-perf", name: "Юлія", avatarIndex: 1, specialty: "Дизайнерка", fop: true };
 const draft = (over: Partial<DealDraft> = {}): DealDraft => ({
@@ -25,26 +25,59 @@ beforeAll(async () => {
   await makeUser(ctx.db, "flag-c");
 });
 afterAll(async () => {
+  delete process.env.SAFE_DEAL_MODE;
+  delete process.env.SAFE_DEAL_USERS;
   await ctx.close();
 });
 
-describe("безпечна угода вимкнена прапорцем", () => {
-  it("прапорець справді вимкнено", () => {
-    expect(SAFE_DEAL_ENABLED).toBe(false);
+describe("режим безпечної угоди", () => {
+  it("за замовчуванням і для сміття це off: помилка в змінній не вмикає гроші", () => {
+    for (const raw of [undefined, "", "yes", "ON ?", "true", "1"]) expect(parseSafeDealMode(raw)).toBe("off");
+    expect(parseSafeDealMode(" Allowlist ")).toBe("allowlist");
+    expect(parseSafeDealMode("on")).toBe("on");
   });
 
+  it("allowlist пускає лише пошти зі списку без урахування регістру й пробілів; off нікого; on всіх", () => {
+    const users = parseSafeDealUsers(" Max@Example.com, ,anna@example.com ");
+    expect(users).toEqual(["max@example.com", "anna@example.com"]);
+    expect(safeDealAllowed("allowlist", users, "MAX@example.com")).toBe(true);
+    expect(safeDealAllowed("allowlist", users, "other@example.com")).toBe(false);
+    expect(safeDealAllowed("allowlist", users, null)).toBe(false);
+    expect(safeDealAllowed("off", users, "max@example.com")).toBe(false);
+    expect(safeDealAllowed("on", [], "any@example.com")).toBe(true);
+  });
+
+  it("сервер читає змінні; юридичні тексти бачать безпечну угоду лише в режимі on", () => {
+    delete process.env.SAFE_DEAL_MODE;
+    expect(safeDealMode()).toBe("off");
+    expect(safeDealEnabledFor("max@example.com")).toBe(false);
+    expect(safeDealPublic()).toBe(false);
+    process.env.SAFE_DEAL_MODE = "allowlist";
+    process.env.SAFE_DEAL_USERS = "max@example.com";
+    expect(safeDealEnabledFor("max@example.com")).toBe(true);
+    expect(safeDealEnabledFor("other@example.com")).toBe(false);
+    expect(safeDealPublic()).toBe(false);
+    process.env.SAFE_DEAL_MODE = "on";
+    expect(safeDealEnabledFor("other@example.com")).toBe(true);
+    expect(safeDealPublic()).toBe(true);
+    delete process.env.SAFE_DEAL_MODE;
+  });
+});
+
+describe("безпечна угода вимкнена для людини", () => {
   it("чернетку з методом safe відхиляє навіть для ФОП, прямий переказ проходить", () => {
-    expect(validateDraft(draft())).toBe(SAFE_DEAL_UNAVAILABLE);
-    expect(validateDraft(draft({ method: "direct" }))).toBeNull();
+    expect(validateDraft(draft(), false)).toBe(SAFE_DEAL_UNAVAILABLE);
+    expect(validateDraft(draft({ method: "direct" }), false)).toBeNull();
+    expect(validateDraft(draft(), true)).toBeNull();
   });
 
   it("створення safe-угоди в репозиторії повертає помилку й нічого не пише", async () => {
-    expect(await proposeDeal("flag-c", draft(), 1_000_000)).toBe(SAFE_DEAL_UNAVAILABLE);
-    const direct = await proposeDeal("flag-c", draft({ method: "direct" }), 1_000_001);
+    expect(await proposeDeal("flag-c", draft(), { safeEnabled: false, now: 1_000_000 })).toBe(SAFE_DEAL_UNAVAILABLE);
+    const direct = await proposeDeal("flag-c", draft({ method: "direct" }), { safeEnabled: false, now: 1_000_001 });
     expect(typeof direct).toBe("object");
   });
 
-  it("заморожування (fund) відхиляється, навіть для вже збереженої safe-угоди", () => {
+  it("дія fund ніколи не міняє стан: «заморожено» ставить лише банк", () => {
     const stored: Deal = {
       id: "deal-old",
       requestId: "r-flag",
@@ -56,14 +89,11 @@ describe("безпечна угода вимкнена прапорцем", () =
       createdAt: new Date(0).toISOString(),
       number: "#OLD1",
     };
-    expect(applyAction(stored, "fund", undefined, 1_000_000, { card: "ua" })).toBe(SAFE_DEAL_UNAVAILABLE);
+    expect(applyAction(stored, "fund", undefined, 1_000_000)).toMatch(/через сторінку банку/);
   });
 
-  it("ФОП-статус не вигадуємо: isFop завжди false", () => {
-    for (const id of ["a", "b", "c", "kyiv-1", "me-x"]) expect(isFop(id)).toBe(false);
-  });
-
-  it("оферти для виконавців немає в списку документів", () => {
-    expect(LEGAL_LINKS.some((link) => link.href === "/offer/safe-deal")).toBe(false);
+  it("оферти для виконавців немає в списку документів, поки режим не on", () => {
+    expect(legalLinks(false).some((link) => link.href === "/offer/safe-deal")).toBe(false);
+    expect(legalLinks(true).some((link) => link.href === "/offer/safe-deal")).toBe(true);
   });
 });

@@ -1,11 +1,12 @@
-// POST /api/deals/:id {action, stageId?, simulate?, as?} — дія з угодою. Замовник:
-// fund (заморозити кошти), claim_paid («я оплатив» після прямого переказу), release (прийняти
-// роботу й виплатити), dispute (спір), cancel (скасувати пропозицію).
+// POST /api/deals/:id {action, stageId?, as?} — дія з угодою. Замовник:
+// claim_paid («я оплатив» після прямого переказу), release (прийняти роботу й виплатити),
+// dispute (спір), cancel (скасувати пропозицію). Оплата безпечної угоди йде окремо: POST /api/deals/:id/pay.
+// У безпечній угоді release лише записує намір, а «виплачено» ставить банк (lib/server/deal-money.ts).
 
 import { problem, readJson } from "@/lib/api/problem";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
 import { getSessionUser } from "@/lib/server/auth";
-import { actAsPerformer, actOnDeal, ownerOfDeal } from "@/lib/server/deal-repo";
+import { settleMessage, settleStage } from "@/lib/server/deal-money";
+import { actAsPerformer, actOnDeal, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealAction, PerformerAction } from "@/lib/deals/types";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -58,19 +59,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   const action = ACTIONS.find((item) => item === body?.action);
   if (!action) return problem(400, "Невідома дія");
-  // Заморожування й імітація відмови банку працюють лише з безпечною угодою.
-  if ((action === "fund" || body?.simulate) && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
-  // Тестова відмова банку при замороженні, щоб побачити, як це виглядає.
-  if (action === "fund" && body?.simulate === "declined") {
-    return problem(402, "Кошти не заморожено", "Банк відхилив операцію. Гроші не списано, спробуйте іншу картку.", "/problems/payment-declined");
-  }
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
-  // Тип картки обирає замовник при заморожуванні: від нього залежить комісія банку в сумі до оплати.
-  const card = body?.card === "ua" || body?.card === "foreign" ? body.card : undefined;
-  const result = await actOnDeal(user.id, (await params).id, action, stageId, Date.now(), { card });
-  if (result === null) return problem(404, "Угоду не знайдено");
-  if (typeof result === "string") return problem(409, "Дію не виконано", result);
-  if (action === "fund" || action === "claim_paid") serverEvent(EVENTS.dealPaid, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");
+  const dealId = (await params).id;
+  const accepted = await actOnDeal(user.id, dealId, action, stageId);
+  if (accepted === null) return problem(404, "Угоду не знайдено");
+  if (typeof accepted === "string") return problem(409, "Дію не виконано", accepted);
+  // Приймання безпечної угоди: намір вже записано (releasing), тепер просимо банк. Підсумок «виплачено» поставить сам банк.
+  let result = accepted;
+  const paying = action === "release" && accepted.method === "safe" ? accepted.stages.find((item) => item.status === "releasing") : undefined;
+  if (paying) {
+    const outcome = await settleStage(dealId, paying.id);
+    result = (await getDealForOwner(dealId, user.id)) ?? accepted;
+    const message = settleMessage(outcome);
+    if (message?.status === 409) return problem(409, "Банк не виконав виплату", message.detail);
+  }
+  if (action === "claim_paid") serverEvent(EVENTS.dealPaid, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");
   if (result.status === "completed") serverEvent(EVENTS.dealCompleted, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");
   const performerUser = userOfPerformer(result.performer.id);
   if (performerUser) await addSystemMessage(user.id, performerUser, OWNER_LINE[action](result.number), result.id);

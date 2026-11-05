@@ -85,6 +85,13 @@
       "when": 1793908142589,
       "tag": "0011_narrow_sleeper",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793909566043,
+      "tag": "0012_quick_spot",
+      "breakpoints": true
     }
   ]
 }

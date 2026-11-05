@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/contacts" },
 };
 
+// Нижня навігація документів залежить від режиму безпечної угоди (змінні воркера), тож сторінка не статична.
+export const dynamic = "force-dynamic";
+
 export default function ContactsPage() {
   return (
     <LegalPage title="Контакти" updated={UPDATED.contacts}>

@@ -14,7 +14,7 @@ describe("швидкий розподіл 30/70", () => {
     const stages = splitAdvance(100, 1);
     expect(stages.every((stage) => stage.amount >= 1 && stage.days >= 1)).toBe(true);
     const performer = { id: "p1", name: "Іван", avatarIndex: 0, specialty: "", fop: false };
-    expect(validateDraft({ requestId: "r", responseId: "x", performer, method: "direct", stages: splitAdvance(5000, 10) })).toBeNull();
+    expect(validateDraft({ requestId: "r", responseId: "x", performer, method: "direct", stages: splitAdvance(5000, 10) }, true)).toBeNull();
   });
 });
 

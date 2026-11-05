@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft } from "@/components/icons";
 import { fill, SERVICE_NAME } from "@/lib/legal/config";
-import { LEGAL_LINKS } from "@/lib/legal/links";
+import { legalLinks } from "@/lib/legal/links";
+import { safeDealPublic } from "@/lib/server/safe-deal";
 import type { LegalSectionData } from "@/lib/legal/types";
 
 /**
@@ -33,7 +34,7 @@ export function LegalPage({ title, updated, children }: { title: string; updated
 export function LegalNav() {
   return (
     <nav aria-label="Документи" className="legal-nav">
-      {LEGAL_LINKS.map((link) => (
+      {legalLinks(safeDealPublic()).map((link) => (
         <Link key={link.href} href={link.href}>
           {link.label}
         </Link>

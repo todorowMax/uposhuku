@@ -57,3 +57,12 @@ export const sendRequisitesChangeNotice = async (email: string, effectiveAt: num
     text: `У вашому кабінеті змінили реквізити для переказів. Нові значення почнуть діяти ${when} (за Києвом). До цього часу, а також в усіх угодах, які вже прийняті, лишаються попередні реквізити.\n\nЯкщо це були не ви, негайно змініть спосіб входу в акаунт і напишіть нам.`,
   });
 };
+
+/** Лист адміністраторам (ADMIN_EMAILS) про те, що потребує людини. Без персональних даних, лише номер угоди й суть. */
+export const sendAdminNotice = async (emails: string[], subject: string, text: string) => {
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] адміністраторам (${emails.length}): ${subject}`);
+    return;
+  }
+  for (const to of emails) await deliver({ to, subject, text });
+};

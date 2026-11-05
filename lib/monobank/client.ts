@@ -25,9 +25,22 @@ export class MonobankError extends Error {
   }
 }
 
-export const getMonobankToken = (): string => {
-  const token = readVar("MONOBANK_TOKEN");
-  if (!token) throw new Error("Не заданий MONOBANK_TOKEN. Тестовий — з https://api.monobank.ua/, бойовий — з кабінету web.monobank.ua.");
+/**
+ * Термінал банку: `plain` (звичайні оплати, розміщення на карті, MONOBANK_TOKEN) або `split` (безпечна угода з
+ * розщепленням, MONOBANK_SPLIT_TOKEN). Токени різні, і вебхук підписує той термінал, чий це рахунок.
+ */
+export type Terminal = "plain" | "split";
+
+export const TERMINALS: readonly Terminal[] = ["plain", "split"];
+
+const TOKEN_VAR = { plain: "MONOBANK_TOKEN", split: "MONOBANK_SPLIT_TOKEN" } as const;
+
+/** Токен терміналу або undefined, якщо не заданий: щоб перевірка підпису могла пропустити відсутній термінал. */
+export const terminalToken = (terminal: Terminal): string | undefined => readVar(TOKEN_VAR[terminal]);
+
+export const getMonobankToken = (terminal: Terminal = "plain"): string => {
+  const token = terminalToken(terminal);
+  if (!token) throw new Error(`Не заданий ${TOKEN_VAR[terminal]}. Тестовий — з https://api.monobank.ua/, бойовий — з кабінету web.monobank.ua.`);
   return token;
 };
 
@@ -66,10 +79,11 @@ const receiverList = z.object({ list: z.array(z.object({ id: z.string(), edrpou:
 export type SplitReceiver = z.infer<typeof receiverList>["list"][number];
 const cancelResult = z.object({ status: z.enum(["processing", "success", "failure"]) });
 
-const request = async <T>(path: string, schema: z.ZodType<T>, init: RequestInit): Promise<T> => {
+const request = async <T>(path: string, schema: z.ZodType<T>, init: RequestInit & { terminal?: Terminal }): Promise<T> => {
+  const { terminal, ...rest } = init;
   const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: { "X-Token": getMonobankToken(), "X-Cms": CMS, "content-type": "application/json" },
+    ...rest,
+    headers: { "X-Token": getMonobankToken(terminal), "X-Cms": CMS, "content-type": "application/json" },
   });
   const text = await response.text();
   if (!response.ok) {
@@ -99,11 +113,14 @@ export interface CreateInvoiceInput {
   redirectUrl?: string;
   /** Холд до фіналізації (у нас 30 днів). Без нього списання одразу. */
   hold: boolean;
+  /** Термінал; без значення plain. Безпечна угода йде через split. */
+  terminal?: Terminal;
   basketOrder: InvoiceItem[];
 }
 
 export const createInvoice = (input: CreateInvoiceInput): Promise<{ invoiceId: string; pageUrl: string }> =>
   request("/api/merchant/invoice/create", created, {
+    terminal: input.terminal,
     method: "POST",
     body: JSON.stringify({
       amount: input.amount,
@@ -115,25 +132,29 @@ export const createInvoice = (input: CreateInvoiceInput): Promise<{ invoiceId: s
     }),
   });
 
-export const getInvoiceStatus = (invoiceId: string): Promise<InvoiceStatusResponse> =>
-  request(`/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoiceId)}`, invoiceStatusResponse, { method: "GET" });
+export const getInvoiceStatus = (invoiceId: string, terminal: Terminal = "plain"): Promise<InvoiceStatusResponse> =>
+  request(`/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoiceId)}`, invoiceStatusResponse, { method: "GET", terminal });
 
 /**
  * Фіналізація холду. Без `amount` і `items` списується вся сума. Для частини
  * передаємо `amount` і `items` з точних вихідних позицій (інакше банк відповідає
  * «wrong amount for finalization without basket»).
  */
-export const finalizeInvoice = (input: { invoiceId: string; amount?: number; items?: BasketItem[] }): Promise<{ status: string }> =>
-  request("/api/merchant/invoice/finalize", z.object({ status: z.string() }), { method: "POST", body: JSON.stringify(input) });
+export const finalizeInvoice = (input: { invoiceId: string; amount?: number; items?: BasketItem[]; terminal?: Terminal }): Promise<{ status: string }> => {
+  const { terminal, ...body } = input;
+  return request("/api/merchant/invoice/finalize", z.object({ status: z.string() }), { method: "POST", body: JSON.stringify(body), terminal });
+};
 
 /**
  * Скасування холду або повернення. Без позицій повертаються обидві долі, з
  * позиціями лише вибрані (повернення довільної суми без позицій банк відхиляє).
  * Повернення після фіналізації можливе лише коли рахунок завершено (`success`).
  */
-export const cancelInvoice = (input: { invoiceId: string; extRef?: string; amount?: number; items?: BasketItem[] }): Promise<{ status: string }> =>
-  request("/api/merchant/invoice/cancel", cancelResult, { method: "POST", body: JSON.stringify(input) });
+export const cancelInvoice = (input: { invoiceId: string; extRef?: string; amount?: number; items?: BasketItem[]; terminal?: Terminal }): Promise<{ status: string }> => {
+  const { terminal, ...body } = input;
+  return request("/api/merchant/invoice/cancel", cancelResult, { method: "POST", body: JSON.stringify(body), terminal });
+};
 
 /** Сабмерчанти, яких банк додав нам для розщеплення. У тестовому середовищі id змінюються при кожному запиті. */
 export const listSplitReceivers = async (): Promise<SplitReceiver[]> =>
-  (await request("/api/merchant/split-receiver/list", receiverList, { method: "GET" })).list;
+  (await request("/api/merchant/split-receiver/list", receiverList, { method: "GET", terminal: "split" })).list;

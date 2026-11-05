@@ -1,12 +1,30 @@
 // lib/deals/flags.ts
 //
-// Єдиний перемикач безпечної угоди для всього застосунку: API, машина станів,
-// інтерфейс і юридичні тексти читають лише його.
+// Режим безпечної угоди: чисті функції без читання середовища. Сервер бере значення зі змінних
+// (lib/server/safe-deal.ts), машина станів і клієнт отримують рішення параметром.
 
 /**
- * Безпечну угоду (холд і виплата виконавцю через Monobank) не вмикаємо до
- * письмових відповідей банку. Поки прапорець вимкнено, сайт не обіцяє того, чого
- * немає: оплата йде прямим переказом, а оферта й умови про безпечну угоду мовчать.
- * Типізовано як boolean, щоб гілки під прапорцем лишалися живими для компілятора.
+ * off: безпечної угоди немає ні для кого (типово). allowlist: лише для пошт зі списку SAFE_DEAL_USERS.
+ * on: для всіх, і лише тоді юридичні тексти про неї з'являються на сайті.
  */
-export const SAFE_DEAL_ENABLED: boolean = false;
+export type SafeDealMode = "off" | "allowlist" | "on";
+
+/** Невідоме чи порожнє значення це `off`: помилка в змінній не вмикає гроші. */
+export const parseSafeDealMode = (raw: string | undefined): SafeDealMode => {
+  const value = raw?.trim().toLowerCase();
+  return value === "allowlist" || value === "on" ? value : "off";
+};
+
+/** Пошти через кому, у нижньому регістрі, без порожніх. */
+export const parseSafeDealUsers = (raw: string | undefined): string[] =>
+  (raw ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+
+/** Чи доступна безпечна угода цій пошті в цьому режимі. */
+export const safeDealAllowed = (mode: SafeDealMode, users: string[], email: string | null | undefined): boolean => {
+  if (mode === "on") return true;
+  if (mode === "off" || !email) return false;
+  return users.includes(email.trim().toLowerCase());
+};

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { LegalDetails, LegalPage, LegalSections } from "@/components/legal/legal-page";
 import { CONTACT_EMAIL, OPERATOR, UPDATED } from "@/lib/legal/config";
 import { offerSections } from "@/lib/legal/offer";
+import { safeDealPublic } from "@/lib/server/safe-deal";
 import { numbered } from "@/lib/legal/types";
 
 export const metadata: Metadata = {
@@ -14,8 +15,11 @@ export const metadata: Metadata = {
  * Договір публічної оферти: його просить банк перед еквайрингом, на нього
  * веде галочка згоди перед оплатою розміщення. Тексти — lib/legal/offer.ts.
  */
+// Режим безпечної угоди читається зі змінних воркера під час запиту, тож сторінка не статична.
+export const dynamic = "force-dynamic";
+
 export default function OfferPage() {
-  const sections = numbered(offerSections());
+  const sections = numbered(offerSections(safeDealPublic()));
   return (
     <LegalPage title="Публічна оферта" updated={UPDATED.offer}>
       <p className="font-semibold text-ink">Договір про надання послуги розміщення профілю на карті</p>

@@ -27,6 +27,15 @@ INTERNAL_TOKEN=
 # На проді: бойовий з кабінету web.monobank.ua, `wrangler secret put MONOBANK_TOKEN --env production`.
 MONOBANK_TOKEN=
 
+# Термінал розщеплення Monobank для безпечної угоди (окремий токен; вебхук підписують ключі обох терміналів).
+MONOBANK_SPLIT_TOKEN=
+# splitReceiverId нашого ФОП у розщепленні (отримує комісію платформи): береться з GET /api/merchant/split-receiver/list.
+MONOBANK_PLATFORM_RECEIVER_ID=
+# Безпечна угода: off (типово) | allowlist | on. Для allowlist: SAFE_DEAL_USERS, пошти через кому.
+# Оплати й нові угоди питають режим; гроші, що вже в русі (вебхук, звірка, виплата), його не питають.
+SAFE_DEAL_MODE=off
+SAFE_DEAL_USERS=
+
 # Ключ шифрування реквізитів виконавців (AES-256-GCM): `openssl rand -base64 32`. Без нього реквізити не зберігаються.
 # На dev і проді: `wrangler secret put REQUISITES_KEY --env development|production`. Не міняти без перешифрування.
 REQUISITES_KEY=

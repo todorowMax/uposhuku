@@ -18,8 +18,10 @@ export const STAGE_STATE: Record<DealStage["status"], string> = {
   claimed: "Оплату позначено",
   funded: "Оплачено, у роботі",
   delivered: "Здано, чекає підтвердження",
+  releasing: "Виплата в банку",
   released: "Виплачено",
   disputed: "Спір",
+  refunding: "Повернення в банку",
   refunded: "Кошти повернено",
 };
 

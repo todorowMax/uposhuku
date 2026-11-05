@@ -1,0 +1,2 @@
+ALTER TABLE `deal_payments` ADD `modified_date` text;--> statement-breakpoint
+CREATE UNIQUE INDEX `deal_payments_live_stage_idx` ON `deal_payments` (`deal_id`,`stage_id`) WHERE "deal_payments"."status" in ('creating', 'created', 'processing', 'hold', 'success');

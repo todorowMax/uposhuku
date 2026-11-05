@@ -8,6 +8,7 @@ export const DECISION_LABEL: Record<ModeratorAction, string> = {
   release: "Виплатити виконавцю",
   refund: "Повернути замовнику",
   rework: "Повернути на доопрацювання",
+  partial: "Виплатити частину",
 };
 
 export const DECISION_COMMENT_MIN = 10;

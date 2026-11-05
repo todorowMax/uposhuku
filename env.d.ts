@@ -39,6 +39,14 @@ interface CloudflareEnv {
   INTERNAL_TOKEN?: string;
   /** Токен еквайрингу Monobank: тестовий з api.monobank.ua або бойовий з кабінету web.monobank.ua. Секрет. */
   MONOBANK_TOKEN?: string;
+  /** Токен терміналу розщеплення Monobank (безпечна угода). Секрет. Окремий від MONOBANK_TOKEN: вебхук підписує той термінал, чий рахунок. */
+  MONOBANK_SPLIT_TOKEN?: string;
+  /** splitReceiverId нашого ФОП у розщепленні: отримувач комісії платформи. Не секрет, але з кабінету банку. */
+  MONOBANK_PLATFORM_RECEIVER_ID?: string;
+  /** Безпечна угода: "off" (типово) | "allowlist" | "on". Невідоме значення це off. */
+  SAFE_DEAL_MODE?: string;
+  /** Пошти через кому, яким доступна безпечна угода в режимі allowlist. */
+  SAFE_DEAL_USERS?: string;
   /** Ключ шифрування реквізитів виконавців: base64, 32 байти (`openssl rand -base64 32`). Секрет; без нього реквізити не зберігаються (503). */
   REQUISITES_KEY?: string;
   /** Пошти адміністраторів через кому: єдиний доступ до /admin і /api/admin. Без значення адмінки немає. */

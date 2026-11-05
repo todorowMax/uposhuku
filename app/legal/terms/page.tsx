@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalPage, LegalSections } from "@/components/legal/legal-page";
 import { fill, UPDATED } from "@/lib/legal/config";
+import { safeDealPublic } from "@/lib/server/safe-deal";
 import { TERMS_INTRO, termsSections } from "@/lib/legal/terms";
 
 export const metadata: Metadata = {
@@ -9,11 +10,15 @@ export const metadata: Metadata = {
   alternates: { canonical: "/legal/terms" },
 };
 
+// Режим безпечної угоди читається зі змінних воркера під час запиту, тож сторінка не статична.
+export const dynamic = "force-dynamic";
+
 export default function TermsPage() {
+  const safeDeal = safeDealPublic();
   return (
     <LegalPage title="Умови користування" updated={UPDATED.terms}>
       <p>{fill(TERMS_INTRO)}</p>
-      <LegalSections sections={termsSections()} />
+      <LegalSections sections={termsSections(safeDeal)} />
     </LegalPage>
   );
 }

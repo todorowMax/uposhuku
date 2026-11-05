@@ -32,7 +32,7 @@ const draft = (performerUser: string): DealDraft => ({
 });
 
 const openDeal = async (performerUser: string, now: number) => {
-  const deal = await proposeDeal("rq-cust", draft(performerUser), now);
+  const deal = await proposeDeal("rq-cust", draft(performerUser), { safeEnabled: true, now: now });
   if (typeof deal === "string") throw new Error(deal);
   return deal;
 };
@@ -118,7 +118,7 @@ describe("знімок у угоді", () => {
     await makeUser(ctx.db, "rq-prop");
     await saveOwnRequisites("rq-prop", value(IBAN_B), T0);
     const conversation = { id: "conv-rq", customerUserId: "rq-cust", performerId: "me-rq-prop" };
-    const deal = await proposeDirectDeal(conversation, "performer", { title: "Логотип", method: "direct", performer: { id: "me-rq-prop", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, T0 + 300);
+    const deal = await proposeDirectDeal(conversation, "performer", { title: "Логотип", method: "direct", performer: { id: "me-rq-prop", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, { safeEnabled: true, now: T0 + 300 });
     expect(typeof deal).toBe("object");
     const id = (deal as { id: string }).id;
     expect(typeof (await actOnDeal("rq-cust", id, "accept", undefined, T0 + 310))).toBe("object");
@@ -127,9 +127,9 @@ describe("знімок у угоді", () => {
   });
 
   it("угода із самим собою відхиляється в обох шляхах", async () => {
-    const own = await proposeDeal("rq-cust", draft("rq-cust"), T0);
+    const own = await proposeDeal("rq-cust", draft("rq-cust"), { safeEnabled: true, now: T0 });
     expect(own).toMatch(/З собою/);
-    const direct = await proposeDirectDeal({ id: "c-self", customerUserId: "rq-cust", performerId: "me-rq-cust" }, "customer", { title: "Тест", method: "direct", performer: { id: "me-rq-cust", name: "Я", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, T0);
+    const direct = await proposeDirectDeal({ id: "c-self", customerUserId: "rq-cust", performerId: "me-rq-cust" }, "customer", { title: "Тест", method: "direct", performer: { id: "me-rq-cust", name: "Я", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] }, { safeEnabled: true, now: T0 });
     expect(direct).toMatch(/З собою/);
   });
 });

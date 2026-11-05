@@ -240,7 +240,7 @@ export const moderationActions = sqliteTable(
     id: text("id").primaryKey(),
     dealId: text("deal_id").notNull(),
     stageId: text("stage_id").notNull(),
-    action: text("action", { enum: ["release", "refund", "rework"] }).notNull(),
+    action: text("action", { enum: ["release", "refund", "rework", "partial"] }).notNull(),
     comment: text("comment").notNull(),
     adminUserId: text("admin_user_id").notNull(),
     adminEmail: text("admin_email").notNull(),

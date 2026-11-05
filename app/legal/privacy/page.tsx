@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/legal/privacy" },
 };
 
+// Нижня навігація документів залежить від режиму безпечної угоди (змінні воркера), тож сторінка не статична.
+export const dynamic = "force-dynamic";
+
 export default function PrivacyPage() {
   return (
     <LegalPage title="Конфіденційність" updated={UPDATED.privacy}>

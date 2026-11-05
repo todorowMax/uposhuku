@@ -48,6 +48,11 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Deploy is by hand: `npm run cf:deploy:development` and `cf:deploy:production`; D1 migrations are
   `db:migrate:development` and `db:migrate:production`. Secrets go in with `wrangler secret put`,
   never into `wrangler.jsonc`.
+- Безпечна угода (гроші через Monobank) вмикається змінними `SAFE_DEAL_MODE` = `off` (типово) | `allowlist` | `on`
+  та `SAFE_DEAL_USERS` (пошти через кому). Нові угоди й оплата питають режим (`lib/server/safe-deal.ts`), гроші, що вже
+  в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`.
+  Токени: `MONOBANK_TOKEN` (звичайний термінал) і `MONOBANK_SPLIT_TOKEN` (розщеплення), `MONOBANK_PLATFORM_RECEIVER_ID`.
+  «Заморожено» і «виплачено» ставить лише підтверджена банком відповідь (`lib/deals/payment-status.ts`).
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
@@ -60,7 +65,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-836 warnings, Stylelint 11. The numbers only go down: fix findings in the files you touch and lower the
+834 warnings, Stylelint 11. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

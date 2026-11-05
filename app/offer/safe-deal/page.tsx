@@ -14,6 +14,9 @@ export const metadata: Metadata = {
  * Публічний договір для виконавців-ФОП про послуги технічного характеру. Його
  * просить Monobank для розщеплення платежу. Тексти — lib/legal/safe-deal-offer.ts.
  */
+// Нижня навігація документів залежить від режиму безпечної угоди (змінні воркера), тож сторінка не статична.
+export const dynamic = "force-dynamic";
+
 export default function SafeDealOfferPage() {
   const sections = numbered(safeDealOfferSections());
   return (

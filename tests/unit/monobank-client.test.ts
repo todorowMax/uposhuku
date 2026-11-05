@@ -99,9 +99,23 @@ describe("клієнт Monobank", () => {
     expect(error.code).toBeNull();
   });
 
-  it("отримувачі: id, ІПН й імʼя", async () => {
+  it("отримувачі: id, ІПН й імʼя; запит іде токеном терміналу розщеплення", async () => {
+    process.env.MONOBANK_SPLIT_TOKEN = "split-token";
     fetchMock.mockImplementation(() => respond(200, { list: [{ id: "test_1", okpo: "1", edrpou: "1234567890", name: "Анна" }] }));
     expect(await listSplitReceivers()).toEqual([{ id: "test_1", edrpou: "1234567890", name: "Анна" }]);
+    expect(lastCall().headers["X-Token"]).toBe("split-token");
+    delete process.env.MONOBANK_SPLIT_TOKEN;
+  });
+
+  it("термінали: звичайний рахунок іде токеном plain, безпечна угода токеном split", async () => {
+    process.env.MONOBANK_SPLIT_TOKEN = "split-token";
+    fetchMock.mockImplementation(() => respond(200, { invoiceId: "i", status: "hold", amount: 1, modifiedDate: "2026-11-05T10:00:00Z" }));
+    await getInvoiceStatus("i");
+    expect(lastCall().headers["X-Token"]).toBe("test-token");
+    await getInvoiceStatus("i", "split");
+    expect(lastCall().headers["X-Token"]).toBe("split-token");
+    delete process.env.MONOBANK_SPLIT_TOKEN;
+    await expect(getInvoiceStatus("i", "split")).rejects.toThrow(/MONOBANK_SPLIT_TOKEN/);
   });
 
   it("без токена кидає зрозумілу помилку й не звертається до банку", async () => {

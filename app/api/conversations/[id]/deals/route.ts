@@ -2,11 +2,11 @@
 // Будь-яка сторона; друга приймає чи відхиляє. Тіло: {title, description?, method, stages[]}.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
-import { isFop } from "@/lib/deals/fop";
 import { performerIdOf } from "@/lib/deals/parties";
 import type { DealMethod } from "@/lib/deals/types";
 import { getSessionUser } from "@/lib/server/auth";
+import { hasActivePayout } from "@/lib/server/deal-parties";
+import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 import { accessibleConversation, addSystemMessage } from "@/lib/server/chat-repo";
 import { proposeDirectDeal, SELF_DEAL } from "@/lib/server/deal-repo";
 import { notifyLater } from "@/lib/server/notify";
@@ -29,7 +29,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
     const method: DealMethod = body?.method === "safe" ? "safe" : "direct";
-    if (method === "safe" && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
+    const safeEnabled = safeDealEnabledFor(user.email);
+    if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
     if (conversation.performerUserId === conversation.customerUserId) return problem(400, "Умови не виставлено", SELF_DEAL);
     const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
     const profile = await getProfile(conversation.performerUserId);
@@ -49,7 +50,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           avatarIndex: 0,
           specialty: profile?.specialty ?? "",
           // ФОП визначаємо самі: цьому полю з клієнта не вірити.
-          fop: isFop(performerId),
+          fop: await hasActivePayout(conversation.performerUserId),
         },
         stages: rawStages.map((stage: Record<string, unknown>) => ({
           title: text(stage?.title, 60),
@@ -57,6 +58,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           days: typeof stage?.days === "number" ? Math.round(stage.days) : NaN,
         })),
       },
+      { safeEnabled },
     );
     if (typeof result === "string") return problem(400, "Умови не виставлено", result);
     serverEvent(EVENTS.dealCreated, { deal_id: result.id, kind: result.method, stages: result.stages.length, direct: true }, user.id, "/api/conversations/deals");
