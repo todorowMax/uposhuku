@@ -44,7 +44,6 @@ export const validateDraft = (draft: DealDraft): string | null => {
   if (draft.stages.length < 1 || draft.stages.length > MAX_STAGES) return `Етапів має бути від 1 до ${MAX_STAGES}.`;
   if (draft.method === "safe" && !SAFE_DEAL_ENABLED) return SAFE_DEAL_UNAVAILABLE;
   if (draft.method === "safe" && !draft.performer.fop) return "Безпечна угода доступна лише виконавцям-ФОП.";
-  if (draft.method === "direct" && draft.stages.length !== 1) return "Прямий переказ іде одним платежем.";
   for (const stage of draft.stages) {
     if (!stage.title.trim()) return "Назвіть кожен етап.";
     if (!Number.isFinite(stage.amount) || stage.amount < 1) return "Вкажіть суму кожного етапу.";

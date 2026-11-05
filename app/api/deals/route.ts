@@ -5,7 +5,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { SAFE_DEAL_ENABLED } from "@/lib/deals/flags";
-import { isFop } from "@/lib/deals/fop";
+import { performerFromResponse } from "@/lib/server/deal-parties";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealDraft, DealMethod } from "@/lib/deals/types";
@@ -38,34 +38,28 @@ export async function POST(request: Request) {
   if (!(await findRequest(user.id, requestId))) return problem(404, "Запит не знайдено");
 
   const rawPerformer = body?.performer as Record<string, unknown> | undefined;
-  const performerId = text(rawPerformer?.id, 60);
   // Поки безпечна угода вимкнена, метод за замовчуванням — прямий переказ, а safe відхиляємо.
   const fallback: DealMethod = SAFE_DEAL_ENABLED ? "safe" : "direct";
   const method: DealMethod = body?.method === "safe" || body?.method === "direct" ? body.method : fallback;
   if (method === "safe" && !SAFE_DEAL_ENABLED) return problem(409, "Безпечна угода ще недоступна");
-  const photo = typeof rawPerformer?.photo === "string" && /^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(rawPerformer.photo) && rawPerformer.photo.length < 300_000 ? rawPerformer.photo : undefined;
   const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
+  const responseId = text(body?.responseId, 80);
+  if (!text(rawPerformer?.id, 60) || !responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
+  // Виконавця, його ім'я й фото бере сервер з відгуку й профілю: клієнту вірити не можна.
+  const performer = await performerFromResponse(user.id, { requestId, responseId, claimedPerformerId: text(rawPerformer?.id, 60) });
+  if (typeof performer === "string") return problem(400, "Угоду не створено", performer);
 
   const draft: DealDraft = {
     requestId,
-    responseId: text(body?.responseId, 80),
+    responseId,
     method,
-    performer: {
-      id: performerId,
-      name: text(rawPerformer?.name, 80),
-      photo,
-      avatarIndex: typeof rawPerformer?.avatarIndex === "number" ? Math.max(0, Math.min(255, Math.round(rawPerformer.avatarIndex))) : 0,
-      specialty: text(rawPerformer?.specialty, 80),
-      // ФОП визначаємо самі: цьому полю з клієнта не вірити.
-      fop: isFop(performerId),
-    },
+    performer,
     stages: rawStages.map((stage: Record<string, unknown>) => ({
       title: text(stage?.title, 60),
       amount: typeof stage?.amount === "number" ? Math.round(stage.amount) : NaN,
       days: typeof stage?.days === "number" ? Math.round(stage.days) : NaN,
     })),
   };
-  if (!draft.performer.id || !draft.responseId) return problem(400, "Угоду не створено", "Не вказано виконавця.");
   const result = await proposeDeal(user.id, draft);
   if (typeof result === "string") return problem(400, "Угоду не створено", result);
   notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: "proposed" }));

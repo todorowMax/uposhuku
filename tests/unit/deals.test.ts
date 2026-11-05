@@ -28,7 +28,7 @@ describe("правила угоди", () => {
     expect(payoutOf(10000)).toBe(10000);
   });
 
-  it("безпечна угода — лише ФОП, етап не довший за холд мінус запас, не більший за ліміт, прямий — одним платежем", () => {
+  it("безпечна угода — лише ФОП, етап не довший за холд мінус запас, не більший за ліміт, прямий — без ліміту етапу, кілька етапів", () => {
     expect(validateDraft(draft())).toBeNull();
     expect(validateDraft(draft({ performer: { ...performer, fop: false } }))).toMatch(/ФОП/);
     expect(validateDraft(draft({ stages: [{ title: "Все", amount: 10000, days: MAX_STAGE_DAYS + 1 }] }))).toMatch(/розділіть/);
@@ -37,7 +37,8 @@ describe("правила угоди", () => {
     expect(validateDraft(draft({ stages: [{ title: "Все", amount: MAX_STAGE_AMOUNT, days: 5 }] }))).toBeNull();
     // Прямий переказ повз банк-еквайр: ліміту етапу немає.
     expect(validateDraft(draft({ method: "direct", stages: [{ title: "Все", amount: 500_000, days: 5 }] }))).toBeNull();
-    expect(validateDraft(draft({ method: "direct", stages: [{ title: "А", amount: 500, days: 3 }, { title: "Б", amount: 500, days: 3 }] }))).toMatch(/одним платежем/);
+    expect(validateDraft(draft({ method: "direct", stages: [{ title: "А", amount: 500, days: 3 }, { title: "Б", amount: 500, days: 3 }] }))).toBeNull();
+    expect(validateDraft(draft({ method: "direct", stages: Array.from({ length: 7 }, (_, index) => ({ title: `Е${index}`, amount: 500, days: 3 })) }))).toMatch(/від 1 до 6/);
     expect(validateDraft(draft({ method: "direct", performer: { ...performer, fop: false }, stages: [{ title: "Все", amount: 5000, days: 40 }] }))).toBeNull();
     expect(validateDraft(draft({ stages: [{ title: "", amount: 500, days: 3 }] }))).toMatch(/Назвіть/);
     expect(validateDraft(draft({ stages: [{ title: "А", amount: 50, days: 3 }] }))).toMatch(/Сума угоди/);
@@ -297,5 +298,28 @@ describe("до оплати: ціна виконавця + комісія пла
     const deal = accepted();
     const funded = applyAction(deal, "fund", undefined, T0 + 5000) as Deal;
     expect(currentStage(funded)!.payment?.card).toBe("foreign");
+  });
+});
+
+describe("прямий переказ в кілька етапів", () => {
+  it("кожен етап проходить pending → claimed → funded → delivered → released по черзі", () => {
+    let deal = createDeal("deal-2st", draft({ method: "direct", stages: [{ title: "Аванс", amount: 3000, days: 3 }, { title: "Решта", amount: 7000, days: 5 }] }), T0);
+    deal = applyPerformerAction(deal, "accept", undefined, T0 + 1) as Deal;
+    const [first, second] = deal.stages;
+    // Другий етап недоступний, поки перший не виплачено.
+    expect(applyAction(deal, "claim_paid", second.id, T0 + 2)).toMatch(/попередній етап/);
+    const step = (action: string, who: "owner" | "performer", at: number) => {
+      const result = who === "owner" ? applyAction(deal, action as never, undefined, at) : applyPerformerAction(deal, action as never, undefined, at);
+      expect(typeof result).toBe("object");
+      deal = result as Deal;
+    };
+    for (const [action, who] of [["claim_paid", "owner"], ["confirm_paid", "performer"], ["deliver", "performer"], ["release", "owner"]] as const) step(action, who, T0 + 10);
+    expect(deal.stages[0].status).toBe("released");
+    expect(currentStage(deal)?.id).toBe(second.id);
+    expect(deal.status).toBe("accepted");
+    for (const [action, who] of [["claim_paid", "owner"], ["confirm_paid", "performer"], ["deliver", "performer"], ["release", "owner"]] as const) step(action, who, T0 + 20);
+    expect(deal.stages.map((stage) => stage.status)).toEqual(["released", "released"]);
+    expect(deal.status).toBe("completed");
+    expect(first.id).not.toBe(second.id);
   });
 });

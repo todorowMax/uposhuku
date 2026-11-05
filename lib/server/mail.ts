@@ -16,21 +16,13 @@ export const mailMode = (): MailMode => {
   return readVar("RESEND_API_KEY") ? "resend" : "dev";
 };
 
-export const sendLoginCode = async (email: string, code: string) => {
+/** Надіслати лист через Resend; помилка кидається, щоб викликач вирішив, чи вона критична. */
+const deliver = async (message: { to: string; subject: string; text: string }) => {
   const key = readVar("RESEND_API_KEY");
-  if (mailMode() === "dev" || !key) {
-    console.log(`[mail:dev] код для ${email}: ${code}`);
-    return;
-  }
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({
-      from: readVar("MAIL_FROM") ?? "Findlyfy <hello@findlyfy.com>",
-      to: [email],
-      subject: `Код входу: ${code}`,
-      text: `Ваш код для входу у Findlyfy: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
-    }),
+    body: JSON.stringify({ from: readVar("MAIL_FROM") ?? "Findlyfy <hello@findlyfy.com>", to: [message.to], subject: message.subject, text: message.text }),
   });
   if (!response.ok) {
     const body = (await response.text()).slice(0, 300);
@@ -38,4 +30,30 @@ export const sendLoginCode = async (email: string, code: string) => {
     logServer({ level: "error", event: "mail_send_failed", message: `Resend відповів ${response.status}`, detail: { status: response.status, body } });
     throw new Error(`Resend відповів ${response.status}: ${body}`);
   }
+};
+
+export const sendLoginCode = async (email: string, code: string) => {
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] код для ${email}: ${code}`);
+    return;
+  }
+  await deliver({
+    to: email,
+    subject: `Код входу: ${code}`,
+    text: `Ваш код для входу у Findlyfy: ${code}\n\nВін діє 10 хвилин. Якщо ви не просили код, просто проігноруйте цей лист.`,
+  });
+};
+
+/** Лист виконавцю про зміну реквізитів: нові значення почнуть діяти після `effectiveAt`. Самих реквізитів у листі немає. */
+export const sendRequisitesChangeNotice = async (email: string, effectiveAt: number) => {
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] зміна реквізитів для ${email}`);
+    return;
+  }
+  const when = new Intl.DateTimeFormat("uk-UA", { timeZone: "Europe/Kyiv", dateStyle: "long", timeStyle: "short" }).format(effectiveAt);
+  await deliver({
+    to: email,
+    subject: "Змінено реквізити для оплати у Findlyfy",
+    text: `У вашому кабінеті змінили реквізити для переказів. Нові значення почнуть діяти ${when} (за Києвом). До цього часу, а також в усіх угодах, які вже прийняті, лишаються попередні реквізити.\n\nЯкщо це були не ви, негайно змініть спосіб входу в акаунт і напишіть нам.`,
+  });
 };

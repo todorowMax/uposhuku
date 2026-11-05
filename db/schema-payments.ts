@@ -85,3 +85,47 @@ export const placementInvoices = sqliteTable(
   },
   (table) => [uniqueIndex("placement_invoices_invoice_idx").on(table.invoiceId), index("placement_invoices_user_idx").on(table.userId)],
 );
+
+/**
+ * Реквізити виконавця для прямого переказу. Лише шифротекст (lib/server/secret-box.ts, aad = id користувача)
+ * і маска IBAN для показу. Зміна не діє одразу: нові значення чекають у `pending_*` до `pending_at`
+ * (24 години), тоді стають поточними при найближчому читанні.
+ */
+export const payoutRequisites = sqliteTable("payout_requisites", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  cipher: text("cipher").notNull(),
+  mask: text("mask").notNull(),
+  pendingCipher: text("pending_cipher"),
+  pendingMask: text("pending_mask"),
+  pendingAt: integer("pending_at"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** Знімок реквізитів у момент прийняття угоди: замовник бачить його, а не поточні реквізити виконавця. */
+export const dealRequisites = sqliteTable("deal_requisites", {
+  dealId: text("deal_id")
+    .primaryKey()
+    .references(() => deals.id, { onDelete: "cascade" }),
+  cipher: text("cipher").notNull(),
+  mask: text("mask").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+/** Журнал: хто й коли відкривав реквізити угоди (лише замовник). */
+export const requisiteReads = sqliteTable(
+  "requisite_reads",
+  {
+    id: text("id").primaryKey(),
+    dealId: text("deal_id")
+      .notNull()
+      .references(() => deals.id, { onDelete: "cascade" }),
+    readerUserId: text("reader_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [index("requisite_reads_deal_idx").on(table.dealId, table.createdAt)],
+);

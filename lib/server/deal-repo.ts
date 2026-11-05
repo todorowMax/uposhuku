@@ -8,7 +8,23 @@ import { deals, moderationActions } from "@/db/schema";
 import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft } from "@/lib/deals/machine";
 import { DIRECT_RESPONSE_ID, directRequestId, type CardKind, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
+import { performerIdOf, performerUserId } from "@/lib/deals/parties";
 import { getDb } from "./db";
+import { snapshotDealRequisites } from "./requisites-repo";
+
+/** Відповідь на спробу укласти угоду із самим собою. */
+export const SELF_DEAL = "З собою угоду оформити не можна.";
+
+/** Прийнята прямим переказом угода фіксує реквізити виконавця. Збій знімка не ламає прийняття: його довзяти при першому читанні. */
+const snapshotOnAccept = async (deal: Deal, now: number) => {
+  const performerUser = performerUserId(deal.performer.id);
+  if (deal.method !== "direct" || deal.status !== "accepted" || !performerUser) return;
+  try {
+    await snapshotDealRequisites(deal.id, performerUser, now);
+  } catch (error) {
+    console.error("requisites snapshot failed", error instanceof Error ? error.message : "unknown");
+  }
+};
 
 const parse = (row: typeof deals.$inferSelect) => JSON.parse(row.data) as Deal;
 
@@ -28,6 +44,7 @@ export const listDeals = async (userId: string, requestId?: string): Promise<Dea
 export const proposeDeal = async (userId: string, draft: DealDraft, now = Date.now()): Promise<Deal | string> => {
   const error = validateDraft(draft);
   if (error) return error;
+  if (draft.performer.id === performerIdOf(userId)) return SELF_DEAL;
   const existing = await readAll(userId);
   // На один відгук одна жива угода: нову можна після відмови чи скасування.
   if (existing.some((deal) => deal.responseId === draft.responseId && deal.status !== "declined" && deal.status !== "cancelled")) return "З цим виконавцем уже є угода.";
@@ -52,6 +69,7 @@ export const actOnDeal = async (userId: string, id: string, action: DealAction, 
   const result = applyAction(deal, action, stageId, now, options);
   if (typeof result === "string") return result;
   await write(userId, result, now);
+  if (action === "accept") await snapshotOnAccept(result, now);
   return result;
 };
 
@@ -84,6 +102,7 @@ export const actAsPerformer = async (performerUserId: string, id: string, action
   const result = applyPerformerAction(parse(row), action, stageId, now);
   if (typeof result === "string") return result;
   await write(row.ownerUserId, result, now);
+  if (action === "accept") await snapshotOnAccept(result, now);
   return result;
 };
 
@@ -101,6 +120,7 @@ export const proposeDirectDeal = async (
   draft: Omit<DealDraft, "requestId" | "responseId" | "conversationId" | "proposedBy">,
   now = Date.now(),
 ): Promise<Deal | string> => {
+  if (conversation.performerId === performerIdOf(conversation.customerUserId)) return SELF_DEAL;
   const title = draft.title?.trim() ?? "";
   if (title.length < 2) return "Назвіть замовлення: хоча б кілька літер.";
   if (title.length > 80) return "Назва задовга: до 80 символів.";
