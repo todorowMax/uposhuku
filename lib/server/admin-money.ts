@@ -5,8 +5,11 @@
 // На проді без секрету грошові рішення недоступні; поза продом без секрету код не питаємо (локальна розробка).
 
 import { parseAdminEmails } from "@/lib/admin/access";
-import { verifyTotp } from "@/lib/admin/totp";
+import { sql } from "drizzle-orm";
+import { matchTotp } from "@/lib/admin/totp";
+import { adminTotpState } from "@/db/schema";
 import type { Deal, ModeratorAction } from "@/lib/deals/types";
+import { getDb } from "./db";
 import { isProduction, readVar } from "./env";
 import { sendAdminNotice } from "./mail";
 import { overLimit } from "./rate-limit";
@@ -18,6 +21,20 @@ export const isMoneyDecision = (deal: Deal, action: ModeratorAction): boolean =>
 
 export type FactorResult = { ok: true } | { ok: false; status: number; title: string; detail: string };
 
+/**
+ * Запам'ятовує крок коду для адміністратора. true, лише якщо крок строго більший за останній прийнятий:
+ * повтор того самого коду й старіший крок відхиляються. Одним запитом, тож два паралельні запити з одним
+ * кодом не пройдуть обидва.
+ */
+export const claimTotpCounter = async (adminId: string, counter: number, now: number): Promise<boolean> => {
+  const rows = await getDb()
+    .insert(adminTotpState)
+    .values({ userId: adminId, lastCounter: counter, updatedAt: now })
+    .onConflictDoUpdate({ target: adminTotpState.userId, set: { lastCounter: counter, updatedAt: now }, setWhere: sql`${adminTotpState.lastCounter} < ${counter}` })
+    .returning({ userId: adminTotpState.userId });
+  return rows.length > 0;
+};
+
 /** Перевірка другого фактора перед грошовим рішенням. Кожна спроба рахується: код не підібрати перебором. */
 export const checkSecondFactor = async (input: { adminId: string; code: unknown; now?: number }): Promise<FactorResult> => {
   const { adminId, code, now = Date.now() } = input;
@@ -26,7 +43,9 @@ export const checkSecondFactor = async (input: { adminId: string; code: unknown;
     return isProduction() ? { ok: false, status: 403, title: "Грошові рішення вимкнені", detail: "Не задано ADMIN_TOTP_SECRET: без другого фактора рішення з грошима недоступні." } : { ok: true };
   }
   if (await overLimit("adminTotp", adminId, now)) return { ok: false, status: 429, title: "Забагато спроб", detail: "Забагато спроб коду. Зачекайте кілька хвилин." };
-  if (!(await verifyTotp({ secret, code, now }))) return { ok: false, status: 403, title: "Потрібен код другого фактора", detail: "Введіть поточний 6-значний код з автентифікатора." };
+  const counter = await matchTotp({ secret, code, now });
+  if (counter === null) return { ok: false, status: 403, title: "Потрібен код другого фактора", detail: "Введіть поточний 6-значний код з автентифікатора." };
+  if (!(await claimTotpCounter(adminId, counter, now))) return { ok: false, status: 403, title: "Код уже використано", detail: "Цей код уже приймали. Дочекайтеся наступного коду з автентифікатора." };
   return { ok: true };
 };
 

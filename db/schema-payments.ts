@@ -78,6 +78,8 @@ export const payoutAccounts = sqliteTable(
     accountConfirmedAt: integer("account_confirmed_at"),
     /** Остання перевірка в банку (адміністратор). */
     checkedAt: integer("checked_at"),
+    /** Причина відхилення чи відключення: її бачить виконавець і може подати заявку знову. */
+    rejectReason: text("reject_reason"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
@@ -170,3 +172,15 @@ export const dealReleaseCodes = sqliteTable(
   },
   (table) => [uniqueIndex("deal_release_codes_stage_idx").on(table.userId, table.dealId, table.stageId)],
 );
+
+/**
+ * Останній прийнятий крок TOTP кожного адміністратора. Код іде в справу лише раз: той самий чи старіший
+ * за збережений крок відхиляється, тож підглянутий код не повторити в межах вікна.
+ */
+export const adminTotpState = sqliteTable("admin_totp_state", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lastCounter: integer("last_counter").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});

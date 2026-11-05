@@ -44,13 +44,19 @@ const sameText = (a: string, b: string): boolean => {
   return diff === 0;
 };
 
-/** Чи вірний код у цей момент (поточний крок і по одному сусідньому). */
-export const verifyTotp = async (input: { secret: string; code: unknown; now: number }): Promise<boolean> => {
+/**
+ * Крок, якому відповідає код у цей момент (поточний і по одному сусідньому), або null. Крок потрібен викликачу,
+ * щоб запам'ятати його й не прийняти той самий код удруге.
+ */
+export const matchTotp = async (input: { secret: string; code: unknown; now: number }): Promise<number | null> => {
   const key = decodeBase32(input.secret);
   const code = typeof input.code === "string" ? input.code.replace(/\s/g, "") : "";
-  if (!key || !/^\d{6}$/.test(code)) return false;
+  if (!key || !/^\d{6}$/.test(code)) return null;
   const counter = Math.floor(input.now / 1000 / STEP_SECONDS);
-  let ok = false;
-  for (const shift of [-1, 0, 1]) ok = sameText(await totpCode(key, counter + shift), code) || ok;
-  return ok;
+  let matched: number | null = null;
+  for (const shift of [-1, 0, 1]) if (sameText(await totpCode(key, counter + shift), code)) matched = counter + shift;
+  return matched;
 };
+
+/** Чи вірний код у цей момент. Повторне використання не відстежує: це робить `claimTotpCounter` на сервері. */
+export const verifyTotp = async (input: { secret: string; code: unknown; now: number }): Promise<boolean> => (await matchTotp(input)) !== null;

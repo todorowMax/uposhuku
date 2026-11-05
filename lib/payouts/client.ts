@@ -13,6 +13,7 @@ export interface PayoutDto {
   taxIdMask: string;
   consentAt: number | null;
   checkedAt: number | null;
+  rejectReason: string | null;
 }
 
 export interface PayoutStateDto {

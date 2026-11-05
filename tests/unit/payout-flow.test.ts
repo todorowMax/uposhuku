@@ -16,8 +16,9 @@ vi.mock("@/lib/server/realtime", () => ({ pushUser: vi.fn(), userOfPerformer: (i
 vi.mock("@/lib/telemetry/log", () => ({ logServer: vi.fn(), logServerError: vi.fn(), serverEvent: vi.fn() }));
 
 import { eq } from "drizzle-orm";
-import { payoutAccounts } from "@/db/schema";
+import { authAttempts, payoutAccounts } from "@/db/schema";
 import { POST as VERIFY } from "@/app/api/admin/payouts/[userId]/verify/route";
+import { POST as REJECT } from "@/app/api/admin/payouts/[userId]/reject/route";
 import { PUT as APPLY, GET as OWN } from "@/app/api/payout-account/route";
 import { POST as DECIDE } from "@/app/api/admin/disputes/[id]/decision/route";
 import { POST as RELEASE_CODE } from "@/app/api/deals/[id]/release-code/route";
@@ -55,6 +56,8 @@ afterEach(() => {
 
 const json = (body: unknown) => ({ method: "POST", body: JSON.stringify(body) });
 const apply = (body: Record<string, unknown>) => APPLY(new Request("https://findlyfy.test/api/payout-account", { method: "PUT", body: JSON.stringify(body) }));
+const reject = (userId: string, reason: string) => REJECT(new Request("https://findlyfy.test/x", json({ reason })), { params: Promise.resolve({ userId }) });
+const rowOfUser = async (userId: string) => (await getDb().select().from(payoutAccounts).where(eq(payoutAccounts.userId, userId)))[0];
 const verify = (userId: string) => VERIFY(new Request("https://findlyfy.test/x", { method: "POST" }), { params: Promise.resolve({ userId }) });
 const decide = (dealId: string, body: Record<string, unknown>) => DECIDE(new Request("https://findlyfy.test/x", json({ comment: "Рішення модератора за матеріалами.", ...body })), ctxFor(dealId));
 
@@ -104,6 +107,27 @@ describe("підключення виконавця до виплат", () => {
 
     admin.user = null;
     expect((await verify("pf-new")).status).toBe(404);
+  });
+
+  it("адмін відхиляє заявку й відключає активний рахунок з причиною; виконавець бачить її й подає знову", async () => {
+    await makeUser(ctx.db, "pf-rej", { createdAt: Date.now() - 30 * DAY });
+    session.user = { id: "pf-rej", email: "pf-rej@example.com" };
+    await apply(FORM);
+    expect((await reject("pf-rej", "")).status).toBe(400);
+    expect((await getPayoutAccount("pf-rej", "monobank"))?.status).toBe("pending");
+    expect((await reject("pf-rej", "ІПН не збігається з реєстром")).status).toBe(200);
+    expect(await rowOfUser("pf-rej")).toMatchObject({ status: "rejected", rejectReason: "ІПН не збігається з реєстром" });
+    expect(await (await OWN()).json()).toMatchObject({ payout: { status: "rejected", rejectReason: "ІПН не збігається з реєстром" } });
+
+    expect((await apply(FORM)).status).toBe(200);
+    expect(await rowOfUser("pf-rej")).toMatchObject({ status: "pending", rejectReason: null });
+    bank.state.receivers = [{ id: "r-rej", edrpou: TAX_ID, name: "ФОП Новий" }];
+    expect((await verify("pf-rej")).status).toBe(200);
+    expect((await reject("pf-rej", "Підозра на чужий рахунок")).status).toBe(200);
+    expect(await rowOfUser("pf-rej")).toMatchObject({ status: "rejected", receiverId: null });
+
+    admin.user = null;
+    expect((await reject("pf-rej", "Причина є")).status).toBe(404);
   });
 
   it("рахунок на оплату бере receiverId зі свіжого списку банку, а не з бази", async () => {
@@ -169,6 +193,14 @@ describe("комісія 7% і ліміти оплати", () => {
     expect(await overLimit("payoutApply", "u-rate", at + 1000)).toBe(true);
     expect(await overLimit("payoutApply", "u-rate", at + 61 * 60_000)).toBe(false);
     expect(await overLimit("payoutApply", "u-other", at)).toBe(false);
+  });
+
+  it("відмови не пишуться в таблицю: настирливий клієнт її не роздуває", async () => {
+    const at = 2_000_000_000;
+    const count = async () => (await getDb().select().from(authAttempts).where(eq(authAttempts.key, "payoutApply:u-flood"))).length;
+    for (let index = 0; index < 5; index++) await overLimit("payoutApply", "u-flood", at);
+    for (let index = 0; index < 50; index++) expect(await overLimit("payoutApply", "u-flood", at + index)).toBe(true);
+    expect(await count()).toBe(5);
   });
 });
 
@@ -261,6 +293,21 @@ describe("грошові рішення модератора: другий фа�
     expect((await decide(deal.id, { action: "refund" })).status).toBe(403);
     expect((await decide(deal.id, { action: "rework" })).status).toBe(200);
     expect(adminMail).not.toHaveBeenCalled();
+  });
+
+  it("один код не працює двічі, а старіший за прийнятий крок відхиляється", async () => {
+    process.env.ADMIN_TOTP_SECRET = SECRET;
+    const first = await disputed();
+    const key = decodeBase32(SECRET)!;
+    const counter = Math.floor(Date.now() / 1000 / 30);
+    // Поточний крок уже взяв попередній тест цього файлу (той самий адміністратор), тож беремо наступний.
+    const used = await totpCode(key, counter + 1);
+    expect((await decide(first.deal.id, { action: "release", totp: used })).status).toBe(200);
+    const second = await disputed();
+    expect((await decide(second.deal.id, { action: "release", totp: used })).status).toBe(403);
+    expect((await decide(second.deal.id, { action: "release", totp: await totpCode(key, counter) })).status).toBe(403);
+    expect((await stageOf(second.deal.id)).status).toBe("disputed");
+    expect(callsFor("invoice/finalize", second.invoiceId)).toBe(0);
   });
 
   it("підбір коду обмежений: після 10 спроб 429", async () => {

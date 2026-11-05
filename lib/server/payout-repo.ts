@@ -21,6 +21,8 @@ export interface OwnPayout {
   taxIdMask: string;
   consentAt: number | null;
   checkedAt: number | null;
+  /** Причина відхилення чи відключення (для статусу `rejected`). */
+  rejectReason: string | null;
 }
 
 export interface PayoutRow extends OwnPayout {
@@ -37,6 +39,7 @@ const toOwn = (row: Row): OwnPayout => ({
   taxIdMask: row.taxIdMask ?? "",
   consentAt: row.consentAt,
   checkedAt: row.checkedAt,
+  rejectReason: row.status === "rejected" ? row.rejectReason : null,
 });
 
 const rowOf = async (userId: string): Promise<Row | null> => (await getDb().select().from(payoutAccounts).where(eq(payoutAccounts.userId, userId)).limit(1))[0] ?? null;
@@ -65,6 +68,7 @@ export const submitPayout = async (userId: string, application: PayoutApplicatio
     consentAt: now,
     accountConfirmedAt: now,
     checkedAt: null,
+    rejectReason: null,
     updatedAt: now,
   };
   await getDb()
@@ -83,6 +87,20 @@ export const listPayoutApplications = async (): Promise<PayoutRow[]> => {
     .orderBy(desc(payoutAccounts.createdAt));
   const list = rows.filter(({ row }) => row.fopName).map(({ row, email }) => ({ ...toOwn(row), userId: row.userId, email, createdAt: row.createdAt }));
   return [...list.filter((item) => item.status === "pending"), ...list.filter((item) => item.status !== "pending")];
+};
+
+export type RejectOutcome = { kind: "rejected"; was: "pending" | "active" | "rejected" } | { kind: "missing" };
+
+/**
+ * Відхиляє заявку чи відключає активний рахунок: статус `rejected`, причина для виконавця, `receiverId`
+ * скидається, тож нові рахунки на оплату по ньому не створюються. Рахунки, що вже виставлені, банк веде сам.
+ * Виконавець бачить причину й може подати заявку знову.
+ */
+export const rejectPayout = async (userId: string, reason: string, now = Date.now()): Promise<RejectOutcome> => {
+  const row = await rowOf(userId);
+  if (!row || !row.fopName) return { kind: "missing" };
+  await getDb().update(payoutAccounts).set({ status: "rejected", rejectReason: reason, receiverId: null, checkedAt: now, updatedAt: now }).where(eq(payoutAccounts.id, row.id));
+  return { kind: "rejected", was: row.status as "pending" | "active" | "rejected" };
 };
 
 /** ІПН виконавця відкритим текстом: лише для звірки з банком, ніколи не віддається назовні. */

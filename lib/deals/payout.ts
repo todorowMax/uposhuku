@@ -45,3 +45,13 @@ export const validatePayoutApplication = (input: unknown): PayoutResult => {
   if (raw.consent !== true) return { ok: false, error: "Потрібна згода з офертою безпечної угоди." };
   return { ok: true, value: { fopName, taxId: normalizeTaxId(taxId) } };
 };
+
+export const REJECT_REASON_MIN = 5;
+export const REJECT_REASON_MAX = 300;
+
+/** Причина відхилення чи відключення: її побачить виконавець. */
+export const checkRejectReason = (value: unknown): { ok: true; reason: string } | { ok: false; error: string } => {
+  const reason = typeof value === "string" ? value.trim().replace(/\s+/g, " ") : "";
+  if (reason.length < REJECT_REASON_MIN || reason.length > REJECT_REASON_MAX) return { ok: false, error: `Вкажіть причину: від ${REJECT_REASON_MIN} до ${REJECT_REASON_MAX} символів.` };
+  return { ok: true, reason };
+};

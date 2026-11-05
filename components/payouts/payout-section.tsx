@@ -63,6 +63,12 @@ export const PayoutSection = () => {
         </p>
       )}
 
+      {form.load === "ready" && payout?.status === "rejected" && (
+        <p className="auth-error" role="status">
+          Заявку відхилено{payout.rejectReason ? `: ${payout.rejectReason}` : "."} Виправте дані й подайте заявку знову.
+        </p>
+      )}
+
       {form.load === "ready" && (!payout || payout.status === "rejected") && (
         <div className="grid gap-3">
           <Field label="Назва ФОП" htmlFor="pe-payout-name" hint="Як у реєстрі, наприклад «ФОП Іваненко Іван Іванович».">
