@@ -96,4 +96,22 @@ describe("GET /api/deals/:id/requisites", () => {
     expect(mine.headers.get("cache-control")).toBe("no-store");
     expect((await body(mine)).requisites?.iban).toBe(IBAN);
   });
+
+  it("qr: true поза продом і false на проді, поки формат НБУ не перевірено", async () => {
+    const deal = await proposeDeal("rr-cust", { requestId: "r2", responseId: "x2", method: "direct", performer: { id: "me-rr-perf", name: "П", avatarIndex: 0, specialty: "", fop: false }, stages: [{ title: "Все", amount: 500, days: 2 }] });
+    if (typeof deal === "string") throw new Error(deal);
+    await actAsPerformer("rr-perf", deal.id, "accept", undefined);
+    session.user = { id: "rr-cust", email: "rr-cust@example.com" };
+    const ask = async () => ((await (await GET_DEAL(new Request("https://findlyfy.test/x"), { params: Promise.resolve({ id: deal.id }) })).json()) as { qr: boolean }).qr;
+    const before = process.env.DEPLOY_ENV;
+    try {
+      process.env.DEPLOY_ENV = "development";
+      expect(await ask()).toBe(true);
+      process.env.DEPLOY_ENV = "production";
+      expect(await ask()).toBe(false);
+    } finally {
+      if (before === undefined) delete process.env.DEPLOY_ENV;
+      else process.env.DEPLOY_ENV = before;
+    }
+  });
 });

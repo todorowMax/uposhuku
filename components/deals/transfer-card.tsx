@@ -80,6 +80,11 @@ export const TransferCard = ({
           <Button variant="secondary" onClick={() => void card.copy("all", requisitesText(state.requisites, amount, card.purpose))} className="w-auto">
             {card.copied === "all" ? "Скопійовано" : "Копіювати всі реквізити"}
           </Button>
+          {card.copyError && (
+            <p role="alert" className="auth-error">
+              {card.copyError}
+            </p>
+          )}
           <span role="status" className="sr-only">
             {card.copied ? "Скопійовано" : ""}
           </span>
@@ -91,12 +96,7 @@ export const TransferCard = ({
           )}
 
           {card.qrLink && (
-            <div className="flex items-center gap-3">
-              <QrImage value={card.qrLink} label={`QR-код для переказу ${PRICE.format(amount)} гривень`} />
-              <p className="pe-hint">
-                QR за форматом НБУ. Сканування в банківських застосунках ще не перевірено: якщо код не читається, скопіюйте реквізити кнопками.
-              </p>
-            </div>
+            <QrImage value={card.qrLink} label={`QR-код для переказу ${PRICE.format(amount)} гривень`} />
           )}
         </div>
       )}

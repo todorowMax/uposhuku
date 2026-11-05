@@ -19,6 +19,8 @@ export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt:
 export interface DealRequisitesDto {
   requisites: Requisites | null;
   mask: string | null;
+  /** Показувати QR: false на проді, поки формат НБУ не перевірено в банках. */
+  qr: boolean;
 }
 
 export const fetchOwnRequisites = () => callApi<OwnRequisitesDto>("/api/requisites");
