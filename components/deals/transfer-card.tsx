@@ -7,7 +7,9 @@
 // спокійний стан «виконавець ще не вказав». Далі «Я оплатив(ла)».
 
 import { Loader2 } from "@/components/icons";
+import { WalletPaySection } from "@/components/wallet/wallet-pay-section";
 import { Button } from "@/components/ui/button";
+import { loadDeals } from "@/lib/deals/client";
 import { groupIban, requisitesText } from "@/lib/deals/transfer";
 import { CopyRow } from "./copy-row";
 import { CryptoTransfer } from "./crypto-transfer";
@@ -19,6 +21,7 @@ const PRICE = new Intl.NumberFormat("uk-UA");
 export const TransferCard = ({
   dealId,
   requestId,
+  stageId,
   dealNumber,
   amount,
   busy,
@@ -26,6 +29,7 @@ export const TransferCard = ({
 }: {
   dealId: string;
   requestId: string;
+  stageId: string;
   dealNumber: string;
   amount: number;
   busy: boolean;
@@ -100,6 +104,10 @@ export const TransferCard = ({
 
           {card.qrLink && (
             <QrImage value={card.qrLink} label={`QR-код для переказу ${PRICE.format(amount)} гривень`} />
+          )}
+
+          {state.wallet && state.requisites.walletAddress && (
+            <WalletPaySection dealId={dealId} stageId={stageId} recipient={state.requisites.walletAddress} onPaid={() => void loadDeals(requestId)} />
           )}
 
           {state.crypto && (state.requisites.usdtTrc20 || state.requisites.binanceId) && (

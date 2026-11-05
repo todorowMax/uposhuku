@@ -14,6 +14,8 @@ export interface OwnRequisitesDto {
   pending: { requisites: Requisites; mask: string; effectiveAt: number } | null;
   /** Чи доступна цій людині оплата USDT: тоді в формі є адреса TRC-20 і Binance ID. */
   crypto: boolean;
+  /** Чи доступне підтвердження адреси гаманця (прапорець `crypto_wallet` і налаштована мережа). */
+  wallet: boolean;
 }
 
 export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt: number };
@@ -25,6 +27,8 @@ export interface DealRequisitesDto {
   crypto: boolean;
   /** Показувати QR: false на проді, поки формат НБУ не перевірено в банках. */
   qr: boolean;
+  /** Чи доступна оплата з гаманця цій людині. */
+  wallet: boolean;
 }
 
 export const fetchOwnRequisites = () => callApi<OwnRequisitesDto>("/api/requisites");

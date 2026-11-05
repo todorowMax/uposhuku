@@ -215,7 +215,26 @@ export const cryptoProofs = sqliteTable(
     amountUnits: text("amount_units").notNull(),
     confirmations: integer("confirmations").notNull(),
     blockTime: integer("block_time").notNull(),
+    /** Мережа оплати: tron (TRC-20 за хешем) або evm (гаманець, мережа з CRYPTO_CHAIN_ID). */
+    chain: text("chain").notNull().default("tron"),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [uniqueIndex("crypto_proofs_hash_idx").on(table.txHash), index("crypto_proofs_deal_idx").on(table.dealId)],
+);
+
+/** Одноразові запити на підпис: людина доводить, що адреса гаманця її. Використаний або прострочений запит не діє. */
+export const walletChallenges = sqliteTable(
+  "wallet_challenges",
+  {
+    nonce: text("nonce").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    address: text("address").notNull(),
+    domain: text("domain").notNull(),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    usedAt: integer("used_at"),
+  },
+  (table) => [index("wallet_challenges_user_idx").on(table.userId, table.createdAt)],
 );

@@ -8,6 +8,6 @@
     "tests/**/*.{ts,tsx}"
   ],
   "ignore": ["config/agent-rules/**", "contracts/**", "lib/crypto/abi/**"],
-  "ignoreDependencies": ["cloudflare"],
+  "ignoreDependencies": ["cloudflare", "@metamask/connect-evm", "@walletconnect/ethereum-provider"],
   "ignoreExportsUsedInFile": true
 }

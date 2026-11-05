@@ -65,6 +65,20 @@ export const saveOwnRequisites = async (userId: string, value: Requisites, now =
   return { kind: "pending", effectiveAt };
 };
 
+export type AttachOutcome = SaveOutcome | { kind: "unchanged" } | { kind: "no_requisites" };
+
+/**
+ * Прикріпити підтверджену підписом адресу гаманця. Вона йде тим самим шляхом, що й зміна реквізитів: чекає
+ * REQUISITES_DELAY_MS і стає поточною при найближчому читанні. Спершу мають бути збережені реквізити.
+ */
+export const attachWalletAddress = async (userId: string, address: string, now = Date.now()): Promise<AttachOutcome> => {
+  const own = await getOwnRequisites(userId, now);
+  const latest = own.pending?.requisites ?? own.requisites;
+  if (!latest) return { kind: "no_requisites" };
+  if (latest.walletAddress?.toLowerCase() === address.toLowerCase()) return { kind: "unchanged" };
+  return saveOwnRequisites(userId, { ...latest, walletAddress: address }, now);
+};
+
 /** Зняти знімок поточних реквізитів виконавця в угоду. Шифротекст копіюємо як є, ключ не потрібен. Повертає, чи знімок є. */
 export const snapshotDealRequisites = async (dealId: string, performerUser: string, now = Date.now()): Promise<boolean> => {
   const db = getDb();

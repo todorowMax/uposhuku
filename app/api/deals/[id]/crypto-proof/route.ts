@@ -6,6 +6,8 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { evaluateTronTransfer, formatUsdt, isTronTxHash, readTronChain, TRON_REJECTION_TEXT, tronscanLink, TronUnavailableError, type TronVerdict } from "@/lib/crypto/tron";
+import { evmExplorerLink } from "@/lib/crypto/chains";
+import { cryptoConfig } from "@/lib/server/crypto-config";
 import { currentStage } from "@/lib/deals/machine";
 import { performerIdOf } from "@/lib/deals/parties";
 import { getSessionUser } from "@/lib/server/auth";
@@ -75,7 +77,8 @@ export const GET = async (request: Request, { params }: { params: Promise<{ id: 
     const deal = await getDealById((await params).id);
     const isParty = deal && ((await getDealForOwner(deal.id, user.id)) !== null || deal.performer.id === performerIdOf(user.id));
     if (!deal || !isParty) return problem(404, "Угоду не знайдено");
-    const proofs = (await listDealProofs(deal.id)).map((item) => ({ stageId: item.stageId, amount: formatUsdt(item.amountUnits), from: item.fromAddress, confirmations: item.confirmations, explorerUrl: tronscanLink(item.txHash) }));
+    const chainId = cryptoConfig()?.chainId;
+    const proofs = (await listDealProofs(deal.id)).map((item) => ({ stageId: item.stageId, amount: formatUsdt(item.amountUnits), from: item.fromAddress, confirmations: item.confirmations, chain: item.chain, explorerUrl: item.chain === "evm" ? evmExplorerLink(chainId ?? 0, item.txHash) : tronscanLink(item.txHash) }));
     return Response.json({ proofs }, { headers: HEADERS });
   } catch (error) {
     return failure(error, request);

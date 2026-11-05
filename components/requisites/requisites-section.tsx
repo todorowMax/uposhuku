@@ -9,6 +9,8 @@ import type { KeyboardEvent } from "react";
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
+import { WalletAddressSection } from "@/components/wallet/wallet-address-section";
+import { useCryptoConfig } from "@/components/wallet/use-crypto-config";
 import { PAY_URL_HOSTS } from "@/lib/deals/requisites";
 import { useRequisitesForm } from "./use-requisites-form";
 
@@ -16,6 +18,7 @@ const WHEN = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", h
 
 export const RequisitesSection = () => {
   const form = useRequisitesForm();
+  const walletConfig = useCryptoConfig();
   const { own, fields, busy, error, notice } = form;
   const onEnter = (event: KeyboardEvent) => {
     // Розділ стоїть усередині форми профілю: Enter не має зберігати профіль.
@@ -118,6 +121,10 @@ export const RequisitesSection = () => {
             )}
           </div>
         </div>
+      )}
+
+      {form.load === "ready" && !form.editing && own?.wallet && walletConfig && (own.requisites || own.pending) && (
+        <WalletAddressSection config={walletConfig} current={own.requisites?.walletAddress} pending={own.pending?.requisites.walletAddress} onDone={() => void form.reload()} />
       )}
 
       {notice && (

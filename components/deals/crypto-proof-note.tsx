@@ -12,11 +12,16 @@ export const CryptoProofNote = ({ dealId, stageId }: { dealId: string; stageId: 
   if (!proof) return null;
   return (
     <p className="deal-note" role="status">
-      Замовник надіслав {proof.amount} USDT (TRC-20), мережа підтвердила переказ.{" "}
-      <a href={proof.explorerUrl} target="_blank" rel="noopener noreferrer" className="auth-link">
-        Переглянути в Tronscan
-      </a>
-      . Перевірте надходження й підтвердьте.
+      Замовник надіслав {proof.amount} USDT ({proof.chain === "evm" ? "з гаманця" : "TRC-20"}), мережа підтвердила переказ.{" "}
+      {proof.explorerUrl && (
+        <>
+          <a href={proof.explorerUrl} target="_blank" rel="noopener noreferrer" className="auth-link">
+            Переглянути в оглядачі
+          </a>
+          .{" "}
+        </>
+      )}
+      Перевірте надходження й підтвердьте.
     </p>
   );
 };

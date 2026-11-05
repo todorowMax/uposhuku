@@ -651,6 +651,7 @@ function StageActions({
       <TransferCard
         dealId={deal.id}
         requestId={deal.requestId}
+        stageId={stage.id}
         dealNumber={deal.number}
         amount={stage.amount}
         busy={busy === "claim_paid"}

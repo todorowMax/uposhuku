@@ -15,6 +15,8 @@ export interface Requisites {
   usdtTrc20?: string;
   /** Binance ID (цифри) для переказу всередині Binance. Перевірити оплату на ньому неможливо. */
   binanceId?: string;
+  /** Адреса EVM-гаманця для USDT, підтверджена підписом. Ставиться лише сервером після перевірки підпису, з форми не приймається. */
+  walletAddress?: string;
 }
 
 export type RequisitesResult = { ok: true; value: Requisites } | { ok: false; error: string };
@@ -97,6 +99,12 @@ export const isValidBinanceId = (value: string): boolean => /^\d{5,15}$/.test(va
 /** Ці поля показуються й зберігаються лише там, де ввімкнено крипто-оплату за хешем. */
 export const withoutCrypto = (value: Requisites): Requisites => {
   const { usdtTrc20: _usdt, binanceId: _binance, ...rest } = value;
+  return rest;
+};
+
+/** Підтверджена адреса гаманця показується й зберігається лише там, де ввімкнено оплату з гаманця. */
+export const withoutWallet = (value: Requisites): Requisites => {
+  const { walletAddress: _wallet, ...rest } = value;
   return rest;
 };
 

@@ -73,3 +73,17 @@ ADMIN_DEV_LOGIN=
 # наприклад `openssl rand 20 | base32`, і додати в застосунок-автентифікатор. На проді без нього ці рішення недоступні.
 # `wrangler secret put ADMIN_TOTP_SECRET --env development|production`.
 ADMIN_TOTP_SECRET=
+
+# Оплати USDT з гаманця (EVM), прапорці crypto_wallet і crypto_escrow. Немає потрібної адреси: функція вимкнена, хоч би що стояло в прапорці.
+# Мережа: 42161 (Arbitrum One), 137 (Polygon), 31337 (локальний Hardhat) тощо.
+CRYPTO_CHAIN_ID=
+# АДРЕСУ ТОКЕНА НЕ БРАТИ З ПАМ'ЯТІ: звірити зі сторінкою Tether (tether.to/en/supported-protocols) для обраної мережі. Це заглушка.
+CRYPTO_TOKEN_ADDRESS=0x0000000000000000000000000000000000000a11
+# FeeRouter: є, тоді прямий платіж іде через нього з комісією; порожньо: звичайний transfer без комісії.
+CRYPTO_ROUTER_ADDRESS=
+# EscrowFactory: без неї ескроу вимкнено.
+CRYPTO_FACTORY_ADDRESS=
+# RPC для перевірки транзакцій на сервері (https; http лише для localhost). Може містити ключ провайдера: секрет, у браузер не віддається.
+CRYPTO_RPC_URL=
+# Project ID із Reown (WalletConnect), публічний, у збірку: прив'язати до своїх доменів. Без нього WalletConnect у списку немає.
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=

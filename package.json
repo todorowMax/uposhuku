@@ -14,6 +14,7 @@
     "deadcode": "knip --include files,dependencies,unlisted,unresolved",
     "test": "npm run test:unit",
     "test:unit": "vitest run --config vitest.config.mts tests/unit",
+    "test:chain": "tsx scripts/e2e-wallet.ts",
     "test:unit:watch": "vitest --config vitest.config.mts tests/unit",
     "clean:build": "rm -rf .next .open-next tsconfig.tsbuildinfo",
     "precf:build": "node scripts/copy-maplibre-worker.mjs",
@@ -47,8 +48,11 @@
     "db:unseed:development": "tsx scripts/seed-dev.ts --clean && wrangler d1 execute DB --remote --env development --file .cache/seed.sql"
   },
   "dependencies": {
+    "@metamask/connect-evm": "2.1.0",
     "@opennextjs/cloudflare": "^1.20.13",
     "@tailwindcss/postcss": "^4.3.3",
+    "@tanstack/react-query": "5.106.1",
+    "@walletconnect/ethereum-provider": "2.21.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "drizzle-orm": "^0.45.3",
@@ -67,6 +71,8 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "uqr": "^0.1.3",
+    "viem": "2.57.16",
+    "wagmi": "3.7.11",
     "zod": "^4.6.5"
   },
   "devDependencies": {

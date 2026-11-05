@@ -16,6 +16,9 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Map: MapLibre GL in a globe projection (`lib/map`, `components/map`, `components/maplibre`).
 - Data: Drizzle ORM on Cloudflare D1 (`db/`, migrations in `db/migrations`), a second D1 for telemetry
   (`kit/telemetry`), R2 for uploads. Validation: zod.
+- Wallets: wagmi 3 + viem + react-query (`components/wallet`, `lib/crypto/pay-flow.ts`). They load only through
+  `next/dynamic` in the payment and requisites panels; nothing imports them on the home page or the map. The
+  end-to-end check against a local Hardhat node is `npm run test:chain` (needs `contracts` built).
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
 - Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
 - `@next/eslint-plugin-next` follows the Next major (`^16.4.3`); the shared lint config in
