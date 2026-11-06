@@ -3,17 +3,17 @@
 // components/deals/release-code-box.tsx
 //
 // Приймання етапу від 10 000 ₴: виплата необоротна, тому перед нею код з пошти замовника. Дві дії: надіслати код,
-// ввести його й підтвердити. Помилки сервера (невірний, застарілий код) показуємо поруч із полем.
+// ввести його й підтвердити. Показується у шторці. Помилки сервера (невірний, застарілий код) показуємо поруч із полем.
 
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { useReleaseCode } from "./use-release-code";
 
-export const ReleaseCodeBox = ({ dealId, amount, busy, onConfirm, onCancel }: { dealId: string; amount: string; busy: boolean; onConfirm: (code: string) => Promise<boolean>; onCancel: () => void }) => {
+export const ReleaseCodeBox = ({ dealId, amount, busy, onConfirm }: { dealId: string; amount: string; busy: boolean; onConfirm: (code: string) => Promise<boolean> }) => {
   const form = useReleaseCode(dealId, onConfirm);
   return (
-    <div className="deal-box grid gap-2">
+    <div className="grid gap-2">
       <p className="text-sm text-ink">Виплатити {amount} виконавцю? Скасувати це не вийде. Для великих сум підтверджуємо кодом, який надішлемо на вашу пошту.</p>
       {!form.sent ? (
         <Button variant="offer" disabled={form.sending} onClick={() => void form.send()}>
@@ -39,9 +39,6 @@ export const ReleaseCodeBox = ({ dealId, amount, busy, onConfirm, onCancel }: { 
           {form.error}
         </p>
       )}
-      <Button variant="secondary" onClick={onCancel} className="w-auto">
-        Назад
-      </Button>
     </div>
   );
 };

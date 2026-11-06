@@ -6,9 +6,10 @@
 // подає назву ФОП, ІПН і підтверджує рахунок у monobank. Стани: завантаження, помилка з повтором, форма, заявка
 // чекає перевірки, підключено. Розділу немає, поки безпечна угода вимкнена.
 
-import type { KeyboardEvent } from "react";
+import { useState } from "react";
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { Screen } from "@/components/ui/screen";
 import { CheckboxField } from "@/components/ui/checkbox";
 import { Field, Input } from "@/components/ui/input";
 import { OFFER_PATH } from "@/lib/deals/payout";
@@ -17,12 +18,7 @@ import { usePayoutForm } from "./use-payout-form";
 export const PayoutSection = () => {
   const form = usePayoutForm();
   const { state, fields } = form;
-  const onEnter = (event: KeyboardEvent) => {
-    // Розділ стоїть усередині форми профілю: Enter не має зберігати профіль.
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    void form.submit();
-  };
+  const [open, setOpen] = useState(false);
   if (form.load === "ready" && !state?.available) return null;
   const payout = state?.payout;
 
@@ -70,37 +66,53 @@ export const PayoutSection = () => {
       )}
 
       {form.load === "ready" && (!payout || payout.status === "rejected") && (
-        <div className="grid gap-3">
-          <Field label="Назва ФОП" htmlFor="pe-payout-name" hint="Як у реєстрі, наприклад «ФОП Іваненко Іван Іванович».">
-            <Input id="pe-payout-name" autoComplete="organization" value={fields.fopName} maxLength={100} onChange={(event) => form.setField("fopName", event.target.value)} onKeyDown={onEnter} />
-          </Field>
-          <Field label="ІПН" htmlFor="pe-payout-tax" hint="10 цифр. Ми зберігаємо його зашифрованим.">
-            <Input id="pe-payout-tax" autoComplete="off" inputMode="numeric" value={fields.taxId} maxLength={12} className="tabular-nums" onChange={(event) => form.setField("taxId", event.target.value)} onKeyDown={onEnter} />
-          </Field>
-          <CheckboxField id="pe-payout-account" checked={fields.accountConfirmed} onCheckedChange={(value) => form.setField("accountConfirmed", value === true)} label="Рахунок цього ФОП відкрито в monobank" />
-          <CheckboxField
-            id="pe-payout-consent"
-            checked={fields.consent}
-            onCheckedChange={(value) => form.setField("consent", value === true)}
-            label={
-              <>
-                Погоджуюся з{" "}
-                <a href={OFFER_PATH} target="_blank" rel="noreferrer" className="auth-link">
-                  офертою безпечної угоди
-                </a>
-              </>
-            }
-          />
-          {form.error && (
-            <p role="alert" className="auth-error">
-              {form.error}
-            </p>
-          )}
-          <Button disabled={form.busy} onClick={() => void form.submit()} className="w-auto px-5">
-            {form.busy && <Loader2 className="size-4 animate-spin" />}
-            Подати заявку
+        <>
+          <Button variant="secondary" onClick={() => setOpen(true)} className="w-auto px-5">
+            {payout ? "Подати заявку знову" : "Підключити виплати"}
           </Button>
-        </div>
+          <Screen
+            open={open}
+            onOpenChange={setOpen}
+            title="Виплати за безпечну угоду"
+            desktop="dialog"
+            footer={
+              <div className="grid gap-2">
+                {form.error && (
+                  <p role="alert" className="auth-error">
+                    {form.error}
+                  </p>
+                )}
+                <Button disabled={form.busy} onClick={() => void form.submit().then((done) => done && setOpen(false))} className="w-full">
+                  {form.busy && <Loader2 className="size-4 animate-spin" />}
+                  Подати заявку
+                </Button>
+              </div>
+            }
+          >
+            <div className="grid gap-3">
+              <Field label="Назва ФОП" htmlFor="pe-payout-name" hint="Як у реєстрі, наприклад «ФОП Іваненко Іван Іванович».">
+                <Input id="pe-payout-name" autoComplete="organization" value={fields.fopName} maxLength={100} onChange={(event) => form.setField("fopName", event.target.value)} />
+              </Field>
+              <Field label="ІПН" htmlFor="pe-payout-tax" hint="10 цифр. Ми зберігаємо його зашифрованим.">
+                <Input id="pe-payout-tax" autoComplete="off" inputMode="numeric" value={fields.taxId} maxLength={12} className="tabular-nums" onChange={(event) => form.setField("taxId", event.target.value)} />
+              </Field>
+              <CheckboxField id="pe-payout-account" checked={fields.accountConfirmed} onCheckedChange={(value) => form.setField("accountConfirmed", value === true)} label="Рахунок цього ФОП відкрито в monobank" />
+              <CheckboxField
+                id="pe-payout-consent"
+                checked={fields.consent}
+                onCheckedChange={(value) => form.setField("consent", value === true)}
+                label={
+                  <>
+                    Погоджуюся з{" "}
+                    <a href={OFFER_PATH} target="_blank" rel="noreferrer" className="auth-link">
+                      офертою безпечної угоди
+                    </a>
+                  </>
+                }
+              />
+            </div>
+          </Screen>
+        </>
       )}
     </section>
   );

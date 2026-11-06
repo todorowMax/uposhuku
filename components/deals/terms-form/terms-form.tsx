@@ -6,8 +6,6 @@
 // під холд). Платить завжди замовник; виконавець отримує свою ціну повністю, а замовник у безпечній угоді
 // доплачує комісії платформи й банку. Показується на екрані (шар «екран»).
 
-import { Loader2 } from "@/components/icons";
-import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { AcceptedMethods } from "@/components/deals/accepted-methods";
@@ -16,16 +14,20 @@ import { CriteriaField } from "@/components/deals/criteria-field";
 import { DisputeTips } from "@/components/deals/dispute-tips";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
 import { StagesEditor } from "@/components/deals/stages-editor";
-import type { ConversationDto } from "@/lib/chat/types";
 import { money, moneyIn } from "@/lib/deals/format";
 import { COMMISSION_RATE, formatKop } from "@/lib/deals/price";
 import { HOLD_DAYS, currencyOfMethod } from "@/lib/deals/types";
-import { useTermsForm } from "./use-terms-form";
+import type { useTermsForm } from "./use-terms-form";
 
 const CURRENCY_SIGN = { UAH: "₴", USDT: "USDT" } as const;
 
-export const TermsForm = ({ conversation, onDone, onCancel }: { conversation: Pick<ConversationDto, "id" | "performerId">; onDone: () => void; onCancel: () => void }) => {
-  const { ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, busy, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal, submit } = useTermsForm(conversation, onDone);
+export namespace TermsFormTypes {
+  export type Value = ReturnType<typeof useTermsForm>;
+}
+
+/** Поля умов; кнопка «Надіслати» стоїть у закріпленому низу екрана (terms-screen.tsx). */
+export const TermsForm = ({ form }: { form: TermsFormTypes.Value }) => {
+  const { ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal } = form;
   return (
     <div className="deal terms-form">
       <p className="auth-lead">
@@ -150,20 +152,6 @@ export const TermsForm = ({ conversation, onDone, onCancel }: { conversation: Pi
       )}
 
       <DisputeTips />
-      {error && (
-        <p role="alert" className="auth-error">
-          {error}
-        </p>
-      )}
-      <div className="flex items-center gap-3">
-        <Button onClick={() => void submit()} disabled={busy} className="px-5">
-          {busy && <Loader2 className="size-4 animate-spin" />}
-          Надіслати умови
-        </Button>
-        <Button variant="link" onClick={onCancel} className="text-sm">
-          Скасувати
-        </Button>
-      </div>
       {problem &&
         !error &&
         amountNumber > 0 &&

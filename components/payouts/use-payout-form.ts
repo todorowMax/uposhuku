@@ -57,16 +57,21 @@ export const usePayoutForm = () => {
     setError(null);
   };
 
-  const submit = async () => {
+  const submit = async (): Promise<boolean> => {
     const checked = validatePayoutApplication(fields);
-    if (!checked.ok) return setError(checked.error);
+    if (!checked.ok) {
+      setError(checked.error);
+      return false;
+    }
     setBusy(true);
     setError(null);
     try {
       setState(await submitPayoutApplication(checked.value));
       setFields(EMPTY);
+      return true;
     } catch (reason) {
       setError(REASON(reason, "Не вдалося подати заявку."));
+      return false;
     } finally {
       setBusy(false);
     }

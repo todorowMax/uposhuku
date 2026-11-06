@@ -9,6 +9,7 @@ import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Screen } from "@/components/ui/screen";
 import { ComplaintBox } from "@/components/deals/complaint-box";
+import { loadDeals } from "@/lib/deals/client";
 import { complaintStageError } from "@/lib/deals/complaints";
 import { paymentReturnStore } from "@/lib/deals/use-payment-return";
 import { formatKop, quoteStage } from "@/lib/deals/price";
@@ -19,7 +20,11 @@ import { useStore } from "@/lib/store";
 import { CustomerStageActions } from "./parts/customer-stage-actions";
 import { DealSummary } from "./parts/deal-summary";
 import { PerformerStageActions } from "./parts/performer-stage-actions";
+import { DeliveryScreen } from "./parts/delivery-screen";
+import { EscrowScreen } from "./parts/escrow-screen";
+import { PaymentScreen } from "./parts/payment-screen";
 import { ProposalNotice } from "./parts/proposal-notice";
+import { ReleaseSheet } from "./parts/release-sheet";
 import { ReviewForm } from "./parts/review-form";
 import { StageTimeline } from "./parts/stage-timeline";
 import { useDealScreen } from "./use-deal-screen";
@@ -82,6 +87,33 @@ export const DealScreen = ({ deal, role, open, onOpenChange, onChanged }: DealSc
         {deal.status === "accepted" && stage && !complaintStageError(deal, stage) && <ComplaintBox dealId={deal.id} stageId={stage.id} />}
         {deal.status === "completed" && role === "customer" && <ReviewForm dealId={deal.id} performerName={deal.performer.name} />}
       </div>
+      {stage && <ReleaseSheet deal={deal} stage={stage} screen={screen} />}
+      {screen.delivering && stage && (
+        <DeliveryScreen
+          dealId={deal.id}
+          busy={screen.busy === "deliver"}
+          onOpenChange={screen.setDelivering}
+          onSubmit={async (fields) => {
+            if (await screen.act("deliver", fields)) screen.setDelivering(false);
+          }}
+        />
+      )}
+      {screen.escrowOpen && stage && deal.method === "escrow" && (
+        <EscrowScreen deal={deal} stage={stage} side={role} onOpenChange={screen.setEscrowOpen} onChanged={() => void loadDeals(deal.requestId)} />
+      )}
+      {screen.paying && stage?.status === "pending" && (
+        <PaymentScreen
+          deal={deal}
+          stage={stage}
+          busy={screen.busy === "claim_paid"}
+          onOpenChange={screen.setPaying}
+          onClaim={async (via) => {
+            const done = await screen.run("claim_paid", stage, { via });
+            if (done) screen.setPaying(false);
+            return done;
+          }}
+        />
+      )}
     </Screen>
   );
 };

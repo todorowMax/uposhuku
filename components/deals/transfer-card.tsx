@@ -4,36 +4,31 @@
 //
 // Картка прямого переказу в угоді. Способи оплати (банк, USDT, гаманець, Binance ID, PayPal, Wise) беремо зі
 // знімка угоди (lib/server/requisites-repo): кілька способів це вкладки, один спосіб без перемикача. Немає
-// жодного: спокійний стан «виконавець ще не вказав». Далі «Я оплатив(ла)» із вибраним способом.
+// жодного: спокійний стан «виконавець ще не вказав». «Я оплатив(ла)» стоїть унизу екрана оплати (payment-screen.tsx).
 
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { isPaymentMethod, METHOD_LABEL, type PaymentMethod } from "@/lib/deals/requisites";
+import { isPaymentMethod, METHOD_LABEL } from "@/lib/deals/requisites";
 import { DisputeTips } from "./dispute-tips";
 import { MethodPanel } from "./method-panels";
-import { useTransferCard } from "./use-transfer-card";
+import type { useTransferCard } from "./use-transfer-card";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 
 export const TransferCard = ({
+  card,
   dealId,
   requestId,
   stageId,
-  dealNumber,
   amount,
-  busy,
-  onClaim,
 }: {
+  card: ReturnType<typeof useTransferCard>;
   dealId: string;
   requestId: string;
   stageId: string;
-  dealNumber: string;
   amount: number;
-  busy: boolean;
-  onClaim: (via?: PaymentMethod) => Promise<boolean>;
 }) => {
-  const card = useTransferCard(dealId, dealNumber, amount);
   const { state } = card;
 
   return (
@@ -106,9 +101,6 @@ export const TransferCard = ({
 
       <p className="pe-hint mt-3">Платформа не отримує ці гроші й не повертає їх. Реквізити зафіксовано на момент прийняття угоди.</p>
       <DisputeTips />
-      <Button variant="offer" disabled={busy || state.kind === "loading"} onClick={() => void onClaim(card.via ?? undefined)} className="mt-3 w-full">
-        {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
-      </Button>
     </div>
   );
 };

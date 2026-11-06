@@ -10,16 +10,10 @@ import { Button } from "@/components/ui/button";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { DeliveryNote } from "@/components/deals/delivery-note";
 import { ReceiptBox } from "@/components/deals/receipt-box";
-import { ReleaseCodeBox } from "@/components/deals/release-code-box";
-import { TransferCard } from "@/components/deals/transfer-card";
-import { EscrowSection } from "@/components/wallet/escrow-section";
-import { loadDeals } from "@/lib/deals/client";
-import { money } from "@/lib/deals/format";
-import { releaseNeedsCode } from "@/lib/deals/limits";
-import { payoutOf } from "@/lib/deals/machine";
 import { formatKop, quoteStage } from "@/lib/deals/price";
 import { HOLD_DAYS, type Deal, type DealStage } from "@/lib/deals/types";
 import type { DealScreenState } from "../use-deal-screen";
+import { EscrowEntry } from "./escrow-entry";
 
 const DATE = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 
@@ -47,80 +41,25 @@ const PayExplain = ({ stage }: { stage: DealStage }) => {
   );
 };
 
-const Delivered = ({ deal, stage, screen }: { deal: Deal; stage: DealStage; screen: DealScreenState.Value }) => {
-  const safe = deal.method === "safe";
-  const { busy } = screen;
-  if (screen.confirmRelease && safe && releaseNeedsCode(stage.amount)) {
-    return (
-      <div className="grid gap-2">
-        <DeliveryNote delivery={stage.delivery} />
-        <ReleaseCodeBox
-          dealId={deal.id}
-          amount={money(payoutOf(stage.amount))}
-          busy={busy === "release"}
-          onConfirm={(code) => screen.run("release", stage, { code })}
-          onCancel={() => screen.setConfirmRelease(false)}
-        />
-      </div>
-    );
-  }
-  if (screen.confirmRelease) {
-    return (
-      <>
-        {/* Результат лишається на екрані, поки людина підтверджує приймання. */}
-        <DeliveryNote delivery={stage.delivery} />
-        <div className="deal-box">
-          <p className="text-sm text-ink">
-            {safe ? `Виплатити ${money(payoutOf(stage.amount))} виконавцю?` : "Підтвердити, що роботу прийнято?"} Скасувати це не вийде.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <Button variant="offer" disabled={busy === "release"} onClick={() => void screen.run("release", stage)} className="flex-1">
-              {busy === "release" && <Loader2 className="size-4 animate-spin" />}
-              Так, все добре
-            </Button>
-            <Button variant="quiet" onClick={() => screen.setConfirmRelease(false)}>
-              Ні
-            </Button>
-          </div>
-        </div>
-      </>
-    );
-  }
-  return (
-    <div className="mt-2 flex flex-wrap gap-2">
-      <DeliveryNote delivery={stage.delivery} />
-      {stage.payoutError && (
-        <p role="alert" className="auth-error w-full">
-          {stage.payoutError}
-        </p>
-      )}
-      {safe && (
-        <Button variant="quiet" disabled={busy === "dispute"} onClick={() => void screen.run("dispute", stage)}>
-          Є претензії
-        </Button>
-      )}
-    </div>
-  );
-};
+const Delivered = ({ deal, stage, screen }: { deal: Deal; stage: DealStage; screen: DealScreenState.Value }) => (
+  <div className="mt-2 flex flex-wrap gap-2">
+    <DeliveryNote delivery={stage.delivery} />
+    {stage.payoutError && (
+      <p role="alert" className="auth-error w-full">
+        {stage.payoutError}
+      </p>
+    )}
+    {deal.method === "safe" && (
+      <Button variant="quiet" disabled={screen.busy === "dispute"} onClick={() => void screen.run("dispute", stage)}>
+        Є претензії
+      </Button>
+    )}
+  </div>
+);
 
-const Pending = ({ deal, stage, screen }: { deal: Deal; stage: DealStage; screen: DealScreenState.Value }) => {
+const Pending = ({ deal, stage }: { deal: Deal; stage: DealStage }) => {
   if (deal.method === "safe") return <PayExplain stage={stage} />;
-  return (
-    <>
-      <TransferCard
-        dealId={deal.id}
-        requestId={deal.requestId}
-        stageId={stage.id}
-        dealNumber={deal.number}
-        amount={stage.amount}
-        busy={screen.busy === "claim_paid"}
-        onClaim={(via) => screen.run("claim_paid", stage, { via })}
-      />
-      <div className="mt-2">
-        <ReceiptBox deal={deal} stage={stage} />
-      </div>
-    </>
-  );
+  return <p className="pe-hint">Оплата прямим переказом: реквізити, спосіб оплати й «Я оплатив(ла)» на екрані оплати. Кнопка «Оплатити» внизу.</p>;
 };
 
 const Claimed = ({ deal, stage }: { deal: Deal; stage: DealStage }) => (
@@ -163,10 +102,10 @@ const Disputed = () => (
 );
 
 export const CustomerStageActions = ({ deal, stage, screen }: { deal: Deal; stage: DealStage; screen: DealScreenState.Value }) => {
-  if (deal.method === "escrow") return <EscrowSection deal={deal} stage={stage} side="customer" onChanged={() => void loadDeals(deal.requestId)} />;
+  if (deal.method === "escrow") return <EscrowEntry stage={stage} onOpen={() => screen.setEscrowOpen(true)} />;
   switch (stage.status) {
     case "pending":
-      return <Pending deal={deal} stage={stage} screen={screen} />;
+      return <Pending deal={deal} stage={stage} />;
     case "claimed":
       return <Claimed deal={deal} stage={stage} />;
     case "funded":

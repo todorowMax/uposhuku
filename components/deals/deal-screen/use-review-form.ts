@@ -16,6 +16,7 @@ export const useReviewForm = (dealId: string) => {
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
   const textRef = useAutoGrow(text, 8);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,5 +43,5 @@ export const useReviewForm = (dealId: string) => {
     }
   };
 
-  return { existing, stars, setStars, shown: hover || stars, setHover, text, setText, textRef, busy, error, submit };
+  return { existing, stars, setStars, shown: hover || stars, setHover, text, setText, textRef, busy, error, submit, open, setOpen };
 };

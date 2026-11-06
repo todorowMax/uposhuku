@@ -3,10 +3,12 @@
 // components/requisites/requisites-section.tsx
 //
 // Розділ кабінету виконавця «Реквізити для прямого переказу». Стани: завантаження, помилка з повтором,
-// порожньо (форма), збережено (маска й кнопка «Змінити»), чекає зміна (дата вступу). Логіка в хуку.
+// порожньо (форма), збережено (маска й кнопка «Змінити»), чекає зміна (дата вступу). Форма відкривається на екрані. Логіка в хуку.
 
+import { useState } from "react";
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { Screen } from "@/components/ui/screen";
 import { WalletAddressSection } from "@/components/wallet/wallet-address-section";
 import { useCryptoConfig } from "@/components/wallet/use-crypto-config";
 import { MethodsForm } from "./methods-form";
@@ -19,6 +21,16 @@ export const RequisitesSection = () => {
   const form = useRequisitesForm();
   const walletConfig = useCryptoConfig();
   const { own, busy, error, notice } = form;
+  // Форма живе на екрані: відкриває її кнопка, закриває «←» (без збереження) або успішне збереження.
+  const [open, setOpen] = useState(false);
+  const openForm = () => {
+    form.startEditing();
+    setOpen(true);
+  };
+  const closeForm = () => {
+    form.cancelEditing();
+    setOpen(false);
+  };
   // Підтвердження гаманця живе в зоні «Крипта» збережених способів, не окремим блоком.
   const cryptoZone =
     own?.wallet && walletConfig && (own.requisites || own.pending) ? (
@@ -52,7 +64,7 @@ export const RequisitesSection = () => {
         </div>
       )}
 
-      {form.load === "ready" && !form.editing && own && (
+      {form.load === "ready" && own && (
         <div className="grid gap-2">
           <div className="text-xs leading-snug">
             {own.requisites && <SavedMethods requisites={own.requisites} mask={own.mask} crypto={cryptoZone} />}
@@ -62,36 +74,38 @@ export const RequisitesSection = () => {
               Нові способи оплати ({own.pending.mask}) набудуть чинності {WHEN.format(own.pending.effectiveAt)}. До того діють попередні.
             </p>
           )}
-          <Button variant="secondary" onClick={form.startEditing} className="w-auto">
-            Змінити способи оплати
+          <Button variant="secondary" onClick={openForm} className="w-auto">
+            {own.requisites || own.pending ? "Змінити способи оплати" : "Додати способи оплати"}
           </Button>
         </div>
       )}
 
-      {form.load === "ready" && form.editing && (
+      <Screen
+        open={open && form.editing}
+        onOpenChange={(next) => !next && closeForm()}
+        title="Способи оплати"
+        desktop="dialog"
+        footer={
+          <div className="grid gap-2">
+            {error && (
+              <p role="alert" className="auth-error">
+                {error}
+              </p>
+            )}
+            <Button disabled={busy} onClick={() => void form.save()} className="w-full">
+              {busy && <Loader2 className="size-4 animate-spin" />}
+              Зберегти
+            </Button>
+          </div>
+        }
+      >
         <div className="grid gap-3">
           <MethodsForm form={form} crypto={own?.crypto ?? false} foreign={own?.foreign ?? false} />
           {own?.requisites && !own.pending && (
             <p className="pe-hint">Зміна набуде чинності через 24 години, а на пошту прийде лист: так ніхто не підмінить рахунок непомітно. Відкриті угоди лишаються зі старими реквізитами.</p>
           )}
-          {error && (
-            <p role="alert" className="auth-error">
-              {error}
-            </p>
-          )}
-          <div className="flex items-center gap-3">
-            <Button disabled={busy} onClick={() => void form.save()} className="w-auto px-5">
-              {busy && <Loader2 className="size-4 animate-spin" />}
-              Зберегти
-            </Button>
-            {(own?.requisites || own?.pending) && (
-              <Button variant="secondary" disabled={busy} onClick={form.cancelEditing} className="w-auto">
-                Скасувати
-              </Button>
-            )}
-          </div>
         </div>
-      )}
+      </Screen>
 
       {notice && (
         <p role="status" className="pe-notice">

@@ -1,14 +1,13 @@
 "use client";
 
-// components/chat/inbox/tsx
+// components/chat/inbox/thread.tsx
 //
 // Открита розмова: шапка, рядок угоди (56 px), стрічка, поле повідомлення і шари над чатом: шторки (список угод,
 // «+») та екрани (угода, умови, пропозиція за відгуком).
 
-import { DealComposer } from "@/components/deals/deal-composer/deal-composer";
+import { DealComposerScreen } from "@/components/deals/deal-composer/deal-composer-screen";
 import { DealScreen } from "@/components/deals/deal-screen/deal-screen";
-import { TermsForm } from "@/components/deals/terms-form/terms-form";
-import { Screen } from "@/components/ui/screen";
+import { TermsScreen } from "@/components/deals/terms-form/terms-screen";
 import { CHAT_PHOTOS_MAX, type ConversationDto } from "@/lib/chat/types";
 import { AttachSheet } from "./parts/attach-sheet";
 import { Composer } from "./parts/composer";
@@ -75,27 +74,24 @@ export const Thread = ({
 
       {selectedDeal && <DealScreen deal={selectedDeal} role={role} open onOpenChange={closeScreen} onChanged={apply} />}
       {screen?.kind === "terms" && (
-        <Screen open onOpenChange={closeScreen} title="Оформити умови" desktop="panel">
-          <TermsForm
-            conversation={conversation}
-            onDone={() => {
-              setScreen(null);
-              reload();
-            }}
-            onCancel={() => setScreen(null)}
-          />
-        </Screen>
+        <TermsScreen
+          conversation={conversation}
+          onOpenChange={closeScreen}
+          onDone={() => {
+            setScreen(null);
+            reload();
+          }}
+        />
       )}
       {screen?.kind === "composer" && response && (
-        <Screen open onOpenChange={closeScreen} title="Запропонувати угоду" desktop="panel">
-          <DealComposer
-            response={response}
-            onDone={(deal) => {
-              apply(deal);
-              openScreenAfterClose({ kind: "deal", id: deal.id });
-            }}
-          />
-        </Screen>
+        <DealComposerScreen
+          response={response}
+          onOpenChange={closeScreen}
+          onDone={(deal) => {
+            apply(deal);
+            openScreenAfterClose({ kind: "deal", id: deal.id });
+          }}
+        />
       )}
     </>
   );

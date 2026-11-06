@@ -21,14 +21,19 @@ export namespace DealScreenState {
 }
 
 /** Кроки, що виконуються закріпленою кнопкою внизу; решта кроків має власні елементи в тілі екрана. */
-const FOOTER_STEPS = new Set<NextStepTypes.Action>(["accept", "pay", "release", "confirm_paid"]);
+const FOOTER_STEPS = new Set<NextStepTypes.Action>(["accept", "pay", "claim", "release", "confirm_paid", "deliver", "open"]);
 
 const reason = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
 export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options) => {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Шторка підтвердження приймання й екран оплати переказом: обидва відкриває закріплена кнопка.
   const [confirmRelease, setConfirmRelease] = useState(false);
+  const [paying, setPaying] = useState(false);
+  // Екрани здачі етапу й ескроу відкривають закріплена кнопка або кнопка в етапі.
+  const [delivering, setDelivering] = useState(false);
+  const [escrowOpen, setEscrowOpen] = useState(false);
   const stage = currentStage(deal);
   const step = nextStepOf(deal, role);
 
@@ -82,11 +87,14 @@ export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options
     if (!step) return;
     if (step.action === "pay") return void pay();
     if (step.action === "release") return setConfirmRelease(true);
+    if (step.action === "claim") return setPaying(true);
+    if (step.action === "deliver") return setDelivering(true);
+    if (step.action === "open") return setEscrowOpen(true);
     if (step.action === "confirm_paid") return void act("confirm_paid");
     void answer("accept");
   };
 
-  const footerStep = step && FOOTER_STEPS.has(step.action) && !confirmRelease ? step : null;
+  const footerStep = step && FOOTER_STEPS.has(step.action) ? step : null;
 
-  return { busy, error, stage, step, footerStep, confirmRelease, setConfirmRelease, run, act, answer, doStep };
+  return { busy, error, stage, step, footerStep, confirmRelease, setConfirmRelease, paying, setPaying, delivering, setDelivering, escrowOpen, setEscrowOpen, run, act, answer, doStep };
 };

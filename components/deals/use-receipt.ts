@@ -16,17 +16,19 @@ export const useReceipt = (deal: Pick<Deal, "id" | "requestId" | "conversationId
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const pick = async (files: FileList | null) => {
+  const pick = async (files: FileList | null): Promise<boolean> => {
     const file = files?.[0];
-    if (!file || !deal.conversationId) return;
+    if (!file || !deal.conversationId) return false;
     setBusy(true);
     setError(null);
     try {
       const uploaded = await uploadChatPhoto(deal.conversationId, await compressForChat(file));
       await callApi(`/api/deals/${encodeURIComponent(deal.id)}/receipt`, { method: "POST", body: JSON.stringify({ stageId, attachmentId: uploaded.id }) });
       await loadDeals(deal.requestId);
+      return true;
     } catch (reason) {
       setError(reason instanceof Error && reason.message ? reason.message : "Не вдалося додати чек.");
+      return false;
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";

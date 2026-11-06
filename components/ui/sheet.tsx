@@ -7,6 +7,7 @@
 
 import * as React from "react";
 import { Dialog as SheetPrimitive } from "radix-ui";
+import { useReturnFocus } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
 import { useLayerHistory } from "@/lib/ui/use-layer-history";
@@ -45,14 +46,15 @@ export namespace SheetTypes {
 }
 
 // Хуки живуть тут, а не в SheetContent: Ref на Content Radix не віддає, тож вузол шторки беремо як батька сітки: callback-ref дає його, щойно він змонтований.
-const SheetPanel = ({ className, children, size = "auto", ...props }: SheetTypes.ContentProps) => {
+const SheetPanel = ({ className, children, size = "auto", onOpenAutoFocus, onCloseAutoFocus, ...props }: SheetTypes.ContentProps) => {
   const [node, setNode] = React.useState<HTMLDivElement | null>(null);
   const findPanel = React.useCallback((grip: HTMLSpanElement | null) => setNode((grip?.parentElement as HTMLDivElement | null) ?? null), []);
   const dismiss = React.useContext(SheetContext);
   useKeyboardInset(node);
   useSheetSwipe(node, dismiss);
+  const focus = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
   return (
-    <SheetPrimitive.Content data-slot="sheet-content" data-size={size} className={cn("ui-sheet", className)} {...props}>
+    <SheetPrimitive.Content data-slot="sheet-content" data-size={size} className={cn("ui-sheet", className)} {...focus} {...props}>
       <span ref={findPanel} className="ui-sheet-grip" aria-hidden />
       {children}
     </SheetPrimitive.Content>

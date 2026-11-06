@@ -5,8 +5,7 @@
 // Форма «Запропонувати угоду» за відгуком виконавця: сума, етапи, спосіб оплати. Показується на екрані
 // (шар «екран»), коли за відгуком ще немає угоди.
 
-import { Loader2, QrCode, ShieldCheck } from "@/components/icons";
-import { Button } from "@/components/ui/button";
+import { QrCode, ShieldCheck } from "@/components/icons";
 import { CheckboxField } from "@/components/ui/checkbox";
 import { Field, Input } from "@/components/ui/input";
 import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
@@ -17,9 +16,8 @@ import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
 import { StagesEditor } from "@/components/deals/stages-editor";
 import { money, moneyIn } from "@/lib/deals/format";
 import { COMMISSION_RATE, formatKop } from "@/lib/deals/price";
-import { currencyOfMethod, type Deal, type DealMethod } from "@/lib/deals/types";
-import type { OfferResponse } from "@/lib/requests/types";
-import { useDealComposer } from "./use-deal-composer";
+import { currencyOfMethod, type DealMethod } from "@/lib/deals/types";
+import type { useDealComposer } from "./use-deal-composer";
 
 const CURRENCY_SIGN = { UAH: "₴", USDT: "USDT" } as const;
 const FEE_NOTE: Record<DealMethod, string> = { safe: "", direct: "немає", escrow: "за контрактом, видно перед внесенням" };
@@ -29,8 +27,13 @@ const AGREE_TEXT: Record<DealMethod, string> = {
   escrow: "Розумію: кошти лягають у контракт у блокчейні, платформа ними не володіє, а спір вирішує арбітр у мережі.",
 };
 
-export const DealComposer = ({ response, onDone }: { response: OfferResponse; onDone: (deal: Deal) => void }) => {
-  const { ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, busy, error, amountNumber, daysNumber, stages, total, fee, payTotal, problem, submit } = useDealComposer(response, onDone);
+export namespace DealComposerTypes {
+  export type Value = ReturnType<typeof useDealComposer>;
+}
+
+/** Поля пропозиції; кнопка «Запропонувати угоду» стоїть у закріпленому низу екрана (deal-composer-screen.tsx). */
+export const DealComposer = ({ form }: { form: DealComposerTypes.Value }) => {
+  const { ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, amountNumber, daysNumber, stages, total, fee, payTotal, problem, error } = form;
   return (
     <div className="deal">
       <p className="auth-lead">
@@ -162,18 +165,6 @@ export const DealComposer = ({ response, onDone }: { response: OfferResponse; on
 
       <CheckboxField id="deal-agree" checked={agree} onCheckedChange={(value) => setAgree(value === true)} label={<span className="text-xs leading-snug text-ink-muted">{AGREE_TEXT[method]}</span>} />
 
-      {error && (
-        <p role="alert" className="auth-error">
-          {error}
-        </p>
-      )}
-      <Button
-        onClick={() => void submit()}
-        disabled={busy || !agree || Boolean(problem && !error && stages.length === 0)}
-      >
-        {busy && <Loader2 className="size-4 animate-spin" />}
-        Запропонувати угоду
-      </Button>
       {problem && agree && !error && stages.length > 0 && (
         <p className="auth-error">{problem}</p>
       )}

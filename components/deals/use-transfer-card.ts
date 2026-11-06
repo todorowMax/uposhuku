@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/auth/client";
 import { nbuQrLink } from "@/lib/deals/nbu-qr";
 import { bankOf, type PaymentMethod, type Requisites } from "@/lib/deals/requisites";
+import { readPickedVia, writePickedVia } from "@/lib/deals/picked-via";
 import { transferPurpose } from "@/lib/deals/transfer";
 import { fetchDealRequisites } from "@/lib/requisites/client";
 
@@ -52,7 +53,12 @@ export const useTransferCard = (dealId: string, dealNumber: string, amount: numb
   const purpose = transferPurpose(dealNumber);
   const bank = state.kind === "ready" && state.qr ? bankOf(state.requisites) : null;
   const qrLink = bank ? nbuQrLink({ ...bank, amount, purpose }) : null;
-  const [picked, setPicked] = useState<PaymentMethod | null>(null);
+  // Вибрана вкладка переживає перезавантаження сторінки (повернення з застосунку банку): тримаємо її в sessionStorage.
+  const [picked, setPickedState] = useState<PaymentMethod | null>(() => readPickedVia(dealId));
+  const setPicked = (method: PaymentMethod) => {
+    setPickedState(method);
+    writePickedVia(dealId, method);
+  };
   // Вибраний замовником спосіб, інакше перший доступний.
   const via = state.kind === "ready" ? (picked && state.methods.includes(picked) ? picked : state.methods[0]) : null;
 

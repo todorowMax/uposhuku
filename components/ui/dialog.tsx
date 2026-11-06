@@ -37,11 +37,16 @@ type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> &
   variant?: "center" | "bottom" | "full" | "panel";
 };
 
-const DialogContent = ({ variant = "center", children, onOpenAutoFocus, onCloseAutoFocus, ...props }: DialogContentProps) => {
-  // Radix возвращает фокус лише на DialogTrigger, а наші діалоги відкриває стан (store). Тож запам'ятовуємо,
-  // що було в фокусі перед відкриттям, і повертаємо туди ж, якщо воно ще в документі.
+type FocusHandlers = Pick<React.ComponentProps<typeof DialogPrimitive.Content>, "onOpenAutoFocus" | "onCloseAutoFocus">;
+
+/**
+ * Radix возвращает фокус лише на DialogTrigger, а наші шари відкриває стан (store, кнопка в низу екрана). Тож
+ * запам'ятовуємо, що було в фокусі перед відкриттям, і повертаємо туди ж, якщо воно ще в документі.
+ * Працює для діалогів, екранів і шторок.
+ */
+const useReturnFocus = ({ onOpenAutoFocus, onCloseAutoFocus }: FocusHandlers): Required<FocusHandlers> => {
   const opener = React.useRef<HTMLElement | null>(null);
-  const handlers = {
+  return {
     onOpenAutoFocus: (event: Event) => {
       const active = document.activeElement;
       const ephemeral = !(active instanceof HTMLElement) || active === document.body || active.closest("[data-slot=dropdown-menu-content],[data-slot=popover-content]");
@@ -56,6 +61,10 @@ const DialogContent = ({ variant = "center", children, onOpenAutoFocus, onCloseA
       if (target?.isConnected) target.focus();
     },
   };
+};
+
+const DialogContent = ({ variant = "center", children, onOpenAutoFocus, onCloseAutoFocus, ...props }: DialogContentProps) => {
+  const handlers = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
   const content = (
     <DialogPrimitive.Content data-slot="dialog-content" data-variant={variant} {...handlers} {...props}>
       {children}
@@ -71,4 +80,4 @@ const DialogContent = ({ variant = "center", children, onOpenAutoFocus, onCloseA
   );
 };
 
-export { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger };
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, DialogTrigger, useReturnFocus };
