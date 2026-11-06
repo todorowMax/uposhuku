@@ -305,7 +305,7 @@
 Перед деплоем:
 
 1. Секреты dev и prod: `REQUISITES_KEY` (`openssl rand -base64 32`, **при потере ключа реквизиты не расшифровать**), `ADMIN_TOTP_SECRET`, `INTERNAL_TOKEN`, для банка `MONOBANK_SPLIT_TOKEN` и `MONOBANK_PLATFORM_RECEIVER_ID`, для крипты `TRONGRID_API_KEY` по желанию, `CRYPTO_*`, `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` (привязать к доменам).
-2. Миграции 0011–0017, сначала dev: `npm run db:migrate:development`, затем prod.
+2. Миграции 0011–0019, сначала dev: `npm run db:migrate:development`, затем prod.
 3. Отсканировать варианты QR и сообщить, какой читается; проверить кошелёк на реальном устройстве.
 4. Письмо менеджеру Monobank, живой прогон на своих счетах (пункт 21), запрос к WayForPay и LiqPay (пункт 19).
 5. Юрист: вопросы выше и тексты оферты, условий, политики.
