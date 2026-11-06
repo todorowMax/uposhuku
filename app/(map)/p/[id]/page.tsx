@@ -34,7 +34,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: `${SITE}/p/${encodeURIComponent(id)}` },
-    openGraph: { title, description, type: "profile", locale: "uk_UA" },
+    // Свій openGraph замінює кореневий цілком, тож картинку для превью повторюємо.
+    openGraph: { title, description, type: "profile", locale: "uk_UA", images: ["/og.png"] },
     // Демо-виконавців з сіда (me-demo-…) вигадані: в індекс їх не пускаємо.
     robots: isDemo(id) ? { index: false, follow: true } : undefined,
   };

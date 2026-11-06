@@ -12,13 +12,23 @@ const fixel = localFont({
   display: "swap",
 });
 
+const SITE_URL = "https://findlyfy.com";
+const SITE_TITLE = "Findlyfy: виконавці й запити на карті України";
+const SITE_DESCRIPTION =
+  "Опиши, що потрібно створити, і побач на карті, хто поруч уже робив схоже. " +
+  "Реальні проєкти, реальні люди, з точністю до міста.";
+
+// Картинка для превью посилань: public/og.png, 1200×630. Адреса абсолютна через metadataBase.
+const SOCIAL_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: SITE_TITLE };
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   // Закрито від індексації, доки не запустимось публічно (також X-Robots-Tag у worker/index.ts і app/robots.ts).
   robots: { index: false, follow: false },
-  title: "Findlyfy: виконавці й запити на карті України",
-  description:
-    "Опиши, що потрібно створити, і побач на карті, хто поруч уже робив схоже. " +
-    "Реальні проєкти, реальні люди, з точністю до міста.",
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: { title: SITE_TITLE, description: SITE_DESCRIPTION, siteName: "Findlyfy", locale: "uk_UA", type: "website", url: "/", images: [SOCIAL_IMAGE] },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [SOCIAL_IMAGE.url] },
 };
 
 export const viewport: Viewport = {
