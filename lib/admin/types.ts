@@ -2,7 +2,9 @@
 //
 // Що адмінка показує про спори: спільні типи сервера й сторінок.
 
+import type { ComplaintReason } from "@/lib/deals/complaints";
 import type { Deal, ModeratorAction } from "@/lib/deals/types";
+import type { DealTimeline } from "./deal-timeline";
 
 export const DECISION_LABEL: Record<ModeratorAction, string> = {
   release: "Виплатити виконавцю",
@@ -65,6 +67,22 @@ export interface DecisionLogRow {
   at: string;
 }
 
+/** Скарга на пряму угоду, як її бачить модератор. */
+export interface ComplaintView {
+  id: string;
+  dealId: string;
+  stageId: string;
+  stageTitle: string;
+  side: "customer" | "performer";
+  reason: ComplaintReason;
+  text: string;
+  status: "open" | "closed";
+  createdAt: string;
+  closedAt: string | null;
+  closedByEmail: string | null;
+  closeComment: string | null;
+}
+
 export interface DisputeCard {
   deal: Deal;
   title: string;
@@ -73,6 +91,8 @@ export interface DisputeCard {
   conversationId: string | null;
   messages: DisputeMessage[];
   log: DecisionLogRow[];
+  timeline: DealTimeline;
+  complaints: ComplaintView[];
   /** Етап у спорі, якщо він ще відкритий. */
   openStageId: string | null;
 }

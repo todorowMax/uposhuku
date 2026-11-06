@@ -27,6 +27,12 @@ export type StageStatus = "pending" | "claimed" | "funded" | "delivered" | "rele
  */
 export type StagePayout = { kind: "full" } | { kind: "partial"; percent: number };
 
+/** Що виконавець прикладає до здачі етапу: пояснення й посилання (лише https). Обидва поля необов'язкові. */
+export interface StageDelivery {
+  text?: string;
+  link?: string;
+}
+
 export interface DealStage {
   id: string;
   title: string;
@@ -38,6 +44,11 @@ export interface DealStage {
   claimedAt?: string;
   /** Прямий переказ: яким способом замовник оплатив. Ставить сервер при «Я оплатив(ла)», лише зі способів знімка реквізитів. */
   paidVia?: PaymentMethod;
+  /** Прямий переказ: чек (картинка з розмови), який додав замовник. Лише id вкладення, сам файл у розмові. */
+  receiptAttachmentId?: string;
+  receiptAt?: string;
+  /** Результат, який виконавець додав, коли здавав етап. */
+  delivery?: StageDelivery;
   fundedAt?: string;
   deliveredAt?: string;
   releasedAt?: string;
@@ -134,6 +145,8 @@ export interface Deal {
   /** Угода з розмови, без запиту: назва замовлення й опис умов. */
   title?: string;
   description?: string;
+  /** «Що вважаємо готовим»: необов'язково, ставиться при створенні умов і далі не змінюється. */
+  criteria?: string;
   conversationId?: string;
   /** Хто виставив умови. Для угод із відгуку це завжди замовник; у розмові — будь-яка сторона. */
   proposedBy?: "customer" | "performer";
@@ -185,6 +198,7 @@ export interface DealDraft {
   stages: { title: string; amount: number; days: number }[];
   title?: string;
   description?: string;
+  criteria?: string;
   conversationId?: string;
   proposedBy?: "customer" | "performer";
 }

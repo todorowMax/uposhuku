@@ -34,6 +34,11 @@ export const DealTerms = ({ deal }: { deal: Deal }) => {
         <span className="font-semibold">{note.name}.</span> <span className="text-ink-muted">{note.text}</span>
       </p>
       {deal.description && <p className="text-ink/85">{deal.description}</p>}
+      {deal.criteria && (
+        <p className="text-ink/85">
+          <span className="font-semibold">Що вважаємо готовим:</span> {deal.criteria}
+        </p>
+      )}
       <ol className="grid gap-1" aria-label="Етапи угоди">
         {deal.stages.map((stage) => (
           <li key={stage.id} className="flex items-baseline justify-between gap-3">

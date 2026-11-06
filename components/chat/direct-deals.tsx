@@ -10,6 +10,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DealView } from "@/components/deals/deal-tab";
 import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
+import { DisputeTips } from "@/components/deals/dispute-tips";
+import { CRITERIA_MAX } from "@/lib/deals/dispute-aids";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
@@ -77,6 +79,7 @@ export function TermsForm({
   const escrowAvailable = useEscrowAvailable();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [criteria, setCriteria] = useState("");
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("");
   // Що людина обрала сама; поки не обирала, «Безпечна угода» лише тоді, коли вона справді доступна цій парі.
@@ -137,6 +140,7 @@ export function TermsForm({
           body: JSON.stringify({
             title: title.trim(),
             description: description.trim(),
+            criteria: criteria.trim(),
             method,
             stages,
           }),
@@ -188,6 +192,17 @@ export function TermsForm({
           maxLength={1000}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="Дизайн, верстка, форма замовлення"
+        />
+      </Field>
+
+      <Field label="Що вважаємо готовим" optional htmlFor="terms-criteria" hint="Після того як друга сторона прийме умови, це не змінюється. Побачать обидві сторони і, якщо буде спір, модератор.">
+        <Textarea
+          id="terms-criteria"
+          rows={2}
+          value={criteria}
+          maxLength={CRITERIA_MAX}
+          onChange={(event) => setCriteria(event.target.value)}
+          placeholder="Макет у Figma і верстка, що відкривається на телефоні"
         />
       </Field>
 
@@ -304,6 +319,7 @@ export function TermsForm({
         </dl>
       )}
 
+      <DisputeTips />
       {error && (
         <p role="alert" className="auth-error">
           {error}

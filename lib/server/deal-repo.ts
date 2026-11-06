@@ -5,11 +5,13 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { deals, moderationActions } from "@/db/schema";
-import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft, withPaidVia } from "@/lib/deals/machine";
+import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, currentStage, disputedStage, validateDraft, withPaidVia } from "@/lib/deals/machine";
 import type { PaymentMethod } from "@/lib/deals/requisites";
-import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
+import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type StageDelivery, type PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
 import { performerIdOf, performerUserId } from "@/lib/deals/parties";
+import { canAttachReceipt, checkCriteria, withDelivery, withReceipt } from "@/lib/deals/dispute-aids";
+import { addMessage, findChatAttachment } from "./chat-repo";
 import { getDb } from "./db";
 import { snapshotDealRequisites } from "./requisites-repo";
 
@@ -81,11 +83,13 @@ export const proposeDeal = async (userId: string, draft: DealDraft, options: { s
   const now = options.now ?? Date.now();
   const error = validateDraft(draft, options.safeEnabled, options.escrowMax ?? null);
   if (error) return error;
+  const criteria = checkCriteria(draft.criteria);
+  if (!criteria.ok) return criteria.error;
   if (draft.performer.id === performerIdOf(userId)) return SELF_DEAL;
   const existing = await readAll(userId);
   // На один відгук одна жива угода: нову можна після відмови чи скасування.
   if (existing.some((deal) => deal.responseId === draft.responseId && deal.status !== "declined" && deal.status !== "cancelled")) return "З цим виконавцем уже є угода.";
-  const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, draft, now);
+  const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, { ...draft, criteria: criteria.value }, now);
   await getDb().insert(deals).values({
     id: deal.id,
     ownerUserId: userId,
@@ -168,6 +172,41 @@ export const actAsPerformer = async (performerUserId: string, id: string, action
   return result;
 };
 
+/** «Здати етап» з необов'язковим результатом (пояснення, посилання), уже перевіреним викликом. */
+export const deliverStage = async (input: { performerUserId: string; dealId: string; stageId?: string; delivery?: StageDelivery; now?: number }): Promise<Deal | string | null> => {
+  const { performerUserId: performer, dealId, stageId, delivery, now = Date.now() } = input;
+  const [row] = await getDb().select().from(deals).where(and(eq(deals.id, dealId), eq(deals.performerId, `me-${performer}`))).limit(1);
+  if (!row) return null;
+  const done = applyPerformerAction(parse(row), "deliver", stageId, now);
+  if (typeof done === "string") return done;
+  const target = stageId ?? currentStage(parse(row))?.id;
+  const result = target ? withDelivery(done, target, delivery) : done;
+  return (await writeGuarded(row, result, now)) ? result : DEAL_CONFLICT;
+};
+
+/**
+ * Чек до етапу прямого переказу: картинка, яку замовник уже завантажив у розмову цієї угоди (saveChatPhoto).
+ * null: угоди немає, це не замовник, або файл не його чи не з цієї розмови (для чужого це «не знайдено»).
+ * Файл прив'язуємо до повідомлення в розмові, інакше його прибере чистка неприкріплених фото.
+ */
+export const attachReceipt = async (input: { userId: string; dealId: string; stageId: unknown; attachmentId: unknown; now?: number }): Promise<Deal | string | null> => {
+  const { userId, dealId, now = Date.now() } = input;
+  const row = await readRow(dealId);
+  if (!row || row.ownerUserId !== userId) return null;
+  const deal = parse(row);
+  const stage = deal.stages.find((item) => item.id === input.stageId);
+  if (!stage) return "Етапу не знайдено.";
+  if (!canAttachReceipt(deal, stage.status)) return "Чек можна додати до оплати прямим переказом, поки етап не здано.";
+  if (!deal.conversationId) return "Для цієї угоди немає розмови, тож чек додати нікуди.";
+  if (typeof input.attachmentId !== "string") return null;
+  const file = await findChatAttachment(deal.conversationId, input.attachmentId);
+  if (!file || file.uploaderUserId !== userId) return null;
+  const result = withReceipt(deal, stage.id, { attachmentId: file.id, now });
+  if (!(await writeGuarded(row, result, now))) return DEAL_CONFLICT;
+  if (!file.messageId) await addMessage(deal.conversationId, "customer", `Чек до угоди ${deal.number}`, { attachmentIds: [file.id] });
+  return result;
+};
+
 // ───────────── умови з розмови (без запиту) ─────────────
 
 const MAX_LIVE_DIRECT = 5;
@@ -188,7 +227,9 @@ export const proposeDirectDeal = async (
   if (title.length < 2) return "Назвіть замовлення: хоча б кілька літер.";
   if (title.length > 80) return "Назва задовга: до 80 символів.";
   if ((draft.description?.length ?? 0) > 1000) return "Опис задовгий: до 1000 символів.";
-  const full: DealDraft = { ...draft, title, requestId: directRequestId(conversation.id), responseId: DIRECT_RESPONSE_ID, conversationId: conversation.id, proposedBy };
+  const criteria = checkCriteria(draft.criteria);
+  if (!criteria.ok) return criteria.error;
+  const full: DealDraft = { ...draft, criteria: criteria.value, title, requestId: directRequestId(conversation.id), responseId: DIRECT_RESPONSE_ID, conversationId: conversation.id, proposedBy };
   const error = validateDraft(full, options.safeEnabled, options.escrowMax ?? null);
   if (error) return error;
   const live = (await readAll(conversation.customerUserId)).filter((deal) => deal.conversationId === conversation.id && (deal.status === "proposed" || deal.status === "accepted"));

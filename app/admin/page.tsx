@@ -5,13 +5,16 @@ import { notFound } from "next/navigation";
 import { DECISION_LABEL, type DisputeRow } from "@/lib/admin/types";
 import { formatMoney, formatStamp, holdLeft, METHOD_LABEL, openFor } from "@/lib/admin/format";
 import { getAdmin } from "@/lib/server/admin";
-import { listDisputes } from "@/lib/server/admin-repo";
+import { listDisputes, openComplaintItems } from "@/lib/server/admin-repo";
+import { ComplaintList } from "@/components/admin/complaint-list";
 
 export default async function AdminDisputesPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   if (!(await getAdmin())) notFound();
-  const tab = (await searchParams).tab === "resolved" ? "resolved" : "open";
+  const requested = (await searchParams).tab;
+  const tab = requested === "resolved" || requested === "complaints" ? requested : "open";
   const { open, resolved } = await listDisputes();
-  const rows = tab === "open" ? open : resolved;
+  const rows = tab === "resolved" ? resolved : open;
+  const complaints = await openComplaintItems();
   const now = Date.now();
   return (
     <>
@@ -23,8 +26,13 @@ export default async function AdminDisputesPage({ searchParams }: { searchParams
         <Link href="/admin?tab=resolved" data-active={tab === "resolved" || undefined} aria-current={tab === "resolved" ? "page" : undefined}>
           Розглянуті <b>{resolved.length}</b>
         </Link>
+        <Link href="/admin?tab=complaints" data-active={tab === "complaints" || undefined} aria-current={tab === "complaints" ? "page" : undefined}>
+          Скарги <b>{complaints.length}</b>
+        </Link>
       </nav>
-      {rows.length === 0 ? (
+      {tab === "complaints" ? (
+        <ComplaintList items={complaints} />
+      ) : rows.length === 0 ? (
         <p className="adm-empty">{tab === "open" ? "Відкритих спорів немає." : "Розглянутих спорів ще немає."}</p>
       ) : (
         <ul className="adm-list">

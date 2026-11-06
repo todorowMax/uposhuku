@@ -10,6 +10,7 @@ import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { isPaymentMethod, METHOD_LABEL, type PaymentMethod } from "@/lib/deals/requisites";
+import { DisputeTips } from "./dispute-tips";
 import { MethodPanel } from "./method-panels";
 import { useTransferCard } from "./use-transfer-card";
 
@@ -104,6 +105,7 @@ export const TransferCard = ({
       )}
 
       <p className="pe-hint mt-3">Платформа не отримує ці гроші й не повертає їх. Реквізити зафіксовано на момент прийняття угоди.</p>
+      <DisputeTips />
       <Button variant="offer" disabled={busy || state.kind === "loading"} onClick={() => void onClaim(card.via ?? undefined)} className="mt-3 w-full">
         {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
       </Button>

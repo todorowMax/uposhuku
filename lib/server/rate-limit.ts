@@ -19,6 +19,8 @@ export interface RateRule {
 export const RATE_RULES = {
   dealCreate: { max: 20, windowMs: 60 * MINUTE },
   dealAction: { max: 60, windowMs: 10 * MINUTE },
+  dealComplaint: { max: 5, windowMs: 60 * MINUTE },
+  dealReceipt: { max: 20, windowMs: 10 * MINUTE },
   dealPay: { max: 10, windowMs: 10 * MINUTE },
   dealRequisitesRead: { max: 30, windowMs: 10 * MINUTE },
   requisitesWrite: { max: 10, windowMs: 60 * MINUTE },
@@ -31,6 +33,7 @@ export const RATE_RULES = {
   payoutApply: { max: 5, windowMs: 60 * MINUTE },
   releaseCode: { max: 5, windowMs: 60 * MINUTE },
   adminDecision: { max: 30, windowMs: 10 * MINUTE },
+  adminComplaint: { max: 30, windowMs: 10 * MINUTE },
   adminTotp: { max: 10, windowMs: 10 * MINUTE },
   cspReport: { max: 60, windowMs: 10 * MINUTE },
   // Щедрі для живої людини, але не безмежні: стеля проти скриптів.

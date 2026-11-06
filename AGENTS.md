@@ -73,6 +73,11 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   `stage.paidVia` лише зі способів знімка. Значення з таблиці `feature_flags` (сторінка `/admin/features`), інакше зі змінних `<ІМ'Я>_MODE` і
   `<ІМ'Я>_USERS`, інакше `off`. Чиста логіка в `lib/features`, сервер у `lib/server/features.ts`. Зміна грошових
   прапорців потребує TOTP.
+- Допомога у спорах (`lib/deals/dispute-aids.ts`, `complaints.ts`, `lib/admin/deal-timeline.ts`): «Що вважаємо готовим» (до 500) ставиться
+  при створенні умов і потім не змінюється; чек (`stage.receiptAttachmentId`) це картинка з розмови угоди, угода без `conversationId`
+  чек не приймає; результат етапу (`stage.delivery`: текст до 1000 і https-посилання) додається до «здати етап». Скарга на пряму угоду
+  (`deal_complaints`, `POST /api/deals/:id/complaint`) гроші й статус етапу не чіпає; закриває її модератор у `/admin?tab=complaints`,
+  закриття (хто, коли, коментар) лежить у самому рядку скарги, окремого журналу немає. Друга сторона бачить лише службовий рядок у розмові.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
@@ -87,7 +92,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-774 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
+770 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

@@ -6729,7 +6729,7 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
   display: grid;
   gap: 14px;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-areas: "deal" "parties" "chat" "decision" "log";
+  grid-template-areas: "deal" "timeline" "parties" "chat" "decision" "log";
 }
 
 @media (min-width: 960px) {
@@ -6738,9 +6738,10 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
     grid-template-areas:
       "chat deal"
       "chat decision"
+      "chat timeline"
       "chat parties"
       "chat log";
-    grid-template-rows: auto auto auto 1fr;
+    grid-template-rows: auto auto auto auto 1fr;
     align-items: start;
   }
 
@@ -6751,6 +6752,10 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
     display: flex;
     flex-direction: column;
   }
+}
+
+.adm-area-timeline {
+  grid-area: timeline;
 }
 
 .adm-card {
@@ -7053,6 +7058,12 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
 
 .adm-log-head {
   font-size: 13px;
+}
+
+.adm-log-link {
+  font-size: 13px;
+  text-decoration: underline;
+  overflow-wrap: anywhere;
 }
 
 .adm-log-text {

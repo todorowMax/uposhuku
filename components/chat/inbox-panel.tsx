@@ -50,7 +50,11 @@ import { mentionsContacts } from "@/lib/chat/contacts";
 import { PAYMENT_HINT, mentionsPaymentDetails } from "@/lib/chat/payment-hints";
 import { CryptoProofNote } from "@/components/deals/crypto-proof-note";
 import { DealTab } from "@/components/deals/deal-tab";
+import { ComplaintBox } from "@/components/deals/complaint-box";
 import { DealTerms } from "@/components/deals/deal-terms";
+import { DeliveryForm } from "@/components/deals/delivery-form";
+import { ReceiptLink } from "@/components/deals/receipt-box";
+import { complaintStageError } from "@/lib/deals/complaints";
 import { DirectDeals, TermsForm } from "@/components/chat/direct-deals";
 import { offersMapStore } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
@@ -964,7 +968,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
     };
   }, [conversationId]);
 
-  const act = async (deal: Deal, action: PerformerAction) => {
+  const act = async (deal: Deal, action: PerformerAction, extra: { deliveryText?: string; deliveryLink?: string } = {}) => {
     setBusy(`${deal.id}:${action}`);
     setError(null);
     try {
@@ -973,7 +977,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ as: "performer", action }),
+          body: JSON.stringify({ as: "performer", action, ...extra }),
         },
       );
       const data = (await response.json()) as {
@@ -1066,6 +1070,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
               </div>
             )}
             {needs === "confirm" && deal.method === "direct" && stage && <CryptoProofNote dealId={deal.id} stageId={stage.id} />}
+            {needs === "confirm" && stage && deal.conversationId && <ReceiptLink conversationId={deal.conversationId} stage={stage} />}
             {needs === "confirm" && stage?.paidVia && <p className="pe-hint">Спосіб оплати, який вказав замовник: {METHOD_LABEL[stage.paidVia]}.</p>}
             {needs === "confirm" && (
               <div className="inbox-deal-actions">
@@ -1083,17 +1088,14 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
               <EscrowSection deal={deal} stage={stage} side="performer" onChanged={() => undefined} />
             )}
             {needs === "deliver" && deal.method !== "escrow" && (
-              <div className="inbox-deal-actions">
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void act(deal, "deliver")}
-                  className="dm-send inbox-deal-main"
-                >
-                  Здати етап
-                </button>
-              </div>
+              <DeliveryForm dealId={deal.id} busy={busy !== null} onSubmit={(fields) => act(deal, "deliver", fields)} />
             )}
+            {deal.status === "accepted" && deal.criteria && (
+              <p className="pe-hint">
+                <strong>Що вважаємо готовим:</strong> {deal.criteria}
+              </p>
+            )}
+            {deal.status === "accepted" && stage && !complaintStageError(deal, stage) && <ComplaintBox dealId={deal.id} stageId={stage.id} />}
           </article>
         );
       })}

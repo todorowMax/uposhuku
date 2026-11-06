@@ -5,14 +5,18 @@
 // маршруті й на кожній сторінці. Переписку віддаємо лише для угод, де був спір.
 
 import { desc, eq, inArray, sql } from "drizzle-orm";
-import { conversations, deals, moderationActions, profiles, requests, users } from "@/db/schema";
-import type { DecisionLogRow, DisputeCard, DisputeMessage, DisputeParty, DisputeRow } from "@/lib/admin/types";
+import { conversations, dealRequisites, deals, moderationActions, profiles, requests, users } from "@/db/schema";
+import { dealTimeline } from "@/lib/admin/deal-timeline";
+import type { ComplaintView, DecisionLogRow, DisputeCard, DisputeMessage, DisputeParty, DisputeRow } from "@/lib/admin/types";
 import { dealTotal, disputedStage } from "@/lib/deals/machine";
 import type { Deal, DealStage, ModeratorAction } from "@/lib/deals/types";
 import { CITIES } from "@/lib/map/cities";
 import { getDb, inChunks } from "./db";
 import { findChatAttachment, listMessages } from "./chat-repo";
 import { getProfile } from "./profile-repo";
+import { complaintsOfDeal, listComplaints, type StoredComplaint } from "./complaint-repo";
+import { listDealProofs } from "./crypto-proof-repo";
+import { tronscanLink } from "@/lib/crypto/tron";
 
 type DealRow = typeof deals.$inferSelect;
 const parse = (row: DealRow) => JSON.parse(row.data) as Deal;
@@ -116,7 +120,8 @@ export const conversationOfDeal = async (row: DealRow, deal: Deal): Promise<stri
 const wasDisputed = async (row: DealRow, deal: Deal) => {
   if (deal.disputed || deal.stages.some((stage) => stage.status === "disputed")) return true;
   const [logged] = await getDb().select({ id: moderationActions.id }).from(moderationActions).where(eq(moderationActions.dealId, row.id)).limit(1);
-  return Boolean(logged);
+  // Угоду зі скаргою модератор теж має бачити: переписка й фото відкриваються тим самим шляхом.
+  return Boolean(logged) || (await complaintsOfDeal(row.id)).length > 0;
 };
 
 export const findDisputedDeal = async (dealId: string): Promise<{ row: DealRow; deal: Deal } | null> => {
@@ -124,6 +129,29 @@ export const findDisputedDeal = async (dealId: string): Promise<{ row: DealRow; 
   if (!row) return null;
   const deal = parse(row);
   return (await wasDisputed(row, deal)) ? { row, deal } : null;
+};
+
+export const complaintView = (item: StoredComplaint, deal: Deal): ComplaintView => ({
+  id: item.id,
+  dealId: item.dealId,
+  stageId: item.stageId,
+  stageTitle: deal.stages.find((stage) => stage.id === item.stageId)?.title ?? "?",
+  side: item.side,
+  reason: item.reason,
+  text: item.text,
+  status: item.status,
+  createdAt: new Date(item.createdAt).toISOString(),
+  closedAt: iso(item.closedAt),
+  closedByEmail: item.closedByEmail,
+  closeComment: item.closeComment,
+});
+
+/** Хронологія угоди для картки спору чи скарги: докази беремо з бази, чеки відкриваємо шляхом модератора. */
+const timelineOf = async (deal: Deal, complaints: StoredComplaint[]) => {
+  const [snapshot] = await getDb().select({ mask: dealRequisites.mask }).from(dealRequisites).where(eq(dealRequisites.dealId, deal.id)).limit(1);
+  const proofs = (await listDealProofs(deal.id)).map((proof) => ({ stageId: proof.stageId, txHash: proof.txHash, at: proof.blockTime, explorerUrl: proof.chain === "tron" ? tronscanLink(proof.txHash) : null }));
+  const receiptUrls = Object.fromEntries(deal.stages.filter((stage) => stage.receiptAttachmentId).map((stage) => [stage.id, adminAttachmentUrl(deal.id, stage.receiptAttachmentId ?? "")]));
+  return dealTimeline({ deal, proofs, receiptUrls, snapshotMask: snapshot?.mask ?? null, complaints: complaints.map((item) => ({ id: item.id, side: item.side, reason: item.reason, createdAt: item.createdAt, closedAt: item.closedAt })) });
 };
 
 export const getDisputeCard = async (dealId: string): Promise<DisputeCard | null> => {
@@ -146,6 +174,7 @@ export const getDisputeCard = async (dealId: string): Promise<DisputeCard | null
     : [];
   const logRows = await db.select().from(moderationActions).where(eq(moderationActions.dealId, dealId)).orderBy(desc(moderationActions.createdAt));
   const log: DecisionLogRow[] = logRows.map((item) => ({ id: item.id, stageId: item.stageId, action: item.action, comment: item.comment, adminEmail: item.adminEmail, at: new Date(item.createdAt).toISOString() }));
+  const complaintRows = await complaintsOfDeal(dealId);
   const performerUserId = row.performerId.startsWith("me-") ? row.performerId.slice(3) : null;
   return {
     deal,
@@ -155,6 +184,8 @@ export const getDisputeCard = async (dealId: string): Promise<DisputeCard | null
     conversationId,
     messages,
     log,
+    timeline: await timelineOf(deal, complaintRows),
+    complaints: complaintRows.map((item) => complaintView(item, deal)),
     openStageId: disputedStage(deal)?.id ?? null,
   };
 };
@@ -167,4 +198,14 @@ export const findDisputeAttachment = async (dealId: string, attachmentId: string
   if (!found) return null;
   const conversationId = await conversationOfDeal(found.row, found.deal);
   return conversationId ? findChatAttachment(conversationId, attachmentId) : null;
+};
+
+/** Відкриті скарги для черги модератора: сама скарга й номер угоди. */
+export const openComplaintItems = async (): Promise<{ complaint: ComplaintView; number: string }[]> => {
+  const items: { complaint: ComplaintView; number: string }[] = [];
+  for (const stored of await listComplaints("open")) {
+    const [row] = await getDb().select().from(deals).where(eq(deals.id, stored.dealId)).limit(1);
+    if (row) items.push({ complaint: complaintView(stored, parse(row)), number: parse(row).number });
+  }
+  return items;
 };

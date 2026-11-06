@@ -108,7 +108,7 @@ const initials = (name: string) =>
     .join("")
     .toUpperCase();
 
-export function PartyCard({ role, party }: { role: string; party: DisputeParty }) {
+export const PartyCard = ({ label, party }: { label: string; party: DisputeParty }) => {
   return (
     <article className="adm-party">
       <div className="adm-party-head">
@@ -122,7 +122,7 @@ export function PartyCard({ role, party }: { role: string; party: DisputeParty }
           </span>
         )}
         <div className="min-w-0">
-          <p className="adm-party-role">{role}</p>
+          <p className="adm-party-role">{label}</p>
           <p className="adm-party-name">{party.name}</p>
         </div>
       </div>
@@ -173,7 +173,9 @@ export function PartyCard({ role, party }: { role: string; party: DisputeParty }
       {party.bio && <p className="adm-party-bio">{party.bio.length > 220 ? `${party.bio.slice(0, 219).trimEnd()}…` : party.bio}</p>}
     </article>
   );
-}
+};
+
+
 
 export function DecisionLog({ log, stages }: { log: DecisionLogRow[]; stages: DealStage[] }) {
   return (

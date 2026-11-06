@@ -19,6 +19,7 @@ import { notifyLater } from "@/lib/server/notify";
 import { addSystemMessage } from "@/lib/server/chat-repo";
 import { dealNotice } from "@/lib/telegram/notices";
 
+const optionalText = (value: unknown) => (typeof value === "string" ? value : undefined);
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
 export const GET = async (request: Request) => {
@@ -60,6 +61,7 @@ export const POST = async (request: Request) => {
     responseId,
     method,
     performer,
+    criteria: optionalText(body?.criteria),
     stages: rawStages.map((stage: Record<string, unknown>) => ({
       title: text(stage?.title, 60),
       amount: typeof stage?.amount === "number" ? Math.round(stage.amount) : NaN,

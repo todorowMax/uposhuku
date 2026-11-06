@@ -57,6 +57,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
       {
         title: text(body?.title, 80),
         description: text(body?.description, 1000),
+        // Довжину критеріїв перевіряє proposeDirectDeal: мовчки обрізати їх не можна.
+        criteria: typeof body?.criteria === "string" ? body.criteria : undefined,
         method,
         performer: {
           id: performerId,

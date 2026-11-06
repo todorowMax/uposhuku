@@ -238,3 +238,32 @@ export const walletChallenges = sqliteTable(
   },
   (table) => [index("wallet_challenges_user_idx").on(table.userId, table.createdAt)],
 );
+
+/**
+ * Скарги сторін на прямі угоди. Гроші й статус етапу вони не змінюють. Одна відкрита скарга на етап від сторони
+ * (частковий унікальний індекс); закриває модератор з коментарем, закриття лишається в самому рядку.
+ */
+export const dealComplaints = sqliteTable(
+  "deal_complaints",
+  {
+    id: text("id").primaryKey(),
+    dealId: text("deal_id")
+      .notNull()
+      .references(() => deals.id, { onDelete: "cascade" }),
+    stageId: text("stage_id").notNull(),
+    complainantUserId: text("complainant_user_id").notNull(),
+    side: text("side", { enum: ["customer", "performer"] }).notNull(),
+    reason: text("reason", { enum: ["no_delivery", "no_payment", "quality", "no_contact", "other"] }).notNull(),
+    text: text("text").notNull(),
+    status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
+    createdAt: integer("created_at").notNull(),
+    closedAt: integer("closed_at"),
+    closedByEmail: text("closed_by_email"),
+    closeComment: text("close_comment"),
+  },
+  (table) => [
+    index("deal_complaints_deal_idx").on(table.dealId),
+    index("deal_complaints_status_idx").on(table.status, table.createdAt),
+    uniqueIndex("deal_complaints_open_idx").on(table.dealId, table.stageId, table.complainantUserId).where(sql`${table.status} = 'open'`),
+  ],
+);

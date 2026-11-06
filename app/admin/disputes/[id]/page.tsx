@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { ChatLog } from "@/components/admin/chat-log";
 import { DecisionForm } from "@/components/admin/decision-form";
 import { EscrowResolveForm } from "@/components/admin/escrow-resolve-form";
+import { ComplaintBody } from "@/components/admin/complaint-blocks";
+import { DealTimelineView } from "@/components/admin/deal-timeline-view";
 import { DealSummary, DecisionLog, PartyCard } from "@/components/admin/dispute-blocks";
 import { ArrowLeft } from "@/components/icons";
 import { DEAL_STATE, formatStamp, holdLeft, METHOD_LABEL, openFor } from "@/lib/admin/format";
@@ -59,14 +61,30 @@ export default async function DisputePage({ params }: { params: Promise<{ id: st
             Угода
           </h2>
           <DealSummary deal={deal} now={now} />
+          {card.complaints.length > 0 && (
+            <div className="mt-4 grid gap-3">
+              <h3 className="adm-h2">Скарги сторін</h3>
+              {card.complaints.map((complaint) => (
+                <Link key={complaint.id} href={`/admin/complaints/${complaint.id}`} className="adm-item">
+                  <ComplaintBody complaint={complaint} />
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="adm-card adm-area-timeline" aria-labelledby="adm-timeline">
+          <h2 id="adm-timeline" className="adm-h2">
+            Хронологія
+          </h2>
+          <DealTimelineView timeline={card.timeline} />
         </section>
         <section className="adm-card" style={{ gridArea: "parties" }} aria-labelledby="adm-parties">
           <h2 id="adm-parties" className="adm-h2">
             Сторони
           </h2>
           <div className="adm-parties">
-            <PartyCard role="Замовник" party={card.customer} />
-            <PartyCard role="Виконавець" party={card.performer} />
+            <PartyCard label="Замовник" party={card.customer} />
+            <PartyCard label="Виконавець" party={card.performer} />
           </div>
         </section>
         <section className="adm-card adm-chat" style={{ gridArea: "chat" }} aria-labelledby="adm-chat">

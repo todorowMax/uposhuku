@@ -12,7 +12,11 @@ import {
   Star,
 } from "@/components/icons";
 import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
+import { ComplaintBox } from "@/components/deals/complaint-box";
+import { DeliveryNote } from "@/components/deals/delivery-note";
+import { ReceiptBox } from "@/components/deals/receipt-box";
 import { TransferCard } from "@/components/deals/transfer-card";
+import { complaintStageError } from "@/lib/deals/complaints";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import { dealAction, loadDeals, proposeDeal, startPayment, useDeals } from "@/lib/deals/client";
@@ -461,6 +465,12 @@ export function DealView({ deal }: { deal: Deal }) {
         </p>
       )}
 
+      {deal.criteria && (
+        <p className="text-sm leading-snug text-ink/85">
+          <span className="font-semibold">Що вважаємо готовим:</span> {deal.criteria}
+        </p>
+      )}
+
       {deal.status === "proposed" && deal.proposedBy === "performer" && (
         <div className="deal-wait" data-incoming>
           <div className="grid w-full gap-2">
@@ -557,6 +567,7 @@ export function DealView({ deal }: { deal: Deal }) {
                       onDispute={() => run("dispute", item)}
                     />
                   )}
+                  {active && !complaintStageError(deal, item) && <ComplaintBox dealId={deal.id} stageId={item.id} />}
                 </div>
               </li>
             );
@@ -674,23 +685,31 @@ function StageActions({
 
   if (stage.status === "pending") {
     return (
-      <TransferCard
-        dealId={deal.id}
-        requestId={deal.requestId}
-        stageId={stage.id}
-        dealNumber={deal.number}
-        amount={stage.amount}
-        busy={busy === "claim_paid"}
-        onClaim={onClaim}
-      />
+      <>
+        <TransferCard
+          dealId={deal.id}
+          requestId={deal.requestId}
+          stageId={stage.id}
+          dealNumber={deal.number}
+          amount={stage.amount}
+          busy={busy === "claim_paid"}
+          onClaim={onClaim}
+        />
+        <div className="mt-2">
+          <ReceiptBox deal={deal} stage={stage} />
+        </div>
+      </>
     );
   }
 
   if (stage.status === "claimed") {
     return (
-      <div className="deal-note">
-        <Loader2 className="size-3.5 animate-spin" />
-        Виконавець підтверджує, що гроші дійшли.
+      <div className="grid gap-2">
+        <div className="deal-note">
+          <Loader2 className="size-3.5 animate-spin" />
+          Виконавець підтверджує, що гроші дійшли.
+        </div>
+        <ReceiptBox deal={deal} stage={stage} />
       </div>
     );
   }
@@ -744,6 +763,7 @@ function StageActions({
     }
     return (
       <div className="mt-2 flex flex-wrap gap-2">
+        <DeliveryNote delivery={stage.delivery} />
         {stage.payoutError && (
           <p role="alert" className="auth-error w-full">
             {stage.payoutError}

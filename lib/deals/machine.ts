@@ -111,6 +111,7 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
   number: `#${id.replace(/\W/g, "").slice(-4).toUpperCase()}`,
   ...(draft.title ? { title: draft.title.trim() } : {}),
   ...(draft.description?.trim() ? { description: draft.description.trim() } : {}),
+  ...(draft.criteria?.trim() ? { criteria: draft.criteria.trim() } : {}),
   ...(draft.conversationId ? { conversationId: draft.conversationId } : {}),
   ...(draft.proposedBy ? { proposedBy: draft.proposedBy } : {}),
   stages: draft.stages.map((stage, index) => ({ id: `${id}-s${index + 1}`, ...stage, title: stage.title.trim(), status: "pending" })),
@@ -175,7 +176,7 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
       break;
     case "dispute":
       if (stage.status !== "delivered" && stage.status !== "funded") return "Спір можна відкрити, коли кошти заморожено або етап здано.";
-      if (deal.method === "direct") return "У прямому переказі гроші в нас не лежать, спір можна лише позначити в профілі.";
+      if (deal.method === "direct") return "У прямому переказі гроші в нас не лежать, тож спору немає. Є кнопка «Поскаржитися»: модератор побачить скаргу, але повернути переказ не зможе.";
       updated = { ...stage, status: "disputed", disputedAt: iso(now) };
       break;
     default:

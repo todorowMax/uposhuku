@@ -4,13 +4,14 @@
 // У безпечній угоді release лише записує намір, а «виплачено» ставить банк (lib/server/deal-money.ts).
 
 import { problem, readJson } from "@/lib/api/problem";
+import { checkDelivery } from "@/lib/deals/dispute-aids";
 import { releaseNeedsCode } from "@/lib/deals/limits";
 import { currentStage } from "@/lib/deals/machine";
 import { getSessionUser } from "@/lib/server/auth";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { verifyReleaseCode } from "@/lib/server/release-code";
 import { settleMessage, settleStage } from "@/lib/server/deal-money";
-import { actAsPerformer, actOnDeal, claimDirectPayment, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
+import { actAsPerformer, actOnDeal, claimDirectPayment, deliverStage, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
 import { dealSnapshotMethods } from "@/lib/server/requisites-repo";
 import { isPaymentMethod, METHOD_LABEL, type PaymentMethod } from "@/lib/deals/requisites";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
@@ -81,7 +82,12 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   if (body?.as === "performer") {
     const performerAction = PERFORMER_ACTIONS.find((item) => item === body?.action);
     if (!performerAction) return problem(400, "Невідома дія");
-    const done = await actAsPerformer(user.id, (await params).id, performerAction, typeof body?.stageId === "string" ? body.stageId : undefined);
+    const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
+    const dealId = (await params).id;
+    // Результат (пояснення, посилання) прикладається лише до «здати етап»; у інших діях ці поля ігноруємо.
+    const delivery = performerAction === "deliver" ? checkDelivery(body?.deliveryText, body?.deliveryLink) : null;
+    if (delivery && !delivery.ok) return problem(400, "Результат не прийнято", delivery.error);
+    const done = delivery ? await deliverStage({ performerUserId: user.id, dealId, stageId, delivery: delivery.value }) : await actAsPerformer(user.id, dealId, performerAction, stageId);
     if (done === null) return problem(404, "Угоду не знайдено");
     if (typeof done === "string") return problem(409, "Дію не виконано", done);
     // Прийняв, підтвердив оплату чи здав роботу: кроки угоди, за якими видно, куди рухається воронка угоди.
