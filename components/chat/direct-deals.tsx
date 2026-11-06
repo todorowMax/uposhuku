@@ -14,6 +14,7 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
+import { AcceptedMethods } from "@/components/deals/accepted-methods";
 import { useSafeDealOptions } from "@/lib/deals/use-safe-deal";
 import { money, moneyIn } from "@/lib/deals/format";
 import { feeOf, initialMethod, splitIntoStages, validateDraft } from "@/lib/deals/machine";
@@ -72,7 +73,7 @@ export function TermsForm({
   onCancel: () => void;
 }) {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
-  const { ready, safeEnabled, fop } = useSafeDealOptions(conversation.performerId);
+  const { ready, safeEnabled, fop, methods } = useSafeDealOptions(conversation.performerId);
   const escrowAvailable = useEscrowAvailable();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -265,6 +266,7 @@ export function TermsForm({
         </label>
         {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
+      {method === "direct" && <AcceptedMethods methods={methods} />}
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
           Оплата прямим переказом, одним платежем або за етапами: без комісії

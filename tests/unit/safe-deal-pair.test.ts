@@ -46,6 +46,6 @@ describe("GET /api/deals/config з виконавцем", () => {
 
   it("при вимкненому режимі про виплати чужої людини не розповідає", async () => {
     process.env.SAFE_DEAL_MODE = "off";
-    expect(await config(performerIdOf("pair-fop"))).toEqual({ safeDeal: false });
+    expect(await config(performerIdOf("pair-fop"))).toEqual({ safeDeal: false, methods: [] });
   });
 });

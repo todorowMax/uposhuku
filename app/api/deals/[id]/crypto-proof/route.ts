@@ -12,7 +12,7 @@ import { currentStage } from "@/lib/deals/machine";
 import { performerIdOf } from "@/lib/deals/parties";
 import { getSessionUser } from "@/lib/server/auth";
 import { deleteProof, listDealProofs, proofByHash, saveProof } from "@/lib/server/crypto-proof-repo";
-import { actOnDeal, getDealById, getDealForOwner } from "@/lib/server/deal-repo";
+import { claimDirectPayment, getDealById, getDealForOwner } from "@/lib/server/deal-repo";
 import { readVar } from "@/lib/server/env";
 import { featureEnabledFor } from "@/lib/server/features";
 import { rateLimited } from "@/lib/server/rate-limit";
@@ -58,7 +58,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     if (verdict instanceof Response) return verdict;
     const stored = await saveProof({ dealId: deal.id, stageId: stage.id, txHash, proof: verdict.proof });
     if (!stored) return problem(409, "Транзакцію вже використано", "За цим хешем оплату вже зараховано.");
-    const claimed = await actOnDeal(user.id, deal.id, "claim_paid", stage.id);
+    const claimed = await claimDirectPayment({ userId: user.id, dealId: deal.id, stageId: stage.id, via: "usdt" });
     if (typeof claimed === "string" || claimed === null) {
       await deleteProof(stored.id);
       return problem(409, "Оплату не прийнято", claimed ?? "Угоду не знайдено.");

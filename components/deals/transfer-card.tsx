@@ -2,18 +2,15 @@
 
 // components/deals/transfer-card.tsx
 //
-// Картка прямого переказу в угоді: одержувач, IBAN, код, сума, призначення з номером угоди, копіювання,
-// посилання на оплату й QR. Реквізити беремо зі знімка угоди (lib/server/requisites-repo). Немає реквізитів:
-// спокійний стан «виконавець ще не вказав». Далі «Я оплатив(ла)».
+// Картка прямого переказу в угоді. Способи оплати (банк, USDT, гаманець, Binance ID, PayPal, Wise) беремо зі
+// знімка угоди (lib/server/requisites-repo): кілька способів це вкладки, один спосіб без перемикача. Немає
+// жодного: спокійний стан «виконавець ще не вказав». Далі «Я оплатив(ла)» із вибраним способом.
 
 import { Loader2 } from "@/components/icons";
-import { WalletPaySection } from "@/components/wallet/wallet-pay-section";
 import { Button } from "@/components/ui/button";
-import { loadDeals } from "@/lib/deals/client";
-import { groupIban, requisitesText } from "@/lib/deals/transfer";
-import { CopyRow } from "./copy-row";
-import { CryptoTransfer } from "./crypto-transfer";
-import { QrImage } from "./qr-image";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isPaymentMethod, METHOD_LABEL, type PaymentMethod } from "@/lib/deals/requisites";
+import { MethodPanel } from "./method-panels";
 import { useTransferCard } from "./use-transfer-card";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -33,7 +30,7 @@ export const TransferCard = ({
   dealNumber: string;
   amount: number;
   busy: boolean;
-  onClaim: () => Promise<boolean>;
+  onClaim: (via?: PaymentMethod) => Promise<boolean>;
 }) => {
   const card = useTransferCard(dealId, dealNumber, amount);
   const { state } = card;
@@ -75,18 +72,26 @@ export const TransferCard = ({
         </div>
       )}
 
-      {state.kind === "ready" && (
+      {state.kind === "ready" && card.via && (
         <div className="mt-2 grid gap-3">
-          <dl className="grid gap-2 text-xs leading-snug">
-            <CopyRow label="Одержувач" value={state.requisites.recipient} copied={card.copied === "recipient"} onCopy={() => void card.copy("recipient", state.requisites.recipient)} />
-            <CopyRow label="IBAN" value={state.requisites.iban} shown={groupIban(state.requisites.iban)} copied={card.copied === "iban"} onCopy={() => void card.copy("iban", state.requisites.iban)} />
-            <CopyRow label="Код РНОКПП / ЄДРПОУ" value={state.requisites.taxCode} copied={card.copied === "code"} onCopy={() => void card.copy("code", state.requisites.taxCode)} />
-            <CopyRow label="Сума" value={String(amount)} shown={`${PRICE.format(amount)} ₴`} copied={card.copied === "amount"} onCopy={() => void card.copy("amount", amount.toFixed(2))} />
-            <CopyRow label="Призначення" value={card.purpose} copied={card.copied === "purpose"} onCopy={() => void card.copy("purpose", card.purpose)} />
-          </dl>
-          <Button variant="secondary" onClick={() => void card.copy("all", requisitesText(state.requisites, amount, card.purpose))} className="w-auto">
-            {card.copied === "all" ? "Скопійовано" : "Копіювати всі реквізити"}
-          </Button>
+          {state.methods.length > 1 ? (
+            <Tabs value={card.via} onValueChange={(value) => isPaymentMethod(value) && card.setPicked(value)}>
+              <TabsList aria-label="Спосіб оплати">
+                {state.methods.map((method) => (
+                  <TabsTrigger key={method} value={method}>
+                    {METHOD_LABEL[method]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {state.methods.map((method) => (
+                <TabsContent key={method} value={method}>
+                  <MethodPanel method={method} requisites={state.requisites} card={card} dealId={dealId} requestId={requestId} stageId={stageId} amount={amount} />
+                </TabsContent>
+              ))}
+            </Tabs>
+          ) : (
+            <MethodPanel method={card.via} requisites={state.requisites} card={card} dealId={dealId} requestId={requestId} stageId={stageId} amount={amount} />
+          )}
           {card.copyError && (
             <p role="alert" className="auth-error">
               {card.copyError}
@@ -95,31 +100,11 @@ export const TransferCard = ({
           <span role="status" className="sr-only">
             {card.copied ? "Скопійовано" : ""}
           </span>
-
-          {state.requisites.payUrl && (
-            <a href={state.requisites.payUrl} target="_blank" rel="noopener noreferrer" className="auth-link text-xs">
-              Відкрити сторінку оплати в банку
-            </a>
-          )}
-
-          {card.qrLink && (
-            <QrImage value={card.qrLink} label={`QR-код для переказу ${PRICE.format(amount)} гривень`} />
-          )}
-
-          {state.wallet && state.requisites.walletAddress && (
-            <WalletPaySection dealId={dealId} stageId={stageId} recipient={state.requisites.walletAddress} onPaid={() => void loadDeals(requestId)} />
-          )}
-
-          {state.crypto && (state.requisites.usdtTrc20 || state.requisites.binanceId) && (
-            <CryptoTransfer dealId={dealId} requestId={requestId} requisites={state.requisites} copied={card.copied} onCopy={(key, text) => void card.copy(key, text)} />
-          )}
         </div>
       )}
 
-      <p className="pe-hint mt-3">
-        Банк може обмежити суму переказів на місяць: перевірте свій ліміт заздалегідь. Платформа не отримує ці гроші й не повертає їх. Реквізити зафіксовано на момент прийняття угоди.
-      </p>
-      <Button variant="offer" disabled={busy} onClick={() => void onClaim()} className="mt-3 w-full">
+      <p className="pe-hint mt-3">Платформа не отримує ці гроші й не повертає їх. Реквізити зафіксовано на момент прийняття угоди.</p>
+      <Button variant="offer" disabled={busy || state.kind === "loading"} onClick={() => void onClaim(card.via ?? undefined)} className="mt-3 w-full">
         {busy && <Loader2 className="size-4 animate-spin" />}Я оплатив(ла)
       </Button>
     </div>

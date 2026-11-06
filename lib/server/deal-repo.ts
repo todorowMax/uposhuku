@@ -5,7 +5,8 @@
 
 import { and, desc, eq } from "drizzle-orm";
 import { deals, moderationActions } from "@/db/schema";
-import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft } from "@/lib/deals/machine";
+import { applyAction, applyModeratorAction, applyPerformerAction, createDeal, disputedStage, validateDraft, withPaidVia } from "@/lib/deals/machine";
+import type { PaymentMethod } from "@/lib/deals/requisites";
 import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type DealDraft, type DealStage, type ModeratorAction, type PerformerAction } from "@/lib/deals/types";
 import { conversations } from "@/db/schema";
 import { performerIdOf, performerUserId } from "@/lib/deals/parties";
@@ -108,6 +109,18 @@ export const actOnDeal = async (userId: string, id: string, action: DealAction, 
   if (!(await writeGuarded(row, result, now))) return DEAL_CONFLICT;
   if (action === "accept") await snapshotOnAccept(result, now);
   return result;
+};
+
+/** «Я оплатив(ла)» у прямому переказі: те саме, що claim_paid, плюс спосіб оплати в етапі (його вже перевірив виклик). */
+export const claimDirectPayment = async (input: { userId: string; dealId: string; stageId?: string; via?: PaymentMethod; now?: number }): Promise<Deal | string | null> => {
+  const { userId, dealId, stageId, via, now = Date.now() } = input;
+  const row = await readRow(dealId);
+  if (!row || row.ownerUserId !== userId) return null;
+  const result = applyAction(parse(row), "claim_paid", stageId, now);
+  if (typeof result === "string") return result;
+  const target = stageId ?? result.stages.find((stage) => stage.status === "claimed")?.id;
+  const withVia = via && target ? withPaidVia(result, target, via) : result;
+  return (await writeGuarded(row, withVia, now)) ? withVia : DEAL_CONFLICT;
 };
 
 /** Угода замовника за id (одна, не весь список) або null. */

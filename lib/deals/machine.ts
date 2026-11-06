@@ -5,6 +5,7 @@
 // виконавця. Гроші безпечної угоди ці функції самі не рухають і «заморожено» чи «виплачено» не ставлять:
 // вони лише записують намір (releasing, refunding), а підсумок приносить банк (lib/deals/payment-status.ts).
 
+import type { PaymentMethod } from "./requisites";
 import {
   ESCROW_MAX_DAYS,
   HOLD_DAYS,
@@ -127,6 +128,12 @@ const startRefund = (stage: DealStage, reason: NonNullable<DealStage["refundReas
   const { payoutError: _error, ...rest } = stage;
   return { ...rest, status: "refunding", refundingAt: iso(now), refundReason: reason, revertTo: revertPoint(stage) };
 };
+
+/** Записати в етап спосіб оплати (після claim_paid). Чиста функція: перевірку способу робить сервер. */
+export const withPaidVia = (deal: Deal, stageId: string, via: PaymentMethod): Deal => ({
+  ...deal,
+  stages: deal.stages.map((stage) => (stage.id === stageId ? { ...stage, paidVia: via } : stage)),
+});
 
 /** Етап, на якому зараз угода: перший не виплачений. */
 export const currentStage = (deal: Deal): DealStage | undefined => deal.stages.find((stage) => stage.status !== "released");

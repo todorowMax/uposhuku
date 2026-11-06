@@ -5,6 +5,8 @@
 // 30 днів, комісія платформи, лише для виконавців-ФОП) і «прямий
 // переказ» (без комісії й без гарантії платформи).
 
+import type { PaymentMethod } from "./requisites";
+
 export type DealMethod = "safe" | "direct" | "escrow";
 
 /** Валюта сум угоди: гривня для safe і direct, USDT для escrow (цілі долари на етап). Старі угоди без поля це UAH. */
@@ -34,6 +36,8 @@ export interface DealStage {
   days: number;
   status: StageStatus;
   claimedAt?: string;
+  /** Прямий переказ: яким способом замовник оплатив. Ставить сервер при «Я оплатив(ла)», лише зі способів знімка реквізитів. */
+  paidVia?: PaymentMethod;
   fundedAt?: string;
   deliveredAt?: string;
   releasedAt?: string;

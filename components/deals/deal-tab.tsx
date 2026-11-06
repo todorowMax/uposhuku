@@ -19,6 +19,7 @@ import { dealAction, loadDeals, proposeDeal, startPayment, useDeals } from "@/li
 import { paymentReturnStore } from "@/lib/deals/use-payment-return";
 import { useStore } from "@/lib/store";
 import { daysWord, money, moneyIn } from "@/lib/deals/format";
+import { AcceptedMethods } from "@/components/deals/accepted-methods";
 import { useSafeDealOptions } from "@/lib/deals/use-safe-deal";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
@@ -48,6 +49,7 @@ import {
 import { fetchMyReview, sendReview } from "@/lib/reviews/client";
 import { REVIEW_TEXT_MAX, type Review } from "@/lib/reviews/types";
 import type { OfferResponse } from "@/lib/requests/types";
+import type { PaymentMethod } from "@/lib/deals/requisites";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 
 const DATE = new Intl.DateTimeFormat("uk-UA", {
@@ -92,7 +94,7 @@ export function DealTab({ response }: { response: OfferResponse }) {
 
 function DealComposer({ response }: { response: OfferResponse }) {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
-  const { ready, safeEnabled, fop } = useSafeDealOptions(response.performerId);
+  const { ready, safeEnabled, fop, methods } = useSafeDealOptions(response.performerId);
   const escrowAvailable = useEscrowAvailable();
   // Що людина обрала сама; поки не обирала, «Безпечна угода» лише тоді, коли вона справді доступна для цього виконавця.
   const [picked, setPicked] = useState<DealMethod | null>(null);
@@ -258,6 +260,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         </label>
         {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
+      {method === "direct" && <AcceptedMethods methods={methods} />}
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
           Оплата прямим переказом виконавцю: без комісії платформи й без її
@@ -403,12 +406,12 @@ export function DealView({ deal }: { deal: Deal }) {
   const run = async (
     action: Parameters<typeof dealAction>[1],
     target?: DealStage,
-    code?: string,
+    extra: { code?: string; via?: PaymentMethod } = {},
   ) => {
     setBusy(action);
     setError(null);
     try {
-      await dealAction(deal, action, { stageId: target?.id, code });
+      await dealAction(deal, action, { stageId: target?.id, ...extra });
       setCheckout(null);
       setConfirmRelease(null);
       return true;
@@ -547,10 +550,10 @@ export function DealView({ deal }: { deal: Deal }) {
                       onCheckout={() => setCheckout(item)}
                       onCancelCheckout={() => setCheckout(null)}
                       onFund={pay}
-                      onClaim={() => run("claim_paid", item)}
+                      onClaim={(via) => run("claim_paid", item, { via })}
                       onAskRelease={() => setConfirmRelease(item)}
                       onCancelRelease={() => setConfirmRelease(null)}
-                      onRelease={(code) => run("release", item, code)}
+                      onRelease={(code) => run("release", item, { code })}
                       onDispute={() => run("dispute", item)}
                     />
                   )}
@@ -601,7 +604,7 @@ function StageActions({
   onCheckout: () => void;
   onCancelCheckout: () => void;
   onFund: () => Promise<boolean>;
-  onClaim: () => Promise<boolean>;
+  onClaim: (via?: PaymentMethod) => Promise<boolean>;
   onAskRelease: () => void;
   onCancelRelease: () => void;
   onRelease: (code?: string) => Promise<boolean>;

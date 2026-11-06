@@ -48,6 +48,9 @@ CRYPTO_ESCROW_USERS=
 # QR переказу за форматом НБУ: показувати, лише коли сканування перевірено в банках. Локально можна `on`.
 NBU_QR_MODE=off
 NBU_QR_USERS=
+# PayPal і Wise у реквізитах (off | allowlist | on). Умови сервісів для України не перевірено: не вмикати без юриста.
+FOREIGN_LINKS_MODE=off
+FOREIGN_LINKS_USERS=
 
 # Ключ TronGrid (необов'язковий): підвищує ліміт запитів при перевірці USDT TRC-20 за хешем. Секрет.
 TRONGRID_API_KEY=

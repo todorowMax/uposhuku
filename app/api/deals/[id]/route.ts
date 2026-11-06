@@ -10,7 +10,9 @@ import { getSessionUser } from "@/lib/server/auth";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { verifyReleaseCode } from "@/lib/server/release-code";
 import { settleMessage, settleStage } from "@/lib/server/deal-money";
-import { actAsPerformer, actOnDeal, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
+import { actAsPerformer, actOnDeal, claimDirectPayment, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
+import { dealSnapshotMethods } from "@/lib/server/requisites-repo";
+import { isPaymentMethod, METHOD_LABEL, type PaymentMethod } from "@/lib/deals/requisites";
 import { pushUser, userOfPerformer } from "@/lib/server/realtime";
 import type { DealAction, PerformerAction } from "@/lib/deals/types";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -54,6 +56,21 @@ const releaseCodeGate = async (input: { userId: string; dealId: string; stageId?
   return problem(403, "Невірний код", outcome === "wrong" ? "Невірний код. Перевірте лист і спробуйте ще раз." : "Код недійсний або застарів. Запросіть новий.", "/problems/release-code-invalid");
 };
 
+/**
+ * «Я оплатив(ла)»: спосіб оплати має бути одним із дозволених і лише зі знімка реквізитів угоди. Знімок порожній
+ * (виконавець нічого не вказав, домовилися в чаті): спосіб не потрібен. Повертає спосіб, відмову або null (угоди немає).
+ */
+const claimVia = async (input: { userId: string; dealId: string; via: unknown }): Promise<PaymentMethod | undefined | Response | null> => {
+  const deal = await getDealForOwner(input.dealId, input.userId);
+  if (!deal) return null;
+  // Другим способам угоди «Я оплатив(ла)» не підходить: відмову дасть машина стану.
+  if (deal.method !== "direct") return undefined;
+  if (input.via !== undefined && !isPaymentMethod(input.via)) return problem(400, "Невідомий спосіб оплати");
+  const methods = await dealSnapshotMethods(input.dealId);
+  if (input.via === undefined) return methods.length > 0 ? problem(400, "Оберіть спосіб оплати", "Вкажіть, яким способом ви заплатили.") : undefined;
+  return methods.includes(input.via) ? input.via : problem(409, "Цього способу немає в угоді", "Виконавець не вказав такий спосіб оплати для цієї угоди.");
+};
+
 export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
@@ -85,7 +102,14 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const refused = await releaseCodeGate({ userId: user.id, dealId, stageId, code: body?.code });
     if (refused) return refused;
   }
-  const accepted = await actOnDeal(user.id, dealId, action, stageId);
+  let via: PaymentMethod | undefined;
+  if (action === "claim_paid") {
+    const checked = await claimVia({ userId: user.id, dealId, via: body?.via });
+    if (checked === null) return problem(404, "Угоду не знайдено");
+    if (checked instanceof Response) return checked;
+    via = checked;
+  }
+  const accepted = action === "claim_paid" ? await claimDirectPayment({ userId: user.id, dealId, stageId, via }) : await actOnDeal(user.id, dealId, action, stageId);
   if (accepted === null) return problem(404, "Угоду не знайдено");
   if (typeof accepted === "string") return problem(409, "Дію не виконано", accepted);
   // Приймання безпечної угоди: намір вже записано (releasing), тепер просимо банк. Підсумок «виплачено» поставить сам банк.
@@ -100,7 +124,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   if (action === "claim_paid") serverEvent(EVENTS.dealPaid, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");
   if (result.status === "completed") serverEvent(EVENTS.dealCompleted, { deal_id: result.id, kind: result.method }, user.id, "/api/deals/action");
   const performerUser = userOfPerformer(result.performer.id);
-  if (performerUser) await addSystemMessage(user.id, performerUser, OWNER_LINE[action](result.number), result.id);
+  const line = OWNER_LINE[action](result.number) + (via ? ` (${METHOD_LABEL[via]})` : "");
+  if (performerUser) await addSystemMessage(user.id, performerUser, line, result.id);
   notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: action === "accept" || action === "decline" ? `owner_${action}` : action }));
   pushUser(userOfPerformer(result.performer.id), { t: "deal", requestId: result.requestId });
   return Response.json({ deal: result });

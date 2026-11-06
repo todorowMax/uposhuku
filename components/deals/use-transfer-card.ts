@@ -8,12 +8,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/lib/auth/client";
 import { nbuQrLink } from "@/lib/deals/nbu-qr";
-import type { Requisites } from "@/lib/deals/requisites";
+import { bankOf, type PaymentMethod, type Requisites } from "@/lib/deals/requisites";
 import { transferPurpose } from "@/lib/deals/transfer";
 import { fetchDealRequisites } from "@/lib/requisites/client";
 
 export namespace TransferCardTypes {
-  export type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; message: string } | { kind: "ready"; requisites: Requisites; qr: boolean; crypto: boolean; wallet: boolean };
+  export type State = { kind: "loading" } | { kind: "missing" } | { kind: "error"; message: string } | { kind: "ready"; requisites: Requisites; methods: PaymentMethod[]; qr: boolean };
 }
 
 const COPIED_MS = 2000;
@@ -28,7 +28,7 @@ export const useTransferCard = (dealId: string, dealNumber: string, amount: numb
   const toState = useCallback(async (): Promise<TransferCardTypes.State> => {
     try {
       const view = await fetchDealRequisites(dealId);
-      return view.requisites ? { kind: "ready", requisites: view.requisites, qr: view.qr, crypto: view.crypto, wallet: view.wallet } : { kind: "missing" };
+      return view.requisites && view.methods.length > 0 ? { kind: "ready", requisites: view.requisites, methods: view.methods, qr: view.qr } : { kind: "missing" };
     } catch (reason) {
       return { kind: "error", message: reason instanceof ApiError ? reason.message : "Не вдалося завантажити реквізити." };
     }
@@ -50,7 +50,11 @@ export const useTransferCard = (dealId: string, dealNumber: string, amount: numb
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
   const purpose = transferPurpose(dealNumber);
-  const qrLink = state.kind === "ready" && state.qr ? nbuQrLink({ ...state.requisites, amount, purpose }) : null;
+  const bank = state.kind === "ready" && state.qr ? bankOf(state.requisites) : null;
+  const qrLink = bank ? nbuQrLink({ ...bank, amount, purpose }) : null;
+  const [picked, setPicked] = useState<PaymentMethod | null>(null);
+  // Вибраний замовником спосіб, інакше перший доступний.
+  const via = state.kind === "ready" ? (picked && state.methods.includes(picked) ? picked : state.methods[0]) : null;
 
   /** Копіює текст і на мить позначає кнопку. Без дозволу на буфер показуємо підказку виділити вручну. */
   const copy = async (key: string, text: string) => {
@@ -67,5 +71,5 @@ export const useTransferCard = (dealId: string, dealNumber: string, amount: numb
     timer.current = setTimeout(() => setCopied(null), COPIED_MS);
   };
 
-  return { state, copied, copyError, purpose, qrLink, copy, reload };
+  return { state, copied, copyError, purpose, qrLink, via, setPicked, copy, reload };
 };

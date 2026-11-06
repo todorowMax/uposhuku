@@ -59,10 +59,10 @@ export const proposeDeal = async (draft: DealDraft) => {
   return deal;
 };
 
-export const dealAction = async (deal: Deal, action: DealAction, extra: { stageId?: string; code?: string } = {}) => {
+export const dealAction = async (deal: Deal, action: DealAction, extra: { stageId?: string; code?: string; via?: string } = {}) => {
   const { deal: next } = await call<{ deal: Deal }>(`/api/deals/${encodeURIComponent(deal.id)}`, {
     method: "POST",
-    body: JSON.stringify({ action, stageId: extra.stageId, ...(extra.code ? { code: extra.code } : {}) }),
+    body: JSON.stringify({ action, stageId: extra.stageId, ...(extra.code ? { code: extra.code } : {}), ...(extra.via ? { via: extra.via } : {}) }),
   });
   replace(next);
   return next;

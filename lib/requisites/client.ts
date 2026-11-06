@@ -6,7 +6,7 @@
 // Значення не кладемо в спільні сховища й не пишемо в журнал.
 
 import { callApi } from "@/lib/deals/client";
-import type { Requisites } from "@/lib/deals/requisites";
+import type { PaymentMethod, Requisites } from "@/lib/deals/requisites";
 
 export interface OwnRequisitesDto {
   requisites: Requisites | null;
@@ -16,6 +16,8 @@ export interface OwnRequisitesDto {
   crypto: boolean;
   /** Чи доступне підтвердження адреси гаманця (прапорець `crypto_wallet` і налаштована мережа). */
   wallet: boolean;
+  /** Чи доступні PayPal і Wise (прапорець `foreign_links`). */
+  foreign: boolean;
 }
 
 export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt: number };
@@ -23,6 +25,8 @@ export type SaveOutcomeDto = { kind: "saved" } | { kind: "pending"; effectiveAt:
 export interface DealRequisitesDto {
   requisites: Requisites | null;
   mask: string | null;
+  /** Способи оплати, які доступні цій людині в цій угоді (лише назви). */
+  methods: PaymentMethod[];
   /** Чи доступна цій людині оплата USDT за хешем (прапорець `crypto_proof`). */
   crypto: boolean;
   /** Показувати QR: false на проді, поки формат НБУ не перевірено в банках. */

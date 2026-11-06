@@ -14,7 +14,7 @@ import { currentStage } from "@/lib/deals/machine";
 import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
 import { deleteProof, proofByHash, saveProof } from "@/lib/server/crypto-proof-repo";
-import { actOnDeal, getDealForOwner } from "@/lib/server/deal-repo";
+import { claimDirectPayment, getDealForOwner } from "@/lib/server/deal-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { readDealRequisites } from "@/lib/server/requisites-repo";
 import { failure } from "@/lib/server/route";
@@ -63,7 +63,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
 
     const stored = await saveProof({ dealId: deal.id, stageId: stage.id, txHash, proof: verdict.proof, chain: "evm" });
     if (!stored) return USED();
-    const claimed = await actOnDeal(user.id, deal.id, "claim_paid", stage.id);
+    const claimed = await claimDirectPayment({ userId: user.id, dealId: deal.id, stageId: stage.id, via: "wallet" });
     if (typeof claimed === "string" || claimed === null) {
       await deleteProof(stored.id);
       return problem(409, "Оплату не прийнято", claimed ?? "Угоду не знайдено.");

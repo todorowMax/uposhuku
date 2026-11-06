@@ -1,5 +1,6 @@
 "use client";
 
+import { METHOD_LABEL } from "@/lib/deals/requisites";
 import {
   useEffect,
   useLayoutEffect,
@@ -1065,6 +1066,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
               </div>
             )}
             {needs === "confirm" && deal.method === "direct" && stage && <CryptoProofNote dealId={deal.id} stageId={stage.id} />}
+            {needs === "confirm" && stage?.paidVia && <p className="pe-hint">Спосіб оплати, який вказав замовник: {METHOD_LABEL[stage.paidVia]}.</p>}
             {needs === "confirm" && (
               <div className="inbox-deal-actions">
                 <button

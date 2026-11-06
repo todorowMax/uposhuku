@@ -2,7 +2,7 @@
 // Лише сторони прийнятої угоди з прямим переказом, решта 404. Читання замовником пишеться в журнал.
 
 import { problem } from "@/lib/api/problem";
-import { withoutCrypto, withoutWallet } from "@/lib/deals/requisites";
+import { paymentMethods, visibleRequisites } from "@/lib/deals/requisites";
 import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
 import { readDealRequisites } from "@/lib/server/requisites-repo";
@@ -21,9 +21,9 @@ export const GET = async (request: Request, { params }: { params: Promise<{ id: 
     if (!view) return problem(404, "Угоду не знайдено");
     const crypto = await featureEnabledFor("crypto_proof", user.email);
     const wallet = (await walletConfigFor(user.email)) !== null;
-    const visible = view.requisites && !wallet ? withoutWallet(view.requisites) : view.requisites;
-    const requisites = visible && !crypto ? withoutCrypto(visible) : visible;
-    return Response.json({ ...view, requisites, crypto, wallet, qr: await featureEnabledFor("nbu_qr", user.email) }, { headers: { "cache-control": "no-store" } });
+    const foreign = await featureEnabledFor("foreign_links", user.email);
+    const requisites = view.requisites && visibleRequisites(view.requisites, { crypto, wallet, foreign });
+    return Response.json({ ...view, requisites, methods: requisites ? paymentMethods(requisites) : [], crypto, wallet, qr: await featureEnabledFor("nbu_qr", user.email) }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     if (error instanceof SecretBoxUnavailableError) return problem(503, "Реквізити тимчасово недоступні", "Спробуйте пізніше.");
     return failure(error, request);

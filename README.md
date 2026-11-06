@@ -43,7 +43,7 @@ CI (`.github/workflows/ci.yml`) запускає lint, typecheck і тести �
   перед dev-деплоєм обов'язково `npm run cf:build`, інакше на dev зникнуть фото демо-виконавців.
   Секрети на воркер кладуть через `wrangler secret put`, у `wrangler.jsonc` їх немає.
 - Функції з грошима й криптою вмикаються прапорцями `off | allowlist | on`: безпечна угода (`SAFE_DEAL_MODE`),
-  `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`. Значення зберігає сторінка `/admin/features`, інакше
+  `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`, `foreign_links`. Значення зберігає сторінка `/admin/features`, інакше
   беруться змінні `<ІМ'Я>_MODE` і `<ІМ'Я>_USERS`; за замовчуванням усе вимкнено.
 
 ## Карта і ресурси

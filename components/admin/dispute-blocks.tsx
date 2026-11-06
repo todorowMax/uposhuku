@@ -3,6 +3,7 @@
 import { DECISION_LABEL, type DecisionLogRow, type DisputeParty } from "@/lib/admin/types";
 import { feeOf, payoutOf, dealTotal } from "@/lib/deals/machine";
 import { formatKop } from "@/lib/deals/price";
+import { METHOD_LABEL } from "@/lib/deals/requisites";
 import { dealCurrency, type Deal, type DealStage } from "@/lib/deals/types";
 import { formatDay, formatMoney, formatStamp, holdLeft, STAGE_STATE } from "@/lib/admin/format";
 
@@ -42,6 +43,7 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
                   {STAGE_STATE[stage.status]}
                 </span>
                 <span className="adm-muted">{stage.days} дн на етап</span>
+                {stage.paidVia && <span className="adm-muted">Оплата: {METHOD_LABEL[stage.paidVia]}</span>}
                 {stage.holdUntil && (
                   <span className="adm-muted">
                     Холд до {formatStamp(stage.holdUntil)}

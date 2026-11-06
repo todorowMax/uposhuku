@@ -66,8 +66,11 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`; CSP лише
   Report-Only (звіти в `/api/csp-report`), HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
   Грошові рішення модератора потребують `ADMIN_TOTP_SECRET`; на проді без нього вони вимкнені.
-- Прапорці функцій (`safe_deal`, `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`): режим `off` | `allowlist` | `on`
-  і список пошт. Значення з таблиці `feature_flags` (сторінка `/admin/features`), інакше зі змінних `<ІМ'Я>_MODE` і
+- Прапорці функцій (`safe_deal`, `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`, `foreign_links`): режим `off` | `allowlist` | `on`
+  і список пошт. `foreign_links` вмикає PayPal і Wise у реквізитах (грошовий: TOTP і лист). Способи оплати виконавця
+  (банк, USDT, гаманець, Binance ID, PayPal, Wise) в `lib/deals/requisites.ts`: усі поля необов'язкові, потрібен
+  хоча б один спосіб; `paymentMethods()` дає список, `mask` без IBAN це мітка способу; «Я оплатив(ла)» пише
+  `stage.paidVia` лише зі способів знімка. Значення з таблиці `feature_flags` (сторінка `/admin/features`), інакше зі змінних `<ІМ'Я>_MODE` і
   `<ІМ'Я>_USERS`, інакше `off`. Чиста логіка в `lib/features`, сервер у `lib/server/features.ts`. Зміна грошових
   прапорців потребує TOTP.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on

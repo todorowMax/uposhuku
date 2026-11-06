@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { callApi } from "./client";
+import type { PaymentMethod } from "./requisites";
 
 export interface SafeDealOptions {
   /** Відповідь сервера вже є. */
@@ -16,11 +17,14 @@ export interface SafeDealOptions {
   safeEnabled: boolean;
   /** Виконавець підключив виплати: без цього безпечна угода з ним неможлива. */
   fop: boolean;
+  /** Способи прямого переказу, які приймає виконавець (лише назви); undefined, поки відповіді немає. */
+  methods?: PaymentMethod[];
 }
 
 interface Config {
   safeDeal: boolean;
   performerPayouts?: boolean;
+  methods?: PaymentMethod[];
 }
 
 const cache = new Map<string, Promise<Config | null>>();
@@ -50,6 +54,7 @@ export const useSafeDealOptions = (performerId: string | null): SafeDealOptions 
         ready: true,
         safeEnabled: config?.safeDeal === true,
         fop: config?.performerPayouts === true,
+        methods: config?.methods,
       });
     });
     return () => {

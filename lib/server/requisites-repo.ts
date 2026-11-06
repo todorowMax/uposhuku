@@ -7,7 +7,7 @@
 import { and, eq, isNotNull, lte, sql } from "drizzle-orm";
 import { dealRequisites, deals, payoutRequisites, requisiteReads } from "@/db/schema";
 import { performerIdOf, performerUserId } from "@/lib/deals/parties";
-import { maskIban, type Requisites } from "@/lib/deals/requisites";
+import { maskOf, paymentMethods, visibleRequisites, type MethodAccess, type PaymentMethod, type Requisites } from "@/lib/deals/requisites";
 import { getDb } from "./db";
 import { openText, sealText } from "./secret-box";
 
@@ -53,7 +53,7 @@ export const getOwnRequisites = async (userId: string, now = Date.now()): Promis
 /** Зберегти: уперше одразу, далі як очікуючу зміну (повторна правка перезапускає очікування). */
 export const saveOwnRequisites = async (userId: string, value: Requisites, now = Date.now()): Promise<SaveOutcome> => {
   const cipher = await seal(value, userId);
-  const mask = maskIban(value.iban);
+  const mask = maskOf(value);
   const db = getDb();
   const current = await rowOf(userId, now);
   if (!current) {
@@ -132,4 +132,27 @@ export const dealWalletAddress = async (dealId: string, now = Date.now()): Promi
   if (!snapshot && (await snapshotDealRequisites(dealId, performerUser, now))) [snapshot] = await db.select().from(dealRequisites).where(eq(dealRequisites.dealId, dealId)).limit(1);
   if (!snapshot) return null;
   return (await open(snapshot.cipher, performerUser)).walletAddress ?? null;
+};
+
+/**
+ * Способи оплати зі знімка угоди (лише назви, без значень) для перевірки «Я оплатив(ла)». Службове читання сервера:
+ * у журнал читань не пишеться. Знімка немає: порожній список.
+ */
+export const dealSnapshotMethods = async (dealId: string, now = Date.now()): Promise<PaymentMethod[]> => {
+  const db = getDb();
+  const [deal] = await db.select({ performerId: deals.performerId }).from(deals).where(eq(deals.id, dealId)).limit(1);
+  const performerUser = deal ? performerUserId(deal.performerId) : null;
+  if (!performerUser) return [];
+  let [snapshot] = await db.select().from(dealRequisites).where(eq(dealRequisites.dealId, dealId)).limit(1);
+  if (!snapshot && (await snapshotDealRequisites(dealId, performerUser, now))) [snapshot] = await db.select().from(dealRequisites).where(eq(dealRequisites.dealId, dealId)).limit(1);
+  return snapshot ? paymentMethods(await open(snapshot.cipher, performerUser)) : [];
+};
+
+/**
+ * Способи, які зараз приймає виконавець, для цієї людини за її прапорцями. Лише назви: значень замовник
+ * до прийняття угоди не бачить. Реквізитів немає: порожній список.
+ */
+export const performerMethods = async (performerUser: string, access: MethodAccess, now = Date.now()): Promise<PaymentMethod[]> => {
+  const row = await rowOf(performerUser, now);
+  return row ? paymentMethods(visibleRequisites(await open(row.cipher, performerUser), access)) : [];
 };
