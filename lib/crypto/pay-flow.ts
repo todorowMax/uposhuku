@@ -5,12 +5,13 @@
 // з динамічно завантажених панелей гаманця: wagmi у загальний пакет потрапляти не повинен.
 
 import type { Address, Hex } from "viem";
-import { readContract, waitForTransactionReceipt, writeContract } from "wagmi/actions";
+import { writeContract } from "wagmi/actions";
 import type { Config } from "wagmi";
 import { erc20Abi } from "./abi/erc20";
 import { feeRouterAbi } from "./abi/fee-router";
 import { approvalSteps } from "./approvals";
 import type { PublicCryptoConfig } from "./config";
+import { readViaWallet, waitReceiptViaWallet } from "./wallet-read";
 
 /** Помилка, текст якої написано для людини й можна показувати як є. */
 export class WalletFlowError extends Error {
@@ -38,12 +39,12 @@ export interface ApproveInput {
 export const approveExact = async (input: ApproveInput): Promise<Hex[]> => {
   const { config, crypto, owner, spender, needed, onPhase } = input;
   const base = { chainId: crypto.chainId, abi: erc20Abi, address: crypto.token } as const;
-  const current = (await readContract(config, { ...base, functionName: "allowance", args: [owner, spender] })) as bigint;
+  const current = (await readViaWallet(config, { ...base, functionName: "allowance", args: [owner, spender] })) as bigint;
   const hashes: Hex[] = [];
   for (const step of approvalSteps(current, needed)) {
     onPhase?.("approving");
     const hash = await writeContract(config, { ...base, functionName: "approve", args: [spender, step] });
-    await waitForTransactionReceipt(config, { hash, chainId: crypto.chainId });
+    await waitReceiptViaWallet(config, { hash, chainId: crypto.chainId });
     hashes.push(hash);
   }
   return hashes;
@@ -63,13 +64,13 @@ export interface DirectPaymentInput {
 export const sendDirectPayment = async (input: DirectPaymentInput): Promise<Hex> => {
   const { config, crypto, owner, recipient, units, dealRef, onPhase } = input;
   const token = { chainId: crypto.chainId, abi: erc20Abi, address: crypto.token } as const;
-  const balance = (await readContract(config, { ...token, functionName: "balanceOf", args: [owner] })) as bigint;
+  const balance = (await readViaWallet(config, { ...token, functionName: "balanceOf", args: [owner] })) as bigint;
   if (!crypto.router) {
     if (balance < units) throw new WalletFlowError("На гаманці не вистачає USDT для цього платежу.");
     onPhase?.("paying");
     return writeContract(config, { ...token, functionName: "transfer", args: [recipient, units] });
   }
-  const fee = (await readContract(config, { chainId: crypto.chainId, abi: feeRouterAbi, address: crypto.router, functionName: "quoteFee", args: [units] })) as bigint;
+  const fee = (await readViaWallet(config, { chainId: crypto.chainId, abi: feeRouterAbi, address: crypto.router, functionName: "quoteFee", args: [units] })) as bigint;
   if (balance < units + fee) throw new WalletFlowError("На гаманці не вистачає USDT для платежу з комісією.");
   await approveExact({ config, crypto, owner, spender: crypto.router, needed: units + fee, onPhase });
   onPhase?.("paying");

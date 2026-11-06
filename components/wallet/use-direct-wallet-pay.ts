@@ -8,12 +8,12 @@
 
 import { useState } from "react";
 import { parseUnits, type Address, type Hex } from "viem";
-import { waitForTransactionReceipt } from "wagmi/actions";
 import { useConfig, useConnection } from "wagmi";
 import { ApiError } from "@/lib/auth/client";
 import { submitWalletPayment } from "@/lib/crypto/client";
 import type { PublicCryptoConfig } from "@/lib/crypto/config";
 import { dealRefOf } from "@/lib/crypto/deal-ref";
+import { waitReceiptViaWallet } from "@/lib/crypto/wallet-read";
 import { sendDirectPayment, WalletFlowError } from "@/lib/crypto/pay-flow";
 import { walletErrorText } from "@/lib/crypto/wallet-errors";
 import { USDT_DECIMALS } from "@/lib/crypto/units";
@@ -62,7 +62,7 @@ export const useDirectWalletPay = (options: DirectWalletPayTypes.Options) => {
   const working = phase !== "idle" && phase !== "paid" && !(phase === "checking" && error);
   const canPay = ready && units !== null && verified && phase === "idle";
 
-  const wait = (tx: Hex) => waitForTransactionReceipt(config, { hash: tx, chainId: crypto.chainId });
+  const wait = (tx: Hex) => waitReceiptViaWallet(config, { hash: tx, chainId: crypto.chainId });
 
   const check = async (tx: Hex) => {
     setPhase("checking");

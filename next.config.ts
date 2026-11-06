@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
   // тут AGENTS.md (RULES-1), тож вимикаємо.
   agentRules: false,
   // Захисні заголовки для `next dev` і сторінок Next; воркер ставить ті самі на всі відповіді (worker/index.ts).
-  headers: async () => [{ source: "/:path*", headers: Object.entries(securityHeaders({ dev: process.env.NODE_ENV !== "production" })).map(([key, value]) => ({ key, value })) }],
+  headers: async () => [{ source: "/:path*", headers: Object.entries(securityHeaders({ dev: process.env.NODE_ENV !== "production", rpcUrl: process.env.CRYPTO_RPC_URL })).map(([key, value]) => ({ key, value })) }],
 };
 
 // `next dev` бачить біндинги Cloudflare (D1, R2). Локальна D1 лежить у

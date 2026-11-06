@@ -105,7 +105,7 @@ export default {
     // Поки сайт закритий від пошуківців: усе, що віддає Next, йде з noindex (разом з app/robots.ts).
     const headers = new Headers(response.headers);
     headers.set("X-Robots-Tag", "noindex, nofollow");
-    for (const [name, value] of Object.entries(securityHeaders())) headers.set(name, value);
+    for (const [name, value] of Object.entries(securityHeaders({ rpcUrl: env.CRYPTO_RPC_URL }))) headers.set(name, value);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },
 } satisfies ExportedHandler<CloudflareEnv>;

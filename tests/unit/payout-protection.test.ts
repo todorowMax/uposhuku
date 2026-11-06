@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { decodeBase32, totpCode, verifyTotp } from "@/lib/admin/totp";
 import { newAccountLimit, NEW_ACCOUNT_MAX_STAGE, releaseNeedsCode, RELEASE_CODE_FROM } from "@/lib/deals/limits";
 import { isValidTaxId, maskTaxId, validatePayoutApplication } from "@/lib/deals/payout";
-import { contentSecurityPolicy, MAP_ORIGINS, securityHeaders } from "@/lib/security-headers";
+import { contentSecurityPolicy, MAP_ORIGINS, rpcOrigin, securityHeaders, WALLETCONNECT_ORIGINS } from "@/lib/security-headers";
 
 /** ІПН із вірною контрольною цифрою за алгоритмом: перші 9 цифр, остання обчислена. */
 const withCheckDigit = (nine: string): string => {
@@ -93,5 +93,16 @@ describe("захисні заголовки", () => {
     expect(csp).toMatch(/img-src[^;]*data:[^;]*blob:/);
     expect(csp).not.toContain("'unsafe-eval'");
     expect(contentSecurityPolicy({ dev: true })).toContain("'unsafe-eval'");
+  });
+
+  it("політика пускає WalletConnect і RPC з налаштувань оплат", () => {
+    const csp = contentSecurityPolicy({ rpcUrl: "https://rpc.example.org/v1/secret-key" });
+    const connect = csp.split("; ").find((part) => part.startsWith("connect-src")) ?? "";
+    for (const origin of WALLETCONNECT_ORIGINS) expect(connect).toContain(origin);
+    expect(connect).toContain("https://rpc.example.org");
+    expect(csp).not.toContain("secret-key");
+    expect(contentSecurityPolicy()).not.toContain("example.org");
+    expect(rpcOrigin("not a url")).toBeNull();
+    expect(rpcOrigin("ftp://x.org")).toBeNull();
   });
 });
