@@ -4,9 +4,8 @@
 // kind = "rate"), а не в пам'яті воркера: ізоляти не діляться станом. Ключ: назва правила + користувач чи IP.
 // Значення правил живуть тут константами; порушення дає 429 у тому ж вигляді, що й вхід.
 
-import { and, eq, gt } from "drizzle-orm";
 import { problem } from "@/lib/api/problem";
-import { authAttempts } from "@/db/schema";
+import { takeAttempt } from "./attempts";
 import { getDb } from "./db";
 
 const MINUTE = 60_000;
@@ -34,26 +33,26 @@ export const RATE_RULES = {
   adminDecision: { max: 30, windowMs: 10 * MINUTE },
   adminTotp: { max: 10, windowMs: 10 * MINUTE },
   cspReport: { max: 60, windowMs: 10 * MINUTE },
+  // Щедрі для живої людини, але не безмежні: стеля проти скриптів.
+  message: { max: 60, windowMs: MINUTE },
+  upload: { max: 30, windowMs: 10 * MINUTE },
+  requestCreate: { max: 10, windowMs: 60 * MINUTE },
+  responseCreate: { max: 30, windowMs: 60 * MINUTE },
+  reviewCreate: { max: 10, windowMs: 60 * MINUTE },
+  conversationCreate: { max: 30, windowMs: 60 * MINUTE },
+  profileSave: { max: 30, windowMs: 60 * MINUTE },
 } as const satisfies Record<string, RateRule>;
 
 export type RateName = keyof typeof RATE_RULES;
 
 /**
- * Рахує звернення й каже, чи перевищено правило. Запис додається лише тоді, коли звернення
- * пропущено. Відмови не пишемо: настирливий клієнт не роздуває таблицю, а вікно ковзає за пропущеними
- * зверненнями, тож після вичікування ліміт знову відкривається. `at` лише для тестів.
+ * Пропускає звернення й резервує його одним атомарним INSERT ... SELECT (lib/server/attempts.ts): облік і перевірка
+ * не розходяться при паралельних запитах, ліміт точний. Відмови не пишемо: настирливий клієнт не роздуває таблицю,
+ * а вікно ковзає за пропущеними зверненнями, тож після вичікування ліміт знову відкривається. `at` лише для тестів.
  */
 export const overLimit = async (name: RateName, subject: string, at = Date.now()): Promise<boolean> => {
-  const rule = RATE_RULES[name];
-  const key = `${name}:${subject}`;
-  const db = getDb();
-  const recent = await db
-    .select({ id: authAttempts.id })
-    .from(authAttempts)
-    .where(and(eq(authAttempts.key, key), eq(authAttempts.kind, "rate"), gt(authAttempts.createdAt, at - rule.windowMs)));
-  if (recent.length >= rule.max) return true;
-  await db.insert(authAttempts).values({ key, kind: "rate", createdAt: at });
-  return false;
+  const rule: RateRule = RATE_RULES[name];
+  return (await takeAttempt(getDb(), { key: `${name}:${subject}`, kind: "rate", max: rule.max, windowMs: rule.windowMs, at })) === null;
 };
 
 /** 429, якщо правило перевищено; null, якщо можна продовжувати. */

@@ -61,8 +61,17 @@ const attachmentsOf = async (messageIds: string[]) => {
   return inChunks(messageIds, (chunk) => getDb().select({ id: chatAttachments.id, messageId: chatAttachments.messageId }).from(chatAttachments).where(inArray(chatAttachments.messageId, chunk)));
 };
 
+const MESSAGES_PAGE = 500;
+
+/**
+ * Перше завантаження (since = 0) віддає останні 500 повідомлень (спершу беремо найновіші, потім розвертаємо),
+ * щоб довга розмова не показувала лише початок. Опитування (since > 0) читає зростаюче від мітки, як і раніше:
+ * так жодне нове повідомлення не губиться.
+ */
 export const listMessages = async (conversationId: string, sinceMs = 0): Promise<ChatMessageDto[]> => {
-  const rows = await getDb().select().from(messages).where(and(eq(messages.conversationId, conversationId), gt(messages.createdAt, sinceMs))).orderBy(asc(messages.createdAt)).limit(500);
+  const where = and(eq(messages.conversationId, conversationId), gt(messages.createdAt, sinceMs));
+  const query = getDb().select().from(messages).where(where);
+  const rows = sinceMs > 0 ? await query.orderBy(asc(messages.createdAt)).limit(MESSAGES_PAGE) : (await query.orderBy(desc(messages.createdAt)).limit(MESSAGES_PAGE)).reverse();
   const files = await attachmentsOf(rows.map((row) => row.id));
   return rows.map((row) => toMessage(row, files.filter((file) => file.messageId === row.id)));
 };
@@ -144,7 +153,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
       other = { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
     } else {
       const customer = customers.find((user) => user.id === row.customerUserId);
-      other = { name: customer?.displayName ?? customer?.email.split("@")[0] ?? "Замовник" };
+      other = { name: customer?.displayName ?? "Замовник" };
     }
     const dealRow = mine.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
     let deal: ConversationDto["deal"];

@@ -209,7 +209,7 @@ describe("чат на D1", () => {
 
     const forCustomer = await listConversations("c1");
     expect(forCustomer[0]).toMatchObject({ role: "customer", other: { name: "Максим" }, lastMessage: { text: "Добрий день, можу взяти" } });
-    expect((await listConversations("perf"))[0]).toMatchObject({ role: "performer", other: { name: "c1" } });
+    expect((await listConversations("perf"))[0]).toMatchObject({ role: "performer", other: { name: "Замовник" } });
     expect(await listConversations("c2")).toEqual([]);
   });
 });

@@ -26,22 +26,26 @@ export const POST = async (request: Request) => {
   const expected = readVar("INTERNAL_TOKEN");
   const given = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!expected || !sameSecret(given, expected)) return new Response(null, { status: 401 });
-  try {
-    const now = Date.now();
-    const posted = await postDueRequests(now);
-    const closed = await closeFinishedPosts(now);
-    await pruneTelegram(now);
-    await getDb().delete(notificationLog).where(and(lt(notificationLog.createdAt, now - WEEK_MS)));
-    // Лічильники спроб і частоти потрібні лише на своє вікно (найдовше година).
-    await getDb().delete(authAttempts).where(lt(authAttempts.createdAt, now - ATTEMPTS_KEEP_MS));
-    // Гроші безпечної угоди йдуть окремо: збій там не зупиняє решту фонових задач, а видно в журналі.
-    const sweep = await runDealSweep(now).catch((error) => {
-      logServer({ level: "error", event: "deal_sweep_crashed", message: error instanceof Error ? error.message : String(error) });
+  const now = Date.now();
+  const failed: string[] = [];
+  // Кожен крок у своєму try/catch: збій одного не скасовує решту, а потрапляє в журнал і у відповідь.
+  const step = async <T>(name: string, run: () => Promise<T>): Promise<T | null> => {
+    try {
+      return await run();
+    } catch (error) {
+      failed.push(name);
+      logServer({ level: "error", event: "tick_step_failed", message: error instanceof Error ? error.message : String(error), detail: { step: name, stack: error instanceof Error ? error.stack : null } });
       return null;
-    });
-    return Response.json({ ok: true, ...posted, closed, sweep });
-  } catch (error) {
-    logServer({ level: "error", event: "tick_failed", message: error instanceof Error ? error.message : String(error), detail: { stack: error instanceof Error ? error.stack : null } });
-    return Response.json({ ok: false }, { status: 500 });
-  }
+    }
+  };
+  // Звірка грошей безпечної угоди йде першою: її не повинні зачепити збої Telegram чи прибирання.
+  const sweep = await step("sweep", () => runDealSweep(now));
+  const posted = await step("post", () => postDueRequests(now));
+  const closed = await step("close", () => closeFinishedPosts(now));
+  await step("prune_telegram", () => pruneTelegram(now));
+  await step("prune_notifications", () => getDb().delete(notificationLog).where(and(lt(notificationLog.createdAt, now - WEEK_MS))));
+  // Лічильники спроб і частоти потрібні лише на своє вікно (найдовше година).
+  await step("prune_attempts", () => getDb().delete(authAttempts).where(lt(authAttempts.createdAt, now - ATTEMPTS_KEEP_MS)));
+  const sweepFailed = failed.includes("sweep");
+  return Response.json({ ok: failed.length === 0, failed, ...posted, closed, sweep }, { status: sweepFailed ? 500 : 200 });
 };

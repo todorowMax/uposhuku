@@ -3,6 +3,7 @@
 // опублікувати); DELETE — видалити профіль і зняти з карти.
 // D1: profiles, projects, profile_tags. Фото поки data URL, потім R2.
 
+import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { deleteProfile, getProfile, saveProfile } from "@/lib/server/profile-repo";
@@ -21,6 +22,8 @@ export async function GET() {
 export async function PUT(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const limited = await rateLimited("profileSave", user.id);
+  if (limited) return limited;
   const profile = parseProfile(await readJson(request));
   if (typeof profile === "string") return problem(400, "Профіль не збережено", profile);
   const previous = await getProfile(user.id);

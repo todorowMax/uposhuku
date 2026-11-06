@@ -2,6 +2,7 @@
 // POST — опублікувати (лише з сесією: гість спершу вводить код з пошти);
 // GET — мої запити, нові першими.
 
+import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { createRequest, listRequests } from "@/lib/server/request-repo";
@@ -52,6 +53,8 @@ const parseDraft = (body: Record<string, unknown> | null): RequestDraft | string
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
+  const limited = await rateLimited("requestCreate", user.id);
+  if (limited) return limited;
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const created = await createRequest(user.id, draft);

@@ -3,6 +3,7 @@
 // Відгукнутися можна на будь-який відкритий чужий запит; замовник бачить
 // пропозицію одразу (подія offer у реальному часі).
 
+import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { canRespond, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
@@ -34,6 +35,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const auth = await authorize(id);
   if (auth.error) return auth.error;
+  const limited = await rateLimited("responseCreate", auth.user.id);
+  if (limited) return limited;
   const value = parseResponse(await readJson(request));
   if (typeof value === "string") return problem(400, "Відгук не надіслано", value);
   const saved = await saveResponse(auth.user.id, id, value);

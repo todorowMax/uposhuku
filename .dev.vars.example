@@ -19,7 +19,8 @@ TELEGRAM_BOT_USERNAME=
 TELEGRAM_CHANNEL_ID=
 CHANNEL_ENABLED=
 CHANNEL_DELAY_MIN=20
-# openssl rand -hex 32: захищає /api/internal/tick, який викликає cron воркера.
+# openssl rand -hex 32: захищає /api/internal/tick, який викликає cron воркера. Обов'язковий: без нього (і без SITE_URL)
+# cron нічого не робить, воркер лише пише tick_not_configured у журнал. На dev і проді: `wrangler secret put INTERNAL_TOKEN --env ...`.
 INTERNAL_TOKEN=
 
 # Токен еквайрингу Monobank: термінал без розщеплення, оплата розміщення на карті; безпечна угода піде тим самим вебхуком.

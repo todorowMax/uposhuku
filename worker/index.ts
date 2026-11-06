@@ -7,6 +7,7 @@
 
 import { jwtVerify } from "jose";
 import { securityHeaders } from "../lib/security-headers";
+import { missingTickConfig } from "../lib/server/tick-config";
 import { sessionSecret } from "../lib/server/session-secret";
 import { logLater, type KitServerConfig } from "../kit/telemetry/core";
 // @ts-expect-error: файл створює збірка OpenNext (npm run cf:build)
@@ -70,9 +71,13 @@ const workerTelemetry = (env: CloudflareEnv, ctx: ExecutionContext): KitServerCo
 
 /** Раз на 5 хвилин: фонові задачі застосунку (пости в Telegram-канал, прибирання). Лише в роуті Next є база й конфіг. */
 const tick = async (env: CloudflareEnv, ctx: ExecutionContext) => {
-  if (!env.INTERNAL_TOKEN) return;
+  // Без токена чи адреси cron мовчки нічого б не робив: пишемо помилку в журнал, щоб це було видно.
   const base = (env.SITE_URL ?? "").replace(/\/$/, "");
-  if (!base) return;
+  const missing = missingTickConfig(env);
+  if (missing.length > 0) {
+    logLater(workerTelemetry(env, ctx), { level: "error", source: "worker", event: "tick_not_configured", message: `Cron не може викликати tick: не задано ${missing.join(", ")}` });
+    return;
+  }
   const request = new Request(`${base}/api/internal/tick`, { method: "POST", headers: { authorization: `Bearer ${env.INTERNAL_TOKEN}` } });
   try {
     const response = await openNext.fetch(request, env, ctx);

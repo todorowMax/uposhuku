@@ -4,6 +4,11 @@
   // їде через ASSETS. Акаунт, домени й бази допишемо, коли буде куди
   // деплоїти; зараз тут лише мінімум, з яким працює `cf:preview`.
   "name": "uposhuku",
+  // Секрети (wrangler secret put <ІМ'Я> --env development|production), імена без значень; приклади в .dev.vars.example:
+  //   обов'язкові: AUTH_SECRET, INTERNAL_TOKEN (без нього cron не викликає /api/internal/tick, воркер пише tick_not_configured),
+  //     REQUISITES_KEY, RESEND_API_KEY (прод), ADMIN_EMAILS, ADMIN_TOTP_SECRET (прод: без нього грошові рішення вимкнені);
+  //   за функціями: MONOBANK_TOKEN, MONOBANK_SPLIT_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+  //     TRONGRID_API_KEY. SITE_URL не секрет, лежить у vars кожного середовища.
   // Свій вхід (worker/index.ts): обгортає воркер OpenNext і додає WebSocket на Durable Objects.
   "main": "worker/index.ts",
   "compatibility_date": "2026-09-01",

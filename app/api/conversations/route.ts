@@ -2,6 +2,7 @@
 // GET — мої розмови в обох ролях; POST {performerId} — відкрити розмову
 // (або отримати вже наявну).
 
+import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { getOrCreateConversation, listConversations, performerKnown } from "@/lib/server/chat-repo";
@@ -21,6 +22,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const limited = await rateLimited("conversationCreate", user.id);
+  if (limited) return limited;
   const body = await readJson(request);
   const performerId = typeof body?.performerId === "string" ? body.performerId.slice(0, 80) : "";
   try {

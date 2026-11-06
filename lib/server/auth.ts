@@ -5,12 +5,13 @@
 // повторний лист не частіше разу на 60 с, ліміти в базі. Сесія — JWT (HS256)
 // у HttpOnly-cookie, `jti` = рядок у `sessions`, без нього токен мертвий.
 
-import { and, eq, gt } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { SessionUser } from "@/lib/auth/types";
 import { MOCK_CODE } from "@/lib/auth/config";
-import { authAttempts, emailCodes, sessions, users } from "@/db/schema";
+import { emailCodes, sessions, users } from "@/db/schema";
+import { releaseAttempt, takeAttempt } from "./attempts";
 import { getDb, type Db } from "./db";
 import { isProduction, readVar } from "./env";
 import { sessionSecret } from "./session-secret";
@@ -67,34 +68,31 @@ const toSessionUser = (user: typeof users.$inferSelect, via: SessionUser["via"])
   via,
 });
 
-/** Скільки записів ліміту за вікно. */
-const countAttempts = async (db: Db, key: string, kind: "email_start" | "email_verify_fail") => {
-  const rows = await db
-    .select({ id: authAttempts.id })
-    .from(authAttempts)
-    .where(and(eq(authAttempts.key, key), eq(authAttempts.kind, kind), gt(authAttempts.createdAt, Date.now() - WINDOW)));
-  return rows.length;
-};
+const tooMany = () => new AuthError(429, "Забагато спроб", "Спробуйте ще раз за пів години.", "/problems/rate-limited");
 
-const recordAttempt = (db: Db, key: string, kind: "email_start" | "email_verify_fail") =>
-  db.insert(authAttempts).values({ key, kind, createdAt: Date.now() });
-
-const recordFail = async (db: Db, email: string, ip: string) => {
-  await recordAttempt(db, `email:${email}`, "email_verify_fail");
-  await recordAttempt(db, `ip:${ip}`, "email_verify_fail");
+/**
+ * Резервує по одній спробі на кожен ключ, усе або нічого. Облік атомарний (lib/server/attempts.ts):
+ * паралельні запити не перевищать ліміт. Повертає id резервів, щоб успіх міг їх зняти.
+ */
+const reserveAttempts = async (db: Db, spec: { keys: string[]; kind: "email_start" | "email_verify_fail"; max: number }): Promise<number[]> => {
+  const { keys, kind, max } = spec;
+  const taken: number[] = [];
+  for (const key of keys) {
+    const id = await takeAttempt(db, { key, kind, max, windowMs: WINDOW });
+    if (id === null) {
+      for (const done of taken) await releaseAttempt(db, done);
+      throw tooMany();
+    }
+    taken.push(id);
+  }
+  return taken;
 };
 
 /** Вхід і реєстрація одним кроком: надсилаємо код, нової пошти «неправильною» не буває. */
 export const startEmailLogin = async (email: string, ip: string) => {
   if (mailMode() === "off") throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
   const db = getDb();
-  const keys = [`email:${email}`, `ip:${ip}`];
-  for (const key of keys) {
-    if ((await countAttempts(db, key, "email_start")) >= MAX_STARTS) {
-      throw new AuthError(429, "Забагато спроб", "Спробуйте ще раз за пів години.", "/problems/rate-limited");
-    }
-  }
-  for (const key of keys) await recordAttempt(db, key, "email_start");
+  await reserveAttempts(db, { keys: [`email:${email}`, `ip:${ip}`], kind: "email_start", max: MAX_STARTS });
 
   let [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   if (!user) {
@@ -130,23 +128,17 @@ const invalidCode = () => new AuthError(400, "Невірний код", "Нев�
 export const verifyEmailLogin = async (email: string, code: string, ip: string): Promise<SessionUser> => {
   if (mailMode() === "off") throw new AuthError(503, "Вхід ще не підключено", "Спробуйте трохи згодом.");
   const db = getDb();
-  // Ліміт і за поштою, і за IP: інакше код підбирали б, міняючи пошту.
-  for (const key of [`email:${email}`, `ip:${ip}`]) {
-    if ((await countAttempts(db, key, "email_verify_fail")) >= MAX_FAILS) {
-      throw new AuthError(429, "Забагато спроб", "Спробуйте ще раз за пів години.", "/problems/rate-limited");
-    }
-  }
+  // Спроба резервується до порівняння коду, за поштою й за IP: інакше код підбирали б, міняючи пошту,
+  // або паралельними запитами. Успішний вхід знімає резерв, отже рахуються лише помилки.
+  const reserved = await reserveAttempts(db, { keys: [`email:${email}`, `ip:${ip}`], kind: "email_verify_fail", max: MAX_FAILS });
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   const [stored] = user ? await db.select().from(emailCodes).where(eq(emailCodes.userId, user.id)).limit(1) : [];
-  if (!user || !stored || stored.expiresAt < Date.now() || stored.attempts >= MAX_CODE_TRIES) {
-    await recordFail(db, email, ip);
-    throw invalidCode();
-  }
-  if (!sameText(stored.codeHash, await sha256(`${user.id}:${code}`))) {
-    await db.update(emailCodes).set({ attempts: stored.attempts + 1 }).where(eq(emailCodes.id, stored.id));
-    await recordFail(db, email, ip);
-    throw invalidCode();
-  }
+  if (!user || !stored || stored.expiresAt < Date.now()) throw invalidCode();
+  // Лічильник спроб коду піднімається атомарно до порівняння; немає рядка, отже спроби вичерпано, код не порівнюється.
+  const bumped = await db.all<{ id: string }>(sql`UPDATE email_codes SET attempts = attempts + 1 WHERE id = ${stored.id} AND attempts < ${MAX_CODE_TRIES} RETURNING id`);
+  if (bumped.length === 0) throw invalidCode();
+  if (!sameText(stored.codeHash, await sha256(`${user.id}:${code}`))) throw invalidCode();
+  for (const id of reserved) await releaseAttempt(db, id);
   await db.delete(emailCodes).where(eq(emailCodes.userId, user.id));
   await db
     .update(users)

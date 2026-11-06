@@ -2,6 +2,7 @@
 // GET ?since=<мс> — повідомлення новіші за мітку (опитування); POST {text} —
 // написати. Доступ лише замовнику й виконавцю цієї розмови.
 
+import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { CHAT_PHOTOS_MAX, CHAT_TEXT_MAX } from "@/lib/chat/types";
 import { getSessionUser } from "@/lib/server/auth";
@@ -33,6 +34,8 @@ export async function GET(request: Request, { params }: Ctx) {
 export async function POST(request: Request, { params }: Ctx) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const limited = await rateLimited("message", user.id);
+  if (limited) return limited;
   const body = await readJson(request);
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, CHAT_TEXT_MAX) : "";
   const requested = Array.isArray(body?.attachmentIds) ? [...new Set(body.attachmentIds.filter((id: unknown): id is string => typeof id === "string"))].slice(0, CHAT_PHOTOS_MAX) : [];
