@@ -6,7 +6,7 @@ import { Telemetry } from "@/kit/telemetry/client";
 import { ConsentBanner } from "@/components/legal/consent-banner";
 
 const fixel = localFont({
-  src: "../public/fonts/FixelVariable.ttf",
+  src: "../public/fonts/FixelVariable.woff2",
   variable: "--font-fixel",
   weight: "100 900",
   display: "swap",

@@ -27,7 +27,7 @@ const SPACING_KM = 15;
 
 /**
  * Вигадані люди для візуальної демонстрації, не профілі користувачів:
- * імена в порядку облич в атласі (public/map/mock-avatars.png) і рід,
+ * імена в порядку облич в атласі (public/map/mock-avatars.webp) і рід,
  * щоб спеціальність звучала правильно.
  */
 const MOCK_PEOPLE: readonly (readonly [string, "f" | "m"])[] = [

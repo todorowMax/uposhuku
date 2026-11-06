@@ -1,14 +1,14 @@
 // lib/map/portrait.ts
 //
 // Портрети виконавців для маркерів карти. Малюємо на полотні в браузері
-// з локального атласу вигаданих облич 4×4 (public/map/mock-avatars.png),
+// з локального атласу вигаданих облич 4×4 (public/map/mock-avatars.webp),
 // без окремого мережевого запиту на кожне фото.
 
 /** Сторона полотна портрета, пікселі. */
 export const PORTRAIT_SIZE = 192;
 
 /** Атлас портретів, 16 облич. */
-export const AVATAR_ATLAS = "/map/mock-avatars.png";
+export const AVATAR_ATLAS = "/map/mock-avatars.webp";
 export const AVATAR_COUNT = 16;
 
 /**

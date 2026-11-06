@@ -1,0 +1,8 @@
+# Cloudflare Workers Assets читає цей файл із кореня статики (.open-next/assets).
+# Файли без хешу в назві: місяць у кеші, а нова версія отримує нову назву (так було з атласом .png -> .webp).
+/map/*
+  Cache-Control: public, max-age=2592000
+/fonts/*
+  Cache-Control: public, max-age=2592000
+/maplibre/*
+  Cache-Control: public, max-age=86400

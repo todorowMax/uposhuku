@@ -35,7 +35,7 @@ UI-токени в `app/globals.css`, OKLCH. Кольори карти в
 
 ## Typography
 
-Fixel Variable з локального файлу `public/fonts/FixelVariable.ttf`.
+Fixel Variable з локального файлу `public/fonts/FixelVariable.woff2` (підмножина: кирилиця, латиниця, знаки; повний TTF у `design/fonts`, збірка `npm run font:build`).
 Підписи на карті поки лишаються Noto Sans з локальних гліфів
 (`public/map/fonts`), бо MapLibre малює текст сам: назви міст 13px Bold
 темним кольором з білим гало замість плашки. Підпис, що наїжджає на фото

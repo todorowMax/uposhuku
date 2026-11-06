@@ -1,6 +1,6 @@
 // scripts/build-faces.ts
 //
-// Нарізає атлас облич 4×4 (public/map/mock-avatars.png) на 16 окремих
+// Нарізає атлас облич 4×4 (public/map/mock-avatars.webp) на 16 окремих
 // квадратних JPEG у public/map/faces. Це фото демо-виконавців: у базі вони
 // лежать як звичайне фото профілю (адреса /map/faces/face-NN.jpg).
 //
@@ -14,7 +14,7 @@ const root = resolve(__dirname, "..");
 const SIDE = 256;
 
 const main = async () => {
-  const atlas = await loadImage(resolve(root, "public/map/mock-avatars.png"));
+  const atlas = await loadImage(resolve(root, "public/map/mock-avatars.webp"));
   const outDir = resolve(root, "public/map/faces");
   mkdirSync(outDir, { recursive: true });
   const cell = atlas.width / 4;

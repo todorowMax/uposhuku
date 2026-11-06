@@ -24,7 +24,7 @@ import { ukraineRim } from "@/lib/maplibre/rim";
 export const FONT_REGULAR = ["Fixel"];
 export const FONT_BOLD = ["Fixel"];
 export const fixelMapFaces = (origin: string): NonNullable<StyleSpecification["font-faces"]> => ({
-  Fixel: `${origin}/fonts/FixelVariable.ttf`,
+  Fixel: `${origin}/fonts/FixelVariable.woff2`,
 });
 
 /** Масштаб, з якого з'являються об'ємні будинки. */
