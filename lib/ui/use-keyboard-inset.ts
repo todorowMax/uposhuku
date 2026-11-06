@@ -8,10 +8,11 @@
 
 import { useEffect, type RefObject } from "react";
 
-export function useKeyboardInset(element: RefObject<HTMLElement | null>, active = true) {
+// Елемент: ref або сам вузол (стан із callback-ref, коли вміст монтується пізніше за хук).
+export const useKeyboardInset = (element: RefObject<HTMLElement | null> | HTMLElement | null, active = true) => {
   useEffect(() => {
     const viewport = window.visualViewport;
-    const target = element.current;
+    const target = element instanceof HTMLElement ? element : (element?.current ?? null);
     if (!active || !viewport || !target) return;
     const sync = () => {
       const covered = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
@@ -26,4 +27,4 @@ export function useKeyboardInset(element: RefObject<HTMLElement | null>, active 
       viewport.removeEventListener("scroll", sync);
     };
   }, [element, active]);
-}
+};

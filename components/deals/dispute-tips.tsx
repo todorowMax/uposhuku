@@ -6,7 +6,7 @@
 // Це поради, а не гарантії: модератор читає факти, а гроші прямого переказу ми не повертаємо.
 
 import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ResponsiveHint } from "@/components/ui/responsive-hint";
 
 export const DISPUTE_TIPS: readonly string[] = [
   "Зафіксуйте умови в картці угоди: що робимо, за скільки і що вважаємо готовим.",
@@ -17,18 +17,19 @@ export const DISPUTE_TIPS: readonly string[] = [
 ];
 
 export const DisputeTips = () => (
-  <Popover>
-    <PopoverTrigger asChild>
+  <ResponsiveHint
+    title="Як уникнути проблем у спорі"
+    popoverClassName="max-w-80"
+    trigger={
       <Button variant="link" className="w-fit text-sm">
         Як уникнути проблем у спорі
       </Button>
-    </PopoverTrigger>
-    <PopoverContent className="max-w-80">
-      <ul className="grid gap-2 pl-4 text-sm leading-snug text-ink list-disc">
-        {DISPUTE_TIPS.map((tip) => (
-          <li key={tip}>{tip}</li>
-        ))}
-      </ul>
-    </PopoverContent>
-  </Popover>
+    }
+  >
+    <ul className="grid gap-2 pl-4 text-sm leading-snug text-ink list-disc">
+      {DISPUTE_TIPS.map((tip) => (
+        <li key={tip}>{tip}</li>
+      ))}
+    </ul>
+  </ResponsiveHint>
 );

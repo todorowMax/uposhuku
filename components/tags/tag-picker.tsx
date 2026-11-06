@@ -233,7 +233,7 @@ export function TagPicker(props: TagPickerProps) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>{button}</SheetTrigger>
-        <SheetContent onEscapeKeyDown={closeOnEscape} className="ui-sheet-picker">
+        <SheetContent onEscapeKeyDown={closeOnEscape} size="tall">
           <SheetTitle className="ui-sheet-title">{title}</SheetTitle>
           <SheetDescription className="sr-only">Знайдіть тег пошуком і виберіть його зі списку.</SheetDescription>
           <TagPickerPanel {...props} />

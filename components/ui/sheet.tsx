@@ -1,45 +1,77 @@
 "use client";
 
-// shadcn/ui Sheet (Radix Dialog), закастомлений під наш дизайн. На
-// телефоні вибір тегів і подібні списки відкриваються шторкою знизу, бо
-// випадайка під пальцем і клавіатурою нічого не вміщає. Стилі: .ui-sheet-*.
+// shadcn/ui Sheet (Radix Dialog), закастомлений під наш дизайн. Це «шторка» з DESIGN.md (розділ «Шари»):
+// швидка дія на телефоні, один рівень, висота за вмістом до 85 %, `size="tall"` для довгого списку.
+// Закривається свайпом вниз, тапом повз, Escape й системним «назад». Від 768 px це маленьке вікно по центру.
+// Стилі: .ui-sheet-*.
 
 import * as React from "react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import { cn } from "@/lib/utils";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
+import { useLayerHistory } from "@/lib/ui/use-layer-history";
+import { useSheetSwipe } from "@/lib/ui/use-sheet-swipe";
 
-const Sheet = SheetPrimitive.Root;
 const SheetTrigger = SheetPrimitive.Trigger;
 const SheetClose = SheetPrimitive.Close;
 const SheetTitle = SheetPrimitive.Title;
 const SheetDescription = SheetPrimitive.Description;
 
-function SheetContent({
-  className,
-  children,
-  ...props
-}: React.ComponentProps<typeof SheetPrimitive.Content>) {
-  const ref = React.useRef<HTMLDivElement>(null);
-  useKeyboardInset(ref);
+const SheetContext = React.createContext<() => void>(() => undefined);
+
+const Sheet = ({ open, defaultOpen = false, onOpenChange, ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) => {
+  const [inner, setInner] = React.useState(defaultOpen);
+  const value = open ?? inner;
+  const controlled = open !== undefined;
+  const close = React.useCallback(() => {
+    if (!controlled) setInner(false);
+    onOpenChange?.(false);
+  }, [controlled, onOpenChange]);
+  const set = (next: boolean) => {
+    if (!controlled) setInner(next);
+    onOpenChange?.(next);
+  };
+  useLayerHistory(value, close);
   return (
-    <SheetPrimitive.Portal>
-      <SheetPrimitive.Overlay className="ui-sheet-overlay" />
-      <SheetPrimitive.Content
-        ref={ref}
-        data-slot="sheet-content"
-        className={cn("ui-sheet", className)}
-        {...props}
-      >
-        <span className="ui-sheet-grip" aria-hidden />
-        {children}
-      </SheetPrimitive.Content>
-    </SheetPrimitive.Portal>
+    <SheetContext.Provider value={close}>
+      <SheetPrimitive.Root open={value} onOpenChange={set} {...props} />
+    </SheetContext.Provider>
   );
+};
+
+export namespace SheetTypes {
+  export type Size = "auto" | "tall";
+  export type ContentProps = React.ComponentProps<typeof SheetPrimitive.Content> & { size?: Size };
 }
+
+// Хуки живуть тут, а не в SheetContent: Ref на Content Radix не віддає, тож вузол шторки беремо як батька сітки: callback-ref дає його, щойно він змонтований.
+const SheetPanel = ({ className, children, size = "auto", ...props }: SheetTypes.ContentProps) => {
+  const [node, setNode] = React.useState<HTMLDivElement | null>(null);
+  const findPanel = React.useCallback((grip: HTMLSpanElement | null) => setNode((grip?.parentElement as HTMLDivElement | null) ?? null), []);
+  const dismiss = React.useContext(SheetContext);
+  useKeyboardInset(node);
+  useSheetSwipe(node, dismiss);
+  return (
+    <SheetPrimitive.Content data-slot="sheet-content" data-size={size} className={cn("ui-sheet", className)} {...props}>
+      <span ref={findPanel} className="ui-sheet-grip" aria-hidden />
+      {children}
+    </SheetPrimitive.Content>
+  );
+};
+
+const SheetContent = (props: SheetTypes.ContentProps) => (
+  <SheetPrimitive.Portal>
+    <SheetPrimitive.Overlay className="ui-sheet-overlay" />
+    <SheetPanel {...props} />
+  </SheetPrimitive.Portal>
+);
+
+/** Єдина прокручувана частина шторки: заголовок над нею стоїть на місці. */
+const SheetBody = ({ className, ...props }: React.ComponentProps<"div">) => <div className={cn("ui-sheet-body", className)} {...props} />;
 
 export {
   Sheet,
+  SheetBody,
   SheetClose,
   SheetContent,
   SheetDescription,

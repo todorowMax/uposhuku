@@ -28,6 +28,11 @@
   --brand-solid-hover: #b93c14;
   --brand-ink: #ffffff;
   --online: var(--wave);
+  /* Шари (DESIGN.md, «Шари»): фон екрана й шторки, затемнення, розмір чату, за яким рівняється панель екрана. */
+  --panel: #ffffff;
+  --scrim: rgb(3 9 13 / 45%);
+  --chat-width: 420px;
+  --chat-height: min(640px, calc(100dvh - 32px));
   --font-ui: var(--font-fixel), system-ui, sans-serif;
 }
 
@@ -51,6 +56,7 @@
   /* Семантична z-шкала замість випадкових 999 */
   --z-map-overlay: 10;
   --z-controls: 20;
+  --z-screen: 70;
   --z-skip-link: 100;
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
@@ -5386,8 +5392,8 @@ html[data-map-ready] .map-skeleton {
   bottom: 16px;
   display: flex;
   flex-direction: column;
-  width: min(420px, calc(100vw - 32px));
-  height: min(640px, calc(100dvh - 32px));
+  width: min(var(--chat-width), calc(100vw - 32px));
+  height: var(--chat-height);
   padding: 0;
   border-radius: 24px;
   background: #ffffff;
@@ -5945,7 +5951,7 @@ html[data-map-ready] .map-skeleton {
   max-height: 280px;
 }
 
-/* Шторка знизу (телефон). */
+/* Шторка знизу (телефон), від 768px маленьке вікно по центру. Правила: DESIGN.md, розділ «Шари». */
 .ui-sheet-overlay {
   position: fixed;
   inset: 0;
@@ -5967,12 +5973,18 @@ html[data-map-ready] .map-skeleton {
   z-index: 100;
   display: flex;
   flex-direction: column;
-  max-height: min(80dvh, calc(var(--vvh, 100dvh) - 16px));
-  padding-bottom: env(safe-area-inset-bottom);
+  max-height: min(85dvh, calc(var(--vvh, 100dvh) - 16px));
+  padding-bottom: max(0px, calc(env(safe-area-inset-bottom) - var(--kb, 0px)));
   border-radius: 20px 20px 0 0;
   background: #ffffff;
   box-shadow: 0 -12px 40px -12px rgb(48 54 58 / 35%);
   outline: none;
+  transform: translateY(var(--sheet-drag, 0px));
+}
+
+/* Після недотягнутого свайпу шторка повертається на місце; під пальцем без згладжування. */
+.ui-sheet:not([data-dragging]) {
+  transition: transform 200ms var(--ease-out-quint);
 }
 
 .ui-sheet[data-state="open"] {
@@ -5983,12 +5995,20 @@ html[data-map-ready] .map-skeleton {
   animation: ui-sheet-in 160ms ease-in reverse;
 }
 
-.ui-sheet-picker {
-  height: min(75dvh, calc(var(--vvh, 100dvh) - 16px));
+.ui-sheet[data-size="tall"] {
+  height: min(85dvh, calc(var(--vvh, 100dvh) - 16px));
 }
 
-.ui-sheet-picker .ui-command {
+.ui-sheet[data-size="tall"] .ui-command {
   flex: 1;
+}
+
+/* Прокручується лише ця частина, заголовок і сітка зверху стоять. */
+.ui-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 16px;
 }
 
 .ui-sheet-grip {
@@ -6007,6 +6027,35 @@ html[data-map-ready] .map-skeleton {
   color: var(--ink);
 }
 
+@media (min-width: 768px) {
+  .ui-sheet {
+    inset: 0;
+    width: min(420px, calc(100vw - 32px));
+    height: fit-content;
+    margin: auto;
+    padding-bottom: 0;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px -12px rgb(16 45 55 / 28%);
+    transform: none;
+  }
+
+  .ui-sheet[data-size="tall"] {
+    height: min(640px, 85dvh);
+  }
+
+  .ui-sheet-grip {
+    display: none;
+  }
+
+  .ui-sheet[data-state="open"] {
+    animation: ui-sheet-pop 180ms var(--ease-out-quint);
+  }
+
+  .ui-sheet[data-state="closed"] {
+    animation: ui-sheet-pop 120ms ease-in reverse;
+  }
+}
+
 @keyframes ui-sheet-fade {
   from { opacity: 0; }
 }
@@ -6015,11 +6064,182 @@ html[data-map-ready] .map-skeleton {
   from { transform: translateY(100%); }
 }
 
+@keyframes ui-sheet-pop {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ui-popover[data-state],
-  .ui-sheet[data-state],
-  .ui-sheet-overlay[data-state] {
+  .ui-popover[data-state] {
     animation: none;
+  }
+
+  /* Шторка не їде, а проявляється: рух прибираємо, зникнення лишаємо. */
+  .ui-sheet[data-state="open"] {
+    animation: ui-sheet-fade 120ms ease-out;
+  }
+
+  .ui-sheet[data-state="closed"] {
+    animation: ui-sheet-fade 100ms ease-in reverse;
+  }
+
+  .ui-sheet:not([data-dragging]) {
+    transition: none;
+  }
+}
+
+/*
+  Екран (components/ui/screen.tsx). До 768px на весь екран і заїжджає справа; від 768px панель біля чату
+  (data-desktop="panel") або вікно по центру (data-desktop="dialog"). Шапка й низ стоять, скролиться
+  лише .ui-screen-body. Висоту обмежує --kb (клавіатура) з use-keyboard-inset.
+*/
+.ui-screen {
+  position: fixed;
+  inset: 0 0 var(--kb, 0px) 0;
+  z-index: var(--z-screen);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--ink);
+  outline: none;
+}
+
+.ui-screen[data-state="open"] {
+  animation: ui-screen-in 280ms var(--ease-out-quint);
+}
+
+.ui-screen[data-state="closed"] {
+  animation: ui-screen-in 200ms ease-in reverse;
+}
+
+.ui-screen-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.ui-screen-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.ui-screen-action {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px calc(env(safe-area-inset-right) + 16px) 16px calc(env(safe-area-inset-left) + 16px);
+}
+
+/* Низ с головною кнопкою; відступ safe-area зникає, коли над низом уже клавіатура. */
+.ui-screen-footer {
+  flex: none;
+  padding: 12px calc(env(safe-area-inset-right) + 16px) max(12px, calc(env(safe-area-inset-bottom) - var(--kb, 0px))) calc(env(safe-area-inset-left) + 16px);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.ui-screen-scrim {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .ui-screen {
+    inset: auto 16px 16px auto;
+    width: var(--chat-width);
+    height: var(--chat-height);
+    border-radius: 24px;
+    box-shadow: 0 24px 60px -12px rgb(16 45 55 / 28%);
+    overflow: hidden;
+  }
+
+  .ui-screen[data-desktop="dialog"] {
+    inset: 0;
+    width: min(520px, calc(100vw - 32px));
+    height: fit-content;
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+  }
+
+  .ui-screen[data-state="open"] {
+    animation: ui-screen-rise 220ms var(--ease-out-quint);
+  }
+
+  .ui-screen[data-state="closed"] {
+    animation: ui-screen-rise 160ms ease-in reverse;
+  }
+
+  .ui-screen-header {
+    padding: 8px 16px;
+  }
+
+  .ui-screen-body,
+  .ui-screen-footer {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .ui-screen-footer {
+    padding-bottom: 12px;
+  }
+
+  .ui-screen-scrim[data-desktop="dialog"] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-screen);
+    background: var(--scrim);
+  }
+
+  .ui-screen-scrim[data-state="open"] {
+    animation: ui-sheet-fade 200ms ease-out;
+  }
+
+  .ui-screen-scrim[data-state="closed"] {
+    animation: ui-sheet-fade 140ms ease-in reverse;
+  }
+}
+
+/* Чат 420px і панель 420px поруч: праворуч чат, ліворуч панель. Вужче 900px вони не вміщаються, панель лягає на чат. */
+@media (min-width: 900px) {
+  .ui-screen[data-desktop="panel"] {
+    right: calc(16px + var(--chat-width) + 12px);
+  }
+}
+
+@keyframes ui-screen-in {
+  from { transform: translateX(100%); }
+}
+
+@keyframes ui-screen-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* Без руху: екран проявляється замість того, щоб заїжджати. */
+@media (prefers-reduced-motion: reduce) {
+  .ui-screen[data-state="open"] {
+    animation: ui-sheet-fade 120ms ease-out;
+  }
+
+  .ui-screen[data-state="closed"] {
+    animation: ui-sheet-fade 100ms ease-in reverse;
   }
 }
 
