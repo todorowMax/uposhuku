@@ -25,6 +25,10 @@ export const STAGE_STATE: Record<DealStage["status"], string> = {
   refunded: "Кошти повернено",
 };
 
+/** Пряму угоду гроші минають повз платформу: «виплачено» тут не буває, замовник лише прийняв роботу. */
+export const stageState = (method: Deal["method"], status: DealStage["status"]): string =>
+  method === "direct" && status === "released" ? "Роботу прийнято" : STAGE_STATE[status];
+
 export const DEAL_STATE: Record<Deal["status"], string> = {
   proposed: "Пропозиція",
   accepted: "Прийнято",

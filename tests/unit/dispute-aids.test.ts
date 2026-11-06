@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { dealTimeline } from "@/lib/admin/deal-timeline";
+import { stageState } from "@/lib/admin/format";
 import { checkComplaint, complaintStageError } from "@/lib/deals/complaints";
 import { checkCriteria, checkDelivery, normalizeDeliveryLink, withDelivery, withReceipt } from "@/lib/deals/dispute-aids";
 import { DISPUTE_TIPS } from "@/components/deals/dispute-tips";
@@ -119,5 +120,21 @@ describe("поради у спорі", () => {
   it("не обіцяють того, чого немає: ні повернення, ні рішення на користь", () => {
     const text = DISPUTE_TIPS.join(" ").toLowerCase();
     expect(text).not.toMatch(/поверн|гарант|захист|обов'язково вирішим/);
+  });
+});
+
+describe("підписи етапу «виплачено»", () => {
+  it("пряма угода: роботу прийнято, виплат платформа не робила; безпечна: виплачено", () => {
+    expect(stageState("direct", "released")).toBe("Роботу прийнято");
+    expect(stageState("safe", "released")).toBe("Виплачено");
+    expect(stageState("direct", "delivered")).toBe("Здано, чекає підтвердження");
+  });
+
+  it("у хронології прямої угоди немає слова «виплачено»", () => {
+    const base = createDeal("d1", draft(), T0);
+    const at = new Date(T0 + 1000).toISOString();
+    const timeline = (method: "direct" | "safe") => dealTimeline({ deal: { ...base, method, status: "completed", acceptedAt: at, stages: [{ ...base.stages[0], status: "released", releasedAt: at }] }, proofs: [], complaints: [], snapshotMask: null, receiptUrls: {} });
+    expect(timeline("direct").events.map((event) => event.label)).toContain("Роботу прийнято");
+    expect(timeline("safe").events.map((event) => event.label)).toContain("Етап виплачено");
   });
 });

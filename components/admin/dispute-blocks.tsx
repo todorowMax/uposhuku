@@ -5,14 +5,14 @@ import { feeOf, payoutOf, dealTotal } from "@/lib/deals/machine";
 import { formatKop } from "@/lib/deals/price";
 import { METHOD_LABEL } from "@/lib/deals/requisites";
 import { dealCurrency, type Deal, type DealStage } from "@/lib/deals/types";
-import { formatDay, formatMoney, formatStamp, holdLeft, STAGE_STATE } from "@/lib/admin/format";
+import { formatDay, formatMoney, formatStamp, holdLeft, stageState } from "@/lib/admin/format";
 
-const stageTimes = (stage: DealStage): [string, string | undefined][] => [
+const stageTimes = (stage: DealStage, deal: Pick<Deal, "method">): [string, string | undefined][] => [
   ["Оплачено", stage.fundedAt],
   ["Здано", stage.deliveredAt],
   ["Спір", stage.disputedAt],
   ["На доопрацювання", stage.reworkAt],
-  ["Виплачено", stage.releasedAt],
+  [deal.method === "direct" ? "Роботу прийнято" : "Виплачено", stage.releasedAt],
   ["Повернено", stage.refundedAt],
 ];
 
@@ -40,7 +40,7 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
               </div>
               <div className="adm-stage-row">
                 <span className="deal-chip" data-tone={stage.status === "released" ? "done" : stage.status === "disputed" ? "todo" : undefined}>
-                  {STAGE_STATE[stage.status]}
+                  {stageState(deal.method, stage.status)}
                 </span>
                 <span className="adm-muted">{stage.days} дн на етап</span>
                 {stage.paidVia && <span className="adm-muted">Оплата: {METHOD_LABEL[stage.paidVia]}</span>}
@@ -52,7 +52,7 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
                 )}
               </div>
               <p className="adm-stage-times">
-                {stageTimes(stage)
+                {stageTimes(stage, deal)
                   .filter(([, at]) => at)
                   .map(([label, at]) => `${label} ${formatStamp(at)}`)
                   .join(" · ")}

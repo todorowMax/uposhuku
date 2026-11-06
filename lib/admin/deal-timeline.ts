@@ -67,7 +67,7 @@ const stageEvents = (deal: Deal, stage: DealStage, input: TimelineInput): Timeli
     stage.deliveredAt ? deliveredEvent(stage, where) : null,
     stage.reworkAt ? { at: stage.reworkAt, label: `Модератор повернув на доопрацювання${where}` } : null,
     stage.disputedAt ? { at: stage.disputedAt, label: `Відкрито спір${where}` } : null,
-    stage.releasedAt ? { at: stage.releasedAt, label: `Етап виплачено${where}` } : null,
+    stage.releasedAt ? { at: stage.releasedAt, label: `${deal.method === "direct" ? "Роботу прийнято" : "Етап виплачено"}${where}` } : null,
     stage.refundedAt ? { at: stage.refundedAt, label: `Кошти повернено замовнику${where}` } : null,
   ];
   return events.filter((event): event is TimelineEvent => event !== null);

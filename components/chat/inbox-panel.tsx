@@ -941,6 +941,9 @@ const STATE_TEXT: Record<string, string> = {
   refunded: "Кошти повернено замовнику",
 };
 
+/** Пряму угоду платформа не виплачує: коли етап закрито, замовник лише прийняв роботу. */
+const stateText = (method: string, status: string): string => (method === "direct" && status === "released" ? "Роботу прийнято" : (STATE_TEXT[status] ?? status));
+
 /** Угоди, які замовник запропонував виконавцю в цій розмові, і що з ними може зробити виконавець. */
 function PerformerDeals({ conversationId }: { conversationId: string }) {
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -1033,7 +1036,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
                 : deal.status === "completed"
                   ? "Завершено"
                   : stage
-                    ? `${stage.title}: ${STATE_TEXT[stage.status] ?? stage.status}`
+                    ? `${stage.title}: ${stateText(deal.method, stage.status)}`
                     : ""}
             </p>
             {deal.status === "proposed" && deal.proposedBy !== "performer" && <DealTerms deal={deal} />}

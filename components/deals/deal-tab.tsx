@@ -552,7 +552,7 @@ export function DealView({ deal }: { deal: Deal }) {
                     </span>
                   </p>
                   <p className="text-[12px] text-ink-muted">
-                    {STAGE_LABEL[item.status]}
+                    {item.status === "released" && deal.method === "direct" ? "Роботу прийнято" : STAGE_LABEL[item.status]}
                   </p>
 
                   {active && (
@@ -732,10 +732,18 @@ function StageActions({
 
   if (stage.status === "delivered") {
     if (confirmRelease && safe && releaseNeedsCode(stage.amount)) {
-      return <ReleaseCodeBox dealId={deal.id} amount={money(payoutOf(stage.amount))} busy={busy === "release"} onConfirm={onRelease} onCancel={onCancelRelease} />;
+      return (
+        <div className="grid gap-2">
+          <DeliveryNote delivery={stage.delivery} />
+          <ReleaseCodeBox dealId={deal.id} amount={money(payoutOf(stage.amount))} busy={busy === "release"} onConfirm={onRelease} onCancel={onCancelRelease} />
+        </div>
+      );
     }
     if (confirmRelease) {
       return (
+        <>
+        {/* Результат лишається на екрані, поки людина підтверджує приймання. */}
+        <DeliveryNote delivery={stage.delivery} />
         <div className="deal-box">
           <p className="text-[13px] text-ink">
             {safe
@@ -764,6 +772,7 @@ function StageActions({
             </button>
           </div>
         </div>
+      </>
       );
     }
     return (
