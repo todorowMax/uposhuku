@@ -5,6 +5,7 @@
 // Приймання етапу від 10 000 ₴: виплата необоротна, тому перед нею код з пошти замовника. Дві дії: надіслати код,
 // ввести його й підтвердити. Показується у шторці. Помилки сервера (невірний, застарілий код) показуємо поруч із полем.
 
+import { useEffect, useRef } from "react";
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
@@ -12,6 +13,11 @@ import { useReleaseCode } from "./use-release-code";
 
 export const ReleaseCodeBox = ({ dealId, amount, busy, onConfirm }: { dealId: string; amount: string; busy: boolean; onConfirm: (code: string) => Promise<boolean> }) => {
   const form = useReleaseCode(dealId, onConfirm);
+  const input = useRef<HTMLInputElement>(null);
+  // Кнопка «Надіслати код» зникає разом із фокусом: переносимо його в поле, що зʼявилося.
+  useEffect(() => {
+    if (form.sent) input.current?.focus();
+  }, [form.sent]);
   return (
     <div className="grid gap-2">
       <p className="text-sm text-ink">Виплатити {amount} виконавцю? Скасувати це не вийде. Для великих сум підтверджуємо кодом, який надішлемо на вашу пошту.</p>
@@ -23,7 +29,7 @@ export const ReleaseCodeBox = ({ dealId, amount, busy, onConfirm }: { dealId: st
       ) : (
         <>
           <Field label="Код з листа" htmlFor={`release-code-${dealId}`} hint="Діє 10 хвилин.">
-            <Input id={`release-code-${dealId}`} inputMode="numeric" autoComplete="one-time-code" value={form.code} onChange={(event) => form.setCode(event.target.value)} className="tabular-nums" />
+            <Input ref={input} id={`release-code-${dealId}`} inputMode="numeric" autoComplete="one-time-code" value={form.code} onChange={(event) => form.setCode(event.target.value)} className="tabular-nums" />
           </Field>
           <Button variant="offer" disabled={busy} onClick={() => void form.confirm()}>
             {busy && <Loader2 className="size-4 animate-spin" />}

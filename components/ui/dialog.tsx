@@ -33,6 +33,16 @@ const trackFocus = () => {
 };
 trackFocus();
 
+const LAYER_SELECTOR = "[data-slot=dialog-content],[data-slot=sheet-content]";
+const FOCUSABLE = "button:not([disabled]),[href],input:not([disabled]),textarea:not([disabled]),select:not([disabled])";
+
+/** Кнопка, що відкрила шар, зникла (дія змінила екран): фокус іде в найвищий шар, що лишився, а не на <body>. */
+const focusTopLayer = (): void => {
+  const layers = document.querySelectorAll<HTMLElement>(LAYER_SELECTOR);
+  const top = layers[layers.length - 1];
+  (top?.querySelector<HTMLElement>(FOCUSABLE) ?? top)?.focus();
+};
+
 type DialogContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
   variant?: "center" | "bottom" | "full" | "panel";
 };
@@ -57,8 +67,9 @@ const useReturnFocus = ({ onOpenAutoFocus, onCloseAutoFocus }: FocusHandlers): R
       onCloseAutoFocus?.(event);
       if (event.defaultPrevented) return;
       event.preventDefault();
-      const target = opener.current?.isConnected ? opener.current : lastOutside;
-      if (target?.isConnected) target.focus();
+      if (opener.current?.isConnected) return opener.current.focus();
+      if (document.querySelector(LAYER_SELECTOR)) return focusTopLayer();
+      if (lastOutside?.isConnected) lastOutside.focus();
     },
   };
 };

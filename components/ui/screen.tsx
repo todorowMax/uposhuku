@@ -22,6 +22,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useFocusIntoView } from "@/lib/ui/use-focus-into-view";
+import { useKeepFocus } from "@/lib/ui/use-keep-focus";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
 import { useLayerHistory } from "@/lib/ui/use-layer-history";
 import { useMediaQuery } from "@/lib/ui/use-media-query";
@@ -56,6 +57,7 @@ const Screen = ({ open, onOpenChange, title, description, desktop = "dialog", ac
   useLayerHistory(open, close);
   useKeyboardInset(content, open);
   useFocusIntoView(body, open);
+  useKeepFocus(content, open);
   // Панель поруч із чатом не блокує сторінку: чат лишається робочим. Екран і вікно модальні.
   const modal = !(wide && desktop === "panel");
   return (

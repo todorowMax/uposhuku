@@ -9,6 +9,7 @@ import * as React from "react";
 import { Dialog as SheetPrimitive } from "radix-ui";
 import { useReturnFocus } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useKeepFocus } from "@/lib/ui/use-keep-focus";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
 import { useLayerHistory } from "@/lib/ui/use-layer-history";
 import { useSheetSwipe } from "@/lib/ui/use-sheet-swipe";
@@ -52,6 +53,7 @@ const SheetPanel = ({ className, children, size = "auto", onOpenAutoFocus, onClo
   const dismiss = React.useContext(SheetContext);
   useKeyboardInset(node);
   useSheetSwipe(node, dismiss);
+  useKeepFocus(node);
   const focus = useReturnFocus({ onOpenAutoFocus, onCloseAutoFocus });
   return (
     <SheetPrimitive.Content data-slot="sheet-content" data-size={size} className={cn("ui-sheet", className)} {...focus} {...props}>
