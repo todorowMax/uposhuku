@@ -14,6 +14,7 @@ import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { usePlacementReturn, type PlacementReturn } from "./use-placement-return";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
@@ -57,31 +58,23 @@ export function PlacementPanel() {
 const close = () => placementOpenStore.set(false);
 
 function Shell({ title, back, hero, children }: { title: string; back?: () => void; hero?: React.ReactNode; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
+  // Панель з'являється в порталі пізніше за Shell, тому тримаємо її в стані, а не в ref.
+  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
-    if (!ref.current || reduced()) return;
-    const tween = gsap.fromTo(ref.current, { opacity: 0, y: 18, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" });
+    if (!panel || reduced()) return;
+    const tween = gsap.fromTo(panel, { opacity: 0, y: 18, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" });
     return () => {
       tween.kill();
     };
-  }, []);
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [panel]);
   return (
-    <>
-      <div aria-hidden className="auth-scrim place-scrim" onClick={close} />
-      <div className="place-wrap">
-      <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className="place-panel glass-panel" data-hero={Boolean(hero) || undefined}>
+    <Dialog open onOpenChange={(next) => !next && close()}>
+      <DialogContent ref={setPanel} variant="bottom" aria-describedby={undefined} className="place-panel glass-panel" data-hero={Boolean(hero) || undefined}>
         {hero ? (
           <header className="place-hero">
             <button type="button" onClick={close} className="place-hero-skip">Пропустити</button>
             {hero}
-            <h2 className="place-hero-title">{title}</h2>
+            <DialogTitle className="place-hero-title">{title}</DialogTitle>
             <p className="place-hero-lead">Хочете, щоб вас бачили на карті й помічали серед перших? Опублікуйте свій профіль прямо тут.</p>
           </header>
         ) : (
@@ -92,15 +85,14 @@ function Shell({ title, back, hero, children }: { title: string; back?: () => vo
                 <ArrowLeft className="size-4" />
               </button>
             )}
-            <h2 className="text-[17px] font-semibold text-ink">{title}</h2>
+            <DialogTitle className="ui-dialog-title">{title}</DialogTitle>
           </div>
           <button type="button" onClick={close} className="place-header-skip">Пропустити</button>
         </div>
         )}
         {hero ? <div className="place-body">{children}</div> : children}
-      </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
 

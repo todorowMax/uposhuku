@@ -7,7 +7,8 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import { createPortal } from "react-dom";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { gsap } from "gsap";
 import {
   ArrowLeft,
@@ -94,7 +95,7 @@ export function InboxPanel() {
   const [filter, setFilter] = useState<Filter>("all");
   const signedIn = session.status === "user";
   const buttonRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const closing = useRef(false);
   useKeyboardInset(panelRef, open);
@@ -319,10 +320,12 @@ export function InboxPanel() {
         </button>
       }
       {open && (
-        <section
+        <Dialog open modal={false} onOpenChange={(next) => !next && close()}>
+        <DialogContent
           ref={panelRef}
-          role="dialog"
-          aria-label="Повідомлення"
+          variant="panel"
+          aria-describedby={undefined}
+          onInteractOutside={(event) => event.preventDefault()}
           className="inbox-panel"
           data-view={active ? "thread" : "list"}
           data-size={size}
@@ -330,7 +333,9 @@ export function InboxPanel() {
           <div ref={innerRef} className="inbox-inner inbox-split">
             <aside className="inbox-side">
               <header className="inbox-header">
-                <h2>Повідомлення</h2>
+                <DialogTitle asChild>
+                  <h2>Повідомлення</h2>
+                </DialogTitle>
                 <button
                   type="button"
                   onClick={toggleSize}
@@ -357,7 +362,7 @@ export function InboxPanel() {
               </header>
               <div
                 className="inbox-filters"
-                role="tablist"
+                role="group"
                 aria-label="Розмови"
               >
                 {FILTERS.filter(
@@ -368,8 +373,7 @@ export function InboxPanel() {
                   <button
                     key={entry.id}
                     type="button"
-                    role="tab"
-                    aria-selected={filter === entry.id}
+                    aria-pressed={filter === entry.id}
                     onClick={() => setFilter(entry.id)}
                     className="inbox-filter"
                   >
@@ -448,7 +452,8 @@ export function InboxPanel() {
               )}
             </div>
           </div>
-        </section>
+        </DialogContent>
+        </Dialog>
       )}
     </>
   );
@@ -743,39 +748,17 @@ function Thread({
 
 /** Фото з чату поверх усього: крестик, Esc і дотик по фону закривають. */
 function PhotoViewer({ url, onClose }: { url: string; onClose: () => void }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.stopPropagation();
-      onClose();
-    };
-    document.addEventListener("keydown", onKey, true);
-    return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
-  return createPortal(
-    <div
-      className="photo-viewer"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Фото"
-      onClick={onClose}
-    >
-      <button
-        type="button"
-        className="photo-viewer-close"
-        aria-label="Закрити фото"
-        onClick={onClose}
-      >
-        <X className="size-5" strokeWidth={2.2} />
-      </button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt="Фото з чату"
-        onClick={(event) => event.stopPropagation()}
-      />
-    </div>,
-    document.body,
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent aria-describedby={undefined} className="photo-viewer">
+        <DialogTitle className="sr-only">Фото з чату</DialogTitle>
+        <Button variant="bare" className="photo-viewer-close" aria-label="Закрити фото" onClick={onClose}>
+          <X className="size-5" strokeWidth={2.2} />
+        </Button>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt="Фото з чату" />
+      </DialogContent>
+    </Dialog>
   );
 }
 

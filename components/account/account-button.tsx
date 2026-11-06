@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { Bell, Code2, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "@/components/icons";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
 import { LegendButton } from "@/components/map/legend";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
 import { feedCountStore } from "@/lib/feed/client";
@@ -28,8 +30,6 @@ export function AccountButton() {
   const performer = useIsPerformer();
   const feedCount = useStore(feedCountStore);
   const placement = useStore(placementStore);
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     void loadSession();
@@ -43,22 +43,6 @@ export function AccountButton() {
     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
     profileEditorStore.set(true);
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
 
   if (session.status === "loading") {
     return (
@@ -96,113 +80,66 @@ export function AccountButton() {
   const { user } = session;
   const initial = (user.name ?? user.email).trim().charAt(0).toUpperCase();
   return (
-    <div ref={rootRef} className="account-slot">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={`Акаунт ${user.email}`}
-        className="account-avatar"
-      >
-        {initial}
-      </button>
-      {open && (
-        <div role="menu" className="account-menu glass-panel">
+    <div className="account-slot">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="bare" aria-label={`Акаунт ${user.email}`} className="account-avatar">
+            {initial}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="top" align="start" className="account-menu">
           <div className="px-3 pb-2 pt-1">
             {user.name && <p className="truncate text-[13px] font-semibold text-ink">{user.name}</p>}
             <p className="truncate text-[12px] text-ink-muted">{user.email}</p>
           </div>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              showMyRequests();
-            }}
-            disabled={!requests?.length}
-            className="account-menu-item"
-          >
+          <DropdownMenuItem onSelect={showMyRequests} disabled={!requests?.length}>
             <ListChecks className="size-4" />
             Мої запити
             {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
-          </button>
+          </DropdownMenuItem>
           {performer && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
+            <DropdownMenuItem
+              onSelect={() => {
                 setMapMode("requests");
                 feedCollapsedStore.set(false);
               }}
-              className="account-menu-item"
             >
               <Inbox className="size-4" />
               Запити для вас
               {feedCount > 0 && <span className="ml-auto text-[11px] text-ink-muted">{feedCount}</span>}
-            </button>
+            </DropdownMenuItem>
           )}
           {performer && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                placementOpenStore.set(true);
-              }}
-              className="account-menu-item"
-            >
+            <DropdownMenuItem onSelect={() => placementOpenStore.set(true)}>
               <MapPinned className="size-4" />
               Стати на карту
               <span className="ml-auto text-[11px] text-ink-muted">{TIER_NAMES[placement?.tier ?? 1]}</span>
-            </button>
+            </DropdownMenuItem>
           )}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
+          <DropdownMenuItem
+            onSelect={() => {
               track(EVENTS.performerCtaClicked, { from: "menu" });
               profileEditorStore.set(true);
             }}
-            className="account-menu-item"
           >
             <UserRound className="size-4" />
             {profile ? "Мій профіль" : "Стати виконавцем"}
             {profile && <span className="ml-auto text-[11px] text-ink-muted">{!profile.published ? "чернетка" : (placement?.tier ?? 1) >= 2 ? "на карті" : "не на карті"}</span>}
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              notificationSettingsStore.set(true);
-            }}
-            className="account-menu-item"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => notificationSettingsStore.set(true)}>
             <Bell className="size-4" />
             Сповіщення
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              void logout();
-            }}
-            className="account-menu-item"
-          >
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void logout()}>
             <LogOut className="size-4" />
             Вийти
-          </button>
-        </div>
-      )}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       {!profile && (
         <button
           type="button"
           onClick={() => {
-            setOpen(false);
             track(EVENTS.performerCtaClicked, { from: "banner" });
             profileEditorStore.set(true);
           }}

@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
 import { gsap } from "gsap";
 import { ArrowLeft, Loader2, MapPin, X } from "@/components/icons";
 import { CodeInput } from "@/components/auth/code-input";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { GoogleButton } from "@/components/auth/google-button";
 import {
   ApiError,
@@ -47,14 +47,12 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
   const [error, setError] = useState<string | null>(null);
   const [mock, setMock] = useState(false);
   const [cooldown, setCooldown] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [draft] = useState<RequestDraft | null>(() => (mode === "publish" ? (loadDraft()?.draft ?? null) : null));
-  const panelRef = useRef<HTMLDivElement>(null);
+  // Панель з'являється в порталі пізніше за сам компонент, тому тримаємо її в стані, а не в ref.
+  const [panel, setPanel] = useState<HTMLDivElement | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef<{ focus: () => void }>(null);
   const startedRef = useRef(false);
-
-  useEffect(() => setMounted(true), []);
 
   // З чого почали: запит (publish), кнопка «Увійти» (login) чи «Я виконавець» (performer).
   useEffect(() => {
@@ -101,33 +99,25 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
 
   // Форма з'являється в центрі екрана, кроки змінюються з легким зсувом.
   useLayoutEffect(() => {
-    if (!panelRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = gsap.fromTo(panelRef.current, { opacity: 0, y: -10, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" });
+    if (!panel || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = gsap.fromTo(panel, { opacity: 0, y: -10, scale: 0.98 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: "power3.out" });
     return () => {
       tween.kill();
     };
-  }, [mounted]);
+  }, [panel]);
   useLayoutEffect(() => {
     if (!bodyRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const tween = gsap.fromTo(bodyRef.current, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.22, ease: "power2.out" });
     return () => {
       tween.kill();
     };
-  }, [step, mounted]);
+  }, [step, panel]);
 
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = window.setTimeout(() => setCooldown((value) => value - 1), 1000);
     return () => window.clearTimeout(timer);
   }, [cooldown]);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  });
 
   const sendCode = async (event?: FormEvent) => {
     event?.preventDefault();
@@ -164,7 +154,8 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
       track(EVENTS.authFailed, { method: "email", reason: "code" });
       setError(reason instanceof ApiError ? reason.message : "Не вдалося перевірити код.");
       setDigits(emptyCode(digits.length));
-      codeRef.current?.focus();
+      // Поки йшла перевірка, комірки були вимкнені: фокус у першу комірку ставимо, коли вони знову живі.
+      window.setTimeout(() => codeRef.current?.focus(), 60);
       const group = bodyRef.current?.querySelector(".code-input");
       if (group) gsap.fromTo(group, { x: -8 }, { x: 0, duration: 0.5, ease: "elastic.out(1, 0.3)" });
     } finally {
@@ -194,12 +185,18 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                 ? "Профіль виконавця"
                 : "Вхід";
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div className="auth-dialog-layer">
-      <div aria-hidden className="auth-dialog-scrim" onClick={close} />
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-label={title} className="auth-panel glass-panel">
+  return (
+    <Dialog open onOpenChange={(open) => !open && close()}>
+      <DialogContent
+        ref={setPanel}
+        aria-describedby={undefined}
+        className="auth-panel glass-panel"
+        onOpenAutoFocus={(event) => {
+          // Курсор у полі пошти, а не на кнопці «Закрити». Не autoFocus: він збив би запам'ятовування кнопки, що відкрила вхід.
+          event.preventDefault();
+          bodyRef.current?.querySelector("input")?.focus();
+        }}
+      >
         <div className="auth-dialog-header">
           {step === "code" && (
             <button type="button" onClick={() => setStep("email")} aria-label="Змінити пошту" className="auth-icon-button auth-back">
@@ -212,7 +209,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
             </button>
           )}
           <span className="auth-hero-icon" aria-hidden="true"><MapPin className="size-5" /></span>
-          <h2 className="auth-dialog-title">{title}</h2>
+          <DialogTitle className="auth-dialog-title">{title}</DialogTitle>
         </div>
 
         <div ref={bodyRef}>
@@ -233,7 +230,6 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                   id="auth-email"
                   type="email"
                   required
-                  autoFocus
                   autoComplete="email"
                   inputMode="email"
                   placeholder="Електронна пошта"
@@ -320,8 +316,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
             </>
           )}
         </div>
-      </div>
-    </div>,
-    document.body
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -4,6 +4,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import { Check, Eraser, MapPin, X } from "@/components/icons";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { CITIES } from "@/lib/map/cities";
 import { nearestCity } from "@/lib/map/nearest-city";
 import type { GeoPoint } from "@/lib/map/types";
@@ -58,14 +59,14 @@ export function LocationPicker({
   onConfirm: (point: Point | null) => void;
   onClose: () => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  // Контейнер карти з'являється в порталі пізніше за компонент, тому тримаємо його в стані, а не в ref.
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const [draft, setDraft] = useState<Point | null>(initial);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const container = containerRef.current;
     if (!container) return;
     const city = CITIES.find((item) => item.id === cityId);
     const start = initial ?? city;
@@ -107,7 +108,7 @@ export function LocationPicker({
     };
     // Початковий вигляд задаємо один раз; далі карту веде людина.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [container]);
 
   // Маркер повторює чернетку: поставили, перетягнули, зняли.
   useEffect(() => {
@@ -134,15 +135,7 @@ export function LocationPicker({
     } else {
       markerRef.current.setLngLat([draft.lng, draft.lat]);
     }
-  }, [draft]);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [draft, container]);
 
   const near = draft ? nearestCity(draft as GeoPoint) : null;
   const changed =
@@ -151,17 +144,13 @@ export function LocationPicker({
   const removing = !draft && Boolean(initial);
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Точка на карті"
-      className="loc-overlay"
-    >
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+    <DialogContent variant="full" aria-describedby={undefined} className="loc-overlay">
       <header className="pe-header">
         <div className="min-w-0 flex-1">
-          <h2 className="text-[18px] font-semibold text-ink">
+          <DialogTitle data-size="lg" className="ui-dialog-title">
             Де вас показувати
-          </h2>
+          </DialogTitle>
           <p className="mt-0.5 text-[12px] text-ink-muted">
             Наблизьте карту й торкніться місця. Точку можна перетягнути.
           </p>
@@ -177,7 +166,7 @@ export function LocationPicker({
       </header>
 
       <div className="loc-map-wrap">
-        <div ref={containerRef} className="loc-map" />
+        <div ref={setContainer} className="loc-map" />
         {failed && (
           <p className="loc-fail">
             Карта не завантажилась. Закрийте вікно й оберіть місто зі списку.
@@ -225,6 +214,7 @@ export function LocationPicker({
           </button>
         </div>
       </footer>
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }

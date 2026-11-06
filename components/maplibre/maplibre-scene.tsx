@@ -300,6 +300,13 @@ const topEdgeUnderStack = (bounds: DOMRect, left: number, width: number) => {
   return edge;
 };
 
+/** Нижня межа картки: над нижніми кнопками, якщо картка стоїть над ними, інакше відступ від краю. */
+const bottomEdgeAboveControls = (bounds: DOMRect, left: number, width: number) => {
+  const box = document.querySelector(".bottom-controls")?.getBoundingClientRect();
+  const overlaps = box && box.right - bounds.left > left && box.left - bounds.left < left + width;
+  return overlaps ? box.top - bounds.top - 12 : bounds.height - 16;
+};
+
 const budgetNumbers = (budget: string | null) =>
   [...(budget ?? "").matchAll(/\d[\d\s\u00a0]*/g)].map((match) => Number(match[0].replace(/\D/g, "")));
 
@@ -1708,7 +1715,8 @@ export default function MapLibreScene() {
       // Маркер стоїть на точці нижнім краєм.
       const markerCenterY = point.y - anchor.centerDy;
       const gap = anchor.half + 18;
-      const { width, height } = card.getBoundingClientRect();
+      // Розмір без transform: під час появи картка ще стиснута анімацією scale.
+      const { offsetWidth: width, offsetHeight: height } = card;
       const bounds = map.getContainer().getBoundingClientRect();
       // Праворуч не заходимо під панель пропозицій, якщо вона відкрита колонкою.
       const offers = document.querySelector(".offers-panel")?.getBoundingClientRect();
@@ -1716,8 +1724,10 @@ export default function MapLibreScene() {
       const fitsRight = point.x + gap + width <= rightEdge;
       const left = clamp(fitsRight ? point.x + gap : point.x - gap - width, 16, rightEdge - width);
       const topEdge = topEdgeUnderStack(bounds, left, width);
-      card.style.maxHeight = `${Math.max(260, bounds.height - topEdge - 16)}px`;
-      const top = clamp(markerCenterY - height / 2, topEdge, Math.max(topEdge, bounds.height - Math.min(height, bounds.height - topEdge - 16) - 16));
+      const bottomEdge = bottomEdgeAboveControls(bounds, left, width);
+      const room = Math.max(260, bottomEdge - topEdge);
+      card.style.maxHeight = `${room}px`;
+      const top = clamp(markerCenterY - height / 2, topEdge, Math.max(topEdge, bottomEdge - Math.min(height, room)));
       card.style.left = `${Math.round(left)}px`;
       card.style.top = `${Math.round(top)}px`;
       card.style.setProperty("--card-origin-x", fitsRight ? "0%" : "100%");
@@ -1828,6 +1838,12 @@ export default function MapLibreScene() {
     if (!map || !flyToRef.current) return;
     const home = homeRef.current;
     flyToRef.current(map, [home.lng, home.lat], home.zoom, 700);
+  };
+  // «Запропонувати роботу»: на телефоні картку закриваємо, щоб не лежала під полем запиту; на ширшому екрані вона стоїть поруч.
+  const proposeWork = () => {
+    if (window.innerWidth < 640) setSelectedId(null);
+    else setCardNotice("Опишіть роботу в полі запиту.");
+    document.getElementById("request")?.focus();
   };
   const focus = useStore(focusPerformerStore);
   useEffect(() => {
@@ -1979,7 +1995,8 @@ export default function MapLibreScene() {
       {selectedRequest && <RequestMapCard ref={cardRef} item={selectedRequest} />}
 
       {selected && (
-        <aside key={selected.id} ref={cardRef} className="performer-card glass-panel absolute inset-x-3 bottom-20 z-[var(--z-controls)] rounded-[22px] p-5 shadow-[0_18px_55px_rgba(45,60,67,.16)] max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain sm:inset-x-auto sm:bottom-auto sm:max-h-[calc(100%-120px)] sm:w-[360px]" aria-label={`Картка виконавця ${selected.name}`}>
+        <aside key={selected.id} ref={cardRef} className="performer-card map-card-person glass-panel" aria-label={`Картка виконавця ${selected.name}`}>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="size-16 shrink-0 rounded-2xl bg-[#e6e9e7] bg-no-repeat shadow-[inset_0_0_0_1px_rgba(255,255,255,.6)]" style={avatarBackground(selected)} role="img" aria-label={`Фото ${selected.name}`} />
@@ -1996,6 +2013,7 @@ export default function MapLibreScene() {
             performer={selected}
             onOpenWork={() => openProfile(selected.id)}
           />
+          </div>
           {selected.mine ? (
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={() => placementOpenStore.set(true)} className="min-h-10 w-full rounded-2xl bg-[var(--brand-solid)] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-solid-hover)]">{selected.tier >= 6 ? "Ваше розміщення" : "Підняти на карті"}</button>
@@ -2004,7 +2022,7 @@ export default function MapLibreScene() {
           ) : (
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={() => openProfile(selected.id)} className="min-h-10 w-full rounded-2xl border border-[#b8c4c7] bg-white/75 px-4 text-[12px] font-medium text-ink shadow-[0_1px_2px_rgba(42,53,57,.05)] transition-colors hover:border-[#87999e] hover:bg-white">Переглянути профіль</button>
-              <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[var(--brand-solid)] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-solid-hover)]">Запропонувати роботу</button>
+              <Button variant="bare" onClick={proposeWork} className="map-card-cta">Запропонувати роботу</Button>
             </div>
           )}
           <p aria-live="polite" className="mt-3 min-h-4 text-xs text-ink-muted">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>

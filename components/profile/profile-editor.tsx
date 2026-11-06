@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Check, Loader2, MapPinned, Plus, X } from "@/components/icons";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { LocationPicker } from "@/components/profile/location-picker";
@@ -68,7 +69,8 @@ export function ProfileEditor() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const overlayRef = useRef<HTMLDivElement>(null);
+  // Оверлей з'являється в порталі пізніше за компонент, тому тримаємо його в стані, а не в ref.
+  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
   const firstFieldRef = useRef<HTMLInputElement>(null);
   const initialSnapshot = useRef<string | null>(null);
 
@@ -116,30 +118,17 @@ export function ProfileEditor() {
   }, [saved]);
 
   useLayoutEffect(() => {
-    if (!overlayRef.current || reduced()) return;
-    const tween = gsap.fromTo(overlayRef.current, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" });
+    if (!overlay || reduced()) return;
+    const tween = gsap.fromTo(overlay, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" });
     return () => {
       tween.kill();
     };
-  }, []);
-
-  useEffect(() => {
-    firstFieldRef.current?.focus({ preventScroll: true });
-  }, []);
+  }, [overlay]);
 
   const requestClose = () => {
     if (dirty && !busy) setConfirmClose(true);
     else profileEditorStore.set(false);
   };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      // Escape у випадайці вибору тегу закриває лише її (подію позначено як оброблену).
-      if (event.key === "Escape" && !event.defaultPrevented) requestClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  });
 
   const save = async (kind: "publish" | "draft" | "unpublish", closeAfter = false) => {
     setBusy(kind);
@@ -184,10 +173,23 @@ export function ProfileEditor() {
   const done = checks.filter(([, ok]) => ok).length;
 
   return (
-    <div ref={overlayRef} role="dialog" aria-modal="true" aria-label="Профіль виконавця" className="pe-overlay">
+    <Dialog open onOpenChange={(next) => !next && requestClose()}>
+    <DialogContent
+      ref={setOverlay}
+      variant="full"
+      aria-describedby={undefined}
+      className="pe-overlay"
+      onOpenAutoFocus={(event) => {
+        // Курсор одразу в першому полі, а не на кнопці «Закрити».
+        event.preventDefault();
+        firstFieldRef.current?.focus({ preventScroll: true });
+      }}
+    >
       <header className="pe-header">
         <div className="min-w-0">
-          <h1 className="text-[18px] font-semibold text-ink">{isPublished ? "Ваш профіль" : "Профіль виконавця"}</h1>
+          <DialogTitle asChild>
+            <h1 data-size="lg" className="ui-dialog-title">{isPublished ? "Ваш профіль" : "Профіль виконавця"}</h1>
+          </DialogTitle>
           <p className="mt-0.5 text-[12px] text-ink-muted">
             {isPublished
               ? onMap
@@ -521,7 +523,8 @@ export function ProfileEditor() {
           }}
         />
       )}
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }
 

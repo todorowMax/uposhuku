@@ -462,7 +462,6 @@ export function RequestComposer() {
               onClick={() => setMenuOpen((open) => !open)}
               aria-label="Додати файл, зображення або код"
               aria-expanded={menuOpen}
-              aria-haspopup="menu"
               tabIndex={actionsVisible ? 0 : -1}
               className="composer-plus composer-action grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
             >
@@ -487,7 +486,6 @@ export function RequestComposer() {
             onClick={() => setMenuOpen((open) => !open)}
             aria-label="Додати файл, зображення або код"
             aria-expanded={menuOpen}
-            aria-haspopup="menu"
             aria-hidden={expanded}
             tabIndex={expanded ? -1 : 0}
             className="composer-compact-plus grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
@@ -513,7 +511,6 @@ export function RequestComposer() {
 
         {menuOpen && (
           <div
-            role="menu"
             className="composer-menu glass-panel absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl p-1.5"
           >
             <MenuItem icon={<Paperclip className="size-4" />} onClick={() => pick("file")}>
@@ -572,7 +569,6 @@ function MenuItem({
   return (
     <button
       type="button"
-      role="menuitem"
       onClick={onClick}
       className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-ink transition-colors hover:bg-white/65"
     >

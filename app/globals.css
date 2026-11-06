@@ -51,6 +51,7 @@
   /* Семантична z-шкала замість випадкових 999 */
   --z-map-overlay: 10;
   --z-controls: 20;
+  --z-skip-link: 100;
 
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -109,6 +110,46 @@ body:has(.map-page) {
   .performer-card {
     animation: none;
   }
+}
+
+/* Картка виконавця на карті: над нижніми кнопками, тіло прокручується, кнопки внизу завжди видно. */
+.map-card-person {
+  position: absolute;
+  inset-inline: 12px;
+  bottom: 80px;
+  z-index: var(--z-controls);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 7rem);
+  overflow: hidden;
+  padding: 20px;
+  border-radius: 22px;
+  box-shadow: 0 18px 55px rgb(45 60 67 / 16%);
+}
+
+@media (min-width: 640px) {
+  .map-card-person {
+    inset-inline: auto;
+    bottom: auto;
+    width: 360px;
+    max-height: calc(100% - 120px);
+  }
+}
+
+.map-card-cta {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: var(--brand-solid);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--brand-ink);
+  transition: background-color 150ms;
+}
+
+.map-card-cta:hover {
+  background: var(--brand-solid-hover);
 }
 
 /*
@@ -1020,6 +1061,59 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   }
 }
 
+/* Шар під діалогом (components/ui/dialog.tsx): затемнення й розташування панелі. */
+.ui-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(29 38 42 / 48%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.ui-dialog-layer[data-variant="bottom"] {
+  align-items: end;
+  padding: 0;
+  background: rgb(3 9 13 / 62%);
+}
+
+@media (min-width: 640px) {
+  .ui-dialog-layer[data-variant="bottom"] {
+    align-items: center;
+    padding: 16px;
+  }
+}
+
+.ui-dialog-layer[data-variant="full"] {
+  display: block;
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-slot="dialog-content"] {
+  outline: none;
+}
+
+/* Заголовок діалогу (DialogTitle): два розміри, як були в панелях. */
+.ui-dialog-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ui-dialog-title[data-size="lg"] {
+  font-size: 18px;
+}
+
+.ui-dialog-title[data-size="sm"] {
+  font-size: 14px;
+}
+
 /* Вхід і публікація запиту: центральна картка над затемненою картою. */
 .auth-dialog-layer {
   position: fixed;
@@ -1479,17 +1573,21 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   background: var(--hover-blue);
 }
 
-.account-menu {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 0;
+/* Випадайка меню (components/ui/dropdown-menu.tsx); ширину задає місце (.account-menu). */
+.ui-dropdown {
+  z-index: 90;
   display: grid;
   gap: 2px;
-  width: 240px;
   padding: 8px;
+  border: 1px solid var(--line);
   border-radius: 16px;
   background: rgb(255 255 255 / 96%);
   box-shadow: 0 18px 44px rgb(45 60 67 / 18%);
+  outline: none;
+}
+
+.account-menu {
+  width: 240px;
 }
 
 .account-menu-item {
@@ -2893,26 +2991,42 @@ html[data-glass] .offers-panel {
   background: var(--hover-blue);
 }
 
-.legend-panel {
-  position: absolute;
-  bottom: calc(100% + 10px);
-  left: 0;
+.legend-panel,
+.legend-sheet {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.legend-body {
   display: grid;
   gap: 12px;
+}
+
+.ui-popover.legend-panel {
   width: min(380px, calc(100vw - 32px));
   max-height: min(520px, calc(100dvh - 100px));
   overflow-y: auto;
-  white-space: normal;
-  overflow-wrap: break-word;
   padding: 16px;
   border-radius: 18px;
   background: rgb(255 255 255 / 97%);
   box-shadow: 0 18px 44px rgb(45 60 67 / 20%);
 }
 
-.account-slot-guest .legend-panel {
-  left: auto;
-  right: 0;
+.legend-lead {
+  font-size: 12px;
+  line-height: 1.625;
+  color: var(--ink-muted);
+}
+
+.legend-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.legend-sheet {
+  overflow-y: auto;
+  padding: 0 16px 16px;
 }
 
 .legend-list {
@@ -3087,12 +3201,12 @@ html[data-glass] .offers-panel {
   transition: background-color 150ms, color 150ms;
 }
 
-.mode-switch button:hover:not([aria-selected="true"]) {
+.mode-switch button:hover:not([aria-pressed="true"]) {
   color: var(--ink);
   background: var(--hover-blue);
 }
 
-.mode-switch button[aria-selected="true"] {
+.mode-switch button[aria-pressed="true"] {
   background: var(--ocean);
   border-color: var(--ocean);
   color: #ffffff;
@@ -3106,7 +3220,7 @@ html[data-glass] .offers-panel {
   font-variant-numeric: lining-nums proportional-nums;
 }
 
-.mode-switch button:not([aria-selected="true"]) .mode-count {
+.mode-switch button:not([aria-pressed="true"]) .mode-count {
   background: rgb(0 54 74 / 8%);
 }
 
@@ -3454,6 +3568,8 @@ html[data-glass] .offers-panel {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Липкий низ (.pe-footer) не закриває поле, на яке перейшли клавішею Tab. */
+  scroll-padding-bottom: 140px;
 }
 
 .pe-layout {
@@ -5919,6 +6035,27 @@ html[data-map-ready] .map-skeleton {
   flex: none;
 }
 
+/* Посилання «Перейти до поля запиту»: першим у порядку Tab, видиме лише з фокусом. */
+.skip-link {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: var(--z-skip-link);
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: var(--brand-solid);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus-visible {
+  transform: none;
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 /* Запит згоди на статистику (components/legal/consent-banner.tsx). */
 .consent-banner {
   position: fixed;
@@ -5979,12 +6116,17 @@ html[data-map-ready] .map-skeleton {
   from { opacity: 0; transform: translateY(8px); }
 }
 
-/* На телефоні над нижніми кнопками (акаунт, режим карти). */
+/* Поки нижні кнопки по центру не вміщаються поруч із карткою (до 1119 px), картка над ними. */
+@media (max-width: 1119px) {
+  .consent-banner {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
 @media (max-width: 639px) {
   .consent-banner {
     left: 16px;
     right: 16px;
-    bottom: calc(88px + env(safe-area-inset-bottom));
     width: auto;
   }
 }
@@ -6164,17 +6306,6 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
   }
 }
 
-/* «Про сервіс» на телефоні: панель на всю ширину над нижньою панеллю, а не від кнопки. */
-.legend-panel[data-phone] {
-  position: fixed;
-  z-index: 70;
-  right: 12px;
-  bottom: calc(max(16px, env(safe-area-inset-bottom)) + 68px);
-  left: 12px;
-  width: auto;
-  max-height: calc(100dvh - 140px);
-}
-
 /* Порожня розмова: підказка, що писати першим повідомленням. */
 .inbox-hint {
   margin: auto;
@@ -6218,7 +6349,7 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
   opacity: 0.7;
 }
 
-.inbox-filter[aria-selected="true"] {
+.inbox-filter[aria-pressed="true"] {
   background: var(--ink);
   color: #ffffff;
 }
@@ -6315,26 +6446,29 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
   cursor: zoom-in;
 }
 
-.photo-viewer {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: grid;
-  place-items: center;
+/* Фото з чату: темніший за звичайні діалоги шар; клік по фону закриває (це «клік поза діалогом»). */
+.ui-dialog-layer:has(.photo-viewer) {
   padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   background: rgb(5 14 18 / 88%);
   animation: photo-viewer-in 180ms ease-out;
 }
 
-.photo-viewer img {
+.photo-viewer {
+  display: grid;
   max-width: 100%;
   max-height: 100%;
+  place-items: center;
+}
+
+.photo-viewer img {
+  max-width: 100%;
+  max-height: calc(100dvh - 32px);
   border-radius: 12px;
   object-fit: contain;
 }
 
 .photo-viewer-close {
-  position: absolute;
+  position: fixed;
   top: max(12px, env(safe-area-inset-top));
   right: 12px;
   display: grid;

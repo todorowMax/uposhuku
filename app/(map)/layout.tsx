@@ -27,6 +27,9 @@ import { VibeMap } from "@/components/maplibre/vibe-map";
 export default function MapLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <main className="map-page relative h-dvh w-full overflow-clip">
+      <a href="#request" className="skip-link">
+        Перейти до поля запиту
+      </a>
       {/* Заставка в першому HTML: видна до завантаження JS карти. */}
       <MapSkeleton />
       <VibeMap />

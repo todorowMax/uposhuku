@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { gsap } from "gsap";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Check,
   Loader2,
@@ -121,7 +122,8 @@ export function ProfileView({
     () => (found ? { ...found, mine } : null),
     [found, mine],
   );
-  const overlayRef = useRef<HTMLDivElement>(null);
+  // Оверлей з'являється в порталі пізніше за компонент, тому тримаємо його в стані, а не в ref.
+  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
   const dialog = useDialog(id);
   // Чи є вже розмова з цим виконавцем-акаунтом: від цього залежить напис кнопки.
   useDialogSync(id, true);
@@ -136,16 +138,16 @@ export function ProfileView({
   }, []);
 
   useLayoutEffect(() => {
-    if (!overlayRef.current || reduced()) return;
+    if (!overlay || reduced()) return;
     const tween = gsap.fromTo(
-      overlayRef.current,
+      overlay,
       { opacity: 0, y: 16 },
       { opacity: 1, y: 0, duration: 0.28, ease: "power3.out" },
     );
     return () => {
       tween.kill();
     };
-  }, []);
+  }, [overlay]);
 
   /** «Описати задачу»: гість спершу входить, далі розмова з цим виконавцем відкривається в месенджері. */
   const contact = () => {
@@ -158,14 +160,6 @@ export function ProfileView({
     }
     inboxOpenStore.set({ conversationId: null, performerId: id });
   };
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [close]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,20 +205,15 @@ export function ProfileView({
   );
 
   return (
-    <div
-      ref={overlayRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={
-        performer ? `Профіль: ${performer.name}` : "Профіль виконавця"
-      }
-      className="pe-overlay"
-    >
+    <Dialog open onOpenChange={(next) => !next && close()}>
+    <DialogContent ref={setOverlay} variant="full" aria-describedby={undefined} className="pe-overlay">
       <header className="pe-header">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[18px] font-semibold text-ink">
-            {performer?.name ?? "Профіль виконавця"}
-          </h1>
+          <DialogTitle asChild>
+            <h1 data-size="lg" className="ui-dialog-title truncate">
+              {performer?.name ?? "Профіль виконавця"}
+            </h1>
+          </DialogTitle>
         </div>
         <button
           type="button"
@@ -430,6 +419,7 @@ export function ProfileView({
           )}
         </footer>
       )}
-    </div>
+    </DialogContent>
+    </Dialog>
   );
 }

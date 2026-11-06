@@ -215,10 +215,10 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
                 <MoreHorizontal className="size-4" />
               </button>
               {menuOpen && (
-                <div role="menu" className="request-summary-menu glass-panel">
-                  <button type="button" role="menuitem" className="account-menu-item" onClick={() => void close()}>
+                <div className="request-summary-menu glass-panel">
+                  <Button variant="bare" className="account-menu-item" onClick={() => void close()}>
                     Закрити запит
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

@@ -27,8 +27,8 @@ export function MapModeSwitch() {
   if (!hasOpenRequest && !canSeeRequests) return null;
   const count = items.filter((item) => item.point).length;
   return (
-    <div className="mode-switch mode-dock" role="tablist" aria-label="Що показувати на карті">
-      <Button variant="bare" role="tab" aria-selected={mode === "performers" && !allPerformers} aria-label="Виконавці" onClick={() => {
+    <div className="mode-switch mode-dock" role="group" aria-label="Що показувати на карті">
+      <Button variant="bare" aria-pressed={mode === "performers" && !allPerformers} aria-label="Виконавці" onClick={() => {
           track(EVENTS.mapModeSwitched, { mode: "performers" });
           setMapMode("performers");
         }}>
@@ -36,7 +36,7 @@ export function MapModeSwitch() {
         <span className="mode-label">Виконавці</span>
       </Button>
       {hasOpenRequest && (
-        <Button variant="bare" role="tab" aria-selected={mode === "performers" && allPerformers} aria-label="Всі виконавці" onClick={() => {
+        <Button variant="bare" aria-pressed={mode === "performers" && allPerformers} aria-label="Всі виконавці" onClick={() => {
             track(EVENTS.mapModeSwitched, { mode: "all_performers" });
             showAllPerformers();
           }}>
@@ -45,7 +45,7 @@ export function MapModeSwitch() {
         </Button>
       )}
       {canSeeRequests && (
-        <Button variant="bare" role="tab" aria-selected={mode === "requests"} aria-label={count > 0 ? `Запити: ${count}` : "Запити"} onClick={() => {
+        <Button variant="bare" aria-pressed={mode === "requests"} aria-label={count > 0 ? `Запити: ${count}` : "Запити"} onClick={() => {
             track(EVENTS.mapModeSwitched, { mode: "requests" });
             setMapMode("requests");
           }}>

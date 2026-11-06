@@ -9,6 +9,7 @@ import { enablePush, pushState, setPrefs, syncPrefsWithServer, usePrefs, type Pu
 import { startPolling } from "@/lib/realtime/client";
 import { cancelTelegramLink, disconnectTelegram, loadTelegram, startTelegramLink, useTelegram } from "@/lib/telegram/link-client";
 import { createStore, useStore } from "@/lib/store";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 export const notificationSettingsStore = createStore(false);
 
@@ -75,15 +76,6 @@ export function NotificationSettings() {
     return startPolling(() => void loadTelegram(), telegram.waiting ? 4000 : 20_000, ["telegram"]);
   }, [open, telegram.linked, telegram.waiting]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open]);
-
   if (!open || session.status !== "user") return null;
 
   const pushHint =
@@ -106,12 +98,10 @@ export function NotificationSettings() {
             : "Особистий бот напише про нові пропозиції, повідомлення й угоди, коли ви не на сайті.";
 
   return (
-    <>
-      <div aria-hidden className="auth-scrim place-scrim" onClick={close} />
-      <div className="place-wrap">
-        <div role="dialog" aria-modal="true" aria-label="Сповіщення" className="place-panel glass-panel">
+    <Dialog open onOpenChange={(next) => !next && close()}>
+      <DialogContent variant="bottom" aria-describedby={undefined} className="place-panel glass-panel">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[17px] font-semibold text-ink">Сповіщення</h2>
+            <DialogTitle className="ui-dialog-title">Сповіщення</DialogTitle>
             <button type="button" onClick={close} aria-label="Закрити" className="auth-icon-button -mr-1.5">
               <X className="size-4" />
             </button>
@@ -156,9 +146,8 @@ export function NotificationSettings() {
             checked={consent === "granted"}
             onChange={(checked) => writeConsent(checked ? "granted" : "denied")}
           />
-        </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
 
