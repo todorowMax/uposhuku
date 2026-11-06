@@ -58,7 +58,7 @@ describe("пульс присутності", () => {
   });
 });
 
-const person = (id: string): Performer => ({ id, name: id, specialty: "x", stats: { months: 1, orders: 0, rating: null, reviews: 0 } }) as unknown as Performer;
+const person = (id: string): Performer => ({ id, name: id, specialty: "x", stats: { months: 1, orders: 0, rating: null, reviews: 0, verifiedReviews: 0 } }) as unknown as Performer;
 
 describe("моя картка при кеші карти", () => {
   it("щойно опублікований профіль видно, хоч кеш його ще не має", () => {

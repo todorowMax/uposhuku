@@ -76,6 +76,8 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
+- «Перевірена угода» (`reviews.verified`, `lib/deals/verified.ts`): сервер ставить її при створенні відгуку, якщо угода `completed` і оплату кожного етапу підтвердив банк (`paidAmount`), контракт (`paidUnits`) або блокчейн (запис у `crypto_proofs`). Переказ на IBAN, Binance, PayPal і Wise ніколи не дає позначки; старі відгуки мають `verified = 0`.
+
 ## Styles
 
 - Tailwind utilities in JSX. Colours, radii, type sizes and layers are tokens (`DESIGN.md`).
@@ -85,7 +87,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-775 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
+774 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

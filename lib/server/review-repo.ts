@@ -11,6 +11,7 @@ const toReview = (row: typeof reviews.$inferSelect): Review => ({
   stars: row.stars as Review["stars"],
   text: row.text,
   author: row.author,
+  verified: row.verified === 1,
   createdAt: new Date(row.createdAt).toISOString(),
 });
 
@@ -39,8 +40,8 @@ export const reviewOfDeal = async (dealId: string): Promise<Review | undefined> 
   return row ? toReview(row) : undefined;
 };
 
-export const addReview = async (authorUserId: string, review: Omit<Review, "id" | "createdAt">): Promise<Review> => {
-  const row = { id: `rev_${crypto.randomUUID().slice(0, 8)}`, performerId: review.performerId, dealId: review.dealId, authorUserId, stars: review.stars, text: review.text, author: review.author, createdAt: Date.now() };
+export const addReview = async (authorUserId: string, review: Omit<Review, "id" | "createdAt" | "verified"> & { verified?: boolean }): Promise<Review> => {
+  const row = { id: `rev_${crypto.randomUUID().slice(0, 8)}`, performerId: review.performerId, dealId: review.dealId, authorUserId, stars: review.stars, text: review.text, author: review.author, verified: review.verified ? 1 : 0, createdAt: Date.now() };
   await getDb().insert(reviews).values(row);
   return toReview(row);
 };

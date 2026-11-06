@@ -1,11 +1,13 @@
 // /api/reviews — відгуки про роботу.
 // GET ?performerId= — відгуки виконавця (відкрито всім); GET ?dealId= — мій
 // відгук по угоді; POST {dealId, stars, text} — лишити відгук після
-// завершеної угоди, один на угоду.
+// завершеної угоди, один на угоду. verified ставить сервер (lib/deals/verified.ts).
 
 import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
+import { isVerifiedDeal } from "@/lib/deals/verified";
+import { listDealProofs } from "@/lib/server/crypto-proof-repo";
 import { listDeals } from "@/lib/server/deal-repo";
 import { addReview, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
 import { reviewAuthor } from "@/lib/reviews/author";
@@ -42,7 +44,9 @@ export async function POST(request: Request) {
   if (stars < 1 || stars > 5) return problem(400, "Оберіть оцінку від 1 до 5");
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, REVIEW_TEXT_MAX) : "";
   const author = reviewAuthor(user.name);
-  const review = await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author }).catch(async (error: unknown) => {
+  // Позначку «Перевірена угода» рахує лише сервер зі стану угоди й підтверджень оплати; з тіла запиту її не беремо.
+  const verified = isVerifiedDeal(deal, await listDealProofs(dealId));
+  const review = await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author, verified }).catch(async (error: unknown) => {
     // Паралельний запит устиг раніше: унікальний індекс по угоді пропустив лише один, другому відповідаємо як на повтор.
     if (await reviewOfDeal(dealId)) return null;
     throw error;

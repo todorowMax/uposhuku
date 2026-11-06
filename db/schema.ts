@@ -261,6 +261,8 @@ export const reviews = sqliteTable(
     stars: integer("stars").notNull(),
     text: text("text").notNull().default(""),
     author: text("author").notNull(),
+    /** 1, якщо оплату всіх етапів підтвердив банк чи блокчейн (lib/deals/verified.ts). Ставить лише сервер при створенні відгуку. */
+    verified: integer("verified").notNull().default(0),
     createdAt: integer("created_at").notNull(),
   },
   (table) => [uniqueIndex("reviews_deal_idx").on(table.dealId), index("reviews_performer_idx").on(table.performerId)],

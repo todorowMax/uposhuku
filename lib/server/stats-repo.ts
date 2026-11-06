@@ -16,15 +16,15 @@ export const allPerformerStats = async (now = Date.now()): Promise<Map<string, P
   const [people, done, rated] = await Promise.all([
     db.select({ id: users.id, createdAt: users.createdAt }).from(users),
     db.select({ performerId: deals.performerId, count: sql<number>`count(*)` }).from(deals).where(eq(deals.status, "completed")).groupBy(deals.performerId),
-    db.select({ performerId: reviews.performerId, average: sql<number>`avg(${reviews.stars})`, count: sql<number>`count(*)` }).from(reviews).groupBy(reviews.performerId),
+    db.select({ performerId: reviews.performerId, average: sql<number>`avg(${reviews.stars})`, count: sql<number>`count(*)`, verified: sql<number>`coalesce(sum(${reviews.verified}), 0)` }).from(reviews).groupBy(reviews.performerId),
   ]);
   const orders = new Map(done.map((row) => [row.performerId, Number(row.count)]));
-  const ratings = new Map(rated.map((row) => [row.performerId, { average: Math.round(Number(row.average) * 10) / 10, count: Number(row.count) }]));
+  const ratings = new Map(rated.map((row) => [row.performerId, { average: Math.round(Number(row.average) * 10) / 10, count: Number(row.count), verified: Number(row.verified) }]));
   const result = new Map<string, PerformerStats>();
   for (const person of people) {
     const performerId = `me-${person.id}`;
     const rating = ratings.get(performerId);
-    result.set(performerId, { months: Math.max(0, Math.floor((now - person.createdAt) / MONTH)), orders: orders.get(performerId) ?? 0, rating: rating?.average ?? null, reviews: rating?.count ?? 0 });
+    result.set(performerId, { months: Math.max(0, Math.floor((now - person.createdAt) / MONTH)), orders: orders.get(performerId) ?? 0, rating: rating?.average ?? null, reviews: rating?.count ?? 0, verifiedReviews: rating?.verified ?? 0 });
   }
   return result;
 };
@@ -36,15 +36,16 @@ export const performerStatsOf = async (userId: string, now = Date.now()): Promis
   const [people, done, rated] = await Promise.all([
     db.select({ createdAt: users.createdAt }).from(users).where(eq(users.id, userId)),
     db.select({ count: sql<number>`count(*)` }).from(deals).where(and(eq(deals.status, "completed"), eq(deals.performerId, performerId))),
-    db.select({ average: sql<number>`avg(${reviews.stars})`, count: sql<number>`count(*)` }).from(reviews).where(eq(reviews.performerId, performerId)),
+    db.select({ average: sql<number>`avg(${reviews.stars})`, count: sql<number>`count(*)`, verified: sql<number>`coalesce(sum(${reviews.verified}), 0)` }).from(reviews).where(eq(reviews.performerId, performerId)),
   ]);
   const person = people[0];
-  if (!person) return { months: 0, orders: 0, rating: null, reviews: 0 };
+  if (!person) return { months: 0, orders: 0, rating: null, reviews: 0, verifiedReviews: 0 };
   const reviewCount = Number(rated[0]?.count ?? 0);
   return {
     months: Math.max(0, Math.floor((now - person.createdAt) / MONTH)),
     orders: Number(done[0]?.count ?? 0),
     rating: reviewCount > 0 ? Math.round(Number(rated[0]?.average) * 10) / 10 : null,
     reviews: reviewCount,
+    verifiedReviews: Number(rated[0]?.verified ?? 0),
   };
 };

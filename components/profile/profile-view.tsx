@@ -13,6 +13,7 @@ import {
 import { inboxOpenStore } from "@/components/chat/inbox-panel";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { Stars } from "@/components/deals/deal-tab";
+import { VerifiedBadge } from "@/components/reviews/verified-badge";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import { CITIES } from "@/lib/map/cities";
 import { usePerformers } from "@/lib/map/performers";
@@ -344,6 +345,7 @@ export function ProfileView({
                       {reviews.average.toFixed(1)}
                     </span>
                     · {reviews.list.length} {reviewsWord(reviews.list.length)}
+                    {stats && stats.verifiedReviews > 0 && ` · перевірених: ${stats.verifiedReviews}`}
                   </span>
                 )}
               </div>
@@ -371,6 +373,7 @@ export function ProfileView({
                       </time>
                     </div>
                     <Stars value={review.stars} size={13} />
+                    {review.verified && <VerifiedBadge />}
                     {review.text && (
                       <p className="mt-1.5 text-[13px] leading-snug text-ink/90">
                         {review.text}

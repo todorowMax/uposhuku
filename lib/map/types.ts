@@ -43,6 +43,8 @@ export interface PerformerStats {
   /** Середня оцінка з відгуків; null, поки відгуків немає. */
   rating: number | null;
   reviews: number;
+  /** Скільки з відгуків позначено «Перевірена угода». */
+  verifiedReviews: number;
 }
 
 export interface Performer extends GeoPoint {

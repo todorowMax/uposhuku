@@ -1,0 +1,1 @@
+ALTER TABLE `reviews` ADD `verified` integer DEFAULT 0 NOT NULL;

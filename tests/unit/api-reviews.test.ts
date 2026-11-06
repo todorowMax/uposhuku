@@ -9,7 +9,8 @@ import { GET, POST } from "@/app/api/reviews/route";
 import { reviews } from "@/db/schema";
 import type { Deal } from "@/lib/deals/types";
 import { getDb } from "@/lib/server/db";
-import { mutateDeal, proposeDeal } from "@/lib/server/deal-repo";
+import { saveProof } from "@/lib/server/crypto-proof-repo";
+import { listDeals, mutateDeal, proposeDeal } from "@/lib/server/deal-repo";
 import { exhaust, jsonRequest } from "../helpers/route-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
@@ -33,7 +34,7 @@ const makeDeal = async (customer: string, performerUser: string, status: Deal["s
 
 beforeAll(async () => {
   ctx = await useTestD1();
-  for (const id of ["rv-cust", "rv-perf", "rv-other", "rv-spam", "rv-bad"]) await makeUser(ctx.db, id);
+  for (const id of ["rv-cust", "rv-perf", "rv-other", "rv-spam", "rv-bad", "rv-ver"]) await makeUser(ctx.db, id);
 });
 afterAll(async () => {
   await ctx.close();
@@ -118,6 +119,47 @@ describe("POST /api/reviews", () => {
     await exhaust("reviewCreate", "rv-spam");
     expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(429);
     expect(await rowsFor(dealId)).toHaveLength(0);
+  });
+});
+
+describe("позначка «Перевірена угода»", () => {
+  /** Завершена прямa угода з етапом, оплаченим вказаним способом. */
+  const paidDeal = async (paidVia: "usdt" | "bank", withProof: boolean) => {
+    const dealId = await makeDeal("rv-ver", "rv-perf", "accepted");
+    await mutateDeal(dealId, (current) => ({ ...current, status: "completed", stages: current.stages.map((stage) => ({ ...stage, status: "released", paidVia })) }));
+    if (withProof) {
+      const stageId = (await getDealStageId(dealId))!;
+      await saveProof({ dealId, stageId, txHash: `${"ab".repeat(31)}${String(counter).padStart(2, "0")}`, proof: { from: "T1", to: "T2", amountUnits: "500000000", confirmations: 20, blockTime: 1 } });
+    }
+    return dealId;
+  };
+  const getDealStageId = async (dealId: string) => (await listDeals("rv-ver")).find((deal) => deal.id === dealId)?.stages[0]?.id;
+  const verifiedOf = async (dealId: string) => (await rowsFor(dealId))[0]?.verified;
+
+  it("підробка verified у тілі не діє: прямий етап без підтвердження дає 0", async () => {
+    as("rv-ver");
+    const dealId = await paidDeal("bank", false);
+    const response = await POST(jsonRequest("POST", { dealId, ...GOOD, verified: true }));
+    expect(response.status).toBe(201);
+    expect(((await body(response)).review as { verified: boolean }).verified).toBe(false);
+    expect(await verifiedOf(dealId)).toBe(0);
+  });
+
+  it("прямий переказ на банк із чужим записом підтвердження теж без позначки", async () => {
+    as("rv-ver");
+    const dealId = await paidDeal("bank", true);
+    expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(201);
+    expect(await verifiedOf(dealId)).toBe(0);
+  });
+
+  it("USDT із підтвердженням блокчейна дає позначку, GET її віддає", async () => {
+    as("rv-ver");
+    const dealId = await paidDeal("usdt", true);
+    const response = await POST(jsonRequest("POST", { dealId, ...GOOD }));
+    expect(((await body(response)).review as { verified: boolean }).verified).toBe(true);
+    expect(await verifiedOf(dealId)).toBe(1);
+    const list = await GET(new Request("https://findlyfy.test/api/reviews?performerId=me-rv-perf"));
+    expect(((await body(list)).reviews as { dealId: string; verified: boolean }[]).find((item) => item.dealId === dealId)?.verified).toBe(true);
   });
 });
 

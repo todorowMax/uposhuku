@@ -11,6 +11,8 @@ export interface Review {
   text: string;
   /** Ім'я автора: перше слово імені або початок пошти. */
   author: string;
+  /** Оплату угоди підтвердив банк чи блокчейн: «Перевірена угода». Старі відгуки без позначки. */
+  verified: boolean;
   createdAt: string;
 }
 
