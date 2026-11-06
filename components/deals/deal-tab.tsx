@@ -12,6 +12,7 @@ import {
   Star,
 } from "@/components/icons";
 import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
+import { CriteriaField } from "@/components/deals/criteria-field";
 import { ComplaintBox } from "@/components/deals/complaint-box";
 import { DeliveryNote } from "@/components/deals/delivery-note";
 import { ReceiptBox } from "@/components/deals/receipt-box";
@@ -110,6 +111,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
   const [days, setDays] = useState(String(response.days));
   /** Етапи, які людина правила руками; null — рахуємо з суми й терміну. */
   const [custom, setCustom] = useState<StagesEditorTypes.Edit[] | null>(null);
+  const [criteria, setCriteria] = useState("");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,6 +164,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         performer,
         method,
         stages,
+        ...(criteria.trim() ? { criteria: criteria.trim() } : {}),
       });
     } catch (reason) {
       setError(
@@ -181,6 +184,8 @@ function DealComposer({ response }: { response: OfferResponse }) {
           ? "Зафіксуйте домовленість: суму, терміни й спосіб оплати. Виконавець побачить пропозицію й погодиться."
           : "Зафіксуйте домовленість: суму й терміни. Виконавець побачить пропозицію й погодиться."}
       </p>
+
+      <CriteriaField id="deal-criteria" value={criteria} onChange={setCriteria} />
 
       <div className="grid grid-cols-2 gap-2">
         <Field label={`Сума, ${CURRENCY_SIGN[currencyOfMethod(method)]}`} htmlFor="deal-amount">

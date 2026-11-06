@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 import { DealView } from "@/components/deals/deal-tab";
 import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-editor";
 import { DisputeTips } from "@/components/deals/dispute-tips";
-import { CRITERIA_MAX } from "@/lib/deals/dispute-aids";
+import { CriteriaField } from "@/components/deals/criteria-field";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
@@ -195,16 +195,7 @@ export function TermsForm({
         />
       </Field>
 
-      <Field label="Що вважаємо готовим" optional htmlFor="terms-criteria" hint="Після того як друга сторона прийме умови, це не змінюється. Побачать обидві сторони і, якщо буде спір, модератор.">
-        <Textarea
-          id="terms-criteria"
-          rows={2}
-          value={criteria}
-          maxLength={CRITERIA_MAX}
-          onChange={(event) => setCriteria(event.target.value)}
-          placeholder="Макет у Figma і верстка, що відкривається на телефоні"
-        />
-      </Field>
+      <CriteriaField id="terms-criteria" value={criteria} onChange={setCriteria} />
 
       <div className="grid grid-cols-2 gap-2">
         <Field label={`Сума, ${CURRENCY_SIGN[currencyOfMethod(method)]}`} htmlFor="terms-amount">

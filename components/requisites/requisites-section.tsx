@@ -19,6 +19,11 @@ export const RequisitesSection = () => {
   const form = useRequisitesForm();
   const walletConfig = useCryptoConfig();
   const { own, busy, error, notice } = form;
+  // Підтвердження гаманця живе в зоні «Крипта» збережених способів, не окремим блоком.
+  const cryptoZone =
+    own?.wallet && walletConfig && (own.requisites || own.pending) ? (
+      <WalletAddressSection config={walletConfig} current={own.requisites?.walletAddress} pending={own.pending?.requisites.walletAddress} onDone={() => void form.reload()} />
+    ) : null;
 
   return (
     <section className="pe-section" aria-labelledby="pe-requisites">
@@ -49,9 +54,9 @@ export const RequisitesSection = () => {
 
       {form.load === "ready" && !form.editing && own && (
         <div className="grid gap-2">
-          <dl className="text-xs leading-snug">
-            {own.requisites && <SavedMethods requisites={own.requisites} mask={own.mask} />}
-          </dl>
+          <div className="text-xs leading-snug">
+            {own.requisites && <SavedMethods requisites={own.requisites} mask={own.mask} crypto={cryptoZone} />}
+          </div>
           {own.pending && (
             <p className="pe-notice" role="status">
               Нові способи оплати ({own.pending.mask}) набудуть чинності {WHEN.format(own.pending.effectiveAt)}. До того діють попередні.
@@ -86,10 +91,6 @@ export const RequisitesSection = () => {
             )}
           </div>
         </div>
-      )}
-
-      {form.load === "ready" && !form.editing && own?.wallet && walletConfig && (own.requisites || own.pending) && (
-        <WalletAddressSection config={walletConfig} current={own.requisites?.walletAddress} pending={own.pending?.requisites.walletAddress} onDone={() => void form.reload()} />
       )}
 
       {notice && (
