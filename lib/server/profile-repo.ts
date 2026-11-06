@@ -79,6 +79,23 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
   return (await load([row])).get(userId) ?? null;
 };
 
+/** Профілі за списком користувачів пачкою (без запиту на кожного): userId → профіль; відсутні в мапі. */
+export const getProfiles = async (userIds: string[]): Promise<Map<string, Profile>> => {
+  const unique = [...new Set(userIds)];
+  if (unique.length === 0) return new Map();
+  const rows = await inChunks(unique, (chunk) => getDb().select().from(profiles).where(inArray(profiles.userId, chunk)));
+  return load(rows);
+};
+
+/** Лише те, що потрібне картці розмови: імʼя, фото, спеціальність. Без тегів і робіт, одним запитом на порцію. */
+export const getProfileCards = async (userIds: string[]): Promise<Map<string, { name: string; photo: string; specialty: string }>> => {
+  const unique = [...new Set(userIds)];
+  const rows = await inChunks(unique, (chunk) =>
+    getDb().select({ userId: profiles.userId, name: profiles.name, photo: profiles.photo, specialty: profiles.specialty }).from(profiles).where(inArray(profiles.userId, chunk)),
+  );
+  return new Map(rows.map((row) => [row.userId, { name: row.name, photo: row.photo, specialty: row.specialty }]));
+};
+
 /** Усі опубліковані профілі: карта, підбір, стрічка. */
 export const listPublishedProfiles = async (): Promise<Map<string, Profile>> => {
   const rows = await getDb().select().from(profiles).where(eq(profiles.published, true));

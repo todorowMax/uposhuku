@@ -227,7 +227,7 @@ export const deals = sqliteTable(
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
-  (table) => [index("deals_owner_idx").on(table.ownerUserId, table.requestId)],
+  (table) => [index("deals_owner_idx").on(table.ownerUserId, table.requestId), index("deals_performer_idx").on(table.performerId, table.createdAt)],
 );
 
 /**

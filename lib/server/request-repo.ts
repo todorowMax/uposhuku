@@ -2,7 +2,7 @@
 //
 // Запити замовників і відгуки виконавців на D1.
 
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
@@ -101,9 +101,15 @@ export const removeResponse = async (userId: string, requestId: string) => {
   await getDb().delete(responses).where(and(eq(responses.requestId, requestId), eq(responses.performerUserId, userId)));
 };
 
-/** Справжні відгуки виконавців на запит: хто відповів і що. Для пропозицій замовника. */
+/** Скільки відгуків на один запит показуємо замовнику; решту (понад стелю) відсікаємо. */
+export const RESPONSES_CAP = 200;
+
+/**
+ * Справжні відгуки виконавців на запит: хто відповів і що. Для пропозицій замовника.
+ * Не більше RESPONSES_CAP, найраніші першими (серед однакових за часом за id), тож вибірка стабільна.
+ */
 export const responsesTo = async (requestId: string): Promise<{ userId: string; response: MyResponse }[]> =>
-  (await getDb().select().from(responses).where(eq(responses.requestId, requestId))).map((row) => ({ userId: row.performerUserId, response: toMine(row) }));
+  (await getDb().select().from(responses).where(eq(responses.requestId, requestId)).orderBy(asc(responses.createdAt), asc(responses.id)).limit(RESPONSES_CAP)).map((row) => ({ userId: row.performerUserId, response: toMine(row) }));
 
 /** Скільки справжніх відгуків на кожен із запитів. */
 export const responseCounts = async (requestIds: string[]): Promise<Map<string, number>> => {

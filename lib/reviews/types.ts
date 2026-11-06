@@ -16,5 +16,7 @@ export interface Review {
 
 export const REVIEW_TEXT_MAX = 600;
 
-export const averageStars = (reviews: Pick<Review, "stars">[]): number | null =>
-  reviews.length ? Math.round((reviews.reduce((sum, review) => sum + review.stars, 0) / reviews.length) * 10) / 10 : null;
+/** Середня з сум і кількості до десятих; null, якщо відгуків немає. */
+export const averageOf = (sum: number, count: number): number | null => (count ? Math.round((sum / count) * 10) / 10 : null);
+
+export const averageStars = (reviews: Pick<Review, "stars">[]): number | null => averageOf(reviews.reduce((sum, review) => sum + review.stars, 0), reviews.length);

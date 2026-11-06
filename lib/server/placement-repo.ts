@@ -48,3 +48,13 @@ export const tiersByUser = async (): Promise<Map<string, ReturnType<typeof tierF
   for (const [userId, total] of all) result.set(userId, tierFor(total, quote(othersOf(all, userId))));
   return result;
 };
+
+/**
+ * Рівні вибраних людей з одного запиту сум. Збігається з getPlacement(id).tier, зокрема для тих, хто нічого не платив:
+ * їхня сума 0, «решта» це всі платники, і рівень рахується тією ж tierFor (нижче мінімальної ціни це завжди рівень 1).
+ */
+export const tiersFor = async (userIds: string[]): Promise<Map<string, ReturnType<typeof tierFor>>> => {
+  const all = await totalsByUser();
+  const unpaid = tierFor(0, quote([...all.values()]));
+  return new Map([...new Set(userIds)].map((userId) => [userId, all.has(userId) ? tierFor(all.get(userId) as number, quote(othersOf(all, userId))) : unpaid]));
+};

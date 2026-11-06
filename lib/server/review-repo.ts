@@ -1,8 +1,8 @@
 // lib/server/review-repo.ts
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import { reviews } from "@/db/schema";
-import { averageStars, type Review } from "@/lib/reviews/types";
-import { getDb } from "./db";
+import { averageOf, type Review } from "@/lib/reviews/types";
+import { getDb, inChunks } from "./db";
 
 const toReview = (row: typeof reviews.$inferSelect): Review => ({
   id: row.id,
@@ -17,11 +17,22 @@ const toReview = (row: typeof reviews.$inferSelect): Review => ({
 export const reviewsFor = async (performerId: string): Promise<Review[]> =>
   (await getDb().select().from(reviews).where(eq(reviews.performerId, performerId)).orderBy(desc(reviews.createdAt))).map(toReview);
 
-/** Середня оцінка й кількість відгуків виконавця. */
-export const getReviewStats = async (performerId: string) => {
-  const list = await reviewsFor(performerId);
-  return { count: list.length, average: averageStars(list) };
+export type ReviewStats = { count: number; average: number | null };
+
+/** Середня оцінка й кількість відгуків кількох виконавців: агрегат із групуванням, відгуки не вантажимо. Без відгуків запису в мапі немає. */
+export const reviewStatsFor = async (performerIds: string[]): Promise<Map<string, ReviewStats>> => {
+  const rows = await inChunks([...new Set(performerIds)], (chunk) =>
+    getDb()
+      .select({ performerId: reviews.performerId, count: sql<number>`count(*)`, sum: sql<number>`sum(${reviews.stars})` })
+      .from(reviews)
+      .where(inArray(reviews.performerId, chunk))
+      .groupBy(reviews.performerId),
+  );
+  return new Map(rows.map((row) => [row.performerId, { count: Number(row.count), average: averageOf(Number(row.sum), Number(row.count)) }]));
 };
+
+/** Середня оцінка й кількість відгуків виконавця. */
+export const getReviewStats = async (performerId: string): Promise<ReviewStats> => (await reviewStatsFor([performerId])).get(performerId) ?? { count: 0, average: null };
 
 export const reviewOfDeal = async (dealId: string): Promise<Review | undefined> => {
   const [row] = await getDb().select().from(reviews).where(eq(reviews.dealId, dealId)).limit(1);

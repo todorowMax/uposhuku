@@ -1,0 +1,1 @@
+CREATE INDEX `deals_performer_idx` ON `deals` (`performer_id`,`created_at`);

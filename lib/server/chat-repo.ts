@@ -10,7 +10,7 @@ import type { Deal } from "@/lib/deals/types";
 import { currentStage, dealTotal, needsAction, performerNeeds } from "@/lib/deals/machine";
 import type { ChatMessageDto, ConversationDto, ConversationOrderDto } from "@/lib/chat/types";
 import { getDb, inChunks } from "./db";
-import { getProfile } from "./profile-repo";
+import { getProfile, getProfileCards } from "./profile-repo";
 import { pushUser } from "./realtime";
 import { CHAT_PHOTOS_PER_CONVERSATION, CHAT_PHOTO_BYTES_PER_CONVERSATION, getBucket, putChatPhoto } from "./uploads";
 
@@ -123,39 +123,68 @@ export const saveChatPhoto = async (conversationId: string, userId: string, byte
 export const findChatAttachment = async (conversationId: string, id: string) =>
   (await getDb().select().from(chatAttachments).where(and(eq(chatAttachments.id, id), eq(chatAttachments.conversationId, conversationId))).limit(1))[0] ?? null;
 
-/** Мої розмови в обох ролях, свіжі першими. */
+/**
+ * Останнє повідомлення кожної розмови: один запит на порцію. Підзапит бере id найновішого за індексом
+ * `messages_conversation_idx` (розмова, час). Якщо в розмові два повідомлення з однаковим часом,
+ * останнім вважаємо те, чий id більший (тож результат завжди однаковий).
+ */
+const lastMessages = async (conversationIds: string[]): Promise<Map<string, typeof messages.$inferSelect>> => {
+  const rows = await inChunks(conversationIds, (chunk) =>
+    getDb()
+      .select()
+      .from(messages)
+      .where(and(inArray(messages.conversationId, chunk), sql`${messages.id} = (select m2.id from messages m2 where m2.conversation_id = ${messages.conversationId} order by m2.created_at desc, m2.id desc limit 1)`)),
+  );
+  return new Map(rows.map((row) => [row.conversationId, row]));
+};
+
+type Offer = { customer: string; performer: string; text: string };
+
+/**
+ * Звідки діалог: найновіший відгук виконавця на запит замовника, окремо на пару. Умова обмежує і замовника,
+ * і виконавця: або я замовник, а виконавці з моїх розмов, або я виконавець, а замовники з моїх розмов.
+ */
+const latestOffers = async (condition: (chunk: string[]) => ReturnType<typeof and>, ids: string[]): Promise<Offer[]> =>
+  inChunks(ids, (chunk) =>
+    getDb()
+      .select({ customer: requests.userId, performer: responses.performerUserId, text: requests.text })
+      .from(responses)
+      .innerJoin(requests, eq(responses.requestId, requests.id))
+      .where(and(condition(chunk), sql`${responses.id} = (select r2.id from responses r2 join requests q2 on q2.id = r2.request_id where q2.user_id = ${requests.userId} and r2.performer_user_id = ${responses.performerUserId} order by r2.created_at desc, r2.id desc limit 1)`)),
+  );
+
+/** Мої розмови в обох ролях, свіжі першими. Кількість запитів не залежить від числа розмов (порціями по 90 id). */
 export const listConversations = async (userId: string): Promise<ConversationDto[]> => {
   const db = getDb();
   const rows = await db.select().from(conversations).where(or(eq(conversations.customerUserId, userId), eq(conversations.performerUserId, userId))).orderBy(desc(conversations.updatedAt)).limit(100);
   if (rows.length === 0) return [];
-  const ids = rows.map((row) => row.id);
-  const allMessages = (await inChunks(ids, (chunk) => db.select().from(messages).where(inArray(messages.conversationId, chunk)))).sort((a, b) => b.createdAt - a.createdAt);
-  const mine = (await db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200)).filter((row) => row.status !== "declined" && row.status !== "cancelled");
-  const customerIds = [...new Set(rows.filter((row) => row.performerUserId === userId).map((row) => row.customerUserId))];
-  const customers = await inChunks(customerIds, (chunk) => db.select().from(users).where(inArray(users.id, chunk)));
-  // Відгуки між цими людьми: звідки діалог (виконавець відгукнувся на запит замовника).
-  const customerOf = [...new Set(rows.map((row) => row.customerUserId))];
-  const offerRows = await inChunks(customerOf, (chunk) =>
-    db
-      .select({ customer: requests.userId, performer: responses.performerUserId, text: requests.text, at: responses.createdAt })
-      .from(responses)
-      .innerJoin(requests, eq(responses.requestId, requests.id))
-      .where(inArray(requests.userId, chunk)),
-  );
-  offerRows.sort((a, b) => b.at - a.at);
+  const asCustomer = rows.filter((row) => row.customerUserId === userId);
+  const asPerformer = rows.filter((row) => row.performerUserId === userId);
+  const customerIds = [...new Set(asPerformer.map((row) => row.customerUserId))];
+  const performerUserIds = [...new Set(asCustomer.flatMap((row) => (row.performerUserId ? [row.performerUserId] : [])))];
+  const [lastById, mine, customers, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
+    lastMessages(rows.map((row) => row.id)),
+    db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200),
+    inChunks(customerIds, (chunk) => db.select().from(users).where(inArray(users.id, chunk))),
+    getProfileCards(performerUserIds),
+    latestOffers((chunk) => and(eq(requests.userId, userId), inArray(responses.performerUserId, chunk)), performerUserIds),
+    latestOffers((chunk) => and(eq(responses.performerUserId, userId), inArray(requests.userId, chunk)), customerIds),
+  ]);
+  const liveDeals = mine.filter((row) => row.status !== "declined" && row.status !== "cancelled");
+  const offerRows = [...offersAsCustomer, ...offersAsPerformer];
   const result: ConversationDto[] = [];
   for (const row of rows) {
     const role = row.customerUserId === userId ? "customer" : "performer";
-    const last = allMessages.find((message) => message.conversationId === row.id);
+    const last = lastById.get(row.id);
     let other: ConversationDto["other"];
     if (role === "customer") {
-      const profile = row.performerUserId ? await getProfile(row.performerUserId) : null;
+      const profile = row.performerUserId ? cards.get(row.performerUserId) : undefined;
       other = { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
     } else {
       const customer = customers.find((user) => user.id === row.customerUserId);
       other = { name: customer?.displayName ?? "Замовник" };
     }
-    const dealRow = mine.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
+    const dealRow = liveDeals.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
     let deal: ConversationDto["deal"];
     let phase: ConversationDto["phase"] = "chat";
     if (dealRow) {

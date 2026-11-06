@@ -38,3 +38,26 @@ export const makeUser = async (db: D1Database, id: string, options: { email?: st
   await db.prepare("insert or ignore into users (id, email, created_at) values (?, ?, ?)").bind(id, email, createdAt).run();
   return id;
 };
+
+/**
+ * Рахує запити до D1, які зробила `run`: підміняє привʼязку на обгортку, що лічить `prepare`
+ * (кожен запит drizzle, і в батчі теж, проходить через нього). Для тестів «число запитів не росте з даними».
+ */
+export const countD1Queries = async <T>(run: () => Promise<T>): Promise<{ result: T; queries: number }> => {
+  const holder = globalThis as { __TEST_D1?: D1Database };
+  const original = holder.__TEST_D1;
+  if (!original) throw new Error("Спершу useTestD1()");
+  let queries = 0;
+  holder.__TEST_D1 = new Proxy(original, {
+    get: (target, key) => {
+      if (key === "prepare") return (sql: string) => (queries++, target.prepare(sql));
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  try {
+    return { result: await run(), queries };
+  } finally {
+    holder.__TEST_D1 = original;
+  }
+};

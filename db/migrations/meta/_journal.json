@@ -120,6 +120,13 @@
       "when": 1793913644309,
       "tag": "0016_dry_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793961602765,
+      "tag": "0017_lyrical_black_bolt",
+      "breakpoints": true
     }
   ]
 }
