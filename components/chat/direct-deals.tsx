@@ -14,9 +14,9 @@ import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
-import { useSafeDeal } from "@/lib/deals/use-safe-deal";
+import { useSafeDealOptions } from "@/lib/deals/use-safe-deal";
 import { money, moneyIn } from "@/lib/deals/format";
-import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
+import { feeOf, initialMethod, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
 import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
@@ -72,14 +72,16 @@ export function TermsForm({
   onCancel: () => void;
 }) {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
-  const safeEnabled = useSafeDeal();
-  const fop = safeEnabled;
+  const { ready, safeEnabled, fop } = useSafeDealOptions(conversation.performerId);
   const escrowAvailable = useEscrowAvailable();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [days, setDays] = useState("");
-  const [method, setMethod] = useState<DealMethod>(fop ? "safe" : "direct");
+  // Що людина обрала сама; поки не обирала, «Безпечна угода» лише тоді, коли вона справді доступна цій парі.
+  const [picked, setPicked] = useState<DealMethod | null>(null);
+  const method: DealMethod = picked ?? initialMethod(safeEnabled, fop);
+  const setMethod = setPicked;
   const [custom, setCustom] = useState<StagesEditorTypes.Edit[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -237,9 +239,11 @@ export function TermsForm({
             {fop && <span className="deal-badge">Рекомендуємо</span>}
           </span>
           <span className="deal-method-text">
-            {fop
+            {!ready
+              ? "Перевіряємо, чи виконавець підключив виплати."
+              : fop
               ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію ${Math.round(COMMISSION_RATE * 100)}%.`
-              : "Недоступна: виконавець не ФОП."}
+              : "Недоступна: виконавець ще не підключив виплати на картку ФОП."}
           </span>
         </label>
         <label
@@ -259,7 +263,7 @@ export function TermsForm({
             Без комісії, одним платежем або за етапами. Без гарантії платформи.
           </span>
         </label>
-        {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : safeEnabled ? "safe" : "direct")} />}
+        {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">

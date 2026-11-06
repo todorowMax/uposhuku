@@ -48,6 +48,7 @@ import { mentionsContacts } from "@/lib/chat/contacts";
 import { PAYMENT_HINT, mentionsPaymentDetails } from "@/lib/chat/payment-hints";
 import { CryptoProofNote } from "@/components/deals/crypto-proof-note";
 import { DealTab } from "@/components/deals/deal-tab";
+import { DealTerms } from "@/components/deals/deal-terms";
 import { DirectDeals, TermsForm } from "@/components/chat/direct-deals";
 import { offersMapStore } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
@@ -1047,6 +1048,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
                     ? `${stage.title}: ${STATE_TEXT[stage.status] ?? stage.status}`
                     : ""}
             </p>
+            {deal.status === "proposed" && deal.proposedBy !== "performer" && <DealTerms deal={deal} />}
             {deal.status === "proposed" && deal.proposedBy === "performer" && (
               <div className="inbox-deal-actions">
                 <button

@@ -19,7 +19,7 @@ import { dealAction, loadDeals, proposeDeal, startPayment, useDeals } from "@/li
 import { paymentReturnStore } from "@/lib/deals/use-payment-return";
 import { useStore } from "@/lib/store";
 import { daysWord, money, moneyIn } from "@/lib/deals/format";
-import { useSafeDeal } from "@/lib/deals/use-safe-deal";
+import { useSafeDealOptions } from "@/lib/deals/use-safe-deal";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
 import { EscrowSection } from "@/components/wallet/escrow-section";
@@ -39,6 +39,7 @@ import {
   currentStage,
   dealTotal,
   feeOf,
+  initialMethod,
   needsAction,
   payoutOf,
   splitIntoStages,
@@ -91,10 +92,12 @@ export function DealTab({ response }: { response: OfferResponse }) {
 
 function DealComposer({ response }: { response: OfferResponse }) {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
-  const safeEnabled = useSafeDeal();
-  const fop = safeEnabled;
+  const { ready, safeEnabled, fop } = useSafeDealOptions(response.performerId);
   const escrowAvailable = useEscrowAvailable();
-  const [method, setMethod] = useState<DealMethod>("direct");
+  // Що людина обрала сама; поки не обирала, «Безпечна угода» лише тоді, коли вона справді доступна для цього виконавця.
+  const [picked, setPicked] = useState<DealMethod | null>(null);
+  const method: DealMethod = picked ?? initialMethod(safeEnabled, fop);
+  const setMethod = setPicked;
   const [amount, setAmount] = useState(
     response.price ? String(response.price) : "",
   );
@@ -227,9 +230,11 @@ function DealComposer({ response }: { response: OfferResponse }) {
             {fop && <span className="deal-badge">Рекомендуємо</span>}
           </span>
           <span className="deal-method-text">
-            {fop
+            {!ready
+              ? "Перевіряємо, чи виконавець підключив виплати."
+              : fop
               ? `Гроші заморожуємо на вашій картці й віддаємо виконавцю, коли ви підтвердите роботу. Виконавець отримує свою ціну повністю, а до оплати додаємо комісію ${Math.round(COMMISSION_RATE * 100)}%.`
-              : "Недоступна: виконавець не ФОП. Безпечна угода лише для виконавців-ФОП."}
+              : "Недоступна: виконавець ще не підключив виплати на картку ФОП."}
           </span>
         </label>
         <label
@@ -251,7 +256,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
             етапами. Без гарантії платформи: у спорі гроші ми не повертаємо.
           </span>
         </label>
-        {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : safeEnabled ? "safe" : "direct")} />}
+        {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">

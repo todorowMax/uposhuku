@@ -17,6 +17,7 @@ import {
   MIN_DEAL,
   type Deal,
   type DealAction,
+  type DealMethod,
   type DealDraft,
   type DealStage,
   type ModeratorAction,
@@ -53,6 +54,9 @@ const validateEscrowDraft = (draft: DealDraft, escrowMax: number | null): string
   if (total > escrowMax) return `Сума угоди ескроу не більша за ${escrowMax.toLocaleString("uk-UA")} USDT.`;
   return null;
 };
+
+/** Спосіб оплати за замовчуванням у формі: безпечна угода лише там, де вона справді доступна цій парі. */
+export const initialMethod = (safeEnabled: boolean, performerHasPayouts: boolean): DealMethod => (safeEnabled && performerHasPayouts ? "safe" : "direct");
 
 /** Помилка у чернетці угоди або null. Текст — для людини. */
 export const validateDraft = (draft: DealDraft, safeEnabled: boolean, escrowMax: number | null = null): string | null => {

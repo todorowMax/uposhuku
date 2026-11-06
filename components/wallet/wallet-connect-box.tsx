@@ -25,6 +25,20 @@ export const WalletConnectBox = ({ wallet, networkName }: { wallet: WalletConnec
             </li>
           ))}
         </ul>
+        {wallet.busy !== null && wallet.busy !== "switch" && wallet.busy !== "leave" && (
+          <Button variant="link" onClick={wallet.cancel} className="w-auto py-1 text-xs">
+            Скасувати підключення
+          </Button>
+        )}
+        {wallet.missing && (
+          <p role="alert" className="auth-error">
+            Гаманець не знайдено. Встановіть розширення,{" "}
+            <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer" className="underline">
+              наприклад MetaMask
+            </a>
+            {wallet.hasWalletConnect ? ", або підключіться через WalletConnect." : ", і оновіть сторінку."}
+          </p>
+        )}
         {wallet.pairingUri && <QrImage value={wallet.pairingUri} label="QR-код для підключення гаманця через WalletConnect" />}
       </>
     )}

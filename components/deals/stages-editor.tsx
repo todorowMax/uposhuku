@@ -86,7 +86,7 @@ export const StagesEditor = ({ method, stages, amount, days, custom, onCustom }:
       {custom
         ? custom.map((stage, index) => (
             <div key={index} className="deal-stage-edit">
-              <Input aria-label={`Назва етапу ${index + 1}`} value={stage.title} onChange={(event) => editStage(index, { title: event.target.value })} className="min-w-0 flex-1" />
+              <Input aria-label={`Назва етапу ${index + 1}`} value={stage.title} onChange={(event) => editStage(index, { title: event.target.value })} className="min-w-36 flex-1" />
               <Input
                 aria-label={`Сума етапу ${index + 1}`}
                 inputMode="numeric"
