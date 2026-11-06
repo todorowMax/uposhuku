@@ -22,16 +22,23 @@ function Input({
   );
 }
 
+/** `field` — поле форми; `chat` — без рамки, росте за вмістом усередині рядка повідомлення (.dm-input-row). */
+const TEXTAREA_VARIANTS = {
+  field: "auth-input auth-textarea w-full resize-none",
+  chat: "dm-input",
+} as const;
+
 function Textarea({
   className,
   rows = 3,
+  variant = "field",
   ...props
-}: React.ComponentProps<"textarea">) {
+}: React.ComponentProps<"textarea"> & { variant?: keyof typeof TEXTAREA_VARIANTS }) {
   return (
     <textarea
       rows={rows}
       data-slot="textarea"
-      className={cn("auth-input auth-textarea w-full resize-none", className)}
+      className={cn(TEXTAREA_VARIANTS[variant], className)}
       {...props}
     />
   );

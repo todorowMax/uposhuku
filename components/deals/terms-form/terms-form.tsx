@@ -9,6 +9,7 @@
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/input";
+import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { AcceptedMethods } from "@/components/deals/accepted-methods";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { CriteriaField } from "@/components/deals/criteria-field";
@@ -85,51 +86,29 @@ export const TermsForm = ({ conversation, onDone, onCancel }: { conversation: Pi
       </div>
 
       <fieldset className="deal-methods" hidden={!safeEnabled && !escrowAvailable}>
-        <legend className="pe-label">Як платити</legend>
-        <label
-          className="deal-method"
-          data-selected={method === "safe" || undefined}
-          data-disabled={!fop || undefined}
-          hidden={!safeEnabled}
-        >
-          {/* eslint-disable-next-line no-restricted-syntax -- перенесена форма без змін: власний вибір способу оплати, замінить RadioCard в ітерації C */}
-          <input
-            type="radio"
-            name="terms-method"
-            checked={method === "safe"}
-            disabled={!fop}
-            onChange={() => setMethod("safe")}
-          />
-          <span className="text-sm font-semibold text-ink">
-            Безпечна угода{" "}
-            {fop && <span className="deal-badge">Рекомендуємо</span>}
-          </span>
-          <span className="deal-method-text">
-            {!ready
-              ? "Перевіряємо, чи виконавець підключив виплати."
-              : fop
-              ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію ${Math.round(COMMISSION_RATE * 100)}%.`
-              : "Недоступна: виконавець ще не підключив виплати на картку ФОП."}
-          </span>
-        </label>
-        <label
-          className="deal-method"
-          data-selected={method === "direct" || undefined}
-        >
-          {/* eslint-disable-next-line no-restricted-syntax -- перенесена форма без змін: власний вибір способу оплати, замінить RadioCard в ітерації C */}
-          <input
-            type="radio"
-            name="terms-method"
-            checked={method === "direct"}
-            onChange={() => setMethod("direct")}
-          />
-          <span className="text-sm font-semibold text-ink">
-            Прямий переказ
-          </span>
-          <span className="deal-method-text">
-            Без комісії, одним платежем або за етапами. Без гарантії платформи.
-          </span>
-        </label>
+        <legend id="terms-method-label" className="pe-label">Як платити</legend>
+        <RadioGroup value={method === "safe" || method === "direct" ? method : ""} onValueChange={(value) => setMethod(value as "safe" | "direct")} aria-labelledby="terms-method-label">
+          {safeEnabled && (
+            <RadioCard
+              id="terms-method-safe"
+              value="safe"
+              disabled={!fop}
+              title={
+                <>
+                  Безпечна угода {fop && <span className="deal-badge">Рекомендуємо</span>}
+                </>
+              }
+              hint={
+                !ready
+                  ? "Перевіряємо, чи виконавець підключив виплати."
+                  : fop
+                  ? `Гроші заморожуємо на картці замовника на ${HOLD_DAYS} днів і віддаємо виконавцю після підтвердження. Виконавець отримує свою ціну повністю, а замовник платить ще комісію ${Math.round(COMMISSION_RATE * 100)}%.`
+                  : "Недоступна: виконавець ще не підключив виплати на картку ФОП."
+              }
+            />
+          )}
+          <RadioCard id="terms-method-direct" value="direct" title="Прямий переказ" hint="Без комісії, одним платежем або за етапами. Без гарантії платформи." />
+        </RadioGroup>
         {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
       {method === "direct" && <AcceptedMethods methods={methods} />}

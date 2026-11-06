@@ -4,7 +4,7 @@ import { applyPaymentStatus } from "@/lib/deals/payment-status";
 import { quoteStage } from "@/lib/deals/price";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import { emptyProfile } from "@/lib/profile/types";
-import { accessibleConversation, addMessage, listConversationOrders, claimableAttachments, findChatAttachment, getOrCreateConversation, listConversations, listMessages, performerKnown, saveChatPhoto } from "@/lib/server/chat-repo";
+import { accessibleConversation, addMessage, claimableAttachments, findChatAttachment, getOrCreateConversation, listConversations, listMessages, performerKnown, saveChatPhoto } from "@/lib/server/chat-repo";
 import { actAsModerator, actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, mutateDeal, proposeDeal, proposeDirectDeal } from "@/lib/server/deal-repo";
 import { deleteProfile, getProfile, listPublishedProfiles, saveProfile } from "@/lib/server/profile-repo";
 import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests } from "@/lib/server/request-repo";
@@ -217,14 +217,10 @@ describe("чат на D1", () => {
 describe("умови з розмови на D1", () => {
   const draft = { method: "direct" as const, title: "Лендинг", description: "Дизайн і верстка", performer: { id: "me-perf", name: "Виконавець", avatarIndex: 0, specialty: "Розробник", fop: false }, stages: [{ title: "Робота", amount: 8000, days: 10 }] };
 
-  it("виконавець виставляє умови, замовник їх приймає, список показує обидві сторони", async () => {
+  it("виконавець виставляє умови, замовник їх приймає", async () => {
     const conv = await getOrCreateConversation("c2", "me-perf", "perf");
     const deal = (await proposeDirectDeal(conv, "performer", draft, { safeEnabled: true })) as Deal;
     expect(deal).toMatchObject({ status: "proposed", proposedBy: "performer", title: "Лендинг", conversationId: conv.id });
-    const forCustomer = await listConversationOrders(conv, "customer");
-    expect(forCustomer[0]).toMatchObject({ title: "Лендинг", needsMe: true, mineProposal: false, direct: true });
-    const forPerformer = await listConversationOrders(conv, "performer");
-    expect(forPerformer[0]).toMatchObject({ needsMe: false, mineProposal: true });
     const accepted = (await actOnDeal("c2", deal.id, "accept", undefined)) as Deal;
     expect(accepted.status).toBe("accepted");
     expect((await listDealsForPerformer("perf", conv.id)).find((item) => item.id === deal.id)?.status).toBe("accepted");

@@ -6,6 +6,8 @@
 
 import { ArrowUp, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
+import { Textarea } from "@/components/ui/input";
 import { mentionsContacts } from "@/lib/chat/contacts";
 import { PAYMENT_HINT, mentionsPaymentDetails } from "@/lib/chat/payment-hints";
 import { CHAT_TEXT_MAX } from "@/lib/chat/types";
@@ -44,7 +46,6 @@ export const Composer = ({
       <ul className="dm-staged">
         {photos.map((photo) => (
           <li key={photo.tempId} data-pending={!photo.id || undefined}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={photo.preview} alt="" />
             <Button variant="bare" onClick={() => onRemovePhoto(photo.tempId)} aria-label="Прибрати фото">
               <X className="size-3" strokeWidth={2.4} />
@@ -60,17 +61,16 @@ export const Composer = ({
       }}
       className="dm-input-row"
     >
-      {/* eslint-disable-next-line no-restricted-syntax -- прихований вибір файлу за кнопкою «+» (DS-2 це дозволяє) */}
-      <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(event) => onFiles(event.target.files)} />
+      <FileInput ref={fileRef} accept="image/*" multiple onChange={(event) => onFiles(event.target.files)} />
       <Button variant="bare" className="dm-attach" aria-label="Додати" onClick={onPlus}>
         <Plus className="size-4" strokeWidth={2} />
       </Button>
       <label htmlFor="inbox-input" className="sr-only">
         Повідомлення
       </label>
-      {/* eslint-disable-next-line no-restricted-syntax -- поле чату росте за вмістом усередині .dm-input-row; Textarea додає власну рамку й відступи */}
-      <textarea
+      <Textarea
         id="inbox-input"
+        variant="chat"
         rows={1}
         value={draft}
         maxLength={CHAT_TEXT_MAX}
@@ -82,7 +82,6 @@ export const Composer = ({
           }
         }}
         placeholder={placeholder}
-        className="dm-input"
       />
       <Button type="submit" variant="bare" disabled={!canSend} aria-label="Надіслати" className="dm-send">
         <ArrowUp className="size-4" strokeWidth={2.4} />

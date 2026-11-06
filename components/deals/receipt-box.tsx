@@ -7,6 +7,7 @@
 
 import { Loader2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { FileInput } from "@/components/ui/file-input";
 import type { Deal, DealStage } from "@/lib/deals/types";
 import { useReceipt } from "./use-receipt";
 
@@ -37,9 +38,7 @@ export const ReceiptBox = ({ deal, stage }: { deal: Pick<Deal, "id" | "requestId
           </a>
         </p>
       )}
-      {/* Прихований вибір файлу за кнопкою: дозволено правилом DS-2. */}
-      {/* eslint-disable-next-line no-restricted-syntax -- DS-2: type="file" за Button */}
-      <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" tabIndex={-1} aria-hidden onChange={(event) => void pick(event.target.files)} />
+      <FileInput ref={fileRef} accept="image/jpeg,image/png,image/webp" onChange={(event) => void pick(event.target.files)} />
       <Button variant="secondary" disabled={busy} onClick={choose} className="w-auto px-4">
         {busy && <Loader2 className="size-4 animate-spin" />}
         {stage.receiptAttachmentId ? "Замінити чек" : "Додати чек"}

@@ -7,8 +7,8 @@
 import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { chatAttachments, conversations, deals, messages, requests, responses, users } from "@/db/schema";
 import type { Deal } from "@/lib/deals/types";
-import { currentStage, dealTotal, needsAction, performerNeeds } from "@/lib/deals/machine";
-import type { ChatMessageDto, ConversationDto, ConversationOrderDto } from "@/lib/chat/types";
+import { needsAction, performerNeeds } from "@/lib/deals/machine";
+import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
 import { getDb, inChunks } from "./db";
 import { getProfile, getProfileCards } from "./profile-repo";
 import { pushUser } from "./realtime";
@@ -215,47 +215,4 @@ export const addSystemMessage = async (customerUserId: string, performerUserId: 
   } catch {
     // Стрічка — лише зручність; сама дія вже виконана.
   }
-};
-
-const STATE_TEXT: Record<string, string> = {
-  pending: "чекаємо оплату",
-  claimed: "оплату позначено",
-  funded: "оплачено, у роботі",
-  delivered: "здано, чекає підтвердження",
-  released: "виплачено",
-  disputed: "спір",
-  refunded: "кошти повернено",
-};
-
-/** Угоди пари з назвою запиту: що зараз і чи чекає це на мене. */
-export const listConversationOrders = async (conversation: Conversation, role: "customer" | "performer"): Promise<ConversationOrderDto[]> => {
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(deals)
-    .where(and(eq(deals.ownerUserId, conversation.customerUserId), eq(deals.performerId, conversation.performerId)))
-    .orderBy(desc(deals.createdAt))
-    .limit(30);
-  const live = rows.filter((row) => row.status !== "declined" && row.status !== "cancelled");
-  if (live.length === 0) return [];
-  const titles = await inChunks([...new Set(live.map((row) => row.requestId))], (chunk) => db.select({ id: requests.id, text: requests.text }).from(requests).where(inArray(requests.id, chunk)));
-  return live.map((row) => {
-    const deal = JSON.parse(row.data) as Deal;
-    const stage = currentStage(deal);
-    const raw = deal.title ?? titles.find((item) => item.id === row.requestId)?.text ?? "Замовлення";
-    const title = raw.length > 48 ? `${raw.slice(0, 47).trimEnd()}…` : raw;
-    const mineProposal = deal.proposedBy ? deal.proposedBy === role : role === "customer";
-    const state = deal.status === "proposed" ? (mineProposal ? "чекає відповіді" : "пропонує умови") : deal.status === "completed" ? "завершено" : stage ? `${stage.title}: ${STATE_TEXT[stage.status] ?? stage.status}` : "у роботі";
-    return {
-      dealId: deal.id,
-      number: deal.number,
-      title,
-      total: dealTotal(deal),
-      status: deal.status === "completed" ? "completed" : deal.status === "proposed" ? "proposed" : "accepted",
-      state,
-      needsMe: role === "performer" ? performerNeeds(deal) !== null : needsAction(deal) !== null,
-      mineProposal,
-      direct: Boolean(deal.conversationId),
-    };
-  });
 };

@@ -16,23 +16,6 @@ export interface ChatMessageDto {
   attachments?: { id: string; url: string }[];
 }
 
-/** Замовлення між цими двома людьми: рядок у випадайці шапки розмови. */
-export interface ConversationOrderDto {
-  dealId: string;
-  number: string;
-  title: string;
-  total: number;
-  status: "proposed" | "accepted" | "completed";
-  /** Що зараз відбувається, одним рядком. */
-  state: string;
-  /** Чекає моєї дії. */
-  needsMe: boolean;
-  /** Умови виставив я, відповіді чекаю від другої сторони. */
-  mineProposal: boolean;
-  /** Умови виставлено в розмові, без запиту. */
-  direct: boolean;
-}
-
 export interface ConversationDto {
   id: string;
   performerId: string;

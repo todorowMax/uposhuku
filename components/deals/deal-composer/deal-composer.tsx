@@ -7,7 +7,9 @@
 
 import { Loader2, QrCode, ShieldCheck } from "@/components/icons";
 import { Button } from "@/components/ui/button";
+import { CheckboxField } from "@/components/ui/checkbox";
 import { Field, Input } from "@/components/ui/input";
+import { RadioCard, RadioGroup } from "@/components/ui/radio-group";
 import { AcceptedMethods } from "@/components/deals/accepted-methods";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { CriteriaField } from "@/components/deals/criteria-field";
@@ -73,54 +75,41 @@ export const DealComposer = ({ response, onDone }: { response: OfferResponse; on
       </div>
 
       <fieldset className="deal-methods" hidden={!safeEnabled && !escrowAvailable}>
-        <legend className="pe-label">Як платити</legend>
-        <label
-          className="deal-method"
-          data-selected={method === "safe" || undefined}
-          data-disabled={!fop || undefined}
-          hidden={!safeEnabled}
-        >
-          {/* eslint-disable-next-line no-restricted-syntax -- перенесена форма без змін: власний вибір способу оплати, замінить RadioCard в ітерації C */}
-          <input
-            type="radio"
-            name="method"
-            checked={method === "safe"}
-            disabled={!fop}
-            onChange={() => setMethod("safe")}
+        <legend id="deal-method-label" className="pe-label">Як платити</legend>
+        <RadioGroup value={method === "safe" || method === "direct" ? method : ""} onValueChange={(value) => setMethod(value as "safe" | "direct")} aria-labelledby="deal-method-label">
+          {safeEnabled && (
+            <RadioCard
+              id="deal-method-safe"
+              value="safe"
+              disabled={!fop}
+              title={
+                <span className="flex flex-wrap items-center gap-2">
+                  <ShieldCheck className="size-4 text-ink" />
+                  Безпечна угода
+                  {fop && <span className="deal-badge">Рекомендуємо</span>}
+                </span>
+              }
+              hint={
+                !ready
+                  ? "Перевіряємо, чи виконавець підключив виплати."
+                  : fop
+                  ? `Гроші заморожуємо на вашій картці й віддаємо виконавцю, коли ви підтвердите роботу. Виконавець отримує свою ціну повністю, а до оплати додаємо комісію ${Math.round(COMMISSION_RATE * 100)}%.`
+                  : "Недоступна: виконавець ще не підключив виплати на картку ФОП."
+              }
+            />
+          )}
+          <RadioCard
+            id="deal-method-direct"
+            value="direct"
+            title={
+              <span className="flex items-center gap-2">
+                <QrCode className="size-4 text-ink-muted" />
+                Прямий переказ
+              </span>
+            }
+            hint="Без комісії, переказ на рахунок виконавця: одним платежем або за етапами. Без гарантії платформи: у спорі гроші ми не повертаємо."
           />
-          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <ShieldCheck className="size-4 text-ink" />
-            Безпечна угода
-            {fop && <span className="deal-badge">Рекомендуємо</span>}
-          </span>
-          <span className="deal-method-text">
-            {!ready
-              ? "Перевіряємо, чи виконавець підключив виплати."
-              : fop
-              ? `Гроші заморожуємо на вашій картці й віддаємо виконавцю, коли ви підтвердите роботу. Виконавець отримує свою ціну повністю, а до оплати додаємо комісію ${Math.round(COMMISSION_RATE * 100)}%.`
-              : "Недоступна: виконавець ще не підключив виплати на картку ФОП."}
-          </span>
-        </label>
-        <label
-          className="deal-method"
-          data-selected={method === "direct" || undefined}
-        >
-          {/* eslint-disable-next-line no-restricted-syntax -- перенесена форма без змін: власний вибір способу оплати, замінить RadioCard в ітерації C */}
-          <input
-            type="radio"
-            name="method"
-            checked={method === "direct"}
-            onChange={() => setMethod("direct")}
-          />
-          <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-            <QrCode className="size-4 text-ink-muted" />
-            Прямий переказ
-          </span>
-          <span className="deal-method-text">
-            Без комісії, переказ на рахунок виконавця: одним платежем або за
-            етапами. Без гарантії платформи: у спорі гроші ми не повертаємо.
-          </span>
-        </label>
+        </RadioGroup>
         {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
       {method === "direct" && <AcceptedMethods methods={methods} />}
@@ -171,18 +160,7 @@ export const DealComposer = ({ response, onDone }: { response: OfferResponse; on
         )}
       </dl>
 
-      <label className="feed-check items-start">
-        {/* eslint-disable-next-line no-restricted-syntax -- перенесена форма без змін: власний вибір способу оплати, замінить RadioCard в ітерації C */}
-        <input
-          type="checkbox"
-          checked={agree}
-          onChange={(event) => setAgree(event.target.checked)}
-          className="mt-0.5"
-        />
-        <span className="text-xs leading-snug text-ink-muted">
-          {AGREE_TEXT[method]}
-        </span>
-      </label>
+      <CheckboxField id="deal-agree" checked={agree} onCheckedChange={(value) => setAgree(value === true)} label={<span className="text-xs leading-snug text-ink-muted">{AGREE_TEXT[method]}</span>} />
 
       {error && (
         <p role="alert" className="auth-error">

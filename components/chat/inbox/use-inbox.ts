@@ -33,13 +33,30 @@ export const useInbox = () => {
   // Системне «назад» закриває чат і лишає на карті.
   useLayerHistory(open, motion.close);
 
-  useEffect(() => {
+  // Вихід з акаунта: чистимо список, відкриту розмову й закриваємо вікно. Змінюємо стан під час відтворення
+  // (за зміною входу), а не в ефекті: так немає зайвого проходу з застарілим списком.
+  const [wasSignedIn, setWasSignedIn] = useState(signedIn);
+  if (wasSignedIn !== signedIn) {
+    setWasSignedIn(signedIn);
     if (!signedIn) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- після виходу з акаунта чистимо список і закриваємо вікно
       setItems([]);
+      setActive(null);
       setOpen(false);
-      return;
     }
+  }
+
+  // Запит відкрити вікно (посилання Telegram, профіль, відгук): виконуємо один раз, щойно можна, тобто
+  // увійшли, а для запиту без виконавця ще й завантажився список розмов.
+  const [handled, setHandled] = useState<typeof requested>(null);
+  if (requested && requested !== handled && signedIn && (requested.performerId || items.length > 0)) {
+    setHandled(requested);
+    setOpen(true);
+    const target = requested.conversationId ? items.find((item) => item.id === requested.conversationId) : null;
+    if (target) setActive(target);
+  }
+
+  useEffect(() => {
+    if (!signedIn) return;
     let cancelled = false;
     const load = () => {
       if (document.hidden) return;
@@ -55,31 +72,29 @@ export const useInbox = () => {
     };
   }, [signedIn, open]);
 
-  // Посилання з Telegram: відкриваємо список чи конкретну розмову, щойно вони завантажились.
+  // Запит виконано: прибираємо його зі сховища (воно зовнішнє, тож тут це не стан компонента).
   useEffect(() => {
-    if (!requested?.performerId || !signedIn) return;
-    const performerId = requested.performerId;
-    inboxOpenStore.set(null);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- відкриваємо вікно у відповідь на запит зі сховища (посилання Telegram, профіль)
-    setOpen(true);
+    if (handled && requested === handled) inboxOpenStore.set(null);
+  }, [handled, requested]);
+
+  // Запит «розмова з виконавцем»: створюємо чи знаходимо її й показуємо.
+  useEffect(() => {
+    const performerId = handled?.performerId;
+    if (!performerId) return;
+    let cancelled = false;
     void openConversation(performerId)
       .then(async (id) => {
         const list = await fetchConversations();
+        if (cancelled) return;
         setItems(list);
         const target = list.find((item) => item.id === id);
         if (target) setActive(target);
       })
       .catch(() => {});
-  }, [requested, signedIn]);
-
-  useEffect(() => {
-    if (!requested || requested.performerId || !signedIn || items.length === 0) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- відкриваємо вікно у відповідь на запит зі сховища, щойно є список розмов
-    setOpen(true);
-    const target = requested.conversationId ? items.find((item) => item.id === requested.conversationId) : null;
-    if (target) setActive(target);
-    inboxOpenStore.set(null);
-  }, [requested, signedIn, items]);
+    return () => {
+      cancelled = true;
+    };
+  }, [handled]);
 
   // Бейдж: розмови, де щось чекає на мене (угода), а якщо таких немає, то де я виконавець.
   const actionCount = items.filter((item) => item.deal?.needsMe).length || items.filter((item) => item.role === "performer").length;

@@ -45,7 +45,6 @@ export const MessageList = ({
             <div className="dm-photos" data-count={line.photos.length}>
               {line.photos.map((url) => (
                 <Button key={url} variant="bare" className="dm-photo" aria-label="Відкрити фото" onClick={() => onPhoto(url)}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={url} alt="Фото з чату" loading="lazy" />
                 </Button>
               ))}

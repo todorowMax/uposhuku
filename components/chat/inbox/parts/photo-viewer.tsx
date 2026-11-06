@@ -13,7 +13,6 @@ export const PhotoViewer = ({ url, onClose }: { url: string; onClose: () => void
       <Button variant="bare" className="photo-viewer-close" aria-label="Закрити фото" onClick={onClose}>
         <X className="size-5" strokeWidth={2.2} />
       </Button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="Фото з чату" />
     </DialogContent>
   </Dialog>
