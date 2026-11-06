@@ -15,17 +15,22 @@ import { ApiError } from "@/lib/auth/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { loadDeals, useDeals } from "@/lib/deals/client";
 import { useSafeDeal } from "@/lib/deals/use-safe-deal";
-import { money } from "@/lib/deals/format";
+import { money, moneyIn } from "@/lib/deals/format";
 import { feeOf, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { CommissionRow } from "@/components/deals/commission-row";
+import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
+import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import { COMMISSION_RATE, formatKop, totalOf } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
+  currencyOfMethod,
   directRequestId,
   type DealMethod,
 } from "@/lib/deals/types";
 import { startPolling } from "@/lib/realtime/client";
 
+
+const CURRENCY_SIGN = { UAH: "₴", USDT: "USDT" } as const;
 
 /** Угоди цієї розмови для замовника: тримаємо свіжими, поки відкрито. */
 export function DirectDeals({
@@ -69,6 +74,7 @@ export function TermsForm({
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
   const safeEnabled = useSafeDeal();
   const fop = safeEnabled;
+  const escrowAvailable = useEscrowAvailable();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -82,14 +88,14 @@ export function TermsForm({
   const daysNumber = Number(days) || 0;
   // Свої етапи є лише в прямому переказі: безпечну угоду ділимо автоматично під холд.
   const stages = useMemo(() => {
-    if (method === "direct" && custom)
+    if (method !== "safe" && custom)
       return custom.map((stage) => ({
         title: stage.title,
         amount: Number(stage.amount.replace(/\s/g, "")) || 0,
         days: Number(stage.days) || 0,
       }));
     if (amountNumber <= 0 || daysNumber <= 0) return [];
-    return method === "direct"
+    return method !== "safe"
       ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
       : splitIntoStages(amountNumber, daysNumber);
   }, [method, custom, amountNumber, daysNumber]);
@@ -110,7 +116,7 @@ export function TermsForm({
           },
           method,
           stages,
-        }, safeEnabled);
+        }, safeEnabled, method === "escrow" ? Number.MAX_SAFE_INTEGER : null);
   const total = stages.reduce((sum, stage) => sum + stage.amount, 0);
   const fee = feeOf(total, method);
   const payTotal = useMemo(() => totalOf(stages.map((stage) => stage.amount)), [stages]);
@@ -183,12 +189,12 @@ export function TermsForm({
       </Field>
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Сума, ₴" htmlFor="terms-amount">
+        <Field label={`Сума, ${CURRENCY_SIGN[currencyOfMethod(method)]}`} htmlFor="terms-amount">
           <Input
             id="terms-amount"
             inputMode="numeric"
-            value={method === "direct" && custom ? String(stages.reduce((sum, stage) => sum + stage.amount, 0)) : amount}
-            disabled={method === "direct" && Boolean(custom)}
+            value={method !== "safe" && custom ? String(stages.reduce((sum, stage) => sum + stage.amount, 0)) : amount}
+            disabled={method !== "safe" && Boolean(custom)}
             onChange={(event) =>
               setAmount(event.target.value.replace(/[^\d\s]/g, ""))
             }
@@ -200,8 +206,8 @@ export function TermsForm({
           <Input
             id="terms-days"
             inputMode="numeric"
-            value={method === "direct" && custom ? String(stages.reduce((sum, stage) => sum + stage.days, 0)) : days}
-            disabled={method === "direct" && Boolean(custom)}
+            value={method !== "safe" && custom ? String(stages.reduce((sum, stage) => sum + stage.days, 0)) : days}
+            disabled={method !== "safe" && Boolean(custom)}
             onChange={(event) =>
               setDays(event.target.value.replace(/\D/g, "").slice(0, 3))
             }
@@ -211,12 +217,13 @@ export function TermsForm({
         </Field>
       </div>
 
-      <fieldset className="deal-methods" hidden={!safeEnabled}>
+      <fieldset className="deal-methods" hidden={!safeEnabled && !escrowAvailable}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
           data-selected={method === "safe" || undefined}
           data-disabled={!fop || undefined}
+          hidden={!safeEnabled}
         >
           <input
             type="radio"
@@ -252,15 +259,16 @@ export function TermsForm({
             Без комісії, одним платежем або за етапами. Без гарантії платформи.
           </span>
         </label>
+        {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : safeEnabled ? "safe" : "direct")} />}
       </fieldset>
-      {!safeEnabled && (
+      {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
           Оплата прямим переказом, одним платежем або за етапами: без комісії
           платформи й без її гарантії.
         </p>
       )}
 
-      {method === "direct" && stages.length > 0 && (
+      {method !== "safe" && stages.length > 0 && (
         <StagesEditor method={method} stages={stages} amount={amountNumber} days={daysNumber} custom={custom} onCustom={setCustom} />
       )}
 
@@ -268,7 +276,7 @@ export function TermsForm({
         <dl className="deal-summary">
           <div>
             <dt>Вартість роботи (отримає виконавець)</dt>
-            <dd className="tabular-nums">{money(total)}</dd>
+            <dd className="tabular-nums">{moneyIn(total, currencyOfMethod(method))}</dd>
           </div>
           {method === "safe" && (
             <>

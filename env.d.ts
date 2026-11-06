@@ -62,6 +62,8 @@ interface CloudflareEnv {
   CRYPTO_ROUTER_ADDRESS?: string;
   CRYPTO_FACTORY_ADDRESS?: string;
   CRYPTO_RPC_URL?: string;
+  /** Стеля угоди ескроу, USDT (ціле число). Не задано: 1000. Не вище ліміту фабрики, його сервер читає з контракту. */
+  CRYPTO_MAX_DEAL_USDT?: string;
   /** Ключ TronGrid: необов'язковий, піднімає ліміт запитів. Секрет. */
   TRONGRID_API_KEY?: string;
   /** Ключ шифрування реквізитів виконавців: base64, 32 байти (`openssl rand -base64 32`). Секрет; без нього реквізити не зберігаються (503). */

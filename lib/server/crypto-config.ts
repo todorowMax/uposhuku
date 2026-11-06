@@ -3,6 +3,7 @@
 // Налаштування оплат з гаманця із середовища сервера й рішення, чи доступні вони цій людині. Прапорець без
 // повної конфігурації (мережа, токен, RPC) не вмикає нічого. Ескроу додатково потребує адреси фабрики.
 
+import { ESCROW_DEFAULT_MAX_USDT } from "@/lib/deals/types";
 import { parseCryptoConfig, type CryptoConfig } from "@/lib/crypto/config";
 import { readVar } from "./env";
 import { featureEnabledFor } from "./features";
@@ -26,4 +27,10 @@ export const walletConfigFor = async (email: string | null | undefined): Promise
 export const escrowConfigFor = async (email: string | null | undefined): Promise<CryptoConfig | null> => {
   const config = cryptoConfig();
   return config?.factory && (await featureEnabledFor("crypto_escrow", email)) ? config : null;
+};
+
+/** Стеля угоди ескроу з оточення (цілі USDT); не задано чи нечинне значення: ESCROW_DEFAULT_MAX_USDT. */
+export const escrowCap = (): number => {
+  const value = Number(readVar("CRYPTO_MAX_DEAL_USDT")?.trim());
+  return Number.isSafeInteger(value) && value > 0 ? value : ESCROW_DEFAULT_MAX_USDT;
 };

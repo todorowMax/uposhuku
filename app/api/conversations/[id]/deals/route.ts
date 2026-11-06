@@ -6,6 +6,7 @@ import { performerIdOf } from "@/lib/deals/parties";
 import type { DealMethod } from "@/lib/deals/types";
 import { getSessionUser } from "@/lib/server/auth";
 import { hasActivePayout } from "@/lib/server/deal-parties";
+import { escrowGate } from "@/lib/server/escrow-gate";
 import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 import { accessibleConversation, addSystemMessage } from "@/lib/server/chat-repo";
 import { proposeDirectDeal, SELF_DEAL } from "@/lib/server/deal-repo";
@@ -20,6 +21,13 @@ import { serverEvent } from "@/lib/telemetry/log";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
+/** Стеля ескроу для угоди цього способу: null для інших способів, відповідь-відмова, коли ескроу недоступне. */
+const escrowLimit = async (method: DealMethod, email: string, performerUserId: string): Promise<number | null | Response> => {
+  if (method !== "escrow") return null;
+  const gate = await escrowGate({ email, performerUserId });
+  return typeof gate === "string" ? problem(409, "Ескроу недоступне", gate) : gate.max;
+};
+
 export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
@@ -31,9 +39,13 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const { conversation, role } = access;
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
-    const method: DealMethod = body?.method === "safe" ? "safe" : "direct";
+    const method: DealMethod = body?.method === "safe" || body?.method === "escrow" ? body.method : "direct";
     const safeEnabled = await safeDealEnabledFor(user.email);
     if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
+    // Ескроу: прапорець у того, хто створює (будь-яка сторона), фабрика, підтверджений гаманець виконавця й стеля з контракту.
+    const escrow = await escrowLimit(method, user.email, conversation.performerUserId);
+    if (escrow instanceof Response) return escrow;
+    const escrowMax = escrow;
     if (conversation.performerUserId === conversation.customerUserId) return problem(400, "Умови не виставлено", SELF_DEAL);
     const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
     const profile = await getProfile(conversation.performerUserId);
@@ -61,7 +73,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
           days: typeof stage?.days === "number" ? Math.round(stage.days) : NaN,
         })),
       },
-      { safeEnabled },
+      { safeEnabled, escrowMax },
     );
     if (typeof result === "string") return problem(400, "Умови не виставлено", result);
     serverEvent(EVENTS.dealCreated, { deal_id: result.id, kind: result.method, stages: result.stages.length, direct: true }, user.id, "/api/conversations/deals");

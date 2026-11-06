@@ -118,3 +118,18 @@ export const readDealRequisites = async (dealId: string, viewerUserId: string, n
   if (isOwner) await db.insert(requisiteReads).values({ id: `rr_${crypto.randomUUID().slice(0, 10)}`, dealId, readerUserId: viewerUserId, createdAt: now });
   return { requisites, mask: snapshot.mask };
 };
+
+/**
+ * Підтверджена адреса гаманця виконавця зі знімка угоди (для ескроу). Службове читання сервера: у журнал читань не
+ * пишеться, назовні віддається лише адреса. Знімок береться, якщо його ще немає.
+ */
+export const dealWalletAddress = async (dealId: string, now = Date.now()): Promise<string | null> => {
+  const db = getDb();
+  const [deal] = await db.select({ performerId: deals.performerId }).from(deals).where(eq(deals.id, dealId)).limit(1);
+  const performerUser = deal ? performerUserId(deal.performerId) : null;
+  if (!performerUser) return null;
+  let [snapshot] = await db.select().from(dealRequisites).where(eq(dealRequisites.dealId, dealId)).limit(1);
+  if (!snapshot && (await snapshotDealRequisites(dealId, performerUser, now))) [snapshot] = await db.select().from(dealRequisites).where(eq(dealRequisites.dealId, dealId)).limit(1);
+  if (!snapshot) return null;
+  return (await open(snapshot.cipher, performerUser)).walletAddress ?? null;
+};

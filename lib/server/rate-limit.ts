@@ -27,6 +27,7 @@ export const RATE_RULES = {
   cryptoProof: { max: 10, windowMs: 10 * MINUTE },
   walletChallenge: { max: 10, windowMs: 10 * MINUTE },
   walletVerify: { max: 10, windowMs: 10 * MINUTE },
+  escrowSync: { max: 60, windowMs: 10 * MINUTE },
   walletPay: { max: 10, windowMs: 10 * MINUTE },
   payoutApply: { max: 5, windowMs: 60 * MINUTE },
   releaseCode: { max: 5, windowMs: 60 * MINUTE },

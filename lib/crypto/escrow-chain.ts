@@ -18,6 +18,8 @@ export interface EscrowSnapshot {
   state: EscrowState;
   client: string;
   performer: string;
+  /** Фабрика, що створила клон (поле FACTORY у контракті). */
+  factory: string;
   /** Ціна без комісії, мінімальні одиниці токена. */
   amount: bigint;
   /** Скільки отримав виконавець після закриття. */
@@ -29,7 +31,7 @@ export interface EscrowSnapshot {
 
 export type EscrowOutcome =
   | { kind: "none" }
-  | { kind: "funded" }
+  | { kind: "funded"; deliverBy: number }
   | { kind: "delivered"; reviewEnds: number }
   | { kind: "disputed" }
   | { kind: "released"; paid: bigint }
@@ -39,7 +41,7 @@ export type EscrowOutcome =
 export const escrowStageOutcome = (snapshot: EscrowSnapshot): EscrowOutcome => {
   switch (snapshot.state) {
     case 1:
-      return { kind: "funded" };
+      return { kind: "funded", deliverBy: snapshot.deliverBy };
     case 2:
       return { kind: "delivered", reviewEnds: snapshot.reviewEnds };
     case 3:
@@ -51,6 +53,29 @@ export const escrowStageOutcome = (snapshot: EscrowSnapshot): EscrowOutcome => {
   }
 };
 
+const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
+
+export type CloneRejection = "wrong_factory" | "wrong_party" | "wrong_amount" | "wrong_ref";
+
+/**
+ * Чи справді це наш клон для цього етапу: фабрика, сторони, сума й dealRef зі стану контракту збігаються з очікуваним.
+ * Чужий адрес (не клон нашої фабрики, інший етап чи інша сума) відхиляється, статус етапу тоді не міняємо.
+ */
+export const verifyEscrowClone = (snapshot: EscrowSnapshot, expected: EscrowExpectation): { ok: true } | { ok: false; reason: CloneRejection } => {
+  if (!same(snapshot.factory, expected.factory)) return { ok: false, reason: "wrong_factory" };
+  if (!same(snapshot.client, expected.client) || !same(snapshot.performer, expected.performer)) return { ok: false, reason: "wrong_party" };
+  if (snapshot.amount !== expected.amount) return { ok: false, reason: "wrong_amount" };
+  if (snapshot.dealRef.toLowerCase() !== expected.dealRef.toLowerCase()) return { ok: false, reason: "wrong_ref" };
+  return { ok: true };
+};
+
+export const CLONE_REJECTION_TEXT: Record<CloneRejection, string> = {
+  wrong_factory: "Цей контракт створено не нашою фабрикою.",
+  wrong_party: "Сторони контракту не збігаються з угодою.",
+  wrong_amount: "Сума в контракті не збігається з сумою етапу.",
+  wrong_ref: "Контракт належить іншому етапу.",
+};
+
 export interface EscrowExpectation {
   factory: Address;
   client: string;
@@ -60,8 +85,6 @@ export interface EscrowExpectation {
 }
 
 export type EscrowCreation = { ok: true; escrow: Address; fee: bigint } | { ok: false; reason: "no_event" | "wrong_party" | "wrong_amount" | "wrong_ref" };
-
-const same = (a: string, b: string): boolean => a.toLowerCase() === b.toLowerCase();
 
 /** Подія DealCreated від нашої фабрики з очікуваними замовником, виконавцем, сумою і посиланням на етап. */
 export const verifyEscrowCreated = (logs: EvmLog[], expected: EscrowExpectation): EscrowCreation => {
@@ -84,6 +107,14 @@ export const verifyEscrowCreated = (logs: EvmLog[], expected: EscrowExpectation)
 
 type Fetcher = typeof fetch;
 
+/** За адресою немає контракту (eth_call повернув 0x): клон ще не створено. Для решти викликів це збій вузла. */
+export class EscrowNotFoundError extends EvmUnavailableError {
+  constructor() {
+    super();
+    this.name = "EscrowNotFoundError";
+  }
+}
+
 const call = async (input: { rpcUrl: string; to: Address; data: Hex; fetcher: Fetcher }): Promise<Hex> => {
   const { rpcUrl, to, data, fetcher } = input;
   let body: { result?: unknown; error?: unknown };
@@ -94,17 +125,18 @@ const call = async (input: { rpcUrl: string; to: Address; data: Hex; fetcher: Fe
   } catch {
     throw new EvmUnavailableError();
   }
-  if (body.error !== undefined || typeof body.result !== "string" || body.result === "0x") throw new EvmUnavailableError();
+  if (body.error !== undefined || typeof body.result !== "string") throw new EvmUnavailableError();
+  if (body.result === "0x") throw new EscrowNotFoundError();
   return body.result as Hex;
 };
 
 /** Поточний стан клона. Помилка вузла піднімається EvmUnavailableError: статус етапу тоді не міняємо. */
 export const readEscrow = async (rpcUrl: string, escrow: Address, fetcher: Fetcher = fetch): Promise<EscrowSnapshot> => {
-  const read = async (functionName: "state" | "client" | "performer" | "amount" | "paidToPerformer" | "dealRef" | "deliverBy" | "reviewEnds") => {
+  const read = async (functionName: "state" | "client" | "performer" | "amount" | "paidToPerformer" | "dealRef" | "deliverBy" | "reviewEnds" | "FACTORY") => {
     const data = encodeFunctionData({ abi: dealEscrowAbi, functionName });
     return decodeFunctionResult({ abi: dealEscrowAbi, functionName, data: await call({ rpcUrl, to: escrow, data, fetcher }) });
   };
-  const [state, client, performer, amount, paid, dealRef, deliverBy, reviewEnds] = await Promise.all([
+  const [state, client, performer, amount, paid, dealRef, deliverBy, reviewEnds, factory] = await Promise.all([
     read("state"),
     read("client"),
     read("performer"),
@@ -113,6 +145,22 @@ export const readEscrow = async (rpcUrl: string, escrow: Address, fetcher: Fetch
     read("dealRef"),
     read("deliverBy"),
     read("reviewEnds"),
+    read("FACTORY"),
   ]);
-  return { state: Number(state) as EscrowState, client: client as string, performer: performer as string, amount: amount as bigint, paidToPerformer: paid as bigint, dealRef: dealRef as string, deliverBy: Number(deliverBy), reviewEnds: Number(reviewEnds) };
+  return { state: Number(state) as EscrowState, client: client as string, performer: performer as string, factory: factory as string, amount: amount as bigint, paidToPerformer: paid as bigint, dealRef: dealRef as string, deliverBy: Number(deliverBy), reviewEnds: Number(reviewEnds) };
+};
+
+/** Адреса клона, яку фабрика створить (чи вже створила) для замовника й етапу: predictEscrow. Сервер рахує її сам. */
+export const predictEscrowAddress = async (input: { rpcUrl: string; factory: Address; client: Address; dealRef: Hex }, fetcher: Fetcher = fetch): Promise<Address> => {
+  const { rpcUrl, factory, client, dealRef } = input;
+  const data = encodeFunctionData({ abi: escrowFactoryAbi, functionName: "predictEscrow", args: [client, dealRef] });
+  return decodeFunctionResult({ abi: escrowFactoryAbi, functionName: "predictEscrow", data: await call({ rpcUrl, to: factory, data, fetcher }) });
+};
+
+/** Ліміт ціни однієї угоди й ставка комісії фабрики (у базисних пунктах): ставку показуємо людям з контракту, не з констант. */
+export const readFactoryTerms = async (input: { rpcUrl: string; factory: Address }, fetcher: Fetcher = fetch): Promise<{ maxAmount: bigint; feeBps: number }> => {
+  const { rpcUrl, factory } = input;
+  const read = async (functionName: "MAX_AMOUNT" | "FEE_BPS") => decodeFunctionResult({ abi: escrowFactoryAbi, functionName, data: await call({ rpcUrl, to: factory, data: encodeFunctionData({ abi: escrowFactoryAbi, functionName }), fetcher }) });
+  const [maxAmount, feeBps] = await Promise.all([read("MAX_AMOUNT"), read("FEE_BPS")]);
+  return { maxAmount: maxAmount as bigint, feeBps: Number(feeBps) };
 };

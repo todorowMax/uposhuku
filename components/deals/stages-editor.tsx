@@ -8,9 +8,9 @@
 import { Plus, Trash2 } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { daysWord, money } from "@/lib/deals/format";
+import { daysWord, moneyIn } from "@/lib/deals/format";
 import { splitAdvance, type StageDraft } from "@/lib/deals/stage-presets";
-import { HOLD_DAYS, MAX_STAGE_DAYS, MAX_STAGES, type DealMethod } from "@/lib/deals/types";
+import { currencyOfMethod, HOLD_DAYS, MAX_STAGE_DAYS, MAX_STAGES, type DealMethod } from "@/lib/deals/types";
 
 export namespace StagesEditorTypes {
   /** Етап у полях форми: усе рядками, як вводить людина. */
@@ -30,7 +30,8 @@ export const toEdits = (stages: StageDraft[]): StagesEditorTypes.Edit[] =>
   stages.map((stage) => ({ title: stage.title, amount: String(stage.amount), days: String(stage.days) }));
 
 export const StagesEditor = ({ method, stages, amount, days, custom, onCustom }: StagesEditorTypes.Props) => {
-  const direct = method === "direct";
+  const direct = method !== "safe";
+  const currency = currencyOfMethod(method);
   const editStage = (index: number, patch: Partial<StagesEditorTypes.Edit>) =>
     onCustom((custom ?? toEdits(stages)).map((stage, i) => (i === index ? { ...stage, ...patch } : stage)));
 
@@ -66,7 +67,7 @@ export const StagesEditor = ({ method, stages, amount, days, custom, onCustom }:
           <p className="deal-stage-line">
             <span>{stages[0].title}</span>
             <span className="tabular-nums">
-              {money(stages[0].amount)} · {stages[0].days} {daysWord(stages[0].days)}
+              {moneyIn(stages[0].amount, currency)} · {stages[0].days} {daysWord(stages[0].days)}
             </span>
           </p>
           <p className="pe-hint">
@@ -112,7 +113,7 @@ export const StagesEditor = ({ method, stages, amount, days, custom, onCustom }:
             <p key={index} className="deal-stage-line">
               <span>{stage.title}</span>
               <span className="tabular-nums">
-                {money(stage.amount)} · {stage.days} {daysWord(stage.days)}
+                {moneyIn(stage.amount, currency)} · {stage.days} {daysWord(stage.days)}
               </span>
             </p>
           ))}

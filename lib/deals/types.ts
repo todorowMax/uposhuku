@@ -5,7 +5,10 @@
 // 30 днів, комісія платформи, лише для виконавців-ФОП) і «прямий
 // переказ» (без комісії й без гарантії платформи).
 
-export type DealMethod = "safe" | "direct";
+export type DealMethod = "safe" | "direct" | "escrow";
+
+/** Валюта сум угоди: гривня для safe і direct, USDT для escrow (цілі долари на етап). Старі угоди без поля це UAH. */
+export type DealCurrency = "UAH" | "USDT";
 
 /**
  * Етап: safe — pending → funded (гроші заморожено) → delivered (виконавець
@@ -64,6 +67,16 @@ export interface DealStage {
   revertTo?: "funded" | "delivered" | "disputed";
   /** Показ для людини: банк відмовив, текст останньої помилки виплати. */
   payoutError?: string;
+  /** Лише escrow: клон контракту цього етапу й гаманець, з якого внесено. Адресу рахує сервер (predictEscrow). */
+  escrow?: { address: string; client: string };
+  /** Лише escrow: строки зі стану контракту. */
+  deliverBy?: string;
+  reviewEnds?: string;
+  /** Лише escrow: скільки отримав виконавець після закриття, у мінімальних одиницях токена (рядок). */
+  paidUnits?: string;
+  /** Лише escrow: нагадування надіслано (по одному разу). */
+  reviewEndedRemindedAt?: string;
+  deliverLateRemindedAt?: string;
 }
 
 /**
@@ -104,6 +117,8 @@ export interface Deal {
   responseId: string;
   performer: DealParty;
   method: DealMethod;
+  /** Валюта сум; немає в старих угодах (вони в гривнях). */
+  currency?: DealCurrency;
   status: DealStatus;
   stages: DealStage[];
   createdAt: string;
@@ -145,6 +160,18 @@ export const MAX_STAGE_AMOUNT = 30_000;
 export const MAX_DEAL = MAX_STAGES * MAX_STAGE_AMOUNT;
 /** Прямий переказ іде повз банк-еквайр, тож ліміту етапу немає. */
 export const MAX_DIRECT_DEAL = 1_000_000;
+
+/** Валюта сум за способом оплати: USDT лише в ескроу. */
+export const currencyOfMethod = (method: DealMethod): DealCurrency => (method === "escrow" ? "USDT" : "UAH");
+
+export const dealCurrency = (deal: Pick<Deal, "currency">): DealCurrency => deal.currency ?? "UAH";
+
+/** Скільки днів перевірки роботи ставимо в контракт ескроу (календарних; мінімум контракту 1 доба). */
+export const ESCROW_REVIEW_DAYS = REVIEW_DAYS;
+/** Найдовше вікно здачі в контракті: 365 діб. */
+export const ESCROW_MAX_DAYS = 365;
+/** Стеля угоди ескроу, USDT, якщо CRYPTO_MAX_DEAL_USDT не задано. */
+export const ESCROW_DEFAULT_MAX_USDT = 1000;
 
 export interface DealDraft {
   requestId: string;

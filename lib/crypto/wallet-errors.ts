@@ -20,6 +20,11 @@ const BY_NAME: Record<string, string> = {
 const BY_MESSAGE: [RegExp, string][] = [
   [/insufficient funds|gas required exceeds|exceeds the balance/i, "Не вистачає коштів на газ (комісію мережі). Поповніть баланс мережі й повторіть."],
   [/transfer amount exceeds balance|exceeds balance|insufficient balance/i, "На гаманці не вистачає USDT для цього платежу."],
+  [/TooLate/i, "Строк здачі вже минув: етап можна лише завершити за таймером або відкрити спір."],
+  [/TooEarly/i, "Ще рано: потрібний строк у контракті не минув."],
+  [/NotClient|NotPerformer|NotParty/i, "Ця дія доступна іншій стороні угоди. Підключіть гаманець, з яким ви в угоді."],
+  [/WrongState/i, "Стан контракту вже змінився: оновіть угоду."],
+  [/InvalidDeadline|InvalidReviewPeriod|InvalidAmount/i, "Контракт відхилив умови етапу (сума чи строки поза лімітами)."],
   [/user rejected|user denied|rejected the request/i, "Ви відхилили запит у гаманці. Нічого не списано: можна спробувати ще раз."],
   [/replaced|cancelled|canceled/i, "Транзакцію скасовано або замінено в гаманці. Якщо гроші не списано, повторіть платіж."],
 ];

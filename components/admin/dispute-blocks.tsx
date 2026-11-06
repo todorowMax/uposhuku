@@ -3,7 +3,7 @@
 import { DECISION_LABEL, type DecisionLogRow, type DisputeParty } from "@/lib/admin/types";
 import { feeOf, payoutOf, dealTotal } from "@/lib/deals/machine";
 import { formatKop } from "@/lib/deals/price";
-import type { Deal, DealStage } from "@/lib/deals/types";
+import { dealCurrency, type Deal, type DealStage } from "@/lib/deals/types";
 import { formatDay, formatMoney, formatStamp, holdLeft, STAGE_STATE } from "@/lib/admin/format";
 
 const stageTimes = (stage: DealStage): [string, string | undefined][] => [
@@ -35,7 +35,7 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
                 <span className="adm-stage-title">
                   {index + 1}. {stage.title}
                 </span>
-                <span className="adm-stage-sum">{formatMoney(stage.amount)}</span>
+                <span className="adm-stage-sum">{formatMoney(stage.amount, dealCurrency(deal))}</span>
               </div>
               <div className="adm-stage-row">
                 <span className="deal-chip" data-tone={stage.status === "released" ? "done" : stage.status === "disputed" ? "todo" : undefined}>
@@ -62,7 +62,7 @@ export function DealSummary({ deal, now }: { deal: Deal; now: number }) {
       <dl className="adm-facts">
         <div>
           <dt>Ціна виконавця</dt>
-          <dd>{formatMoney(dealTotal(deal))}</dd>
+          <dd>{formatMoney(dealTotal(deal), dealCurrency(deal))}</dd>
         </div>
         {deal.method === "safe" && (
           <>

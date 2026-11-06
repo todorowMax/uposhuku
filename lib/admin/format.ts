@@ -11,7 +11,7 @@ const money = new Intl.NumberFormat("uk-UA");
 
 export const formatStamp = (iso: string | null | undefined) => (iso ? stamp.format(new Date(iso)) : "");
 export const formatDay = (iso: string | null | undefined) => (iso ? day.format(new Date(iso)) : "");
-export const formatMoney = (value: number) => `${money.format(value)} ₴`;
+export const formatMoney = (value: number, currency: "UAH" | "USDT" = "UAH") => `${money.format(value)} ${currency === "USDT" ? "USDT" : "₴"}`;
 
 export const STAGE_STATE: Record<DealStage["status"], string> = {
   pending: "Чекає оплату",
@@ -33,7 +33,7 @@ export const DEAL_STATE: Record<Deal["status"], string> = {
   cancelled: "Скасовано",
 };
 
-export const METHOD_LABEL: Record<Deal["method"], string> = { safe: "Безпечна угода", direct: "Прямий переказ" };
+export const METHOD_LABEL: Record<Deal["method"], string> = { safe: "Безпечна угода", direct: "Прямий переказ", escrow: "Ескроу (USDT)" };
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

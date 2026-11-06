@@ -10,11 +10,14 @@ import { and, asc, eq, like } from "drizzle-orm";
 import { deals } from "@/db/schema";
 import { parseAdminEmails } from "@/lib/admin/access";
 import { applyAutoAccept, applyHoldExpiryRefund } from "@/lib/deals/machine";
+import { planEscrowSweep, type EscrowSweepAction } from "@/lib/deals/escrow-state";
 import { planDealSweep, type SweepAction } from "@/lib/deals/sweep-plan";
 import type { Deal } from "@/lib/deals/types";
 import { logServer } from "@/lib/telemetry/log";
 import { notifyParties } from "./deal-announce";
+import { cryptoConfig } from "./crypto-config";
 import { reconcilePayment, settleStage } from "./deal-money";
+import { syncEscrowStage } from "./escrow-sync";
 import { mutateDeal } from "./deal-repo";
 import { getDb } from "./db";
 import { readVar } from "./env";
@@ -31,6 +34,8 @@ const SCAN_LIMIT = 300;
 const STALE_RESERVATION_MS = 15 * 60_000;
 
 export interface SweepReport {
+  /** Етапів ескроу, звірених із контрактом за прохід. */
+  escrow: number;
   deals: number;
   actions: number;
   payments: number;
@@ -136,9 +141,68 @@ const reconcileOpenPayments = async (now: number, report: SweepReport): Promise<
   }
 };
 
+/** Прийняті угоди ескроу, найдавніше змінені першими. */
+const escrowCandidates = async (): Promise<Deal[]> =>
+  (
+    await getDb()
+      .select()
+      .from(deals)
+      .where(and(eq(deals.status, "accepted"), like(deals.data, '%"method":"escrow"%')))
+      .orderBy(asc(deals.updatedAt))
+      .limit(SCAN_LIMIT)
+  ).map((row) => JSON.parse(row.data) as Deal);
+
+const performEscrow = async (deal: Deal, action: EscrowSweepAction, now: number): Promise<void> => {
+  const { stageId } = action;
+  if (action.kind === "sync") {
+    const result = await syncEscrowStage({ dealId: deal.id, stageId, now });
+    // Мережа недоступна чи контракт не підходить: стан не міняли, це не зупиняє решту.
+    if (!result.ok && result.status === 503) throw new Error("escrow rpc unavailable");
+    return;
+  }
+  const field = action.kind === "remind_performer_review_ended" ? "reviewEndedRemindedAt" : "deliverLateRemindedAt";
+  const notice = action.kind === "remind_performer_review_ended" ? "escrow_review_ended" : "escrow_delivery_late";
+  const marked = await mutateDeal(
+    deal.id,
+    (current) => {
+      const stage = current.stages.find((item) => item.id === stageId);
+      if (!stage || stage[field]) return undefined;
+      return { ...current, stages: current.stages.map((item) => (item.id === stageId ? { ...item, [field]: new Date(now).toISOString() } : item)) };
+    },
+    now,
+  );
+  if (marked === null || typeof marked === "string" || !marked.changed) return;
+  const ownerId = await owner(deal.id);
+  if (!ownerId) return;
+  // Простроченій здачі нагадуємо замовнику, закінченій перевірці виконавцю: сповіщення йде обом, текст пояснює дію.
+  notifyParties({ deal, ownerUserId: ownerId, action: notice, stageId });
+};
+
+/** Звірка етапів ескроу з контрактом і нагадування. Без фабрики в оточенні функція вимкнена. */
+const runEscrowSweep = async (now: number, report: SweepReport): Promise<void> => {
+  if (!cryptoConfig()?.factory) return;
+  let handled = 0;
+  for (const deal of await escrowCandidates()) {
+    if (handled >= SWEEP_LIMIT) break;
+    const plan = planEscrowSweep(deal, now);
+    if (plan.length === 0) continue;
+    handled += 1;
+    for (const action of plan) {
+      report.escrow += 1;
+      try {
+        await performEscrow(deal, action, now);
+      } catch (error) {
+        report.errors += 1;
+        logServer({ level: "error", event: "escrow_sweep_failed", message: error instanceof Error ? error.message : String(error), detail: { dealId: deal.id, action: action.kind, stageId: action.stageId } });
+      }
+    }
+  }
+};
+
 export const runDealSweep = async (now = Date.now()): Promise<SweepReport> => {
-  const report: SweepReport = { deals: 0, actions: 0, payments: 0, errors: 0 };
+  const report: SweepReport = { escrow: 0, deals: 0, actions: 0, payments: 0, errors: 0 };
   await reconcileOpenPayments(now, report);
+  await runEscrowSweep(now, report);
   for (const deal of await candidates()) {
     if (report.deals >= SWEEP_LIMIT) break;
     const plan = planDealSweep(deal, now);

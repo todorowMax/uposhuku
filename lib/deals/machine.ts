@@ -6,6 +6,7 @@
 // вони лише записують намір (releasing, refunding), а підсумок приносить банк (lib/deals/payment-status.ts).
 
 import {
+  ESCROW_MAX_DAYS,
   HOLD_DAYS,
   HOLD_RESERVE_DAYS,
   MAX_DEAL,
@@ -29,6 +30,9 @@ const iso = (ms: number) => new Date(ms).toISOString();
 /** Відповідь на спробу створити безпечну угоду чи оплатити її, коли функція для людини вимкнена. */
 export const SAFE_DEAL_UNAVAILABLE = "Безпечна угода ще недоступна";
 
+/** Відповідь, коли просять змінити статус етапу ескроу словом: його змінює лише стан контракту (applyEscrowState). */
+export const ESCROW_ONCHAIN = "Статус етапу ескроу змінює гаманець у блокчейні: зробіть дію в гаманці, і сайт оновить статус за станом контракту.";
+
 export const dealTotal = (deal: Pick<Deal, "stages">) => deal.stages.reduce((sum, stage) => sum + stage.amount, 0);
 
 /** Комісія безпечної угоди від ціни виконавця, у гривнях. Платить замовник понад ціну. */
@@ -37,9 +41,23 @@ export const feeOf = (amount: number, method: Deal["method"]) => (method === "sa
 /** Виконавець отримує ціну повністю: комісії платформи й банку лягають на замовника, див. lib/deals/price.ts. */
 export const payoutOf = (amount: number) => amount;
 
+/** Ескроу в USDT: цілі долари на етап, сума угоди від 1 до стелі, вікно здачі в межах контракту. */
+const validateEscrowDraft = (draft: DealDraft, escrowMax: number | null): string | null => {
+  if (escrowMax === null) return "Ескроу ще недоступне.";
+  for (const stage of draft.stages) {
+    if (!stage.title.trim()) return "Назвіть кожен етап.";
+    if (!Number.isInteger(stage.amount) || stage.amount < 1) return "Сума етапу ескроу: ціле число USDT, не менше 1.";
+    if (!Number.isInteger(stage.days) || stage.days < 1 || stage.days > ESCROW_MAX_DAYS) return `Термін етапу від 1 до ${ESCROW_MAX_DAYS} днів.`;
+  }
+  const total = draft.stages.reduce((sum, stage) => sum + stage.amount, 0);
+  if (total > escrowMax) return `Сума угоди ескроу не більша за ${escrowMax.toLocaleString("uk-UA")} USDT.`;
+  return null;
+};
+
 /** Помилка у чернетці угоди або null. Текст — для людини. */
-export const validateDraft = (draft: DealDraft, safeEnabled: boolean): string | null => {
+export const validateDraft = (draft: DealDraft, safeEnabled: boolean, escrowMax: number | null = null): string | null => {
   if (draft.stages.length < 1 || draft.stages.length > MAX_STAGES) return `Етапів має бути від 1 до ${MAX_STAGES}.`;
+  if (draft.method === "escrow") return validateEscrowDraft(draft, escrowMax);
   if (draft.method === "safe" && !safeEnabled) return SAFE_DEAL_UNAVAILABLE;
   if (draft.method === "safe" && !draft.performer.fop) return "Безпечна угода доступна лише виконавцям-ФОП.";
   for (const stage of draft.stages) {
@@ -82,6 +100,7 @@ export const createDeal = (id: string, draft: DealDraft, now: number): Deal => (
   responseId: draft.responseId,
   performer: draft.performer,
   method: draft.method,
+  ...(draft.method === "escrow" ? { currency: "USDT" as const } : {}),
   status: "proposed",
   createdAt: iso(now),
   number: `#${id.replace(/\W/g, "").slice(-4).toUpperCase()}`,
@@ -127,6 +146,7 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
   const before = deal.stages.slice(0, deal.stages.indexOf(stage));
   if (before.some((item) => item.status !== "released")) return "Спершу завершіть попередній етап.";
 
+  if (deal.method === "escrow" && (action === "fund" || action === "claim_paid" || action === "release" || action === "dispute")) return ESCROW_ONCHAIN;
   let updated: DealStage;
   switch (action) {
     case "fund":
@@ -171,6 +191,7 @@ export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageI
   if (!stage) return "Етапу не знайдено.";
   const before = deal.stages.slice(0, deal.stages.indexOf(stage));
   if (before.some((item) => item.status !== "released")) return "Спершу завершіть попередній етап.";
+  if (deal.method === "escrow" && (action === "confirm_paid" || action === "deliver")) return ESCROW_ONCHAIN;
   let updated: DealStage;
   if (action === "confirm_paid") {
     if (deal.method !== "direct" || stage.status !== "claimed") return "Замовник ще не позначив оплату.";
@@ -227,6 +248,7 @@ const startRework = (stage: DealStage, now: number): DealStage | string => {
  * - rework: етап повертається виконавцю на доопрацювання, холд лишається той самий, гроші не рухаються.
  */
 export const applyModeratorAction = (deal: Deal, action: ModeratorAction, stageId: string | undefined, now: number, options: ModeratorOptions = {}): Deal | string => {
+  if (deal.method === "escrow") return "Спір ескроу вирішує арбітр у блокчейні: див. адмінку (calldata для мультипідпису).";
   const stage = stageId ? deal.stages.find((item) => item.id === stageId) : disputedStage(deal);
   if (!stage || stage.status !== "disputed") return "Цей етап не в спорі.";
   let updated: DealStage;
@@ -301,7 +323,7 @@ export const needsAction = (deal: Deal): "answer" | "fund" | "pay" | "confirm" |
   const stage = currentStage(deal);
   if (!stage) return null;
   if (stage.status === "disputed") return "dispute";
-  if (stage.status === "pending") return deal.method === "safe" ? "fund" : "pay";
+  if (stage.status === "pending") return deal.method === "direct" ? "pay" : "fund";
   if (stage.status === "delivered") return "confirm";
   return null;
 };

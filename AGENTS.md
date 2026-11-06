@@ -19,6 +19,9 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Wallets: wagmi 3 + viem + react-query (`components/wallet`, `lib/crypto/pay-flow.ts`). They load only through
   `next/dynamic` in the payment and requisites panels; nothing imports them on the home page or the map. The
   end-to-end check against a local Hardhat node is `npm run test:chain` (needs `contracts` built).
+  Escrow deals (`method: "escrow"`, amounts in whole USDT, one contract clone per stage) take their stage status only from
+  the contract state (`lib/deals/escrow-state.ts`, `lib/server/escrow-sync.ts`); `CRYPTO_MAX_DEAL_USDT` caps a deal
+  (default 1000, never above the factory limit read from the contract). Wallet reads go through the connected wallet's provider.
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
 - Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
 - `@next/eslint-plugin-next` follows the Next major (`^16.4.3`); the shared lint config in

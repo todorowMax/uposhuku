@@ -15,10 +15,10 @@ import { snapshotDealRequisites } from "./requisites-repo";
 /** Відповідь на спробу укласти угоду із самим собою. */
 export const SELF_DEAL = "З собою угоду оформити не можна.";
 
-/** Прийнята прямим переказом угода фіксує реквізити виконавця. Збій знімка не ламає прийняття: його довзяти при першому читанні. */
+/** Прийнята угода (прямий переказ чи ескроу) фіксує реквізити виконавця; для ескроу з них береться підтверджена адреса гаманця. Збій знімка не ламає прийняття: його довзяти при першому читанні. */
 const snapshotOnAccept = async (deal: Deal, now: number) => {
   const performerUser = performerUserId(deal.performer.id);
-  if (deal.method !== "direct" || deal.status !== "accepted" || !performerUser) return;
+  if (deal.method === "safe" || deal.status !== "accepted" || !performerUser) return;
   try {
     await snapshotDealRequisites(deal.id, performerUser, now);
   } catch (error) {
@@ -76,9 +76,9 @@ const readAll = async (userId: string): Promise<Deal[]> =>
 export const listDeals = async (userId: string, requestId?: string): Promise<Deal[]> =>
   (await readAll(userId)).filter((deal) => !requestId || deal.requestId === requestId);
 
-export const proposeDeal = async (userId: string, draft: DealDraft, options: { safeEnabled: boolean; now?: number }): Promise<Deal | string> => {
+export const proposeDeal = async (userId: string, draft: DealDraft, options: { safeEnabled: boolean; escrowMax?: number | null; now?: number }): Promise<Deal | string> => {
   const now = options.now ?? Date.now();
-  const error = validateDraft(draft, options.safeEnabled);
+  const error = validateDraft(draft, options.safeEnabled, options.escrowMax ?? null);
   if (error) return error;
   if (draft.performer.id === performerIdOf(userId)) return SELF_DEAL;
   const existing = await readAll(userId);
@@ -167,7 +167,7 @@ export const proposeDirectDeal = async (
   conversation: { id: string; customerUserId: string; performerId: string },
   proposedBy: "customer" | "performer",
   draft: Omit<DealDraft, "requestId" | "responseId" | "conversationId" | "proposedBy">,
-  options: { safeEnabled: boolean; now?: number },
+  options: { safeEnabled: boolean; escrowMax?: number | null; now?: number },
 ): Promise<Deal | string> => {
   const now = options.now ?? Date.now();
   if (conversation.performerId === performerIdOf(conversation.customerUserId)) return SELF_DEAL;
@@ -176,7 +176,7 @@ export const proposeDirectDeal = async (
   if (title.length > 80) return "Назва задовга: до 80 символів.";
   if ((draft.description?.length ?? 0) > 1000) return "Опис задовгий: до 1000 символів.";
   const full: DealDraft = { ...draft, title, requestId: directRequestId(conversation.id), responseId: DIRECT_RESPONSE_ID, conversationId: conversation.id, proposedBy };
-  const error = validateDraft(full, options.safeEnabled);
+  const error = validateDraft(full, options.safeEnabled, options.escrowMax ?? null);
   if (error) return error;
   const live = (await readAll(conversation.customerUserId)).filter((deal) => deal.conversationId === conversation.id && (deal.status === "proposed" || deal.status === "accepted"));
   if (live.length >= MAX_LIVE_DIRECT) return `У розмові вже ${MAX_LIVE_DIRECT} відкритих замовлень: завершіть одне, щоб додати нове.`;

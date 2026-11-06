@@ -51,6 +51,7 @@ import { DealTab } from "@/components/deals/deal-tab";
 import { DirectDeals, TermsForm } from "@/components/chat/direct-deals";
 import { offersMapStore } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
+import { EscrowSection } from "@/components/wallet/escrow-section";
 import { createStore, useStore } from "@/lib/store";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
 import { EVENTS, track } from "@/lib/telemetry/track";
@@ -1029,7 +1030,7 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
                 {deal.number}
               </strong>
               <span>
-                {MONEY.format(dealTotal(deal))} ₴
+                {MONEY.format(dealTotal(deal))} {deal.method === "escrow" ? "USDT" : "₴"}
                 {deal.method === "safe"
                   ? `, вам ${MONEY.format(payoutOf(dealTotal(deal)))} ₴ повністю`
                   : ""}
@@ -1091,7 +1092,10 @@ function PerformerDeals({ conversationId }: { conversationId: string }) {
                 </button>
               </div>
             )}
-            {needs === "deliver" && (
+            {deal.method === "escrow" && deal.status === "accepted" && stage && (
+              <EscrowSection deal={deal} stage={stage} side="performer" onChanged={() => undefined} />
+            )}
+            {needs === "deliver" && deal.method !== "escrow" && (
               <div className="inbox-deal-actions">
                 <button
                   type="button"

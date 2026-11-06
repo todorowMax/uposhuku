@@ -5,6 +5,8 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { rateLimited } from "@/lib/server/rate-limit";
+import { escrowGate } from "@/lib/server/escrow-gate";
+import { performerUserId } from "@/lib/deals/parties";
 import { safeDealEnabledFor } from "@/lib/server/safe-deal";
 import { performerFromResponse } from "@/lib/server/deal-parties";
 import { listDeals, listDealsForPerformer, proposeDeal } from "@/lib/server/deal-repo";
@@ -44,7 +46,7 @@ export const POST = async (request: Request) => {
   // Безпечна угода лише тим, кому її ввімкнено (SAFE_DEAL_MODE); решті метод за замовчуванням — прямий переказ.
   const safeEnabled = await safeDealEnabledFor(user.email);
   const fallback: DealMethod = safeEnabled ? "safe" : "direct";
-  const method: DealMethod = body?.method === "safe" || body?.method === "direct" ? body.method : fallback;
+  const method: DealMethod = body?.method === "safe" || body?.method === "direct" || body?.method === "escrow" ? body.method : fallback;
   if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
   const rawStages = Array.isArray(body?.stages) ? body.stages.slice(0, 6) : [];
   const responseId = text(body?.responseId, 80);
@@ -64,7 +66,14 @@ export const POST = async (request: Request) => {
       days: typeof stage?.days === "number" ? Math.round(stage.days) : NaN,
     })),
   };
-  const result = await proposeDeal(user.id, draft, { safeEnabled });
+  // Ескроу: прапорець у того, хто створює, фабрика, підтверджений гаманець виконавця й стеля з контракту.
+  let escrowMax: number | null = null;
+  if (method === "escrow") {
+    const gate = await escrowGate({ email: user.email, performerUserId: performerUserId(performer.id) });
+    if (typeof gate === "string") return problem(409, "Ескроу недоступне", gate);
+    escrowMax = gate.max;
+  }
+  const result = await proposeDeal(user.id, draft, { safeEnabled, escrowMax });
   if (typeof result === "string") return problem(400, "Угоду не створено", result);
   notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: "proposed" }));
   serverEvent(EVENTS.dealCreated, { deal_id: result.id, kind: result.method, stages: result.stages.length }, user.id, "/api/deals");

@@ -6,6 +6,9 @@ const PRICE = new Intl.NumberFormat("uk-UA");
 
 export const money = (value: number): string => `${PRICE.format(value)} ₴`;
 
+/** Сума угоди у валюті угоди: гривні (за замовчуванням) або USDT для ескроу. */
+export const moneyIn = (value: number, currency: "UAH" | "USDT" = "UAH"): string => (currency === "USDT" ? `${PRICE.format(value)} USDT` : money(value));
+
 /** «день / дні / днів» за числом. */
 export const daysWord = (days: number): string => {
   const tens = days % 100;

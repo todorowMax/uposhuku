@@ -19,7 +19,9 @@ import { erc20Abi } from "@/lib/crypto/abi/erc20";
 import { approvalSteps } from "@/lib/crypto/approvals";
 import type { PublicCryptoConfig } from "@/lib/crypto/config";
 import { dealRefOf } from "@/lib/crypto/deal-ref";
-import { escrowStageOutcome, readEscrow, verifyEscrowCreated } from "@/lib/crypto/escrow-chain";
+import { escrowStageOutcome, predictEscrowAddress, readEscrow, readFactoryTerms, verifyEscrowClone, verifyEscrowCreated } from "@/lib/crypto/escrow-chain";
+import { applyEscrowState } from "@/lib/deals/escrow-state";
+import { createDeal } from "@/lib/deals/machine";
 import { actOnEscrow, createEscrowDeal } from "@/lib/crypto/escrow-flow";
 import { evaluateEvmPayment, EVM_MIN_CONFIRMATIONS, readEvmChain } from "@/lib/crypto/evm";
 import { sendDirectPayment } from "@/lib/crypto/pay-flow";
@@ -147,11 +149,18 @@ const run = async () => {
     const receipt = await send(hash);
     const created = verifyEscrowCreated(receipt.logs.map((entry) => ({ address: entry.address, topics: entry.topics as string[], data: entry.data })), { factory, client: customer.address, performer: performer.address, amount: 10_000_000n, dealRef });
     if (!created.ok) throw new Error(`ПРОВАЛ: подія створення: ${created.reason}`);
+    // Те, що робить сервер: адреса клона з predictEscrow збігається з подією, а поля клона проходять перевірку.
+    const predicted = await predictEscrowAddress({ rpcUrl: RPC, factory, client: customer.address, dealRef });
+    assert(predicted === created.escrow, `сервер сам вираховує адресу клона (${name}): збігається з подією створення`);
+    const verdict = verifyEscrowClone(await readEscrow(RPC, predicted), { factory, client: customer.address, performer: performer.address, amount: 10_000_000n, dealRef });
+    assert(verdict.ok, `клон проходить перевірку фабрики, сторін, суми й посилання (${name})`);
     return created.escrow;
   };
   const wrongParty = verifyEscrowCreated([], { factory, client: customer.address, performer: performer.address, amount: 1n, dealRef: ref });
   assert(!wrongParty.ok && wrongParty.reason === "no_event", "без події створення ескроу не зараховується");
 
+  const terms = await readFactoryTerms({ rpcUrl: RPC, factory });
+  assert(terms.feeBps === 500 && terms.maxAmount === 10_000_000_000n, "ставка комісії й ліміт читаються з контракту");
   const paidBefore = await balance(usdt, performer.address);
   const first = await escrowAt("release");
   assert(escrowStageOutcome(await readEscrow(RPC, first)).kind === "funded", "після внесення стан контракту funded");
@@ -162,6 +171,10 @@ const run = async () => {
   const released = escrowStageOutcome(await readEscrow(RPC, first));
   assert(released.kind === "released" && released.paid === 10_000_000n, "замовник прийняв: стан released, виконавцю виплачена повна ціна");
   assert((await balance(usdt, performer.address)) - paidBefore === 10_000_000n, "гроші на гаманці виконавця");
+  // Статус етапу сервер виводить лише зі стану контракту: «відповідник» applyEscrowState на справжньому контракті.
+  const deal = { ...createDeal("deal_e2e", { requestId: "r", responseId: "s", performer: { id: "me-x", name: "x", avatarIndex: 0, specialty: "", fop: false }, method: "escrow", stages: [{ title: "release", amount: 10, days: 3 }] }, 1), status: "accepted" as const };
+  const applied = applyEscrowState(deal, { stageId: deal.stages[0].id, outcome: released, now: Date.now() });
+  assert(applied?.stages[0].status === "released" && applied.stages[0].paidUnits === "10000000" && applied.status === "completed", "applyEscrowState переводить етап у released за станом контракту");
 
   // 5. Ескроу: завершення за таймером без здачі (повернення), спір.
   const second = await escrowAt("refund");

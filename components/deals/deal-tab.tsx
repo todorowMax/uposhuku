@@ -15,17 +15,22 @@ import { StagesEditor, type StagesEditorTypes } from "@/components/deals/stages-
 import { TransferCard } from "@/components/deals/transfer-card";
 import { Field, Input, Textarea } from "@/components/ui/input";
 import { ApiError } from "@/lib/auth/client";
-import { dealAction, proposeDeal, startPayment, useDeals } from "@/lib/deals/client";
+import { dealAction, loadDeals, proposeDeal, startPayment, useDeals } from "@/lib/deals/client";
 import { paymentReturnStore } from "@/lib/deals/use-payment-return";
 import { useStore } from "@/lib/store";
-import { daysWord, money } from "@/lib/deals/format";
+import { daysWord, money, moneyIn } from "@/lib/deals/format";
 import { useSafeDeal } from "@/lib/deals/use-safe-deal";
 import { CommissionRow } from "@/components/deals/commission-row";
+import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
+import { EscrowSection } from "@/components/wallet/escrow-section";
+import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import { ReleaseCodeBox } from "@/components/deals/release-code-box";
 import { releaseNeedsCode } from "@/lib/deals/limits";
 import { COMMISSION_RATE, formatKop, quoteStage, totalOf } from "@/lib/deals/price";
 import {
   HOLD_DAYS,
+  currencyOfMethod,
+  dealCurrency,
   type Deal,
   type DealMethod,
   type DealStage,
@@ -52,6 +57,14 @@ const DATE = new Intl.DateTimeFormat("uk-UA", {
 });
 const reduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const CURRENCY_SIGN = { UAH: "₴", USDT: "USDT" } as const;
+const FEE_NOTE: Record<DealMethod, string> = { safe: "", direct: "немає", escrow: "за контрактом, видно перед внесенням" };
+const AGREE_TEXT: Record<DealMethod, string> = {
+  safe: "Розумію: гроші заморожуються на картці до підтвердження, а спір має закінчитися до кінця холду.",
+  direct: "Розумію: це прямий переказ, платформа не гарантує повернення грошей, а податки сторони вирішують самі.",
+  escrow: "Розумію: кошти лягають у контракт у блокчейні, платформа ними не володіє, а спір вирішує арбітр у мережі.",
+};
 
 /** Угода живе й не закрита відмовою чи скасуванням. */
 export const liveDeal = (deals: Deal[], responseId: string) =>
@@ -80,6 +93,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
   const safeEnabled = useSafeDeal();
   const fop = safeEnabled;
+  const escrowAvailable = useEscrowAvailable();
   const [method, setMethod] = useState<DealMethod>("direct");
   const [amount, setAmount] = useState(
     response.price ? String(response.price) : "",
@@ -102,7 +116,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         days: Number(stage.days) || 0,
       }));
     if (amountNumber <= 0 || daysNumber <= 0) return [];
-    return method === "direct"
+    return method !== "safe"
       ? [{ title: "Робота", amount: amountNumber, days: daysNumber }]
       : splitIntoStages(amountNumber, daysNumber);
   }, [method, custom, amountNumber, daysNumber]);
@@ -125,7 +139,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
         performer,
         method,
         stages,
-      }, safeEnabled)
+      }, safeEnabled, method === "escrow" ? Number.MAX_SAFE_INTEGER : null)
     : "Вкажіть суму й термін.";
 
   const submit = async () => {
@@ -160,7 +174,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
       </p>
 
       <div className="grid grid-cols-2 gap-2">
-        <Field label="Сума, ₴" htmlFor="deal-amount">
+        <Field label={`Сума, ${CURRENCY_SIGN[currencyOfMethod(method)]}`} htmlFor="deal-amount">
           <Input
             id="deal-amount"
             inputMode="numeric"
@@ -192,12 +206,13 @@ function DealComposer({ response }: { response: OfferResponse }) {
         </Field>
       </div>
 
-      <fieldset className="deal-methods" hidden={!safeEnabled}>
+      <fieldset className="deal-methods" hidden={!safeEnabled && !escrowAvailable}>
         <legend className="pe-label">Як платити</legend>
         <label
           className="deal-method"
           data-selected={method === "safe" || undefined}
           data-disabled={!fop || undefined}
+          hidden={!safeEnabled}
         >
           <input
             type="radio"
@@ -236,8 +251,9 @@ function DealComposer({ response }: { response: OfferResponse }) {
             етапами. Без гарантії платформи: у спорі гроші ми не повертаємо.
           </span>
         </label>
+        {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : safeEnabled ? "safe" : "direct")} />}
       </fieldset>
-      {!safeEnabled && (
+      {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
           Оплата прямим переказом виконавцю: без комісії платформи й без її
           гарантії, у спорі гроші ми не повертаємо.
@@ -274,11 +290,11 @@ function DealComposer({ response }: { response: OfferResponse }) {
           <>
             <div>
               <dt>Ви платите</dt>
-              <dd className="tabular-nums">{money(total)}</dd>
+              <dd className="tabular-nums">{moneyIn(total, currencyOfMethod(method))}</dd>
             </div>
             <div>
               <dt>Комісія платформи</dt>
-              <dd>немає</dd>
+              <dd>{FEE_NOTE[method]}</dd>
             </div>
           </>
         )}
@@ -292,9 +308,7 @@ function DealComposer({ response }: { response: OfferResponse }) {
           className="mt-0.5"
         />
         <span className="text-[12px] leading-snug text-ink-muted">
-          {method === "safe"
-            ? "Розумію: гроші заморожуються на картці до підтвердження, а спір має закінчитися до кінця холду."
-            : "Розумію: це прямий переказ, платформа не гарантує повернення грошей, а податки сторони вирішують самі."}
+          {AGREE_TEXT[method]}
         </span>
       </label>
 
@@ -413,11 +427,11 @@ export function DealView({ deal }: { deal: Deal }) {
             {deal.title ? `${deal.title} · ` : "Угода "}
             {deal.number}
             <span className="ml-2 text-[13px] font-normal tabular-nums text-ink-muted">
-              {money(total)}
+              {moneyIn(total, dealCurrency(deal))}
             </span>
           </p>
           <p className="mt-0.5 text-[12px] text-ink-muted">
-            {deal.method === "safe" ? "Безпечна угода" : "Прямий переказ"}
+            {deal.method === "safe" ? "Безпечна угода" : deal.method === "escrow" ? "Ескроу (USDT)" : "Прямий переказ"}
           </p>
         </div>
         <span
@@ -443,7 +457,7 @@ export function DealView({ deal }: { deal: Deal }) {
         <div className="deal-wait" data-incoming>
           <div className="grid w-full gap-2">
             <p>
-              {deal.performer.name} пропонує умови: {money(total)}
+              {deal.performer.name} пропонує умови: {moneyIn(total, dealCurrency(deal))}
               {deal.stages.length === 1
                 ? `, ${deal.stages[0].days} ${daysWord(deal.stages[0].days)}`
                 : `, ${deal.stages.length} ${deal.stages.length < 5 ? "етапи" : "етапів"}`}
@@ -511,7 +525,7 @@ export function DealView({ deal }: { deal: Deal }) {
                   <p className="flex items-baseline justify-between gap-2 text-[13px] font-semibold text-ink">
                     <span className="truncate">{item.title}</span>
                     <span className="shrink-0 font-normal tabular-nums text-ink-muted">
-                      {money(item.amount)} · {item.days} {daysWord(item.days)}
+                      {moneyIn(item.amount, dealCurrency(deal))} · {item.days} {daysWord(item.days)}
                     </span>
                   </p>
                   <p className="text-[12px] text-ink-muted">
@@ -590,6 +604,10 @@ function StageActions({
 }) {
   const safe = deal.method === "safe";
   const quote = quoteStage(stage.amount);
+
+  if (deal.method === "escrow") {
+    return <EscrowSection deal={deal} stage={stage} side="customer" onChanged={() => void loadDeals(deal.requestId)} />;
+  }
 
   if (stage.status === "pending" && safe) {
     return checkout ? (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChatLog } from "@/components/admin/chat-log";
 import { DecisionForm } from "@/components/admin/decision-form";
+import { EscrowResolveForm } from "@/components/admin/escrow-resolve-form";
 import { DealSummary, DecisionLog, PartyCard } from "@/components/admin/dispute-blocks";
 import { ArrowLeft } from "@/components/icons";
 import { DEAL_STATE, formatStamp, holdLeft, METHOD_LABEL, openFor } from "@/lib/admin/format";
@@ -78,7 +79,9 @@ export default async function DisputePage({ params }: { params: Promise<{ id: st
           <h2 id="adm-decision" className="adm-h2">
             Рішення
           </h2>
-          {openStage ? (
+          {openStage && deal.method === "escrow" ? (
+            <EscrowResolveForm dealId={deal.id} stageId={openStage.id} stageTitle={openStage.title} amount={openStage.amount} contract={openStage.escrow?.address ?? null} />
+          ) : openStage ? (
             <DecisionForm dealId={deal.id} stageId={openStage.id} stageTitle={openStage.title} amount={openStage.amount} method={deal.method} holdLate={hold?.tone === "late"} reworkable={hold?.tone !== "late"} />
           ) : (
             <p className="adm-muted">Спору на етапах немає. Ухвалені рішення дивіться в журналі нижче.</p>

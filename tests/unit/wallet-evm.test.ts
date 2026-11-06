@@ -140,9 +140,9 @@ describe("ескроу в блокчейні", () => {
   });
 
   it("escrowStageOutcome: стан контракту визначає етап; закрито без виплати це повернення", () => {
-    const base = { client, performer: RECIPIENT, amount: 5n, paidToPerformer: 0n, dealRef: REF, deliverBy: 0, reviewEnds: 7 };
+    const base = { client, performer: RECIPIENT, factory, amount: 5n, paidToPerformer: 0n, dealRef: REF, deliverBy: 0, reviewEnds: 7 };
     expect(escrowStageOutcome({ ...base, state: 0 }).kind).toBe("none");
-    expect(escrowStageOutcome({ ...base, state: 1 }).kind).toBe("funded");
+    expect(escrowStageOutcome({ ...base, state: 1 })).toEqual({ kind: "funded", deliverBy: 0 });
     expect(escrowStageOutcome({ ...base, state: 2 })).toEqual({ kind: "delivered", reviewEnds: 7 });
     expect(escrowStageOutcome({ ...base, state: 3 }).kind).toBe("disputed");
     expect(escrowStageOutcome({ ...base, state: 4 }).kind).toBe("refunded");
@@ -160,6 +160,7 @@ describe("ескроу в блокчейні", () => {
       [encodeFunctionData({ abi: dealEscrowAbi, functionName: "dealRef" })]: word(REF),
       [encodeFunctionData({ abi: dealEscrowAbi, functionName: "deliverBy" })]: word(100n),
       [encodeFunctionData({ abi: dealEscrowAbi, functionName: "reviewEnds" })]: word(200n),
+      [encodeFunctionData({ abi: dealEscrowAbi, functionName: "FACTORY" })]: word(factory),
     };
     const fetcher = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       const data = (JSON.parse(String(init?.body)) as { params: [{ data: string }] }).params[0].data;

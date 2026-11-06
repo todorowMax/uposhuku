@@ -40,3 +40,15 @@ export const sendWalletSignature = (nonce: string, signature: string) =>
 
 export const submitWalletPayment = (dealId: string, hash: string) =>
   callApi<{ proof: CryptoProofDto }>(`/api/deals/${encodeURIComponent(dealId)}/wallet-pay`, { method: "POST", body: JSON.stringify({ hash }) });
+
+export interface EscrowInfoDto {
+  config: PublicCryptoConfig;
+  /** Підтверджена адреса гаманця виконавця зі знімка угоди; null, якщо знімка чи адреси немає. */
+  performerWallet: string | null;
+}
+
+export const fetchEscrowInfo = (dealId: string) => callApi<EscrowInfoDto>(`/api/deals/${encodeURIComponent(dealId)}/escrow`);
+
+/** Звірка етапу з контрактом після транзакції. `client`: гаманець замовника (потрібен до першої звірки етапу). */
+export const syncEscrow = (dealId: string, stageId: string, client?: string) =>
+  callApi<{ changed: boolean; funded: boolean }>(`/api/deals/${encodeURIComponent(dealId)}/escrow-sync`, { method: "POST", body: JSON.stringify({ stageId, ...(client ? { client } : {}) }) });

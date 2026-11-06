@@ -22,3 +22,18 @@ export const useCryptoConfig = (): PublicCryptoConfig | null => {
   }, []);
   return config;
 };
+
+/** Чи доступне цій людині ескроу (прапорець `crypto_escrow` і фабрика). Лише для показу вибору: рішення завжди за сервером. */
+export const useEscrowAvailable = (): boolean => {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCryptoConfig()
+      .then((value) => !cancelled && setAvailable(value.escrow))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return available;
+};
