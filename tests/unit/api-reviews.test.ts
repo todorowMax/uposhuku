@@ -96,7 +96,7 @@ describe("POST /api/reviews", () => {
     const dealId = await makeDeal("rv-cust", "rv-perf", "completed");
     const results = await Promise.allSettled([POST(jsonRequest("POST", { dealId, ...GOOD })), POST(jsonRequest("POST", { dealId, ...GOOD }))]);
     const statuses = results.map((result) => (result.status === "fulfilled" ? result.value.status : 500));
-    expect(statuses.filter((status) => status === 201)).toHaveLength(1);
+    expect(statuses.sort()).toEqual([201, 409]);
     expect(await rowsFor(dealId)).toHaveLength(1);
   });
 

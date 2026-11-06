@@ -42,7 +42,12 @@ export async function POST(request: Request) {
   if (stars < 1 || stars > 5) return problem(400, "Оберіть оцінку від 1 до 5");
   const text = typeof body?.text === "string" ? body.text.trim().slice(0, REVIEW_TEXT_MAX) : "";
   const author = reviewAuthor(user.name);
-  const review = await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author });
+  const review = await addReview(user.id, { performerId: deal.performer.id, dealId, stars: stars as 1 | 2 | 3 | 4 | 5, text, author }).catch(async (error: unknown) => {
+    // Паралельний запит устиг раніше: унікальний індекс по угоді пропустив лише один, другому відповідаємо як на повтор.
+    if (await reviewOfDeal(dealId)) return null;
+    throw error;
+  });
+  if (!review) return problem(409, "Ви вже лишили відгук по цій угоді");
   serverEvent(EVENTS.reviewLeft, { deal_id: dealId, stars }, user.id, "/api/reviews");
   return Response.json({ review }, { status: 201 });
 }
