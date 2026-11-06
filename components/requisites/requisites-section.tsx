@@ -37,10 +37,10 @@ export const RequisitesSection = () => {
       </p>
 
       {form.load === "loading" && (
-        <p role="status" className="pe-hint flex items-center gap-2">
+        <div role="status" className="pe-hint flex items-center gap-2">
           <Loader2 className="size-4 animate-spin" />
           Завантажуємо реквізити…
-        </p>
+        </div>
       )}
 
       {form.load === "error" && (
@@ -63,6 +63,12 @@ export const RequisitesSection = () => {
               <>
                 <dt className="mt-1.5 text-ink-muted">USDT (TRC-20)</dt>
                 <dd className="break-all font-medium tabular-nums text-ink">{own.requisites.usdtTrc20}</dd>
+              </>
+            )}
+            {own.requisites?.binanceId && (
+              <>
+                <dt className="mt-1.5 text-ink-muted">Binance ID</dt>
+                <dd className="font-medium tabular-nums text-ink">{own.requisites.binanceId}</dd>
               </>
             )}
           </dl>

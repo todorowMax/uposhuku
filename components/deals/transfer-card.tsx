@@ -43,10 +43,10 @@ export const TransferCard = ({
       <p className="text-sm font-semibold text-ink">Прямий переказ</p>
 
       {state.kind === "loading" && (
-        <p role="status" className="pe-hint mt-2 flex items-center gap-2">
+        <div role="status" className="pe-hint mt-2 flex items-center gap-2">
           <Loader2 className="size-4 animate-spin" />
           Завантажуємо реквізити…
-        </p>
+        </div>
       )}
 
       {state.kind === "error" && (

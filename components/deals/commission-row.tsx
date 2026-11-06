@@ -12,7 +12,7 @@ import { COMMISSION_RATE } from "@/lib/deals/price";
 export const COMMISSION_LABEL = `Комісія, ${Math.round(COMMISSION_RATE * 100)}%`;
 
 export const CommissionRow = ({ amount }: { amount: string }) => (
-  <div>
+  <div className="items-center">
     <dt className="flex items-center gap-1.5">
       {COMMISSION_LABEL}
       <Popover>

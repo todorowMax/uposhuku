@@ -17,10 +17,10 @@ import { useEscrowInfo } from "./use-escrow-info";
 const Panel = dynamic(() => import("./escrow-panel"), {
   ssr: false,
   loading: () => (
-    <p role="status" className="pe-hint flex items-center gap-2">
+    <div role="status" className="pe-hint flex items-center gap-2">
       <Loader2 className="size-4 animate-spin" />
       Завантажуємо гаманці…
-    </p>
+    </div>
   ),
 });
 
@@ -56,10 +56,10 @@ export const EscrowSection = ({ deal, stage, side, onChanged }: { deal: Deal; st
         </div>
       )}
       {!closed && !error && !info && (
-        <p role="status" className="pe-hint flex items-center gap-2">
+        <div role="status" className="pe-hint flex items-center gap-2">
           <Loader2 className="size-4 animate-spin" />
           Завантажуємо дані ескроу…
-        </p>
+        </div>
       )}
       {!closed && info &&
         (open ? (

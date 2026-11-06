@@ -14,10 +14,10 @@ import type { PublicCryptoConfig } from "@/lib/crypto/config";
 const Panel = dynamic(() => import("./address-proof-panel"), {
   ssr: false,
   loading: () => (
-    <p role="status" className="pe-hint flex items-center gap-2">
+    <div role="status" className="pe-hint flex items-center gap-2">
       <Loader2 className="size-4 animate-spin" />
       Завантажуємо гаманці…
-    </p>
+    </div>
   ),
 });
 

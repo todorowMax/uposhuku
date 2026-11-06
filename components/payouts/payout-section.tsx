@@ -34,10 +34,10 @@ export const PayoutSection = () => {
       <p className="pe-hint -mt-1">Безпечна угода лише для ФОП з рахунком у monobank. Гроші замовника заморожуються в банку й після підтвердження роботи йдуть вам.</p>
 
       {form.load === "loading" && (
-        <p role="status" className="pe-hint flex items-center gap-2">
+        <div role="status" className="pe-hint flex items-center gap-2">
           <Loader2 className="size-4 animate-spin" />
           Завантажуємо стан…
-        </p>
+        </div>
       )}
 
       {form.load === "error" && (
