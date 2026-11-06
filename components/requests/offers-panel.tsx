@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import {
@@ -69,6 +70,8 @@ export function OffersPanel() {
   const collapsed = useStore(offersCollapsedStore);
   const {
     loading,
+    error,
+    retry,
     offers,
     declinedOffers,
     pending,
@@ -215,12 +218,21 @@ export function OffersPanel() {
             )}
 
             {loading && (
-              <div className="grid justify-items-center py-10">
+              <div role="status" aria-label="Завантажуємо пропозиції" className="grid justify-items-center py-10">
                 <Loader2 className="size-5 animate-spin text-ink-muted" />
               </div>
             )}
 
-            {!loading && offers.length === 0 && pending.length === 0 && (
+            {error && (
+              <div role="alert" className="offers-empty">
+                <p>Не вдалося завантажити пропозиції.</p>
+                <Button variant="secondary" onClick={retry} className="w-auto">
+                  Спробувати ще
+                </Button>
+              </div>
+            )}
+
+            {!loading && !error && offers.length === 0 && pending.length === 0 && (
               <div className="offers-empty">
                 <span aria-hidden className="request-live-dot" />
                 <p>

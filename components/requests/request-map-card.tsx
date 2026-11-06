@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { forwardRef } from "react";
 import { X } from "@/components/icons";
 import { FeedCard, type RespondGate } from "@/components/requests/feed-panel";
@@ -61,9 +62,9 @@ export const RequestMapCard = forwardRef<HTMLElement, { item: MapRequest }>(func
     <aside ref={ref} key={item.id} className="performer-card request-map-card glass-panel absolute inset-x-3 bottom-20 z-[var(--z-controls)] rounded-[22px] p-5 shadow-[0_18px_55px_rgba(45,60,67,.16)] max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain sm:inset-x-auto sm:bottom-auto sm:max-h-[calc(100%-120px)] sm:w-[360px]" aria-label="Запит замовника">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-[12px] font-semibold text-ink-muted">{item.own ? "Ваш запит" : "Запит замовника"}</p>
-        <button type="button" onClick={close} aria-label="Закрити картку" className="grid size-7 shrink-0 place-items-center rounded-full bg-white/65 text-ink-muted transition-colors hover:bg-white hover:text-ink">
+        <Button variant="icon" onClick={close} aria-label="Закрити картку" className="shrink-0">
           <X className="size-4" />
-        </button>
+        </Button>
       </div>
       <FeedCard bare item={item} gate={gate} onChange={(change) => patchMapRequest(item.id, change)} />
     </aside>

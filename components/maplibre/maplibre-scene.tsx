@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import * as maplibregl from "maplibre-gl";
@@ -268,20 +269,20 @@ interface GroupPreview {
   box: { left: number; top: number; width: number; height: number };
 }
 
-/** «1 розробник», «4 розробники», «12 розробників». */
-const developerCount = (count: number) => {
+/** «1 виконавець», «4 виконавці», «12 виконавців». */
+const performerCount = (count: number) => {
   const tens = count % 100;
   const ones = count % 10;
-  if (ones === 1 && tens !== 11) return `${count} розробник`;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} розробники`;
-  return `${count} розробників`;
+  if (ones === 1 && tens !== 11) return `${count} виконавець`;
+  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} виконавці`;
+  return `${count} виконавців`;
 };
 const groupTitle = ({ members, requests }: GroupPreview) => {
   const tens = requests.length % 100;
   const ones = requests.length % 10;
   const word = ones === 1 && tens !== 11 ? "запит" : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? "запити" : "запитів";
   const jobs = `${requests.length} ${word}`;
-  return [members.length ? developerCount(members.length) : null, requests.length ? jobs : null].filter(Boolean).join(" · ");
+  return [members.length ? performerCount(members.length) : null, requests.length ? jobs : null].filter(Boolean).join(" · ");
 };
 
 /**
@@ -1988,12 +1989,12 @@ export default function MapLibreScene() {
                 <p className="mt-1 text-[11px] text-ink-muted">{selectedCity?.name}</p>
               </div>
             </div>
-            <button type="button" onClick={closeSelectedPerson} aria-label="Закрити картку" className="grid size-7 shrink-0 place-items-center rounded-full bg-white/65 text-[19px] leading-none text-ink-muted transition-colors hover:bg-white hover:text-ink">×</button>
+            <Button variant="icon" onClick={closeSelectedPerson} aria-label="Закрити картку" className="shrink-0 text-lg leading-none">×</Button>
           </div>
           <ProfileStats performer={selected} />
           <PerformerAbout
             performer={selected}
-            onOpenWork={() => setCardNotice("Сторінки робіт з'являться після підключення профілів.")}
+            onOpenWork={() => openProfile(selected.id)}
           />
           {selected.mine ? (
             <div className="mt-4 flex flex-col gap-2">
@@ -2006,7 +2007,7 @@ export default function MapLibreScene() {
               <button type="button" onClick={() => { document.getElementById("request")?.focus(); setCardNotice("Опишіть роботу в полі запиту."); }} className="min-h-10 w-full rounded-2xl bg-[var(--brand-solid)] px-4 text-[12px] font-medium text-white transition-colors hover:bg-[var(--brand-solid-hover)]">Запропонувати роботу</button>
             </div>
           )}
-          <p aria-live="polite" className="mt-3 min-h-4 text-[10px] text-ink-muted/75">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>
+          <p aria-live="polite" className="mt-3 min-h-4 text-xs text-ink-muted">{cardNotice ?? (selected.mine ? "Так вас бачать замовники" : "")}</p>
         </aside>
       )}
 

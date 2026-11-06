@@ -500,7 +500,7 @@ export function RequestComposer() {
         <span className="composer-compact-send-wrap" style={{ position: "absolute", top: 8, right: 8, width: 40, height: 40 }}>
           <button
             type="button"
-            aria-label="Розкрити чат"
+            aria-label="Описати задачу"
             aria-hidden={expanded}
             tabIndex={expanded ? -1 : 0}
             onClick={() => { inputRef.current?.focus(); openInput(); }}

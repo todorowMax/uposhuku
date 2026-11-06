@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { FileText, UserRound, Users } from "@/components/icons";
 import { allPerformersStore, mapModeStore, mapRequestsStore, setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
 import { sessionStore } from "@/lib/auth/client";
@@ -27,31 +28,31 @@ export function MapModeSwitch() {
   const count = items.filter((item) => item.point).length;
   return (
     <div className="mode-switch mode-dock" role="tablist" aria-label="Що показувати на карті">
-      <button type="button" role="tab" aria-selected={mode === "performers" && !allPerformers} aria-label="Виконавці" onClick={() => {
+      <Button variant="bare" role="tab" aria-selected={mode === "performers" && !allPerformers} aria-label="Виконавці" onClick={() => {
           track(EVENTS.mapModeSwitched, { mode: "performers" });
           setMapMode("performers");
         }}>
         <UserRound className="size-[18px]" />
         <span className="mode-label">Виконавці</span>
-      </button>
+      </Button>
       {hasOpenRequest && (
-        <button type="button" role="tab" aria-selected={mode === "performers" && allPerformers} aria-label="Всі розробники" onClick={() => {
+        <Button variant="bare" role="tab" aria-selected={mode === "performers" && allPerformers} aria-label="Всі виконавці" onClick={() => {
             track(EVENTS.mapModeSwitched, { mode: "all_performers" });
             showAllPerformers();
           }}>
           <Users className="size-[18px]" />
-          <span className="mode-label">Всі розробники</span>
-        </button>
+          <span className="mode-label">Всі виконавці</span>
+        </Button>
       )}
       {canSeeRequests && (
-        <button type="button" role="tab" aria-selected={mode === "requests"} aria-label={count > 0 ? `Запити: ${count}` : "Запити"} onClick={() => {
+        <Button variant="bare" role="tab" aria-selected={mode === "requests"} aria-label={count > 0 ? `Запити: ${count}` : "Запити"} onClick={() => {
             track(EVENTS.mapModeSwitched, { mode: "requests" });
             setMapMode("requests");
           }}>
           <FileText className="size-[18px]" />
           <span className="mode-label">Запити</span>
           {count > 0 && <span className="mode-count">{count}</span>}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -70,12 +70,16 @@ export const useOffers = (request: PublishedRequest | null) => {
   const [shown, setShown] = useState<OfferResponse[] | null>(null);
   const [pending, setPending] = useState<OfferResponse[]>([]);
   const [declined, setDeclined] = useState<string[]>([]);
+  /** Перший список не завантажився: показуємо помилку з повтором замість вічного спінера. */
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   /** Що вже на екрані: нове порівнюємо з ним, щоб решта списку не рухалась. */
   const shownIds = useRef(new Set<string>());
   const requestId = request?.status === "open" ? request.id : null;
 
   useEffect(() => {
     setShown(null);
+    setFailed(false);
     setPending([]);
     setDeclined(requestId ? readSet(`vm:declined:${requestId}`) : []);
     offersMapStore.set({ requestId, responses: [] });
@@ -85,9 +89,14 @@ export const useOffers = (request: PublishedRequest | null) => {
     const load = async () => {
       try {
         const response = await fetch(`/api/requests/${encodeURIComponent(requestId)}/responses`, { cache: "no-store" });
-        if (!response.ok || cancelled) return;
+        if (cancelled) return;
+        if (!response.ok) {
+          setFailed(true);
+          return;
+        }
         const { responses } = (await response.json()) as { responses: OfferResponse[] };
         if (cancelled) return;
+        setFailed(false);
         const currentMap = offersMapStore.get();
         if (currentMap.requestId !== requestId || currentMap.responses.length !== responses.length || responses.some((item, index) => item.id !== currentMap.responses[index]?.id)) {
           offersMapStore.set({ requestId, responses });
@@ -107,7 +116,8 @@ export const useOffers = (request: PublishedRequest | null) => {
         }
         setPending(responses.filter((item) => !shownIds.current.has(item.id)));
       } catch {
-        // Мережа моргнула — спробуємо наступного разу.
+        // Мережа моргнула: наступний запит за таймером спробує знову, а поки показуємо помилку, якщо списку ще немає.
+        if (!cancelled) setFailed(true);
       }
     };
     void load();
@@ -116,7 +126,7 @@ export const useOffers = (request: PublishedRequest | null) => {
       cancelled = true;
       stop();
     };
-  }, [requestId]);
+  }, [requestId, attempt]);
 
   const all = useMemo(() => [...(shown ?? []), ...pending], [shown, pending]);
   useEffect(() => offersCountStore.set(all.length), [all.length]);
@@ -135,7 +145,9 @@ export const useOffers = (request: PublishedRequest | null) => {
   };
 
   return {
-    loading: shown === null && Boolean(requestId),
+    loading: shown === null && Boolean(requestId) && !failed,
+    error: shown === null && failed,
+    retry: () => setAttempt((value) => value + 1),
     offers: (shown ?? []).filter((item) => !declined.includes(item.id)),
     declinedOffers: (shown ?? []).filter((item) => declined.includes(item.id)),
     pending,

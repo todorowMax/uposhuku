@@ -14,7 +14,7 @@ import type { FeedItem, MapRequest } from "./types";
 
 export type MapMode = "performers" | "requests";
 export const mapModeStore = createStore<MapMode>("performers");
-/** Окремий огляд усіх розробників, незалежно від відгуків на активний запит. */
+/** Окремий огляд усіх виконавців, незалежно від відгуків на активний запит. */
 export const allPerformersStore = createStore(false);
 
 const canViewRequests = () => {

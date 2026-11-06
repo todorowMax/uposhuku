@@ -23,7 +23,7 @@ const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matc
 
 type Step = "choose" | "checkout" | "processing" | "failed";
 const CHOICES = [
-  { tier: 2, name: "Старт", description: "Невеликий маркер, і вас уже видно на мапі." },
+  { tier: 2, name: "Старт", description: "Невеликий маркер, і вас уже видно на карті." },
   { tier: 4, name: "Професійний", description: "Помітніший маркер і більше шансів отримати замовлення." },
   { tier: 6, name: "Топ", description: "Найбільший маркер: вас помітять першими." },
 ] as const;
@@ -82,7 +82,7 @@ function Shell({ title, back, hero, children }: { title: string; back?: () => vo
             <button type="button" onClick={close} className="place-hero-skip">Пропустити</button>
             {hero}
             <h2 className="place-hero-title">{title}</h2>
-            <p className="place-hero-lead">Хочете, щоб вас бачили на мапі й помічали серед перших? Опублікуйте свій профіль прямо тут.</p>
+            <p className="place-hero-lead">Хочете, щоб вас бачили на карті й помічали серед перших? Опублікуйте свій профіль прямо тут.</p>
           </header>
         ) : (
         <div className="flex items-center justify-between gap-3">
@@ -227,7 +227,7 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
   }
 
   return (
-    <Shell title="Зʼявитись на мапі" hero={<PlacementFaces people={others} photo={photo} name={name} />}>
+    <Shell title="Зʼявитися на карті" hero={<PlacementFaces people={others} photo={photo} name={name} />}>
       <fieldset className="place-tiers">
         <legend className="sr-only">Рівень розміщення</legend>
         {CHOICES.map(({ tier, name: tierName }) => {
@@ -259,12 +259,12 @@ function Chooser({ photo, name }: { photo: string; name: string }) {
       </p>
 
       <p className="place-warn" role="note">
-        Інші виконавці можуть змінити ваш розмір на мапі. Повернути його можна доплатою.
+        Інші виконавці можуть змінити ваш розмір на карті. Повернути його можна доплатою.
       </p>
 
       {current < 6 ? (
         <button type="button" onClick={() => setStep("checkout")} className="auth-primary place-publish">
-          Опублікуватись на мапі
+          Опублікуватися на карті
         </button>
       ) : (
         <p className="auth-lead text-center">Ви на найвищому рівні. Більшого маркера немає.</p>

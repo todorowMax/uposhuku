@@ -425,7 +425,7 @@ export function ProfileView({
               <MessageSquareText className="size-4" />
               {dialog
                 ? "Відкрити чат"
-                : `Описати задачу для ${performer.name.split(" ")[0]}`}
+                : "Описати задачу виконавцю"}
             </button>
           )}
         </footer>

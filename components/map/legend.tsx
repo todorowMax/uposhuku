@@ -85,11 +85,11 @@ export function LegendButton() {
                 </button>
               </div>
               <p className="text-[12px] leading-relaxed text-ink-muted">
-                Опишіть задачу й знайдіть виконавця на мапі України. Виконавці з
+                Опишіть задачу й знайдіть виконавця на карті України. Виконавці з
                 профілем можуть переглядати запити після входу.
               </p>
               <h3 className="text-[12px] font-semibold text-ink">
-                Позначки на мапі
+                Позначки на карті
               </h3>
               {mode === "requests" ? (
                 <ul className="legend-list">

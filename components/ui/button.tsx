@@ -11,6 +11,8 @@ const VARIANTS = {
   offer: "offer-primary",
   link: "auth-link",
   icon: "auth-icon-button",
+  /** Без своїх стилів: вигляд дає контейнер (перемикач режимів карти). */
+  bare: "",
 } as const;
 
 export namespace ButtonTypes {

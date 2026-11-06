@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Loader2, Mail, Send, X } from "@/components/icons";
+import { Bell, Loader2, Send, X } from "@/components/icons";
 import { BarChart3, Moon } from "lucide-react";
 import { getConsent, onConsentChange, writeConsent, type Consent } from "@/kit/telemetry/client";
 import { sessionStore } from "@/lib/auth/client";
@@ -120,13 +120,6 @@ export function NotificationSettings() {
 
           <h3 className="pe-label">Де</h3>
           <div className="grid gap-1">
-            <Row
-              icon={<Mail className="size-[18px]" />}
-              title="Пошта"
-              hint={`Листи на ${session.user.email}. Надсилання підключимо разом із сервером.`}
-              checked={prefs.channels.email}
-              onChange={(email) => setPrefs({ channels: { email } })}
-            />
             <Row
               icon={<Bell className="size-[18px]" />}
               title="Сповіщення в браузері"

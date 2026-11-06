@@ -13,7 +13,8 @@ import {
 } from "@/lib/auth/client";
 import { useDeals } from "@/lib/deals/client";
 import { dealPhase } from "@/lib/deals/machine";
-import { setMapMode } from "@/lib/feed/map-requests";
+import { setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
+import { Button } from "@/components/ui/button";
 import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
 import { requestFacts } from "@/lib/requests/format";
 import type { PublishedRequest } from "@/lib/requests/types";
@@ -235,6 +236,16 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       </div>
 
       {error && <p role="alert" className="auth-error request-summary-error">{error}</p>}
+
+      {/* Поки ніхто не відгукнувся, карта виконавців порожня: пояснюємо це й даємо вихід до всіх. */}
+      {!closed && offers === 0 && phase === "none" && (
+        <p className="px-3 pb-2 text-xs text-ink-muted">
+          Тут з’являться виконавці, які відгукнуться на запит.{" "}
+          <Button variant="link" onClick={showAllPerformers} className="inline h-auto p-0 text-xs">
+            Показати всіх виконавців
+          </Button>
+        </p>
+      )}
 
       {detailsOpen && (
         <div className="request-details glass-panel" aria-label="Деталі запиту">

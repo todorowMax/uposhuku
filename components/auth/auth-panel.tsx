@@ -258,9 +258,9 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
               </form>
               <div className="auth-divider"><span>або</span></div>
               <GoogleButton href={googleHref} onClick={() => draft && saveDraft(draft, true)} />
-              <p className="text-center text-[11px] leading-snug text-ink-muted">
-                Продовжуючи, ви погоджуєтесь з <a href="/legal/terms" target="_blank" rel="noreferrer" className="auth-link text-[11px]">умовами</a> і{" "}
-                <a href="/legal/privacy" target="_blank" rel="noreferrer" className="auth-link text-[11px]">політикою конфіденційності</a>.
+              <p className="text-center text-xs leading-snug text-ink-muted">
+                Продовжуючи, ви погоджуєтесь з <a href="/legal/terms" target="_blank" rel="noreferrer" className="auth-link text-xs">умовами</a> і{" "}
+                <a href="/legal/privacy" target="_blank" rel="noreferrer" className="auth-link text-xs">політикою конфіденційності</a>.
               </p>
               {mode === "login" && (
                 <p className="text-center text-[12px] text-ink-muted">

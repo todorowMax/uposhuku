@@ -85,8 +85,8 @@ export function AccountButton() {
           className="account-login account-performer"
         >
           <MapPinned className="size-4" />
-          <span className="account-performer-short">На мапу</span>
-          <span className="account-performer-full">Зʼявитися на мапі</span>
+          <span className="account-performer-short">На карту</span>
+          <span className="account-performer-full">Зʼявитися на карті</span>
         </button>
         <LegendButton />
       </div>
@@ -210,7 +210,7 @@ export function AccountButton() {
         >
           <Code2 className="size-4" />
           <span className="account-performer-short">Профіль</span>
-          <span className="account-performer-full">Стати розробником</span>
+          <span className="account-performer-full">Стати виконавцем</span>
         </button>
       )}
       <LegendButton />

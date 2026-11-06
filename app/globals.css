@@ -20,7 +20,7 @@
   --bg: var(--deep);
   --surface: var(--foam);
   --ink: #102d37;
-  --ink-muted: #52717b;
+  --ink-muted: #46646e;
   --line: rgb(66 116 132 / 34%);
   --brand: #f2693c;
   /* Оранжевий під текст: білий на ньому дає контраст 4.6:1, на фірмовому #f2693c було б лише 3:1. */
@@ -1153,6 +1153,7 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
 }
 
 .auth-icon-button {
+  position: relative;
   display: grid;
   place-items: center;
   width: 30px;
@@ -1160,6 +1161,13 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   border-radius: 999px;
   color: var(--ink-muted);
   transition: background-color 150ms, color 150ms;
+}
+
+/* Видима кнопка 30px, а зона дотику 44px: ::after виходить за межі й не зсуває розкладку. */
+.auth-icon-button::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
 }
 
 .auth-icon-button:hover {
@@ -3757,13 +3765,9 @@ select.auth-input[data-empty] {
   background-image: linear-gradient(145deg, #e9eded, #d9e0e0);
 }
 
-.account-performer {
-  display: none;
-}
-
+/* Кнопка виконавця видна й на телефоні (короткий напис), інакше гість не знає, де стати на карту. */
 @media (min-width: 640px) {
   .account-performer {
-    display: inline-flex;
     width: auto;
     padding: 0 16px;
   }
