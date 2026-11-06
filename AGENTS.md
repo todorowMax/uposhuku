@@ -53,7 +53,11 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   `uposhuku`, domains `findlyfy.com` and `www.findlyfy.com`, own D1 database and R2 bucket.
 - Deploy is by hand: `npm run cf:deploy:development` and `cf:deploy:production`; D1 migrations are
   `db:migrate:development` and `db:migrate:production`. Secrets go in with `wrangler secret put`,
-  never into `wrangler.jsonc`.
+  never into `wrangler.jsonc`. The production deploy first removes `.open-next/assets/map/faces`
+  (`scripts/strip-prod-assets.mjs`); `opennextjs-cloudflare deploy` does not rebuild assets from `public/`, so run
+  `npm run cf:build` again before a development deploy.
+- Escrow cap `CRYPTO_MAX_DEAL_USDT`: development 1000, production 10000 (`wrangler.jsonc`). The production contract
+  is deployed with 50 000; raising the server cap above 10 000 waits for an audit. Code default 1000 is not changed.
 - Безпечна угода (гроші через Monobank) вмикається змінними `SAFE_DEAL_MODE` = `off` (типово) | `allowlist` | `on`
   та `SAFE_DEAL_USERS` (пошти через кому). Нові угоди й оплата питають режим (`lib/server/safe-deal.ts`), гроші, що вже
   в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`.

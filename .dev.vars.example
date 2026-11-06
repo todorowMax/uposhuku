@@ -86,7 +86,8 @@ CRYPTO_ROUTER_ADDRESS=
 CRYPTO_FACTORY_ADDRESS=
 # RPC для перевірки транзакцій на сервері (https; http лише для localhost). Може містити ключ провайдера: секрет, у браузер не віддається.
 CRYPTO_RPC_URL=
-# Стеля угоди ескроу, USDT (ціле); порожньо: 1000. Не вище ліміту фабрики.
+# Стеля угоди ескроу, USDT (ціле); порожньо: 1000. Не вище ліміту фабрики. Значення для dev і прода задані в wrangler.jsonc
+# (dev 1000, prod 10000); тут лише для локальної перевірки. Підняти прод вище 10000 можна тільки після аудита.
 CRYPTO_MAX_DEAL_USDT=
 # Project ID із Reown (WalletConnect), публічний, у збірку: прив'язати до своїх доменів. Без нього WalletConnect у списку немає.
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=

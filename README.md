@@ -39,6 +39,8 @@ CI (`.github/workflows/ci.yml`) запускає lint, typecheck і тести �
   (`db:telemetry:migrate:*`).
 - Збірка воркера: `npm run cf:build`, локально `npm run cf:preview`. Деплой вручну:
   `npm run cf:deploy:development` (dev.findlyfy.com) і `npm run cf:deploy:production` (findlyfy.com).
+  Прод-деплой спершу вирізає демо-обличчя з `.open-next/assets` (`scripts/strip-prod-assets.mjs`), тож після нього
+  перед dev-деплоєм обов'язково `npm run cf:build`, інакше на dev зникнуть фото демо-виконавців.
   Секрети на воркер кладуть через `wrangler secret put`, у `wrangler.jsonc` їх немає.
 - Функції з грошима й криптою вмикаються прапорцями `off | allowlist | on`: безпечна угода (`SAFE_DEAL_MODE`),
   `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`. Значення зберігає сторінка `/admin/features`, інакше

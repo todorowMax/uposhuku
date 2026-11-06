@@ -30,7 +30,9 @@
         // TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, INTERNAL_TOKEN: лише секретами (wrangler secret put).
         "TELEGRAM_BOT_USERNAME": "",
         // Канал запитів на dev можна перевіряти з короткою затримкою.
-        "CHANNEL_DELAY_MIN": "1"
+        "CHANNEL_DELAY_MIN": "1",
+        // Стеля ескроу-угоди, USDT: тестовий контракт, на dev ліміт 1000.
+        "CRYPTO_MAX_DEAL_USDT": "1000"
       },
       // Явно, щоб wrangler не попереджав: dev-воркер живе на workers.dev, прев'ю-адреси не потрібні.
       "workers_dev": true,
@@ -65,7 +67,11 @@
         "TELEGRAM_BOT_USERNAME": "",
         // Публікація в канал вимкнена, доки Макс не ввімкне: CHANNEL_ENABLED=1.
         "CHANNEL_ENABLED": "",
-        "CHANNEL_DELAY_MIN": "20"
+        "CHANNEL_DELAY_MIN": "20",
+        // Стеля ескроу-угоди, USDT. На проді контракт розгортається з maxAmount 50 000 USDT, але сервер пускає 10 000.
+        // Вище 10 000 піднімати лише після аудита контрактів (contracts/README.md). Типове 1000 у коді не міняти:
+        // порожня або пропущена змінна не має піднімати ліміт.
+        "CRYPTO_MAX_DEAL_USDT": "10000"
       },
       // Прод: окрема база й бакет. На проді вхід вимкнений, доки немає RESEND_API_KEY
       // (див. lib/server/mail.ts), а MAIL_MODE=dev тут не діє. Перед першим деплоєм:

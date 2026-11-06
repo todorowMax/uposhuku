@@ -29,7 +29,9 @@ npx hardhat build && npx hardhat run scripts/export-abi.ts   # оновити ..
 
 ## Розгортання (робить власник, не агент)
 
-Параметри лише з оточення, ключів у скрипті немає: `TOKEN_ADDRESS` (звірити зі сторінкою Tether), `FEE_RECIPIENT`, `ARBITER` (мультипідпис Safe на апаратних ключах), `FEE_BPS`, `MAX_AMOUNT`, `DISPUTE_TIMEOUT`, `FALLBACK_PCT`. Мережа описується у `hardhat.config.ts` через `configVariable` (RPC і ключ у сховищі ключів Hardhat, не в файлах), запуск `npx hardhat run scripts/deploy.ts --network <назва>`. У справжній мережі скрипт відмовиться працювати без `TOKEN_ADDRESS`. Після розгортання звірити на оглядачі код і параметри: `FEE_BPS`, `FEE_RECIPIENT`, `ARBITER`, `MAX_AMOUNT`.
+Параметри лише з оточення, ключів у скрипті немає: `TOKEN_ADDRESS` (звірити зі сторінкою Tether), `FEE_RECIPIENT`, `ARBITER` (мультипідпис Safe на апаратних ключах), `FEE_BPS`, `MAX_AMOUNT`, `DISPUTE_TIMEOUT`, `FALLBACK_PCT`.
+
+Ліміт `MAX_AMOUNT` у найменших одиницях USDT (6 знаків): dev 1000 USDT = `1000000000`, prod 50 000 USDT = `50000000000`. Потолок контракту незмінний, тому на проді він 50 000, а сервер пускає 10 000 (`CRYPTO_MAX_DEAL_USDT` у `wrangler.jsonc`). Підняти сервер до 50 000 можна лише після аудита; вище 50 000 потрібен новий контракт. Мережа описується у `hardhat.config.ts` через `configVariable` (RPC і ключ у сховищі ключів Hardhat, не в файлах), запуск `npx hardhat run scripts/deploy.ts --network <назва>`. У справжній мережі скрипт відмовиться працювати без `TOKEN_ADDRESS`. Після розгортання звірити на оглядачі код і параметри: `FEE_BPS`, `FEE_RECIPIENT`, `ARBITER`, `MAX_AMOUNT`.
 
 ## Для сервера (ітерація 5c)
 
