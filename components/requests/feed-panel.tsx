@@ -68,6 +68,9 @@ export function FeedPanel() {
     if (!active || collapsed) hoveredFeedRequestStore.set(null);
   }, [active, collapsed]);
 
+  // Шлюз знімає панель, коли режим карти інший: підсвітку картки не лишаємо.
+  useEffect(() => () => hoveredFeedRequestStore.set(null), []);
+
   useLayoutEffect(() => {
     if (!active || !panelRef.current || reduced()) return;
     const tween = gsap.fromTo(

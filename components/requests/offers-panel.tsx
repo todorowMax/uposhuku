@@ -97,6 +97,15 @@ export function OffersPanel() {
     if (collapsed || !open) hoveredOfferStore.set(null);
   }, [collapsed, open]);
 
+  // Панель знімає шлюз, коли запит закрито: стан не лишаємо від неї до наступного запиту.
+  useEffect(
+    () => () => {
+      offersCollapsedStore.set(true);
+      hoveredOfferStore.set(null);
+    },
+    [],
+  );
+
   // Замовник відкрив пропозиції: скільки там було, коли зайшов.
   const panelShown = open && !collapsed;
   useEffect(() => {

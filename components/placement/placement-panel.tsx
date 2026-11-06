@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { gsap } from "gsap";
 import { ArrowLeft, Loader2 } from "@/components/icons";
-import { ApiError, sessionStore } from "@/lib/auth/client";
+import { ApiError } from "@/lib/auth/client";
 import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import type { Performer, PlacementTier } from "@/lib/map/types";
@@ -15,7 +15,7 @@ import { focusPerformerStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { usePlacementReturn, type PlacementReturn } from "./use-placement-return";
+import type { PlacementReturn } from "./use-placement-return";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -38,22 +38,14 @@ const CHOICES = [
  * нижче, позначку «Просування» (закон «Про рекламу») і попередження, що
  * розмір можуть перебити.
  */
-export function PlacementPanel() {
-  const open = useStore(placementOpenStore);
-  const session = useStore(sessionStore);
+export const PlacementDialog = ({ returnState, dismiss }: { returnState: PlacementReturn | null; dismiss: () => void }) => {
   const profileState = useStore(profileStore);
   const placement = useStore(placementStore);
-  const { state: returnState, dismiss } = usePlacementReturn();
-  // Панель закрили: результат повернення більше не показуємо.
-  useEffect(() => {
-    if (!open && returnState) dismiss();
-  }, [open, returnState, dismiss]);
-  if (!open || session.status !== "user") return null;
   const profile = profileState.status === "ready" ? profileState.profile : null;
   if (returnState) return <ReturnResult state={returnState} name={profile?.name ?? ""} photo={profile?.photo ?? ""} tier={placement?.tier ?? 1} retry={dismiss} />;
   if (!profile?.published) return <NeedProfile />;
   return <Chooser photo={profile.photo} name={profile.name} />;
-}
+};
 
 const close = () => placementOpenStore.set(false);
 

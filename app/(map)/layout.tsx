@@ -14,13 +14,12 @@ import { MapRequestsSync } from "@/lib/feed/map-requests";
 import { RealPerformersSync } from "@/lib/map/performers-sync";
 import { RealtimeSync } from "@/lib/realtime/client";
 import { RequestComposer } from "@/components/composer/request-composer";
-import { PlacementPanel } from "@/components/placement/placement-panel";
+import { FeedPanelGate, OffersPanelGate, PanelPreload } from "@/components/map/lazy-panels";
+import { PlacementPanel } from "@/components/placement/placement-host";
 import { InboxPanel } from "@/components/chat/inbox-panel";
 import { DirectChatSync } from "@/components/profile/direct-chat-sync";
-import { ProfileEditorHost } from "@/components/profile/profile-editor";
+import { ProfileEditorHost } from "@/components/profile/profile-editor-host";
 import { MapSkeleton } from "@/components/map-skeleton";
-import { FeedPanel } from "@/components/requests/feed-panel";
-import { OffersPanel } from "@/components/requests/offers-panel";
 import { VibeMap } from "@/components/maplibre/vibe-map";
 
 /* Карта на весь екран, поле запиту над нею, нижні панелі в одному ряду. */
@@ -47,12 +46,13 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <RealtimeSync />
       <TabBadge />
       <NotificationSettings />
-      <OffersPanel />
-      <FeedPanel />
+      <OffersPanelGate />
+      <FeedPanelGate />
       <ProfileEditorHost />
       <PlacementPanel />
       <DirectChatSync />
       <InboxPanel />
+      <PanelPreload />
       {children}
     </main>
   );

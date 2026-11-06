@@ -527,20 +527,3 @@ export function ProfileEditor() {
     </Dialog>
   );
 }
-
-/** Редактор поверх усього, коли відкритий і людина увійшла. */
-export function ProfileEditorHost() {
-  const open = useStore(profileEditorStore);
-  const session = useStore(sessionStore);
-  const profileState = useStore(profileStore);
-  if (!open || session.status !== "user") return null;
-  // Чекаємо, поки профіль завантажиться: інакше форма стартувала б порожньою й затерла б збережене.
-  if (profileState.status !== "ready") {
-    return (
-      <div className="pe-overlay grid place-items-center" role="status" aria-label="Завантажуємо профіль">
-        <Loader2 className="size-6 animate-spin text-ink-muted" />
-      </div>
-    );
-  }
-  return <ProfileEditor />;
-}
