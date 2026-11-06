@@ -44,7 +44,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   `origin` resolves to a work account, so push over SSH: `git push git@github.com:todorowMax/uposhuku.git development`.
 - Locales: the page is Ukrainian (`<html lang="uk">`). No i18n library and no message files exist yet;
   other locales are not set.
-- First-load JS budget: not set.
+- First-load JS budget: the home page `/` is 1.55 MB uncompressed (`firstLoadUncompressedJsBytes` in `.next/diagnostics/route-bundle-stats.json` after `npx next build`; measured 1.51 MB). The side panels (offers, feed, profile editor, placement dialog) load through `next/dynamic` when opened (`components/map/lazy-panels.tsx`); the inbox panel stays in the first load because it polls for conversations. A bigger number means something heavy landed in `app/(map)/layout.tsx`: load it lazily or raise the budget here on purpose.
 
 ## Environments
 
@@ -78,7 +78,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-776 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
+775 warnings, Stylelint 10. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

@@ -1,110 +1,67 @@
-# Vibe Map (uposhuku)
+# Findlyfy (uposhuku)
 
-Карта виконавців і запитів в Україні: людина описує, що потрібно створити,
-і бачить, хто поруч уже робив схоже. Реальні проєкти, реальні люди, з
-точністю до міста, а не адреси.
+Карта виконавців і запитів в Україні. Людина описує, що потрібно зробити, і бачить на карті, хто поруч уже робив
+схоже. Виконавці стають на карту за разову оплату розміщення, замовник і виконавець домовляються в чаті, гроші за
+роботу йдуть через Monobank (безпечна угода), прямим переказом або в USDT TRC-20.
 
-Зараз зроблено карту, поле запиту над нею і візуальний прототип маркерів.
-Дані людей та запитів мокові; поле запиту поки нічого не надсилає.
+Стек: Next.js 16 (App Router), React 19, TypeScript, Tailwind v4, MapLibre GL, Drizzle на Cloudflare D1, R2 для
+файлів, OpenNext на Cloudflare Workers.
 
-## Стек
-
-Той самий, що в mealcart: Next.js 16 (App Router), React 19, TypeScript
-strict, Tailwind v4, OpenNext на Cloudflare Workers. Карта:
-[MapLibre GL](https://maplibre.org/) у проєкції глобуса.
-
-## Швидкий старт
+## Встановлення й запуск
 
 ```bash
 npm install
-npm run dev          # http://localhost:3031
+cp .dev.vars.example .dev.vars   # заповніть потрібне, див. нижче
+npm run db:migrate:local         # локальна D1
+npm run db:seed:local            # демо-виконавці й запити (за бажанням)
+npm run dev                      # http://localhost:3031
 ```
 
-Порт 3031, щоб не сваритися з mealcart на 3030.
+Секрети й змінні лежать у `.dev.vars`. Файл у git не потрапляє, імена й пояснення є в `.dev.vars.example`.
+Без пошти локально вхід працює з кодом `000000` (або `DEV_LOGIN_CODE`). `AUTH_SECRET` і `REQUISITES_KEY` потрібні завжди.
 
-## Команди
+## Перевірка
 
 | Команда | Що робить |
 |---|---|
-| `npm run dev` | Next.js dev |
+| `npm run lint` | ESLint і Stylelint (`lint:ci` ще й стежить, щоб попереджень не побільшало) |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run test:unit` | Vitest: розкладка маркерів, контур і кромка України |
-| `npm run build` | Next-збірка |
-| `npm run cf:build` / `cf:preview` | OpenNext-збірка / локальний воркер |
-| `npm run map:textures` | Перемалювати текстури Землі й контур України |
-| `npm run map:assets` | Перепроєктувати текстури для карти, скачати шрифти підписів |
+| `npm test` | Vitest: логіка, репозиторії на in-memory D1 і R2, основні маршрути |
+| `npm run test:chain` | Оплата USDT і ескроу проти локальної Hardhat-ноди; спершу `cd contracts && npm ci && npx hardhat build` |
+| `npm run deadcode` | Невикористаний код (knip) |
 
-## Як влаштована карта
+CI (`.github/workflows/ci.yml`) запускає lint, typecheck і тести на pull request. Він нічого не деплоїть.
 
-```
-app/page.tsx                    заставка, карта на весь екран, поле запиту
-components/
-  map-skeleton.tsx              серверна заставка на CSS, до завантаження JS
-  maplibre/
-    vibe-map.tsx                завантажує сцену тільки в браузері
-    maplibre-scene.tsx          карта: шари людей, груп, запитів, міст
-    zoom-control.tsx            «Україна — Місто» і −/+
-lib/maplibre/
-  style.ts                      стиль: статичні картинки, OSM, рельєф, плато
-  rim.ts                        синя кромка плато з трикутників
-  static.ts                     межі статичних картинок, DETAIL_ZOOM
-lib/map/
-  cities.ts, demo.ts, scatter.ts міста, демо-дані, розкладка маркерів
-  portrait.ts                   портрет-маркер на canvas з атласу
-  palette.ts, region.ts         кольори й межі детальної текстури
-  outline.ts                    контур України для заставки
-  data/ukraine.geo.json         контур України (з Кримом)
-assets/textures/                рівнокутні текстури, вихідник для public/map
-public/map/                     картинки першого кадру, шрифти, атлас портретів
-  mock-avatars.png              локальний атлас вигаданих портретів 4×4
-scripts/                        збирання текстур, картинок і шрифтів
-```
+## Бази, деплой, прапорці
 
-**Перший кадр статичний і весь наш:** текстури Землі, перепроєктовані
-в Web Mercator (`public/map/world.webp`, `region.webp`), шрифти підписів
-(`public/map/fonts`), контур України, люди й запити. Мережа потрібна лише
-на опис тайлів OpenFreeMap. До того видно серверну заставку.
+- Схема в `db/schema*.ts`; після правки `npm run db:generate`, нова міграція з'являється в `db/migrations`. Застосування:
+  `db:migrate:local`, `db:migrate:development`, `db:migrate:production`. Телеметрія має свою базу
+  (`db:telemetry:migrate:*`).
+- Збірка воркера: `npm run cf:build`, локально `npm run cf:preview`. Деплой вручну:
+  `npm run cf:deploy:development` (dev.findlyfy.com) і `npm run cf:deploy:production` (findlyfy.com).
+  Секрети на воркер кладуть через `wrangler secret put`, у `wrangler.jsonc` їх немає.
+- Функції з грошима й криптою вмикаються прапорцями `off | allowlist | on`: безпечна угода (`SAFE_DEAL_MODE`),
+  `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`. Значення зберігає сторінка `/admin/features`, інакше
+  беруться змінні `<ІМ'Я>_MODE` і `<ІМ'Я>_USERS`; за замовчуванням усе вимкнено.
 
-**Деталі з масштабу 6,5** (`DETAIL_ZOOM`): дані OpenStreetMap з
-[OpenFreeMap](https://openfreemap.org/) (без ключів і лімітів) і рельєф
-AWS Terrain Tiles, статична картинка плавно тане. З 13-го — білі
-3D-будинки з реальною висотою. Поки вулиці їдуть з мережі, унизу плашка
-«Підвантажуємо деталі…».
+## Карта і ресурси
 
-**Плато України.** Напівпрозора блакитна плита (`fill-extrusion`) із
-синьою кромкою; ближче до міста осідає й тане, щоб не накривати вулиці.
+Карта малює глобус на MapLibre: перший кадр складається з наших статичних картинок, деталі з масштабу 6,5 приходять
+з [OpenFreeMap](https://openfreemap.org/) (дані OpenStreetMap, підпис про авторів обов'язковий) і AWS Terrain Tiles.
+Портрети маркерів у демо вигадані; як їх готували, написано в `design/avatar-mock-asset.md`.
 
-**Маркери.** Виконавці показані фотоаватарками трьох розмірів. У демо
-розмір відповідає моковому рівню платного розміщення, а не якості роботи.
-Групи — вбудована кластеризація MapLibre: синій ромб із числом, клік
-наближає карту, і група розпадається на людей. Натискання на аватарку
-відкриває демопрофіль, Escape його закриває. Запити — окремі круглі
-точки. Позиції виконавців декоративно розкладені біля міста лише на
-суходолі, без справжніх адрес. Підписи міст самі ховаються, якщо
-наїжджають на фото. Портрети вигадані й зберігаються локально; промпт і
-спосіб підготовки атласу — у `design/avatar-mock-asset.md`.
+Статичні ресурси в `public/`:
 
-**Воркер MapLibre** копіюється в `public/maplibre` перед `dev`/`build`
-(`scripts/copy-maplibre-worker.mjs`, у `.gitignore`).
+- `npm run map:textures`, `map:assets`, `map:space`: текстури Землі й картинки першого кадру;
+- `npm run map:faces`: різає атлас `public/map/mock-avatars.webp` на окремі фото демо-виконавців;
+- `npm run font:build`: збирає підмножину шрифту Fixel (`public/fonts/FixelVariable.woff2`) з повного файлу в
+  `design/fonts`; потрібні Python, `fonttools` і `brotli`.
 
-## Дані й ліцензії
+Кордони беруться з `ne_10m_admin_0_countries_ukr` (Natural Earth, версія з погляду України, з Кримом); тест
+`tests/unit/map-data.test.ts` падає, якщо контур перемалюють з іншого файлу.
 
-- Висоти й глибини: [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/)
-  (Terrarium), відкриті дані.
-- Кордони, річки, озера: [Natural Earth](https://www.naturalearthdata.com/),
-  суспільне надбання.
-- **Кордони беруться з `ne_10m_admin_0_countries_ukr`**, версії з погляду
-  України. У звичайних `ne_*_admin_0_countries` Крим віднесено до Росії.
-  Тест `tests/unit/map-data.test.ts` падає, якщо контур перемалюють не з того
-  файлу.
-- Каховське водосховище з озер прибране: його спущено після підриву греблі
-  у 2023 році.
+## Куди дивитися далі
 
-## Що свідомо спрощено
-
-- Вулиці й будинки поки з публічного OpenFreeMap. Згодом той самий стиль
-  піде на власні PMTiles у Cloudflare R2, зміниться лише адреса джерела.
-- Дані демонстраційні (`lib/map/demo.ts`), бекенду, справжніх оплат і
-  профілів ще немає.
-- Деплой на Cloudflare налаштований мінімально: без акаунта, доменів і
-  бази, лише щоб `cf:build` і `cf:preview` працювали.
+- `AGENTS.md`: стек, середовища, правила для розробки й агентів, бюджет першого завантаження.
+- `DESIGN.md`: токени, розміри, кольори, компоненти.
+- `docs/tasks`: плани й журнал задач; `docs/` загалом: специфікації, чернетки, дослідження.
