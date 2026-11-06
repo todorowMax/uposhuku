@@ -156,9 +156,9 @@ describe("вхід через Google: повернення", () => {
     expect(cookieJar.get("vm_session")).toBeUndefined();
   });
 
-  it("next на чужий сайт з //, https:// або без / веде на головну, а не назовні", async () => {
+  it("next на чужий сайт (//, https://, без /, зворотна скісна, табуляція) веде на головну, а не назовні", async () => {
     configure();
-    for (const next of ["//evil.example/x", "https://evil.example/x", "evil.example", "javascript:alert(1)"]) {
+    for (const next of ["//evil.example/x", "https://evil.example/x", "evil.example", "javascript:alert(1)", "/\\evil.example", "/\t/evil.example"]) {
       const { email, googleId } = fresh();
       fakeGoogle({ sub: googleId, email, email_verified: true });
       const response = await callback({ saved: { state: "good-state", next } });
