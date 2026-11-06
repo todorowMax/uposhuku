@@ -208,6 +208,18 @@ describe("звірка з контрактом", () => {
     expect((await getDealById(deal.id))!.stages[0]).toMatchObject({ status: "released", paidUnits: "10000000" });
   });
 
+  it("гаманець замовника приймається лише від замовника: виконавець зі своїм клоном не позначить етап оплаченим", async () => {
+    const deal = await newEscrowDeal();
+    const first = deal.stages[0].id;
+    // Виконавець створює клон як «замовник» зі своїм другим гаманцем.
+    const own = "0x00000000000000000000000000000000000000b2";
+    const ref = dealRefOf(deal.id, first);
+    chain.clones.set(cloneAddress(own, ref).toLowerCase(), { state: 1, client: own, performer: PERFORMER_WALLET, amount: BigInt(deal.stages[0].amount) * UNIT, paid: 0n, dealRef: ref, deliverBy: 2_000_000_000, reviewEnds: 0, factory: FACTORY } satisfies FakeClone);
+    as("esc-perf");
+    expect((await ESCROW_SYNC(post({ stageId: first, client: own }), ctxOf(deal.id))).status).toBe(409);
+    expect((await getDealById(deal.id))!.stages[0].status).not.toBe("funded");
+  });
+
   it("чужа фабрика, чужий виконавець, чужа сума й чужий етап: статус не змінюється", async () => {
     const deal = await newEscrowDeal();
     const first = deal.stages[0].id;
