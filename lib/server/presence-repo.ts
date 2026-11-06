@@ -19,4 +19,12 @@ export const onlineUsers = async (now = Date.now()): Promise<Set<string>> => {
   return new Set(rows.map((row) => row.userId));
 };
 
-export const isOnline = async (userId: string, now = Date.now()): Promise<boolean> => (await onlineUsers(now)).has(userId);
+/** Один користувач: запит по `user_id`, без вибірки всіх онлайн. */
+export const isOnline = async (userId: string, now = Date.now()): Promise<boolean> => {
+  const rows = await getDb()
+    .select({ userId: presence.userId })
+    .from(presence)
+    .where(and(eq(presence.userId, userId), eq(presence.online, true), gt(presence.lastSeen, now - ONLINE_TTL)))
+    .limit(1);
+  return rows.length > 0;
+};

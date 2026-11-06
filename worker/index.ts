@@ -41,7 +41,15 @@ const realtime = async (request: Request, env: CloudflareEnv): Promise<Response>
   // Захист від чужих сторінок: сокет відкриваємо лише зі свого походження.
   const url = new URL(request.url);
   const origin = request.headers.get("Origin");
-  if (origin && new URL(origin).host !== url.host) return new Response("Заборонено", { status: 403 });
+  if (origin) {
+    let originHost: string | null = null;
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      // Зіпсований Origin: відмова, а не 500.
+    }
+    if (originHost !== url.host) return new Response("Заборонено", { status: 403 });
+  }
 
   // Заголовок x-rt-user ставимо лише ми: з клієнта він не береться, тож підробити, чий це сокет, не вийде.
   const headers = new Headers(request.headers);

@@ -12,3 +12,8 @@ export const markPresence = async (db: D1Database, userId: string, online: boole
     .bind(userId, online ? 1 : 0, now)
     .run();
 };
+
+/** Не частіше одного пульсу на 20 с з сокета; решту відкидаємо до звернення до D1. */
+export const BEAT_MIN_GAP = 20_000;
+
+export const beatAllowed = (last: number | undefined, now: number): boolean => last === undefined || now - last >= BEAT_MIN_GAP;

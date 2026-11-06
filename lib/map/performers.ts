@@ -10,11 +10,13 @@ import type { Performer } from "./types";
 
 let real: Performer[] = [];
 let mine: Performer | null = null;
+/** Кеш краю (до 20 с) може ще містити мою знятую з публікації картку: ховаємо її, поки сервер не оновиться. */
+let hiddenId: string | null = null;
 
 const merged = () => {
   // Себе не дублюємо: сервер віддає й мій профіль, а «mine» у мене свій, але цифри беремо серверні.
   const own = mine ? { ...mine, stats: real.find((person) => person.id === mine?.id)?.stats ?? mine.stats } : null;
-  const others = own ? real.filter((person) => person.id !== own.id) : real;
+  const others = real.filter((person) => person.id !== own?.id && person.id !== hiddenId);
   return [...others, ...(own ? [own] : [])];
 };
 
@@ -31,6 +33,8 @@ export const setRealPerformers = (list: Performer[]) => {
 
 /** Свій профіль на карті (або прибрати, якщо null). */
 export const setMyPerformer = (next: Performer | null) => {
+  if (next) hiddenId = null;
+  else if (mine) hiddenId = mine.id;
   mine = next;
   performersStore.set(merged());
 };

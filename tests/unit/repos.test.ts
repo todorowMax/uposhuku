@@ -301,7 +301,9 @@ describe("цифри виконавця з бази", () => {
     await addReview("stat-cust", { performerId: "me-stat-perf", dealId: "deal_other", stars: 5, text: "", author: "Іван" });
 
     expect(await performerStatsOf("stat-perf")).toEqual({ months: 3, orders: 1, rating: 4.5, reviews: 2 });
-    expect((await allPerformerStats()).get("me-stat-perf")).toMatchObject({ orders: 1 });
+    // Статистика одного виконавця збігається з загальною.
+    expect((await allPerformerStats()).get("me-stat-perf")).toEqual(await performerStatsOf("stat-perf"));
+    expect((await allPerformerStats()).get("me-stat-cust")).toEqual(await performerStatsOf("stat-cust"));
     expect(await performerStatsOf("nobody-here")).toEqual({ months: 0, orders: 0, rating: null, reviews: 0 });
   });
 });

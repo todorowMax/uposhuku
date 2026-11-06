@@ -3,7 +3,7 @@
 // Цифри виконавців для карти й профілів: місяці з реєстрації, завершені угоди,
 // середня оцінка. Одним запитом на таблицю, без прив'язки до списку id.
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { deals, reviews, users } from "@/db/schema";
 import type { PerformerStats } from "@/lib/map/types";
 import { getDb } from "./db";
@@ -29,4 +29,22 @@ export const allPerformerStats = async (now = Date.now()): Promise<Map<string, P
   return result;
 };
 
-export const performerStatsOf = async (userId: string): Promise<PerformerStats> => (await allPerformerStats()).get(`me-${userId}`) ?? { months: 0, orders: 0, rating: null, reviews: 0 };
+/** Статистика одного виконавця: три вузькі запити по `me-<id>`, а не обхід усіх користувачів. */
+export const performerStatsOf = async (userId: string, now = Date.now()): Promise<PerformerStats> => {
+  const db = getDb();
+  const performerId = `me-${userId}`;
+  const [people, done, rated] = await Promise.all([
+    db.select({ createdAt: users.createdAt }).from(users).where(eq(users.id, userId)),
+    db.select({ count: sql<number>`count(*)` }).from(deals).where(and(eq(deals.status, "completed"), eq(deals.performerId, performerId))),
+    db.select({ average: sql<number>`avg(${reviews.stars})`, count: sql<number>`count(*)` }).from(reviews).where(eq(reviews.performerId, performerId)),
+  ]);
+  const person = people[0];
+  if (!person) return { months: 0, orders: 0, rating: null, reviews: 0 };
+  const reviewCount = Number(rated[0]?.count ?? 0);
+  return {
+    months: Math.max(0, Math.floor((now - person.createdAt) / MONTH)),
+    orders: Number(done[0]?.count ?? 0),
+    rating: reviewCount > 0 ? Math.round(Number(rated[0]?.average) * 10) / 10 : null,
+    reviews: reviewCount,
+  };
+};

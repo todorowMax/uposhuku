@@ -61,7 +61,6 @@ const refreshEverything = () => {
   dispatch({ t: "offer", requestId: "" });
   dispatch({ t: "feed" });
   dispatch({ t: "map" });
-  dispatch({ t: "presence" });
 };
 
 /** Особистий сокет: через нього йдуть пульс присутності й «друкує». */

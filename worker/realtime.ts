@@ -10,7 +10,7 @@
 // «друкує» співрозмовнику: сокет мовчить, крім пульсу раз на хвилину й подій набору.
 
 import { DurableObject } from "cloudflare:workers";
-import { ONLINE_TTL, markPresence } from "../lib/server/presence-sql";
+import { beatAllowed, markPresence } from "../lib/server/presence-sql";
 
 interface Attachment {
   userId: string;
@@ -21,6 +21,8 @@ const TYPING_GAP = 1000;
 
 export class Realtime extends DurableObject<CloudflareEnv> {
   private lastTyping = 0;
+  /** Коли з сокета востаннє приймали пульс. Після сну об'єкта зникає, і це нормально: пропустимо один зайвий. */
+  private lastBeat = new WeakMap<WebSocket, number>();
 
   constructor(ctx: DurableObjectState, env: CloudflareEnv) {
     super(ctx, env);
@@ -64,7 +66,12 @@ export class Realtime extends DurableObject<CloudflareEnv> {
     } catch {
       return;
     }
-    if (data.t === "hb") return this.setOnline(who.userId, true);
+    if (data.t === "hb") {
+      const now = Date.now();
+      if (!beatAllowed(this.lastBeat.get(socket), now)) return;
+      this.lastBeat.set(socket, now);
+      return this.setOnline(who.userId, true);
+    }
     if (data.t === "typing" && typeof data.c === "string") return this.relayTyping(who.userId, data.c);
   }
 
@@ -89,13 +96,10 @@ export class Realtime extends DurableObject<CloudflareEnv> {
     if (left.length === 0) await this.setOnline(who.userId, false);
   }
 
-  /** Пише присутність у D1 і, якщо вона змінилась, сповіщає карту. */
+  /** Пише присутність у D1. Подію «presence» не шлемо: «онлайн» на карті оновлює опитування. */
   private async setOnline(userId: string, online: boolean): Promise<void> {
     try {
-      const was = (await this.env.DB.prepare("select online, last_seen from presence where user_id = ?").bind(userId).first<{ online: number; last_seen: number }>()) ?? null;
       await markPresence(this.env.DB, userId, online);
-      const changed = !was || Boolean(was.online) !== online || (online && Date.now() - was.last_seen > ONLINE_TTL);
-      if (changed) await this.push("global", '{"t":"presence"}');
     } catch (error) {
       console.warn("presence не записано", error);
     }
