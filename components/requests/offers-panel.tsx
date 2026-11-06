@@ -26,7 +26,7 @@ import { mapModeStore } from "@/lib/feed/map-requests";
 import { useSidePanel } from "@/lib/requests/side-panel";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
-import { inboxOpenStore } from "@/components/chat/inbox-panel";
+import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");

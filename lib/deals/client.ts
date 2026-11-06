@@ -10,7 +10,7 @@ import { ApiError } from "@/lib/auth/client";
 import { createStore, useStore } from "@/lib/store";
 import { startPolling } from "@/lib/realtime/client";
 import { useActiveRequest } from "@/lib/requests/offers";
-import type { Deal, DealAction, DealDraft } from "./types";
+import type { Deal, DealAction, DealDraft, DealMethod, PerformerAction } from "./types";
 
 /** Угоди за id запиту. */
 export const dealsStore = createStore<Record<string, Deal[]>>({});
@@ -65,6 +65,25 @@ export const dealAction = async (deal: Deal, action: DealAction, extra: { stageI
     body: JSON.stringify({ action, stageId: extra.stageId, ...(extra.code ? { code: extra.code } : {}), ...(extra.via ? { via: extra.via } : {}) }),
   });
   replace(next);
+  return next;
+};
+
+/** Умови, які виставляє сторона розмови без запиту. Платить завжди замовник. */
+export const proposeTerms = async (conversationId: string, terms: { title: string; description: string; criteria: string; method: DealMethod; stages: DealDraft["stages"] }) => {
+  await call<unknown>(`/api/conversations/${encodeURIComponent(conversationId)}/deals`, { method: "POST", body: JSON.stringify(terms) });
+};
+
+/** Усі живі угоди з цією людиною в розмові: замовник бачить свої, виконавець запропоновані йому. */
+export const fetchPartyDeals = async (conversation: { id: string; performerId: string; role: "customer" | "performer" }): Promise<Deal[]> => {
+  const url = conversation.role === "performer" ? `/api/deals?as=performer&conversation=${encodeURIComponent(conversation.id)}` : "/api/deals";
+  const { deals } = await call<{ deals: Deal[] }>(url);
+  const mine = conversation.role === "performer" ? deals : deals.filter((deal) => deal.performer.id === conversation.performerId);
+  return mine.filter((deal) => deal.status !== "declined" && deal.status !== "cancelled");
+};
+
+/** Дія виконавця з угодою: прийняти, відхилити, підтвердити оплату, здати етап, відкликати умови. */
+export const performerAction = async (deal: Deal, action: PerformerAction, extra: { deliveryText?: string; deliveryLink?: string } = {}) => {
+  const { deal: next } = await call<{ deal: Deal }>(`/api/deals/${encodeURIComponent(deal.id)}`, { method: "POST", body: JSON.stringify({ as: "performer", action, ...extra }) });
   return next;
 };
 

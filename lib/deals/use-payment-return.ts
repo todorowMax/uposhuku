@@ -28,7 +28,7 @@ const takeDealId = (): string | null => {
   const id = url.searchParams.get("paid");
   if (!id) return null;
   url.searchParams.delete("paid");
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   return id;
 };
 

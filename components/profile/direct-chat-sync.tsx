@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { useOpenProfile } from "@/lib/profile/navigation";
-import { inboxOpenStore } from "@/components/chat/inbox-panel";
+import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { startDialog, takePending } from "@/lib/requests/direct-chat";
 import { useStore } from "@/lib/store";
 

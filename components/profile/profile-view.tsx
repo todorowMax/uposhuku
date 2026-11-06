@@ -10,9 +10,9 @@ import {
   MessageSquareText,
   X,
 } from "@/components/icons";
-import { inboxOpenStore } from "@/components/chat/inbox-panel";
+import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
-import { Stars } from "@/components/deals/deal-tab";
+import { Stars } from "@/components/deals/stars";
 import { VerifiedBadge } from "@/components/reviews/verified-badge";
 import { avatarBackground } from "@/lib/map/avatar-style";
 import { CITIES } from "@/lib/map/cities";

@@ -196,7 +196,7 @@ export function RequestComposer() {
     const url = new URL(window.location.href);
     if (url.searchParams.get("auth") !== "google") return;
     url.searchParams.delete("auth");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     if (loadDraft()?.pending) authFlowStore.set({ mode: "publish" });
   }, []);
 

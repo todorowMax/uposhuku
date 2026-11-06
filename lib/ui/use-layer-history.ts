@@ -17,6 +17,16 @@ const store = {
   ignore: 0,
   listening: false,
   closers: new Map<string, () => void>(),
+  /** Що чекає, поки наші history.go відпрацюють (наступний шар відкриваємо лише після них). */
+  waiting: [] as (() => void)[],
+  /** Закриття шару відкладено на мить: React у розробці знімає й ставить ефект назад, це не справжнє закриття. */
+  pending: new Map<string, ReturnType<typeof setTimeout>>(),
+};
+
+const flushWaiting = () => {
+  if (store.ignore > 0 || store.pending.size > 0) return;
+  const queued = store.waiting.splice(0);
+  queued.forEach((run) => run());
 };
 
 const currentLayerId = (): string | null => {
@@ -35,6 +45,7 @@ const goBack = (steps: number) => {
 const onPopState = () => {
   if (store.ignore > 0) {
     store.ignore -= 1;
+    flushWaiting();
     return;
   }
   const result = popLayer(store.stack);
@@ -45,6 +56,13 @@ const onPopState = () => {
 
 const openInHistory = (id: string, close: () => void) => {
   store.closers.set(id, close);
+  const pending = store.pending.get(id);
+  if (pending !== undefined) {
+    // Той самий шар одразу відкрито знову (повторний запуск ефекту): запис в історії лишається.
+    clearTimeout(pending);
+    store.pending.delete(id);
+    return;
+  }
   const result = openLayer(store.stack, id);
   store.stack = result.stack;
   if (!store.listening) {
@@ -54,13 +72,34 @@ const openInHistory = (id: string, close: () => void) => {
   if (result.push) window.history.pushState({ ...(window.history.state as object | null), [LAYER_KEY]: id }, "");
 };
 
-const closeInHistory = (id: string) => {
+const closeNow = (id: string) => {
   const topBefore = topLayerId(store.stack);
   const result = closeLayer(store.stack, id);
   store.stack = result.stack;
   store.closers.delete(id);
   // Якщо за час відкриття людина пішла на іншу сторінку, поточний запис уже не наш: назад не ходимо.
   if (result.go > 0 && currentLayerId() === topBefore) goBack(result.go);
+};
+
+const closeInHistory = (id: string) => {
+  store.pending.set(
+    id,
+    setTimeout(() => {
+      store.pending.delete(id);
+      closeNow(id);
+      flushWaiting();
+    }, 0),
+  );
+};
+
+/**
+ * Виконує `run`, щойно історія браузера скінчить рух від закритих шарів. Шторка закрилась і зараз відкриє екран:
+ * якщо екран кине запис раніше, ніж пройде `history.go` шторки, перехід зачепить не той запис.
+ * Викликати після того, як шар закрито (стан уже оновлено), напр. в `setTimeout(…, 0)`.
+ */
+export const afterLayerHistory = (run: () => void) => {
+  if (store.ignore === 0 && store.pending.size === 0) return run();
+  store.waiting.push(run);
 };
 
 /**

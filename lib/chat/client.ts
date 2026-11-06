@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notifyTyping, startPolling, useTyping } from "@/lib/realtime/client";
-import type { ChatMessageDto, ConversationDto, ConversationOrderDto } from "./types";
+import type { ChatMessageDto, ConversationDto } from "./types";
 
 const POLL_MS = 3500;
 
@@ -38,8 +38,6 @@ export const uploadChatPhoto = async (conversationId: string, blob: Blob) => {
 };
 
 export const fetchConversations = async () => (await call<{ conversations: ConversationDto[] }>("/api/conversations")).conversations;
-
-export const fetchOrders = async (conversationId: string) => (await call<{ orders: ConversationOrderDto[] }>(`/api/conversations/${conversationId}/orders`)).orders;
 
 /** Репліка в тому вигляді, як її малює чат: me — це я, them — співрозмовник. */
 export interface ChatLine {

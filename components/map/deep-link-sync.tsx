@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
-import { inboxOpenStore } from "@/components/chat/inbox-panel";
+import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { authFlowStore, activeRequestStore, requestsStore, sessionStore } from "@/lib/auth/client";
 import { mapSelectedRequest, setMapMode } from "@/lib/feed/map-requests";
 import { profileStore } from "@/lib/profile/client";
@@ -35,7 +35,7 @@ export function DeepLinkSync() {
     if (!open) return;
     pending.current = open;
     url.searchParams.delete("open");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
   useEffect(() => {

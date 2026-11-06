@@ -9,6 +9,7 @@ const VARIANTS = {
   primary: "auth-primary",
   secondary: "auth-secondary",
   offer: "offer-primary",
+  quiet: "offer-secondary",
   link: "auth-link",
   icon: "auth-icon-button",
   /** Без своїх стилів: вигляд дає контейнер (перемикач режимів карти). */

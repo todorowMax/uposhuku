@@ -27,7 +27,7 @@ const takeInvoiceId = (): string | null => {
   const id = url.searchParams.get("placement");
   if (!id) return null;
   url.searchParams.delete("placement");
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   return id;
 };
 

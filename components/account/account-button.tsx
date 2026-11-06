@@ -40,7 +40,7 @@ export function AccountButton() {
     const url = new URL(window.location.href);
     if (url.searchParams.get("auth") !== "performer") return;
     url.searchParams.delete("auth");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     profileEditorStore.set(true);
   }, []);
 
