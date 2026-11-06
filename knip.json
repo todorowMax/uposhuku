@@ -7,7 +7,7 @@
     "vitest*.config.{ts,mts}",
     "tests/**/*.{ts,tsx}"
   ],
-  "ignore": ["config/agent-rules/**", "contracts/**", "lib/crypto/abi/**"],
+  "ignore": ["config/agent-rules/**", "scripts/strip-prod-assets.d.mts", "contracts/**", "lib/crypto/abi/**"],
   "ignoreDependencies": ["cloudflare", "@metamask/connect-evm", "@walletconnect/ethereum-provider"],
   "ignoreExportsUsedInFile": true
 }
