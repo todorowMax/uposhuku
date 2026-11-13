@@ -10,6 +10,7 @@ import { DELETED_NAME } from "@/lib/account/deletion";
 import type { Deal } from "@/lib/deals/types";
 import { needsAction, performerNeeds } from "@/lib/deals/machine";
 import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
+import { newId } from "@/lib/ids";
 import { getDb, inChunks } from "./db";
 import { getProfile, getProfileCards } from "./profile-repo";
 import { pushUser } from "./realtime";
@@ -44,7 +45,7 @@ export const getOrCreateConversation = async (customerUserId: string, performerI
   const existing = await find();
   if (existing) return existing;
   const now = Date.now();
-  await db.insert(conversations).values({ id: `conv_${crypto.randomUUID().slice(0, 8)}`, customerUserId, performerId, performerUserId, createdAt: now, updatedAt: now }).onConflictDoNothing();
+  await db.insert(conversations).values({ id: newId("conv"), customerUserId, performerId, performerUserId, createdAt: now, updatedAt: now }).onConflictDoNothing();
   return (await find()) as Conversation;
 };
 

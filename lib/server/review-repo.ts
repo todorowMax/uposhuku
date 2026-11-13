@@ -2,6 +2,7 @@
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { reviews } from "@/db/schema";
 import { averageOf, type Review } from "@/lib/reviews/types";
+import { newId } from "@/lib/ids";
 import { getDb, inChunks } from "./db";
 
 const toReview = (row: typeof reviews.$inferSelect): Review => ({
@@ -41,7 +42,7 @@ export const reviewOfDeal = async (dealId: string): Promise<Review | undefined> 
 };
 
 export const addReview = async (authorUserId: string, review: Omit<Review, "id" | "createdAt" | "verified"> & { verified?: boolean }): Promise<Review> => {
-  const row = { id: `rev_${crypto.randomUUID().slice(0, 8)}`, performerId: review.performerId, dealId: review.dealId, authorUserId, stars: review.stars, text: review.text, author: review.author, verified: review.verified ? 1 : 0, createdAt: Date.now() };
+  const row = { id: newId("rev"), performerId: review.performerId, dealId: review.dealId, authorUserId, stars: review.stars, text: review.text, author: review.author, verified: review.verified ? 1 : 0, createdAt: Date.now() };
   await getDb().insert(reviews).values(row);
   return toReview(row);
 };

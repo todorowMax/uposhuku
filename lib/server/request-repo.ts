@@ -7,6 +7,7 @@ import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { isDeadline } from "@/lib/requests/types";
+import { newId } from "@/lib/ids";
 import { getDb, inChunks } from "./db";
 
 type Row = typeof requests.$inferSelect;
@@ -34,7 +35,7 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
 
 export const createRequest = async (userId: string, draft: RequestDraft): Promise<PublishedRequest> => {
   const db = getDb();
-  const id = `req_${crypto.randomUUID().slice(0, 8)}`;
+  const id = newId("req");
   const statements = [
     db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: Date.now() }),
     ...(draft.tags.length ? [db.insert(requestTags).values(draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index))] : []),

@@ -11,6 +11,7 @@ import { DIRECT_RESPONSE_ID, directRequestId, type Deal, type DealAction, type D
 import { conversations } from "@/db/schema";
 import { performerIdOf, performerUserId } from "@/lib/deals/parties";
 import { canAttachReceipt, checkCriteria, withDelivery, withReceipt } from "@/lib/deals/dispute-aids";
+import { newId } from "@/lib/ids";
 import { addMessage, findChatAttachment } from "./chat-repo";
 import { getDb } from "./db";
 import { snapshotDealRequisites } from "./requisites-repo";
@@ -89,7 +90,7 @@ export const proposeDeal = async (userId: string, draft: DealDraft, options: { s
   const existing = await readAll(userId);
   // На один відгук одна жива угода: нову можна після відмови чи скасування.
   if (existing.some((deal) => deal.responseId === draft.responseId && deal.status !== "declined" && deal.status !== "cancelled")) return "З цим виконавцем уже є угода.";
-  const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, { ...draft, criteria: criteria.value }, now);
+  const deal = createDeal(newId("deal"), { ...draft, criteria: criteria.value }, now);
   await getDb().insert(deals).values({
     id: deal.id,
     ownerUserId: userId,
@@ -234,7 +235,7 @@ export const proposeDirectDeal = async (
   if (error) return error;
   const live = (await readAll(conversation.customerUserId)).filter((deal) => deal.conversationId === conversation.id && (deal.status === "proposed" || deal.status === "accepted"));
   if (live.length >= MAX_LIVE_DIRECT) return `У розмові вже ${MAX_LIVE_DIRECT} відкритих замовлень: завершіть одне, щоб додати нове.`;
-  const deal = createDeal(`deal_${crypto.randomUUID().slice(0, 8)}`, full, now);
+  const deal = createDeal(newId("deal"), full, now);
   await getDb().insert(deals).values({
     id: deal.id,
     ownerUserId: conversation.customerUserId,
