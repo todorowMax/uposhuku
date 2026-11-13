@@ -4,6 +4,8 @@
 // головною й профілем виконавця (/p/[id]) вони не перестворюються.
 import { AccountButton } from "@/components/account/account-button";
 import { NotificationSettings } from "@/components/account/notification-settings";
+import { DeleteAccountScreen } from "@/components/account/delete-account-screen";
+import { ExportDataScreen } from "@/components/account/export-data-screen";
 import { TabBadge } from "@/components/account/tab-badge";
 import { ChromeReveal } from "@/components/map/chrome-reveal";
 import { MapModeSwitch } from "@/components/map/mode-switch";
@@ -47,6 +49,8 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <RealtimeSync />
       <TabBadge />
       <NotificationSettings />
+      <ExportDataScreen />
+      <DeleteAccountScreen />
       <OffersPanelGate />
       <FeedPanelGate />
       <ProfileEditorHost />

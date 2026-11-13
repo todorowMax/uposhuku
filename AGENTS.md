@@ -78,6 +78,10 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   чек не приймає; результат етапу (`stage.delivery`: текст до 1000 і https-посилання) додається до «здати етап». Скарга на пряму угоду
   (`deal_complaints`, `POST /api/deals/:id/complaint`) гроші й статус етапу не чіпає; закриває її модератор у `/admin?tab=complaints`,
   закриття (хто, коли, коментар) лежить у самому рядку скарги, окремого журналу немає. Друга сторона бачить лише службовий рядок у розмові.
+- Видалення акаунта (меню акаунта; `lib/server/account-delete.ts`, таблиця «що з чим» у шапці файла): рядок у `users` ніколи не видаляється фізично, він стає
+  «могилою» (`deleted_at`, пошта `deleted-<id>@deleted.invalid`), бо на нього ведуть `onDelete: cascade` угод, платежів і відгуків. Видалити не можна, поки є угода
+  з грошима в русі чи відкрита скарга; людям з угодами потрібен код з пошти (`lib/server/account-code.ts`). Виписка даних: `GET /api/account/export`. Строк зберігання
+  `RETENTION_YEARS = 3` (`lib/account/deletion.ts`), прибирання знімків реквізитів раз на добу в `app/api/internal/tick`. У коді немає `DELETE` по `users`, це перевіряє тест.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 

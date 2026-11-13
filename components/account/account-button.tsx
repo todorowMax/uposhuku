@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
-import { Bell, Code2, Inbox, ListChecks, LogOut, MapPinned, UserRound } from "@/components/icons";
+import { Bell, Code2, FileText, Inbox, ListChecks, LogOut, MapPinned, Trash2, UserRound } from "@/components/icons";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
+import { deleteScreenStore, exportScreenStore } from "@/lib/account/client";
 import { LegendButton } from "@/components/map/legend";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -129,6 +130,14 @@ export function AccountButton() {
           <DropdownMenuItem onSelect={() => notificationSettingsStore.set(true)}>
             <Bell className="size-4" />
             Сповіщення
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => exportScreenStore.set(true)}>
+            <FileText className="size-4" />
+            Завантажити мої дані
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => deleteScreenStore.set(true)}>
+            <Trash2 className="size-4" />
+            Видалити акаунт
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void logout()}>
             <LogOut className="size-4" />
