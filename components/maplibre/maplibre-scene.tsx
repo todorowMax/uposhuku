@@ -27,6 +27,7 @@ import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer, PlacementTier } from "@/lib/map/types";
 import { cityFilter, filterTags, groupFilter, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
+import { whenStyleReady } from "@/lib/maplibre/style-ready";
 import { isChromium } from "@/lib/ui/glass";
 import { filterPerformers } from "@/lib/map/groups";
 import { focusPerformerStore, hoveredOfferStore, offersMapStore, useActiveRequest } from "@/lib/requests/offers";
@@ -1487,11 +1488,14 @@ export default function MapLibreScene() {
     if (!ready || !map) return;
     const requestLayers = ["req-clusters", "req-cluster-count", "req-pins"];
     const peopleLayers = ["people", "people-clusters", "people-outgoing", "people-clusters-outgoing", "own-req-pins", "own-req-pins-outgoing"];
-    for (const id of requestLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "visible" : "none");
-    for (const id of peopleLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "none" : "visible");
     lensControlRef.current.hide(true);
     requestLensControlRef.current.hide(true);
     if (mode === "requests") setSelectedId(null);
+    // Стиль міг ще не доїхати: видимість шарів ставимо, коли він готовий (lib/maplibre/style-ready.ts).
+    return whenStyleReady(map, () => {
+      for (const id of requestLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "visible" : "none");
+      for (const id of peopleLayers) map.setLayoutProperty(id, "visibility", mode === "requests" ? "none" : "visible");
+    });
   }, [ready, mode]);
 
   // У режимі запитів окремо показуємо стрічку; власні завдання об'єднані з людьми в їхньому джерелі.
@@ -1636,9 +1640,11 @@ export default function MapLibreScene() {
     if (!ready || !map) return;
     const isolate = mode === "performers" && !allPerformers && activeRequest?.status === "open"
       && hoveredOffer?.requestId === activeRequest.id;
-    for (const id of ["people", "people-clusters", "people-outgoing", "people-clusters-outgoing", "own-req-pins", "own-req-pins-outgoing"]) {
-      map.setLayoutProperty(id, "visibility", mode === "requests" || isolate ? "none" : "visible");
-    }
+    return whenStyleReady(map, () => {
+      for (const id of ["people", "people-clusters", "people-outgoing", "people-clusters-outgoing", "own-req-pins", "own-req-pins-outgoing"]) {
+        map.setLayoutProperty(id, "visibility", mode === "requests" || isolate ? "none" : "visible");
+      }
+    });
   }, [ready, mode, allPerformers, activeRequest?.id, activeRequest?.status, hoveredOffer]);
 
   useEffect(() => {
