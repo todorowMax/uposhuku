@@ -31,6 +31,9 @@
   /* Шари (DESIGN.md, «Шари»): фон екрана й шторки, затемнення, розмір чату, за яким рівняється панель екрана. */
   --panel: #ffffff;
   --scrim: rgb(3 9 13 / 45%);
+  /* Згасання країв стрічок, що гортаються (фільтри під полем запиту): ширина й «непрозорий» колір маски (маска читає лише альфу). */
+  --fade-width: 40px;
+  --mask-solid: #000;
   --chat-width: 420px;
   --chat-height: min(640px, calc(100dvh - 32px));
   --font-ui: var(--font-fixel), system-ui, sans-serif;
@@ -805,12 +808,13 @@ html[data-glass] .composer {
   padding-block: 16px;
   margin-block: -16px;
   scrollbar-width: none;
-  /* Справа згасання: натяк, що чипів більше, і м'який край біля «Фільтрів». */
-  mask-image: linear-gradient(90deg, #000 calc(100% - 24px), transparent 100%);
+  /* Справа м'яке згасання до прозорого: натяк, що чипів більше, і плавний край біля «Фільтрів», а не різкий зріз. */
+  mask-image: linear-gradient(90deg, var(--mask-solid) calc(100% - var(--fade-width)), transparent 100%);
 }
 
+/* Зліва згасання лише коли стрічку вже прогорнули: на початку перший чип нічим не перекритий. */
 .filter-strip[data-scrolled="true"] {
-  mask-image: linear-gradient(90deg, transparent 0, #000 20px, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, var(--mask-solid) calc(var(--fade-width) / 2), var(--mask-solid) calc(100% - var(--fade-width)), transparent 100%);
 }
 
 .filter-strip::-webkit-scrollbar {
@@ -821,7 +825,8 @@ html[data-glass] .composer {
   display: flex;
   gap: 6px;
   width: max-content;
-  padding: 2px 24px 2px 0;
+  /* Праворуч запас на ширину згасання: останній чип можна прогорнути з-під нього. */
+  padding: 2px var(--fade-width) 2px 0;
 }
 
 .filter-chip {
