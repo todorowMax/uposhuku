@@ -8,6 +8,15 @@ import type { NotificationKind } from "@/lib/notification-prefs";
 import { stripContacts } from "@/lib/chat/contacts";
 import { escapeHtml, excerpt } from "./texts";
 
+/**
+ * Що сталося, без тексту й особистого: з цього будується лист (lib/server/mail.ts). Лише факт, ім'я співрозмовника
+ * з профілю чи назва власного запиту (до 60 знаків), і куди відкрити на сайті (`open`, як у `?open=`).
+ */
+export type EmailEvent =
+  | { type: "message"; fromName: string; open: string }
+  | { type: "offer"; title: string; open: string }
+  | { type: "deal"; action: string; open: string };
+
 export interface Notice {
   kind: NotificationKind;
   /** Унікальний ключ випадку: вікно часу чи стан угоди всередині. */
@@ -16,6 +25,8 @@ export interface Notice {
   html: string;
   /** Кнопка під повідомленням: шлях на сайті, що відкриває потрібну панель. */
   button?: { text: string; path: string };
+  /** Лист на пошту, якщо цей випадок його вартий; без поля листа немає. */
+  email?: EmailEvent;
 }
 
 /** Не частіше разу на 10 хвилин на розмову чи запит: серія повідомлень не має ставати лавиною. */
@@ -32,6 +43,7 @@ export const offerNotice = (input: { requestId: string; requestText: string; pri
   key: `offer:${input.requestId}:${bucket(input.now ?? Date.now())}`,
   html: `Нова пропозиція на ваш запит «${escapeHtml(excerpt(stripContacts(input.requestText), 60))}»: ${input.price === null ? "ціну обговоримо" : `${money(input.price)} ₴`}, ${input.days} дн.`,
   button: { text: "Переглянути", path: deepLink(`offers:${input.requestId}`) },
+  email: { type: "offer", title: excerpt(stripContacts(input.requestText), 60), open: `offers:${input.requestId}` },
 });
 
 export const messageNotice = (input: { conversationId: string; fromName: string; text: string; now?: number }): Notice => ({
@@ -39,6 +51,8 @@ export const messageNotice = (input: { conversationId: string; fromName: string;
   key: `msg:${input.conversationId}:${bucket(input.now ?? Date.now())}`,
   html: `<b>${escapeHtml(excerpt(input.fromName, 40))}</b>: ${escapeHtml(excerpt(input.text, 100))}`,
   button: { text: "Відповісти", path: deepLink(`chat:${input.conversationId}`) },
+  // У листі тексту повідомлення немає, лише ім'я.
+  email: { type: "message", fromName: excerpt(input.fromName, 40), open: `chat:${input.conversationId}` },
 });
 
 /** Що сталося з угодою: дія → текст для іншої сторони. */
@@ -75,15 +89,20 @@ export const DEAL_TEXTS: Record<string, string> = {
   owner_decline: "Замовник відхилив ваші умови угоди.",
 };
 
+/** Про що з угоди пишемо ще й листом: умови запропоновано чи прийнято, роботу прийнято, просять підтвердити оплату. Решта лишається в Telegram і на сайті. */
+export const EMAIL_DEAL_ACTIONS: ReadonlySet<string> = new Set(["proposed", "owner_accept", "accept", "release", "auto_accepted", "claim_paid"]);
+
 export const dealNotice = (input: { dealId: string; action: string; conversationId?: string }): Notice | null => {
   const text = DEAL_TEXTS[input.action];
   if (!text) return null;
+  // Розмова за угодою невідома з роуту дій: ведемо у список повідомлень, де угода стоїть угорі.
+  const open = input.conversationId ? `chat:${input.conversationId}` : "inbox";
   return {
     kind: "deals",
     key: `deal:${input.dealId}:${input.action}`,
     html: `Угода: ${escapeHtml(text)}`,
-    // Розмова за угодою невідома з роуту дій: ведемо у список повідомлень, де угода стоїть угорі.
-    button: { text: "Відкрити", path: deepLink(input.conversationId ? `chat:${input.conversationId}` : "inbox") },
+    button: { text: "Відкрити", path: deepLink(open) },
+    ...(EMAIL_DEAL_ACTIONS.has(input.action) ? { email: { type: "deal" as const, action: input.action, open } } : {}),
   };
 };
 

@@ -1,9 +1,9 @@
 // lib/server/notify.ts
 //
-// Сповіщення в Telegram. Диспетчер питає по черзі: бот увімкнений? людина
-// прив'язана? вона цього хоче? вона зараз не на сайті? не повторюємо ми те
-// саме? Хоч на одне «ні», і мовчимо. Нічого не кидає й не затримує відповідь
-// API: усе добігає після неї.
+// Сповіщення в Telegram і листом. Диспетчер питає по черзі: канал увімкнений?
+// людина прив'язана? вона цього хоче? вона зараз не на сайті? не повторюємо ми
+// те саме? Хоч на одне «ні», і мовчимо. Лист живе в notify-email.ts. Нічого не
+// кидає й не затримує відповідь API: усе добігає після неї.
 
 import { and, count, eq, gt } from "drizzle-orm";
 import { notificationLog } from "@/db/schema";
@@ -14,6 +14,7 @@ import { logServer } from "@/lib/telemetry/log";
 import { telemetryConfig } from "@/lib/telemetry/server";
 import { getDb } from "./db";
 import { getPrefs } from "./notification-prefs-repo";
+import { notifyEmail } from "./notify-email";
 import { isOnline } from "./presence-repo";
 import { activeLink, deactivateByChat } from "./telegram-repo";
 
@@ -36,7 +37,13 @@ export const isQuietHour = (now: number): boolean => {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Обидва канали незалежні: збій чи «ні» в одному не заважає другому. Повертає підсумок Telegram. */
 export const notifyUser = async (userId: string, notice: Notice, now = Date.now()): Promise<NotifyOutcome> => {
+  const [telegram] = await Promise.all([notifyTelegram(userId, notice, now), notifyEmail(userId, notice, now)]);
+  return telegram;
+};
+
+const notifyTelegram = async (userId: string, notice: Notice, now: number): Promise<NotifyOutcome> => {
   try {
     const config = telegramConfig();
     if (!config.enabled) return "disabled";

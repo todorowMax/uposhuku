@@ -4,7 +4,7 @@
 // усе мовчки вимкнено, як пошта без ключа Resend. Читаємо щоразу, а не під
 // час збирання: застосунок збирається один раз для кількох середовищ.
 
-import { readVar } from "@/lib/server/env";
+import { readVar, siteUrl } from "@/lib/server/env";
 
 export interface TelegramConfig {
   /** Бот увімкнений: є токен і секрет вебхука. */
@@ -34,7 +34,7 @@ export const telegramConfig = (): TelegramConfig => {
     webhookSecret,
     username: text("TELEGRAM_BOT_USERNAME")?.replace(/^@/, "") ?? null,
     channelId: text("TELEGRAM_CHANNEL_ID"),
-    siteUrl: (text("SITE_URL") ?? "http://localhost:3031").replace(/\/$/, ""),
+    siteUrl: siteUrl(),
     channelEnabled: text("CHANNEL_ENABLED") === "1",
     channelDelayMin: Number.isFinite(delay) && delay >= 0 ? delay : DEFAULT_CHANNEL_DELAY_MIN,
   };

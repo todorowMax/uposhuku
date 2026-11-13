@@ -3,6 +3,9 @@
 // Лист із кодом входу через Resend. Без ключа (локально) лист не йде, а код
 // друкуємо в лог сервера: для розробки цього досить.
 
+import { CONTACT_EMAIL, OPERATOR, SERVICE_NAME } from "@/lib/legal/config";
+import { DEAL_TEXTS, type EmailEvent } from "@/lib/telegram/notices";
+import { excerpt } from "@/lib/telegram/texts";
 import { logServer } from "@/lib/telemetry/log";
 import { readVar } from "./env";
 
@@ -17,12 +20,19 @@ export const mailMode = (): MailMode => {
 };
 
 /** Надіслати лист через Resend; помилка кидається, щоб викликач вирішив, чи вона критична. */
-const deliver = async (message: { to: string; subject: string; text: string }) => {
+const deliver = async (message: { to: string; subject: string; text: string; html?: string; headers?: Record<string, string> }) => {
   const key = readVar("RESEND_API_KEY");
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: readVar("MAIL_FROM") ?? "Findlyfy <hello@findlyfy.com>", to: [message.to], subject: message.subject, text: message.text }),
+    body: JSON.stringify({
+      from: readVar("MAIL_FROM") ?? "Findlyfy <hello@findlyfy.com>",
+      to: [message.to],
+      subject: message.subject,
+      text: message.text,
+      ...(message.html ? { html: message.html } : {}),
+      ...(message.headers ? { headers: message.headers } : {}),
+    }),
   });
   if (!response.ok) {
     const body = (await response.text()).slice(0, 300);
@@ -91,4 +101,58 @@ export const sendReleaseCodeMail = async (email: string, code: string, dealNumbe
     subject: `Код підтвердження виплати: ${code}`,
     text: `Ви приймаєте роботу за угодою ${dealNumber}, після цього гроші підуть виконавцю і повернути їх не можна. Код підтвердження: ${code}\n\nВін діє 10 хвилин. Якщо це не ви, нічого не вводьте й змініть спосіб входу в акаунт.`,
   });
+};
+
+const htmlEscape = (value: string): string => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+export interface NoticeMailInput {
+  event: EmailEvent;
+  /** Скільки подій цього виду ми притримали за останні півгодини: «ще N нових». */
+  held: number;
+  siteUrl: string;
+  unsubscribeUrl: string;
+}
+
+/**
+ * Єдиний шаблон листа-сповіщення (повідомлення, відгук, угода). Лише факт події, ім'я співрозмовника з профілю чи назва
+ * власного запиту, посилання на сайт і відписка; тексту повідомлень, пошти й телефонів немає. Без картинок і трекерів.
+ * Підпис і реквізити Оператора з lib/legal/config.ts. Чиста функція: тести читають її результат.
+ */
+export const renderNoticeMail = ({ event, held, siteUrl, unsubscribeUrl }: NoticeMailInput): { subject: string; text: string; html: string } => {
+  const name = excerpt(event.type === "message" ? event.fromName : "", 40);
+  const title = excerpt(event.type === "offer" ? event.title : "", 60);
+  const lead =
+    event.type === "message"
+      ? `Нове повідомлення від ${name}.`
+      : event.type === "offer"
+        ? `Новий відгук на ваш запит «${title}».`
+        : (DEAL_TEXTS[event.action] ?? "Є зміни за вашою угодою.");
+  const subject = event.type === "message" ? `Нове повідомлення від ${name}` : event.type === "offer" ? `Новий відгук на ваш запит «${title}»` : "Зміни за вашою угодою у Findlyfy";
+  const more = held > 0 ? `Поки вас не було, ще ${held} нових.` : "";
+  const link = `${siteUrl}/?open=${encodeURIComponent(event.open)}`;
+  const operator = [SERVICE_NAME, `${OPERATOR.entity}, РНОКПП ${OPERATOR.taxId}`, OPERATOR.address, CONTACT_EMAIL];
+  const reason = "Ви отримали цей лист, бо в налаштуваннях сповіщень увімкнено пошту, а вас не було в сервісі.";
+  const text = [lead, ...(more ? [more] : []), `Відкрити: ${link}`, "--", ...operator, "", reason, `Відписатися від таких листів: ${unsubscribeUrl}`].join("\n");
+  const html = [
+    '<div style="font-family:sans-serif;line-height:1.5;max-width:560px">',
+    `<p>${htmlEscape(lead)}</p>`,
+    more ? `<p>${htmlEscape(more)}</p>` : "",
+    `<p><a href="${htmlEscape(link)}">Відкрити у ${SERVICE_NAME}</a></p>`,
+    `<p style="font-size:13px">${operator.map(htmlEscape).join("<br>")}</p>`,
+    `<p style="font-size:13px">${htmlEscape(reason)} <a href="${htmlEscape(unsubscribeUrl)}">Відписатися від таких листів</a></p>`,
+    "</div>",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return { subject, text, html };
+};
+
+/** Лист-сповіщення; з посиланням відписки й заголовками List-Unsubscribe (один клік). У dev-режимі лише в журнал. */
+export const sendNoticeMail = async (to: string, input: NoticeMailInput) => {
+  const mail = renderNoticeMail(input);
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] сповіщення для ${to}: ${mail.subject}\n${mail.text}`);
+    return;
+  }
+  await deliver({ to, ...mail, headers: { "List-Unsubscribe": `<${input.unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } });
 };

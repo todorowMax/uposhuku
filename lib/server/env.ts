@@ -17,3 +17,6 @@ export const readVar = (name: keyof CloudflareEnv): string | undefined => {
 };
 
 export const isProduction = () => readVar("DEPLOY_ENV") === "production";
+
+/** Адреса сайту для посилань у листах і ботах, без кінцевого слеша. Без SITE_URL: локальний dev-сервер. */
+export const siteUrl = (): string => (readVar("SITE_URL")?.trim() || "http://localhost:3031").replace(/\/$/, "");

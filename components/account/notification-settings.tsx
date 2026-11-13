@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Loader2, Send, X } from "@/components/icons";
+import { Bell, Loader2, Mail, Send, X } from "@/components/icons";
 import { BarChart3, Moon } from "lucide-react";
 import { getConsent, onConsentChange, writeConsent, type Consent } from "@/kit/telemetry/client";
 import { sessionStore } from "@/lib/auth/client";
@@ -46,9 +46,9 @@ function Row({
 }
 
 /**
- * Куди писати, коли з'явилась пропозиція, повідомлення чи угода. Сповіщення
- * браузера працюють уже зараз, поки вкладка відкрита; пошта й Telegram —
- * налаштування наперед, самі канали підключимо з бекендом.
+ * Куди писати, коли з'явилась пропозиція, повідомлення чи угода. Браузер
+ * показує сповіщення, поки вкладка відкрита; пошта й Telegram пишуть із
+ * сервера, коли людини немає на сайті (lib/server/notify.ts).
  */
 export function NotificationSettings() {
   const open = useStore(notificationSettingsStore);
@@ -123,6 +123,13 @@ export function NotificationSettings() {
                 }
                 void enablePush().then(setPush);
               }}
+            />
+            <Row
+              icon={<Mail className="size-4.5" />}
+              title="Пошта"
+              hint="Листи про нові відгуки й повідомлення, якщо ви не в сервісі."
+              checked={prefs.channels.email}
+              onChange={(email) => setPrefs({ channels: { email } })}
             />
             <TelegramRow hint={telegramHint} />
           </div>

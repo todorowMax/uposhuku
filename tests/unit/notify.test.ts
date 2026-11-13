@@ -38,6 +38,8 @@ afterEach(() => {
   for (const name of ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "SITE_URL"]) delete process.env[name];
 });
 
+/** Журнал Telegram без рядків листа (канал пошти має свої тести в notify-email.test.ts). */
+const telegramLog = async () => (await getDb().select().from(notificationLog)).filter((row) => !row.kind.startsWith("email"));
 const link = async (userId = "u1") => {
   await consumeLinkToken((await createLinkToken(userId)).token, { chatId: userId === "u1" ? "1001" : "1002" });
 };
@@ -143,7 +145,7 @@ describe("диспетчер сповіщень", () => {
     expect(await notifyUser("u1", notice(), NOON)).toBe("failed");
     expect(await getLink("u1")).toMatchObject({ active: false });
     expect((await getLink("u1"))?.blockedAt).not.toBeNull();
-    expect(await getDb().select().from(notificationLog)).toHaveLength(0);
+    expect(await telegramLog()).toHaveLength(0);
   });
 
   it("429 з короткою паузою: одна повторна спроба, далі успіх", async () => {
@@ -158,7 +160,7 @@ describe("диспетчер сповіщень", () => {
     await link();
     respond = () => Response.json({ ok: false, error_code: 500, description: "Internal" });
     expect(await notifyUser("u1", notice(), NOON)).toBe("failed");
-    expect(await getDb().select().from(notificationLog)).toHaveLength(0);
+    expect(await telegramLog()).toHaveLength(0);
     respond = () => Response.json({ ok: true, result: { message_id: 1 } });
     expect(await notifyUser("u1", notice(), NOON)).toBe("sent");
   });
