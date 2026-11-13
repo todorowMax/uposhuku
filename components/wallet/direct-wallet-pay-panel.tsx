@@ -44,7 +44,7 @@ const Inner = ({ dealId, stageId, recipient, config, onPaid }: DirectWalletPayPa
           </div>
           <CheckboxField id={`${id}-verified`} checked={pay.verified} onCheckedChange={(value) => pay.setVerified(value === true)} label="Адресу на екрані гаманця (на пристрої) звірено з цією повністю" />
           {config.router ? (
-            <p className="pe-hint">Платіж іде через контракт сервісу: ви схвалюєте рівно суму разом з комісією, ніколи не безмежно.</p>
+            <p className="pe-hint">Платіж іде через контракт сервісу: ви схвалюєте рівно суму платежу (разом з комісією, якщо контракт її бере), ніколи не безмежно.</p>
           ) : (
             <p className="pe-hint">Платіж іде прямим переказом токена виконавцю, без комісії.</p>
           )}

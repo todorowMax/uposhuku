@@ -35,7 +35,24 @@ export const showRequestsListStore = createStore(false);
 /** Людина натиснула «Новий запит»: показуємо поле, хоча запити вже є. */
 export const composingStore = createStore(false);
 
-export class ApiError extends Error {}
+/** Помилка API. `code` це стабільний код з тіла відповіді (`legal_reaccept_required`, `risk_ack_required`). */
+export class ApiError extends Error {
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/** Подія, після якої шторка «Ми оновили умови» перечитує статус (components/legal/use-terms-update). */
+export const LEGAL_RECHECK_EVENT = "legal:recheck";
+
+/** Помилка з тіла problem+json: текст для людини й код. Відмова через умови одразу просить показати шторку. */
+export const problemError = (data: { detail?: string; title?: string; code?: string } | null): ApiError => {
+  if (data?.code === "legal_reaccept_required" && typeof window !== "undefined") window.dispatchEvent(new Event(LEGAL_RECHECK_EVENT));
+  return new ApiError(data?.detail ?? data?.title ?? "Щось пішло не так. Спробуйте ще раз.", data?.code);
+};
 
 const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   let response: Response;
@@ -48,8 +65,8 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
     throw new ApiError("Немає зв'язку. Перевірте інтернет і спробуйте ще раз.");
   }
   if (response.status === 204) return undefined as T;
-  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string }) | null;
-  if (!response.ok) throw new ApiError(data?.detail ?? data?.title ?? "Щось пішло не так. Спробуйте ще раз.");
+  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string; code?: string }) | null;
+  if (!response.ok) throw problemError(data);
   return data as T;
 };
 
@@ -73,10 +90,10 @@ export const loadSession = (force = false) => {
 export const startEmail = (email: string) =>
   call<EmailStartResult>("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });
 
-export const verifyEmail = async (email: string, code: string) => {
+export const verifyEmail = async (email: string, code: string, accepted: boolean) => {
   const { user } = await call<{ user: SessionUser }>("/api/auth/email/verify", {
     method: "POST",
-    body: JSON.stringify({ email, code }),
+    body: JSON.stringify({ email, code, accepted }),
   });
   sessionStore.set({ status: "user", user });
   void loadMyRequests();

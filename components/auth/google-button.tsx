@@ -1,14 +1,16 @@
+import type { MouseEvent } from "react";
+
 /** Кнопка «Продовжити з Google». Посилання, а не fetch: вхід іде через редірект у Google. */
-export function GoogleButton({ href, onClick }: { href: string; onClick?: () => void }) {
+export const GoogleButton = ({ href, onClick }: { href: string; onClick?: (event: MouseEvent<HTMLAnchorElement>) => void }) => {
   return (
     <a href={href} onClick={onClick} className="auth-google">
       <GoogleMark />
       Продовжити з Google
     </a>
   );
-}
+};
 
-function GoogleMark() {
+const GoogleMark = () => {
   return (
     <svg viewBox="0 0 18 18" className="size-[18px]" aria-hidden>
       <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z" />
@@ -17,4 +19,4 @@ function GoogleMark() {
       <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.96l2.99 2.33C4.66 5.16 6.65 3.58 9 3.58z" />
     </svg>
   );
-}
+};

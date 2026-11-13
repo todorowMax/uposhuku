@@ -6,6 +6,8 @@ import { ArrowLeft, Loader2, MapPin, X } from "@/components/icons";
 import { CodeInput } from "@/components/auth/code-input";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { GoogleButton } from "@/components/auth/google-button";
+import { TERMS_CHECKBOX_ID, useTermsConsent } from "@/components/auth/use-terms-consent";
+import { CheckboxField } from "@/components/ui/checkbox";
 import {
   ApiError,
   addPublishedRequest,
@@ -47,6 +49,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
   const [error, setError] = useState<string | null>(null);
   const [mock, setMock] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const terms = useTermsConsent();
   const [draft] = useState<RequestDraft | null>(() => (mode === "publish" ? (loadDraft()?.draft ?? null) : null));
   // Панель з'являється в порталі пізніше за сам компонент, тому тримаємо її в стані, а не в ref.
   const [panel, setPanel] = useState<HTMLDivElement | null>(null);
@@ -121,6 +124,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
 
   const sendCode = async (event?: FormEvent) => {
     event?.preventDefault();
+    if (!terms.confirm()) return;
     setBusy(true);
     setError(null);
     try {
@@ -144,7 +148,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
     setBusy(true);
     setError(null);
     try {
-      await verifyEmail(email, code);
+      await verifyEmail(email, code, terms.agreed);
       if (mode === "publish") await publish();
       else {
         authFlowStore.set(null);
@@ -171,7 +175,7 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
   };
 
   const googleNext = mode === "publish" ? "/?auth=google" : mode === "performer" ? "/?auth=performer" : "/";
-  const googleHref = `/api/auth/google?next=${encodeURIComponent(googleNext)}`;
+  const googleHref = `/api/auth/google?next=${encodeURIComponent(googleNext)}&accepted=1`;
   const title =
     step === "code"
       ? (mock ? "Код доступу" : "Код з листа")
@@ -253,11 +257,33 @@ export function AuthPanel({ onPublished }: { onPublished: (request: PublishedReq
                 </button>
               </form>
               <div className="auth-divider"><span>або</span></div>
-              <GoogleButton href={googleHref} onClick={() => draft && saveDraft(draft, true)} />
-              <p className="text-center text-xs leading-snug text-ink-muted">
-                Продовжуючи, ви погоджуєтесь з <a href="/legal/terms" target="_blank" rel="noreferrer" className="auth-link text-xs">умовами</a> і{" "}
-                <a href="/legal/privacy" target="_blank" rel="noreferrer" className="auth-link text-xs">політикою конфіденційності</a>.
-              </p>
+              <GoogleButton
+                href={googleHref}
+                onClick={(event) => {
+                  if (!terms.confirm()) return event.preventDefault();
+                  if (draft) saveDraft(draft, true);
+                }}
+              />
+              <div className="grid gap-1.5">
+                <CheckboxField
+                  id={TERMS_CHECKBOX_ID}
+                  checked={terms.agreed}
+                  onCheckedChange={(value) => terms.change(value === true)}
+                  aria-invalid={Boolean(terms.error) || undefined}
+                  aria-describedby={terms.error ? "auth-terms-error" : undefined}
+                  label={
+                    <>
+                      Мені є 18 років, я приймаю <a href="/legal/terms" target="_blank" rel="noreferrer" className="auth-link">умови</a> та{" "}
+                      <a href="/legal/privacy" target="_blank" rel="noreferrer" className="auth-link">політику конфіденційності</a>
+                    </>
+                  }
+                />
+                {terms.error && (
+                  <p id="auth-terms-error" role="alert" className="auth-error">
+                    {terms.error}
+                  </p>
+                )}
+              </div>
               {mode === "login" && (
                 <p className="text-center text-[12px] text-ink-muted">
                   Хочете, щоб вас знайшли замовники?{" "}

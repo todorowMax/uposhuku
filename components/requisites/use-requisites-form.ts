@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/lib/auth/client";
+import { withRiskAck } from "@/lib/legal/client";
 import { validateRequisites, type Requisites, type RequisitesField } from "@/lib/deals/requisites";
 import { fetchOwnRequisites, saveOwnRequisites, type OwnRequisitesDto } from "@/lib/requisites/client";
 
@@ -123,7 +124,7 @@ export const useRequisitesForm = () => {
     setErrors({});
     setNotice(null);
     try {
-      const { outcome, ...data } = await saveOwnRequisites(checked.value);
+      const { outcome, ...data } = await withRiskAck(() => saveOwnRequisites(checked.value));
       apply(data);
       setNotice(outcome.kind === "saved" ? "Способи оплати збережено." : "Зміну прийнято: вона набуде чинності через 24 години. Ми надіслали вам лист.");
     } catch (reason) {

@@ -8,6 +8,7 @@ import { TabBadge } from "@/components/account/tab-badge";
 import { ChromeReveal } from "@/components/map/chrome-reveal";
 import { MapModeSwitch } from "@/components/map/mode-switch";
 import { DeepLinkSync } from "@/components/map/deep-link-sync";
+import { LegalSheets } from "@/components/legal/legal-sheets";
 import { DealSync } from "@/lib/deals/client";
 import { PaymentReturnSync } from "@/lib/deals/use-payment-return";
 import { MapRequestsSync } from "@/lib/feed/map-requests";
@@ -53,6 +54,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <DirectChatSync />
       <InboxPanel />
       <PanelPreload />
+      <LegalSheets />
       {children}
     </main>
   );

@@ -11,6 +11,7 @@ import { useConfig } from "wagmi";
 import { ApiError } from "@/lib/auth/client";
 import { requestWalletChallenge, sendWalletSignature } from "@/lib/crypto/client";
 import { walletErrorText } from "@/lib/crypto/wallet-errors";
+import { withRiskAck } from "@/lib/legal/client";
 
 export namespace AddressProofTypes {
   export type Result = { kind: "saved" } | { kind: "pending"; effectiveAt: number } | { kind: "unchanged" };
@@ -27,9 +28,9 @@ export const useAddressProof = (address: string | null, onDone: () => void) => {
     setBusy(true);
     setError(null);
     try {
-      const { nonce, message } = await requestWalletChallenge(address);
+      const { nonce, message } = await withRiskAck(() => requestWalletChallenge(address));
       const signature = await signMessage(config, { message });
-      const done = await sendWalletSignature(nonce, signature);
+      const done = await withRiskAck(() => sendWalletSignature(nonce, signature));
       setResult(done.outcome);
       onDone();
     } catch (reason) {

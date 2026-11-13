@@ -21,6 +21,7 @@ import { WalletFlowError, type PayPhase } from "@/lib/crypto/pay-flow";
 import { USDT_DECIMALS } from "@/lib/crypto/units";
 import { readViaWallet, waitReceiptViaWallet } from "@/lib/crypto/wallet-read";
 import { walletErrorText } from "@/lib/crypto/wallet-errors";
+import { ensureRiskAck, withRiskAck } from "@/lib/legal/client";
 import { ESCROW_REVIEW_DAYS, type Deal, type DealStage } from "@/lib/deals/types";
 
 export namespace EscrowPanelTypes {
@@ -89,7 +90,7 @@ export const useEscrowPanel = (options: EscrowPanelTypes.Options) => {
   const reconcile = async (client?: string) => {
     setPhase("syncing");
     try {
-      await syncEscrow(deal.id, stage.id, client);
+      await withRiskAck(() => syncEscrow(deal.id, stage.id, client));
       setNeedsSync(false);
       setPhase("done");
       onChanged();
@@ -106,6 +107,8 @@ export const useEscrowPanel = (options: EscrowPanelTypes.Options) => {
     setError(null);
     try {
       if (act === "deposit") {
+        // Внесення це транзакція в гаманці, її сервер не зупинить: ризик підтверджуємо до неї.
+        if (!(await ensureRiskAck())) throw new WalletFlowError("Без підтвердження ризиків внесення в ескроу не починаємо.");
         if (!performerWallet) throw new WalletFlowError("Виконавець не підтвердив адресу гаманця.");
         const hash = await createEscrowDeal({
           config,

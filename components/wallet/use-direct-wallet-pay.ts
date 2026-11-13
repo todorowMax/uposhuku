@@ -16,6 +16,7 @@ import { dealRefOf } from "@/lib/crypto/deal-ref";
 import { waitReceiptViaWallet } from "@/lib/crypto/wallet-read";
 import { sendDirectPayment, WalletFlowError } from "@/lib/crypto/pay-flow";
 import { walletErrorText } from "@/lib/crypto/wallet-errors";
+import { ensureRiskAck, withRiskAck } from "@/lib/legal/client";
 import { USDT_DECIMALS } from "@/lib/crypto/units";
 
 export namespace DirectWalletPayTypes {
@@ -68,7 +69,7 @@ export const useDirectWalletPay = (options: DirectWalletPayTypes.Options) => {
     setPhase("checking");
     setError(null);
     try {
-      await submitWalletPayment(dealId, tx);
+      await withRiskAck(() => submitWalletPayment(dealId, tx));
       setPhase("paid");
       onPaid();
     } catch (reason) {
@@ -80,6 +81,8 @@ export const useDirectWalletPay = (options: DirectWalletPayTypes.Options) => {
     if (!canPay || !owner || units === null) return;
     setError(null);
     try {
+      // Транзакцію в гаманці сервер зупинити не може: ризик підтверджуємо до неї.
+      if (!(await ensureRiskAck())) throw new WalletFlowError("Без підтвердження ризиків оплату в USDT не починаємо.");
       const tx = await sendDirectPayment({ config, crypto, owner, recipient: recipient as Address, units, dealRef: dealRefOf(dealId, stageId), onPhase: setPhase });
       setHash(tx);
       setPhase("mining");

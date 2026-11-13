@@ -1,6 +1,6 @@
 "use client";
 
-import { ApiError } from "@/lib/auth/client";
+import { ApiError, problemError } from "@/lib/auth/client";
 import type { Review } from "./types";
 
 const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
@@ -14,8 +14,8 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   } catch {
     throw new ApiError("Немає зв'язку. Перевірте інтернет і спробуйте ще раз.");
   }
-  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string }) | null;
-  if (!response.ok) throw new ApiError(data?.detail ?? data?.title ?? "Щось пішло не так. Спробуйте ще раз.");
+  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string; code?: string }) | null;
+  if (!response.ok) throw problemError(data);
   return data as T;
 };
 

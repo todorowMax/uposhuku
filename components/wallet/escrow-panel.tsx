@@ -12,6 +12,7 @@ import { CheckboxField } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { chainById } from "@/lib/crypto/chains";
 import type { PublicCryptoConfig } from "@/lib/crypto/config";
+import { feeLabel } from "@/lib/crypto/fee-label";
 import { SETTLE_LABEL, type EscrowRole } from "@/lib/crypto/escrow-ui";
 import type { Deal, DealStage } from "@/lib/deals/types";
 import { useEscrowPanel } from "./use-escrow-panel";
@@ -40,15 +41,17 @@ const AddressRow = ({ label, value }: { label: string; value: string }) => (
 /** Рядок комісії: ставка з контракту, «?» відкриває пояснення дотиком і клавіатурою. */
 const FeeLine = ({ feeBps }: { feeBps: number | null }) => (
   <p className="flex items-center gap-1.5 text-xs text-ink">
-    {feeBps === null ? "Комісія: читаємо з контракту…" : `Комісія, ${feeBps / 100}%`}
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="icon" aria-label="Що входить у комісію">
-          ?
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="max-w-64 text-sm">Комісію сервісу контракт бере зверху до ціни етапу. Виконавець отримує ціну повністю. Ставку читаємо прямо з контракту.</PopoverContent>
-    </Popover>
+    {feeLabel(feeBps)}
+    {feeBps !== 0 && (
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="icon" aria-label="Що входить у комісію">
+            ?
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="max-w-64 text-sm">Комісію сервісу контракт бере зверху до ціни етапу. Виконавець отримує ціну повністю. Ставку читаємо прямо з контракту.</PopoverContent>
+      </Popover>
+    )}
   </p>
 );
 

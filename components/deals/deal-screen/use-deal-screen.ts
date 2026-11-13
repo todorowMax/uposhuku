@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/auth/client";
 import { dealAction, performerAction, startPayment } from "@/lib/deals/client";
 import { currentStage } from "@/lib/deals/machine";
 import { nextStepOf, type NextStepTypes } from "@/lib/deals/next-step";
+import { withRiskAck } from "@/lib/legal/client";
 import type { PaymentMethod } from "@/lib/deals/requisites";
 import type { Deal, DealStage } from "@/lib/deals/types";
 
@@ -42,7 +43,7 @@ export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options
     setBusy(action);
     setError(null);
     try {
-      onChanged(await dealAction(deal, action, { stageId: target?.id, ...extra }));
+      onChanged(await withRiskAck(() => dealAction(deal, action, { stageId: target?.id, ...extra })));
       setConfirmRelease(false);
       return true;
     } catch (failure) {

@@ -10,6 +10,7 @@ import { submitCryptoProof } from "@/lib/crypto/client";
 import { isTronTxHash } from "@/lib/crypto/tron";
 import { ApiError } from "@/lib/auth/client";
 import { loadDeals } from "@/lib/deals/client";
+import { withRiskAck } from "@/lib/legal/client";
 
 export const useCryptoTransfer = (dealId: string, requestId: string) => {
   const [hash, setHash] = useState("");
@@ -23,7 +24,7 @@ export const useCryptoTransfer = (dealId: string, requestId: string) => {
     setBusy(true);
     setError(null);
     try {
-      await submitCryptoProof(dealId, hash.trim());
+      await withRiskAck(() => submitCryptoProof(dealId, hash.trim()));
       await loadDeals(requestId);
     } catch (reason) {
       setError(reason instanceof ApiError ? reason.message : "Не вдалося перевірити транзакцію.");

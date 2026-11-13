@@ -4,7 +4,7 @@
 // виклики /api/profile. Опублікований профіль з'являється на карті лише після
 // оплати розміщення (lib/map/performers.ts).
 
-import { ApiError, sessionStore } from "@/lib/auth/client";
+import { ApiError, problemError, sessionStore } from "@/lib/auth/client";
 import { setMyPerformer } from "@/lib/map/performers";
 import { forgetPlacement, loadPlacement } from "@/lib/placement/client";
 import { registerCustomAvatar } from "@/lib/map/portrait";
@@ -31,8 +31,8 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
     throw new ApiError("Немає зв'язку. Перевірте інтернет і спробуйте ще раз.");
   }
   if (response.status === 204) return undefined as T;
-  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string }) | null;
-  if (!response.ok) throw new ApiError(data?.detail ?? data?.title ?? "Щось пішло не так. Спробуйте ще раз.");
+  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string; code?: string }) | null;
+  if (!response.ok) throw problemError(data);
   return data as T;
 };
 

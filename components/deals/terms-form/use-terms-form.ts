@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import type { StagesEditorTypes } from "@/components/deals/stages-editor";
 import { ApiError } from "@/lib/auth/client";
+import { withRiskAck } from "@/lib/legal/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { proposeTerms } from "@/lib/deals/client";
 import { feeOf, initialMethod, splitIntoStages, validateDraft } from "@/lib/deals/machine";
@@ -74,7 +75,7 @@ export const useTermsForm = (conversation: Pick<ConversationDto, "id" | "perform
     setBusy(true);
     setError(null);
     try {
-      await proposeTerms(conversation.id, { title: title.trim(), description: description.trim(), criteria: criteria.trim(), method, stages });
+      await withRiskAck(() => proposeTerms(conversation.id, { title: title.trim(), description: description.trim(), criteria: criteria.trim(), method, stages }));
       onDone();
     } catch (reason) {
       setError(

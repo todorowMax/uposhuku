@@ -5,7 +5,7 @@
 // Розміщення в браузері: скільки сплачено й який рівень, відкрита панель
 // «Стати на карту», рахунок на оплату й перевірка його стану. Рівень одразу міняє маркер людини на карті; без оплати маркера на карті немає.
 
-import { ApiError, sessionStore } from "@/lib/auth/client";
+import { ApiError, problemError, sessionStore } from "@/lib/auth/client";
 import { createStore } from "@/lib/store";
 import type { InvoiceCheck, Placement, PlacementInvoice } from "./types";
 
@@ -26,8 +26,8 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
   } catch {
     throw new ApiError("Немає зв'язку. Перевірте інтернет і спробуйте ще раз.");
   }
-  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string }) | null;
-  if (!response.ok) throw new ApiError(data?.detail ?? data?.title ?? "Щось пішло не так. Спробуйте ще раз.");
+  const data = (await response.json().catch(() => null)) as (T & { detail?: string; title?: string; code?: string }) | null;
+  if (!response.ok) throw problemError(data);
   return data as T;
 };
 
