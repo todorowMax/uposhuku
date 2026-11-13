@@ -1115,6 +1115,11 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   gap: 14px;
 }
 
+/* У шторці входу заголовка немає, тож верхній відступ дає лише ручка (телефон) або нічого (вікно): іконка липла до краю. */
+.ui-sheet-body.auth-sheet {
+  padding-top: 12px;
+}
+
 .auth-lead {
   font-size: 13px;
   line-height: 1.55;
@@ -1827,7 +1832,8 @@ html[data-glass] .offers-panel {
 .offers-tab {
   white-space: nowrap;
   position: absolute;
-  bottom: 76px;
+  /* Над нижньою панеллю з запасом: при 76 px кнопка торкалася її верхнього краю на планшетній ширині (640–1023). */
+  bottom: 94px;
   left: 50%;
   z-index: var(--z-controls);
   display: inline-flex;
@@ -5600,6 +5606,10 @@ html[data-map-ready] .map-skeleton {
 
   .ui-sheet-body {
     padding: 0 24px 24px;
+  }
+
+  .ui-sheet-body.auth-sheet {
+    padding-top: 28px;
   }
 
   .ui-sheet[data-state="open"] {
