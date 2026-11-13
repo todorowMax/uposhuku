@@ -8,6 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
 import { useTermsConsent } from "@/components/auth/use-terms-consent";
+import { useTurnstile } from "@/components/auth/use-turnstile";
 import { ApiError, addPublishedRequest, authFlowStore, publishRequest, sessionStore, startEmail, verifyEmail } from "@/lib/auth/client";
 import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
@@ -36,6 +37,7 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
   const [mock, setMock] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const terms = useTermsConsent();
+  const captcha = useTurnstile();
   const [draft] = useState<RequestDraft | null>(() => (mode === "publish" ? (loadDraft()?.draft ?? null) : null));
   const bodyRef = useRef<HTMLDivElement>(null);
   const codeRef = useRef<{ focus: () => void }>(null);
@@ -100,11 +102,11 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
 
   const sendCode = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (!terms.confirm()) return;
+    if (!terms.confirm() || captcha.pending) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await startEmail(email);
+      const result = await startEmail(email, captcha.token);
       setMock(result.mock);
       setHint(result.hint ?? null);
       setDigits(emptyCode(result.codeLength));
@@ -116,6 +118,8 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
       track(EVENTS.authFailed, { method: "email", reason: "send" });
       setError(reason instanceof ApiError ? reason.message : "Не вдалося надіслати код.");
     } finally {
+      // Токен одноразовий: і після успіху, і після відмови потрібен новий (повторний лист, інша пошта).
+      captcha.reset();
       setBusy(false);
     }
   };
@@ -191,6 +195,8 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
     mock,
     cooldown,
     terms,
+    captcha: { pending: captcha.pending, failed: captcha.failed },
+    captchaRef: captcha.boxRef,
     bodyRef,
     codeRef,
     close,

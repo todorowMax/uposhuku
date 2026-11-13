@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { decodeBase32, totpCode, verifyTotp } from "@/lib/admin/totp";
 import { newAccountLimit, NEW_ACCOUNT_MAX_STAGE, releaseNeedsCode, RELEASE_CODE_FROM } from "@/lib/deals/limits";
 import { isValidTaxId, maskTaxId, validatePayoutApplication } from "@/lib/deals/payout";
-import { contentSecurityPolicy, MAP_ORIGINS, rpcOrigin, securityHeaders, WALLETCONNECT_ORIGINS } from "@/lib/security-headers";
+import { contentSecurityPolicy, enforcedPolicy, MAP_ORIGINS, rpcOrigin, securityHeaders, WALLETCONNECT_ORIGINS } from "@/lib/security-headers";
 
 /** ІПН із вірною контрольною цифрою за алгоритмом: перші 9 цифр, остання обчислена. */
 const withCheckDigit = (nine: string): string => {
@@ -72,10 +72,14 @@ describe("ліміти безпечної угоди", () => {
 });
 
 describe("захисні заголовки", () => {
-  it("CSP лише Report-Only, а три прості заголовки діють одразу", () => {
+  it("безпечні директиви CSP діють одразу, script-src лишається в Report-Only, прості заголовки на місці", () => {
     const headers = securityHeaders();
-    expect(headers["Content-Security-Policy-Report-Only"]).toBeDefined();
-    expect(headers).not.toHaveProperty("Content-Security-Policy");
+    expect(headers["Content-Security-Policy-Report-Only"]).toContain("script-src");
+    const enforced = headers["Content-Security-Policy"];
+    for (const directive of ["frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) expect(enforced).toContain(directive);
+    expect(enforcedPolicy()).toBe(enforced);
+    // Те, що залежить від переліку джерел (скрипти, картинки, мережа, фрейми), нічого не блокує.
+    for (const name of ["script-src", "default-src", "connect-src", "img-src", "style-src", "frame-src", "worker-src"]) expect(enforced).not.toContain(name);
     expect(headers["X-Content-Type-Options"]).toBe("nosniff");
     expect(headers["X-Frame-Options"]).toBe("DENY");
     expect(headers["Referrer-Policy"]).toBeTruthy();
@@ -93,6 +97,11 @@ describe("захисні заголовки", () => {
     expect(csp).toMatch(/img-src[^;]*data:[^;]*blob:/);
     expect(csp).not.toContain("'unsafe-eval'");
     expect(contentSecurityPolicy({ dev: true })).toContain("'unsafe-eval'");
+  });
+
+  it("політика пускає Turnstile: скрипт, фрейм і запити з challenges.cloudflare.com", () => {
+    const parts = contentSecurityPolicy().split("; ");
+    for (const name of ["script-src", "frame-src", "connect-src"]) expect(parts.find((part) => part.startsWith(name))).toContain("https://challenges.cloudflare.com");
   });
 
   it("політика пускає WalletConnect і RPC з налаштувань оплат", () => {

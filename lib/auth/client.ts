@@ -87,8 +87,9 @@ export const loadSession = (force = false) => {
   return loading;
 };
 
-export const startEmail = (email: string) =>
-  call<EmailStartResult>("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email }) });
+/** `turnstileToken`: токен віджета Cloudflare; без ключів перевірки на сервері його не питають. */
+export const startEmail = (email: string, turnstileToken?: string | null) =>
+  call<EmailStartResult>("/api/auth/email/start", { method: "POST", body: JSON.stringify({ email, ...(turnstileToken ? { turnstileToken } : {}) }) });
 
 export const verifyEmail = async (email: string, code: string, accepted: boolean) => {
   const { user } = await call<{ user: SessionUser }>("/api/auth/email/verify", {

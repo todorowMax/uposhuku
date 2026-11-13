@@ -28,3 +28,9 @@ export const authMode = (): AuthMode =>
 export const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value) && value.length <= 254;
 
 export const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+/** Дія віджета Turnstile на відправці коду: сервер звіряє її з відповіддю siteverify. */
+export const TURNSTILE_ACTION = "login";
+
+/** Сесія без жодного звернення довше цього часу мертва (її не приймає `getSessionUser`); tick прибирає такі рядки. */
+export const SESSION_IDLE_MS = 14 * 24 * 60 * 60 * 1000;

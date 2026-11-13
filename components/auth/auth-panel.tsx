@@ -21,7 +21,7 @@ export namespace AuthPanelScreenTypes {
 }
 
 export const AuthPanel = ({ onPublished }: AuthPanelScreenTypes.Props) => {
-  const { bodyRef, codeRef, ...auth } = useAuthPanel(onPublished);
+  const { bodyRef, codeRef, captchaRef, ...auth } = useAuthPanel(onPublished);
   const { step } = auth;
   const publishing = step === "publishing";
   // Пока публікуємо, шторку не закрити: чернетка вже в дорозі.
@@ -75,6 +75,8 @@ export const AuthPanel = ({ onPublished }: AuthPanelScreenTypes.Props) => {
               </>
             )}
           </div>
+          {/* Віджет Turnstile живе між кроками, щоб повторний лист мав свіжий токен; поки людину не треба перевіряти, він порожній. */}
+          <div ref={captchaRef} />
         </SheetBody>
       </SheetContent>
     </Sheet>

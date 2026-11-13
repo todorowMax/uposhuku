@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { authFlowStore } from "@/lib/auth/client";
 
 export namespace AuthEmailStepTypes {
-  export type Props = Pick<AuthPanelState, "mode" | "email" | "busy" | "error" | "terms" | "googleHref" | "sendCode" | "changeEmail" | "beforeGoogle">;
+  export type Props = Pick<AuthPanelState, "mode" | "email" | "busy" | "error" | "terms" | "captcha" | "googleHref" | "sendCode" | "changeEmail" | "beforeGoogle">;
 }
 
 const lead = (mode: AuthPanelState["mode"]) => {
@@ -21,7 +21,7 @@ const lead = (mode: AuthPanelState["mode"]) => {
   return "Пошта й код з листа, без пароля. Нова адреса створює новий акаунт.";
 };
 
-export const AuthEmailStep = ({ mode, email, busy, error, terms, googleHref, sendCode, changeEmail, beforeGoogle }: AuthEmailStepTypes.Props) => (
+export const AuthEmailStep = ({ mode, email, busy, error, terms, captcha, googleHref, sendCode, changeEmail, beforeGoogle }: AuthEmailStepTypes.Props) => (
   <>
     <p className="auth-lead">{lead(mode)}</p>
     <form onSubmit={sendCode} className="grid gap-2.5">
@@ -45,10 +45,15 @@ export const AuthEmailStep = ({ mode, email, busy, error, terms, googleHref, sen
           {error}
         </p>
       )}
-      <Button type="submit" disabled={busy || !email.includes("@")}>
+      <Button type="submit" disabled={busy || !email.includes("@") || captcha.pending}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
         Увійти або зареєструватися
       </Button>
+      {captcha.failed && (
+        <p role="alert" className="auth-error">
+          Не вдалося завантажити перевірку на ботів. Оновіть сторінку або вимкніть блокувальник реклами.
+        </p>
+      )}
     </form>
     <div className="auth-divider">
       <span>або</span>

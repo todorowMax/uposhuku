@@ -7,10 +7,10 @@ import type { AuthPanelState } from "@/components/auth/use-auth-panel";
 import { Button } from "@/components/ui/button";
 
 export namespace AuthCodeStepTypes {
-  export type Props = Pick<AuthPanelState, "email" | "mock" | "hint" | "digits" | "busy" | "error" | "cooldown" | "codeRef" | "onDigits" | "sendCode">;
+  export type Props = Pick<AuthPanelState, "email" | "mock" | "hint" | "digits" | "busy" | "error" | "cooldown" | "captcha" | "codeRef" | "onDigits" | "sendCode">;
 }
 
-export const AuthCodeStep = ({ email, mock, hint, digits, busy, error, cooldown, codeRef, onDigits, sendCode }: AuthCodeStepTypes.Props) => (
+export const AuthCodeStep = ({ email, mock, hint, digits, busy, error, cooldown, captcha, codeRef, onDigits, sendCode }: AuthCodeStepTypes.Props) => (
   <>
     {mock ? (
       <p className="auth-lead">
@@ -32,7 +32,7 @@ export const AuthCodeStep = ({ email, mock, hint, digits, busy, error, cooldown,
     </p>
     <div className="flex items-center justify-center gap-1 text-sm text-ink-muted">
       Не прийшов лист?
-      <Button variant="link" disabled={cooldown > 0 || busy} onClick={() => void sendCode()}>
+      <Button variant="link" disabled={cooldown > 0 || busy || captcha.pending} onClick={() => void sendCode()}>
         {cooldown > 0 ? `Надіслати ще раз за ${cooldown} с` : "Надіслати ще раз"}
       </Button>
     </div>

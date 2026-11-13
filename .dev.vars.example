@@ -6,6 +6,11 @@ RESEND_API_KEY=
 MAIL_FROM=Findlyfy <hello@findlyfy.com>
 # Тестовий вхід без пошти: код доступу, 4–8 цифр. Без нього локально працює 000000.
 DEV_LOGIN_CODE=
+# Cloudflare Turnstile на відправці коду входу. Без обох ключів перевірка вимкнена (на проді тоді є попередження в журналі).
+# Тестові ключі для розробки (завжди проходять): TURNSTILE_SITE_KEY=1x00000000000000000000AA, TURNSTILE_SECRET=1x0000000000000000000000000000000AA.
+# Справжні: віджет у кабінеті Cloudflare (Turnstile) з доменами сайту, секрет через `wrangler secret put TURNSTILE_SECRET`.
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET=
 # Google OAuth; кнопку показуємо, лише коли обидва заповнені.
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

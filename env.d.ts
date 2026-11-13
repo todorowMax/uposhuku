@@ -78,6 +78,9 @@ interface CloudflareEnv {
   ADMIN_DEV_LOGIN?: string;
   /** Секрет TOTP модератора (base32, як у автентифікаторах). Секрет. Без нього на проді грошові рішення спорів недоступні. */
   ADMIN_TOTP_SECRET?: string;
+  /** Cloudflare Turnstile на вході: публічний ключ віджета (віддаємо клієнту) і секрет siteverify. Без обох перевірка вимкнена. */
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
 }

@@ -1,7 +1,11 @@
 // lib/security-headers.ts
 //
 // Захисні заголовки відповідей. X-Content-Type-Options, Referrer-Policy і X-Frame-Options діють одразу.
-// Content-Security-Policy поки лише Report-Only: порушення йдуть у /api/csp-report, нічого не блокується.
+// CSP розділено на два заголовки:
+//  - Content-Security-Policy (діє): лише безпечні директиви, які не залежать від джерел скриптів і картинок:
+//    frame-ancestors, object-src, base-uri, form-action;
+//  - Content-Security-Policy-Report-Only: повна політика з script-src тощо, нічого не блокує, порушення йдуть
+//    у /api/csp-report. `script-src` лишається тут: сайт тримає 'unsafe-inline', поки Next вставляє inline-скрипти без nonce.
 // HSTS не ставимо: це налаштування зони Cloudflare у власника.
 //
 // Джерела CSP зібрано з коду:
@@ -13,6 +17,8 @@
 //    оплат з CRYPTO_RPC_URL (origin) додається, якщо задано: браузер читає мережу через гаманець, але пакет може
 //    звернутися до вузла напряму;
 //  - WebSocket чату: той самий хост (wss:/ws:);
+//  - Turnstile на вході (components/auth/use-turnstile.ts): скрипт, iframe і запити з challenges.cloudflare.com
+//    (script-src, frame-src, connect-src);
 //  - heic-to (WASM у браузері): 'wasm-unsafe-eval'; Next вставляє inline-скрипти без nonce: 'unsafe-inline'.
 
 export const CSP_REPORT_PATH = "/api/csp-report";
@@ -32,6 +38,19 @@ export const WALLETCONNECT_ORIGINS: readonly string[] = [
   "wss://relay.walletconnect.com",
 ];
 
+/** Cloudflare Turnstile: https://developers.cloudflare.com/turnstile/reference/content-security-policy/. */
+export const TURNSTILE_ORIGIN = "https://challenges.cloudflare.com";
+
+/** Директиви, які діють одразу: не залежать від переліку скриптів, картинок і мережі, тож не можуть зламати карту чи оплату. */
+const ENFORCED_DIRECTIVES: Record<string, string[]> = {
+  "object-src": ["'none'"],
+  "base-uri": ["'self'"],
+  "form-action": ["'self'"],
+  "frame-ancestors": ["'none'"],
+};
+
+const serialize = (directives: Record<string, string[]>): string => [...Object.entries(directives).map(([name, values]) => `${name} ${values.join(" ")}`), `report-uri ${CSP_REPORT_PATH}`].join("; ");
+
 /** Origin RPC з налаштувань оплат або null, якщо не задано чи адреса некоректна. */
 export const rpcOrigin = (rpcUrl: string | undefined): string | null => {
   try {
@@ -48,25 +67,26 @@ export interface HeaderOptions {
   rpcUrl?: string;
 }
 
-/** Політика як рядок. У режимі розробки React потребує eval для зневадження. */
+/** Директиви, що діють одразу, як рядок заголовка Content-Security-Policy. */
+export const enforcedPolicy = (): string => serialize(ENFORCED_DIRECTIVES);
+
+/** Повна політика як рядок для Report-Only. У режимі розробки React потребує eval для зневадження. */
 export const contentSecurityPolicy = (options: HeaderOptions = {}): string => {
   const rpc = rpcOrigin(options.rpcUrl);
-  const scripts = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", ...(options.dev ? ["'unsafe-eval'"] : [])];
+  const scripts = ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", TURNSTILE_ORIGIN, ...(options.dev ? ["'unsafe-eval'"] : [])];
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
     "script-src": scripts,
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", "https:"],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", "blob:", "data:", ...MAP_ORIGINS, "wss:", ...WALLETCONNECT_ORIGINS, ...(rpc ? [rpc] : []), ...(options.dev ? ["ws:"] : [])],
+    "connect-src": ["'self'", "blob:", "data:", ...MAP_ORIGINS, TURNSTILE_ORIGIN, "wss:", ...WALLETCONNECT_ORIGINS, ...(rpc ? [rpc] : []), ...(options.dev ? ["ws:"] : [])],
     "worker-src": ["'self'", "blob:"],
     "child-src": ["'self'", "blob:"],
-    "object-src": ["'none'"],
-    "base-uri": ["'self'"],
-    "frame-ancestors": ["'none'"],
+    "frame-src": ["'self'", TURNSTILE_ORIGIN],
+    // object-src, base-uri, form-action і frame-ancestors діють окремим заголовком (ENFORCED_DIRECTIVES): тут їх не дублюємо.
   };
-  const body = Object.entries(directives).map(([name, values]) => `${name} ${values.join(" ")}`);
-  return [...body, `report-uri ${CSP_REPORT_PATH}`].join("; ");
+  return serialize(directives);
 };
 
 /** Заголовки для кожної відповіді. */
@@ -74,5 +94,6 @@ export const securityHeaders = (options: HeaderOptions = {}): Record<string, str
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "X-Frame-Options": "DENY",
+  "Content-Security-Policy": enforcedPolicy(),
   "Content-Security-Policy-Report-Only": contentSecurityPolicy(options),
 });
