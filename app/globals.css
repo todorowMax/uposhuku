@@ -1152,6 +1152,8 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   position: relative;
   z-index: 1;
   display: grid;
+  /* minmax(0, 1fr): без нуля колонка росла до ширини шести клітинок коду й виштовхувала вміст за край панелі. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   width: 100%;
   max-width: 420px;
@@ -1201,8 +1203,9 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   text-align: center;
 }
 
-.auth-back,
-.auth-close {
+/* Двічі клас: `.auth-icon-button` нижче задає `position: relative`, і без цього кнопки вставали в потік, а не в кути. */
+.auth-icon-button.auth-back,
+.auth-icon-button.auth-close {
   position: absolute;
   top: 0;
 }
@@ -1408,10 +1411,14 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   display: flex;
   justify-content: center;
   gap: 8px;
+  /* Предок з grid і auto-колонкою інакше росте до ширини шести клітинок (324 px) і виходить за панель. */
+  min-width: 0;
 }
 
 .code-cell {
-  width: 46px;
+  /* flex-basis 46px, але вужче, якщо не вміщаємось: шість клітинок і проміжок на 375 px не вміщалися (324 проти 303) і шоста виходила за край. */
+  flex: 0 1 46px;
+  min-width: 0;
   height: 54px;
   border: 1px solid #a7bcc0;
   border-radius: 12px;
