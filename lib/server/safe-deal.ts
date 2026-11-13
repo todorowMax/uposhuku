@@ -4,6 +4,7 @@
 // Нові оплати й нові угоди питають тут; гроші, що вже в русі (вебхук, звірка, виплата), режиму не питають.
 
 import type { FeatureMode } from "@/lib/features/flags";
+import type { LegalFlags } from "@/lib/legal/types";
 import { featureEnabledFor, featureMode } from "./features";
 
 export const safeDealMode = (): Promise<FeatureMode> => featureMode("safe_deal");
@@ -13,3 +14,15 @@ export const safeDealEnabledFor = (email: string | null | undefined): Promise<bo
 
 /** Юридичні тексти показують безпечну угоду лише в режимі `on`. */
 export const safeDealPublic = async (): Promise<boolean> => (await safeDealMode()) === "on";
+
+/** Крипто-функції (USDT за хешем, оплата з гаманця, ескроу) видно в юридичних текстах, коли будь-яка з них у режимі `on`. */
+export const cryptoPublic = async (): Promise<boolean> => {
+  const modes = await Promise.all([featureMode("crypto_proof"), featureMode("crypto_wallet"), featureMode("crypto_escrow")]);
+  return modes.some((mode) => mode === "on");
+};
+
+/** Що з функцій показувати в умовах і політиці. */
+export const legalFlags = async (): Promise<LegalFlags> => {
+  const [safeDeal, crypto] = await Promise.all([safeDealPublic(), cryptoPublic()]);
+  return { safeDeal, crypto };
+};

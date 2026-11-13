@@ -5,7 +5,10 @@
 // ФОП, тож тут вони мають збігатися з документами, а в тексті сторінок їх
 // не дублюємо: підставляємо через {плейсхолдери}.
 
-import { COMMISSION_RATE } from "@/lib/deals/price";
+import { BANK_RESERVE_RATE, COMMISSION_RATE } from "@/lib/deals/price";
+import { CRITERIA_MAX, DELIVERY_TEXT_MAX } from "@/lib/deals/dispute-aids";
+import { RELEASE_CODE_FROM } from "@/lib/deals/limits";
+import { HOLD_WARN_MS } from "@/lib/deals/sweep-plan";
 import { HOLD_DAYS, MAX_DEAL, MAX_STAGE_AMOUNT, MAX_STAGES, MIN_DEAL, REVIEW_DAYS } from "@/lib/deals/types";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/pricing";
 
@@ -35,12 +38,15 @@ export const DISPUTE_TALK_DAYS = 2;
 
 /** Дати останньої правки кожного документа. */
 export const UPDATED = {
-  offer: "17 жовтня 2026 року",
-  terms: "5 листопада 2026 року",
-  privacy: "5 листопада 2026 року",
+  offer: "13 листопада 2026 року",
+  terms: "13 листопада 2026 року",
+  privacy: "13 листопада 2026 року",
   contacts: "17 жовтня 2026 року",
-  safeDealOffer: "5 листопада 2026 року",
+  safeDealOffer: "13 листопада 2026 року",
 } as const;
+
+/** Частка винагороди Оператора в комісії: комісія мінус резерв банку (резерв рахується від суми платежу, ціна + комісія). */
+const operatorShare = COMMISSION_RATE - BANK_RESERVE_RATE * (1 + COMMISSION_RATE);
 
 const money = (value: number) => new Intl.NumberFormat("uk-UA").format(value).replace(/ /g, " ");
 
@@ -56,6 +62,12 @@ export const LEGAL_VALUES: Record<string, string> = {
   holdDays: String(HOLD_DAYS),
   maxStages: String(MAX_STAGES),
   fee: String(Math.round(COMMISSION_RATE * 100)),
+  reserve: String(Math.round(BANK_RESERVE_RATE * 100)),
+  operatorFee: String(Math.round(operatorShare * 100)),
+  holdWarnDays: String(Math.round(HOLD_WARN_MS / 86_400_000)),
+  releaseCodeFrom: money(RELEASE_CODE_FROM),
+  criteriaMax: String(CRITERIA_MAX),
+  deliveryMax: String(DELIVERY_TEXT_MAX),
   minDeal: money(MIN_DEAL),
   maxDeal: money(MAX_DEAL),
   maxStage: money(MAX_STAGE_AMOUNT),

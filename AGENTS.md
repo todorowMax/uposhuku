@@ -60,7 +60,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   is deployed with 50 000; raising the server cap above 10 000 waits for an audit. Code default 1000 is not changed.
 - Безпечна угода (гроші через Monobank) вмикається змінними `SAFE_DEAL_MODE` = `off` (типово) | `allowlist` | `on`
   та `SAFE_DEAL_USERS` (пошти через кому). Нові угоди й оплата питають режим (`lib/server/safe-deal.ts`), гроші, що вже
-  в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`.
+  в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`; крипту (розділ «Крипта» в умовах, отримувачі в політиці) лише коли хоч один із `crypto_proof`, `crypto_wallet`, `crypto_escrow` у режимі `on` (`cryptoPublic()` у `lib/server/safe-deal.ts`); про `foreign_links` вони не кажуть ніде.
   Токени: `MONOBANK_TOKEN` (звичайний термінал) і `MONOBANK_SPLIT_TOKEN` (розщеплення), `MONOBANK_PLATFORM_RECEIVER_ID`.
   «Заморожено» і «виплачено» ставить лише підтверджена банком відповідь (`lib/deals/payment-status.ts`).
 - Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`; CSP лише

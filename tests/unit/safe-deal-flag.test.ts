@@ -4,7 +4,7 @@ import { applyAction, SAFE_DEAL_UNAVAILABLE, validateDraft } from "@/lib/deals/m
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import { legalLinks } from "@/lib/legal/links";
 import { proposeDeal } from "@/lib/server/deal-repo";
-import { safeDealEnabledFor, safeDealMode, safeDealPublic } from "@/lib/server/safe-deal";
+import { cryptoPublic, legalFlags, safeDealEnabledFor, safeDealMode, safeDealPublic } from "@/lib/server/safe-deal";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 // Режим безпечної угоди: off (типово), allowlist, on. Чиста машина отримує рішення параметром, сервер читає змінні.
@@ -19,6 +19,8 @@ const draft = (over: Partial<DealDraft> = {}): DealDraft => ({
   ...over,
 });
 
+const CRYPTO_MODES = ["CRYPTO_PROOF_MODE", "CRYPTO_WALLET_MODE", "CRYPTO_ESCROW_MODE"] as const;
+
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
   ctx = await useTestD1();
@@ -27,6 +29,7 @@ beforeAll(async () => {
 afterAll(async () => {
   delete process.env.SAFE_DEAL_MODE;
   delete process.env.SAFE_DEAL_USERS;
+  for (const name of CRYPTO_MODES) delete process.env[name];
   await ctx.close();
 });
 
@@ -60,6 +63,32 @@ describe("режим безпечної угоди", () => {
     process.env.SAFE_DEAL_MODE = "on";
     expect(await safeDealEnabledFor("other@example.com")).toBe(true);
     expect(await safeDealPublic()).toBe(true);
+    delete process.env.SAFE_DEAL_MODE;
+  });
+});
+
+describe("видимість крипти в юридичних текстах", () => {
+  it("cryptoPublic: істина, лише коли будь-яка з трьох крипто-функцій у режимі on; allowlist не рахується", async () => {
+    for (const name of CRYPTO_MODES) delete process.env[name];
+    expect(await cryptoPublic()).toBe(false);
+    process.env.CRYPTO_PROOF_MODE = "allowlist";
+    process.env.CRYPTO_PROOF_USERS = "max@example.com";
+    expect(await cryptoPublic()).toBe(false);
+    for (const name of CRYPTO_MODES) {
+      process.env[name] = "on";
+      expect(await cryptoPublic(), name).toBe(true);
+      delete process.env[name];
+    }
+    delete process.env.CRYPTO_PROOF_USERS;
+  });
+
+  it("legalFlags збирає обидва прапорці незалежно", async () => {
+    delete process.env.SAFE_DEAL_MODE;
+    process.env.CRYPTO_ESCROW_MODE = "on";
+    expect(await legalFlags()).toEqual({ safeDeal: false, crypto: true });
+    process.env.SAFE_DEAL_MODE = "on";
+    delete process.env.CRYPTO_ESCROW_MODE;
+    expect(await legalFlags()).toEqual({ safeDeal: true, crypto: false });
     delete process.env.SAFE_DEAL_MODE;
   });
 });

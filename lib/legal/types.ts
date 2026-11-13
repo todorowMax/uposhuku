@@ -8,6 +8,18 @@ export interface LegalSectionData {
   items: string[];
 }
 
+/**
+ * Що з функцій публічно ввімкнено (режим `on`): лише про них пишемо в умовах і політиці.
+ * `safeDeal`: безпечна угода; `crypto`: будь-який із `crypto_proof`, `crypto_wallet`, `crypto_escrow`.
+ * PayPal і Wise (`foreign_links`) у публічних текстах не згадуємо взагалі.
+ */
+export interface LegalFlags {
+  safeDeal: boolean;
+  crypto: boolean;
+}
+
+export const NO_LEGAL_FLAGS: LegalFlags = { safeDeal: false, crypto: false };
+
 /** Розділи, залежні від прапорця, лишаємо `false`/`undefined` і відсікаємо тут. */
 export const visible = (sections: (LegalSectionData | false | undefined)[]): LegalSectionData[] =>
   sections.filter((section): section is LegalSectionData => Boolean(section));
