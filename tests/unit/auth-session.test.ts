@@ -63,6 +63,8 @@ const asToken = (token: string) => {
 };
 
 const json = (body: unknown) => new Request("https://findlyfy.test/api", { method: "POST", body: JSON.stringify(body) });
+/** Вхід із галочкою «Мені є 18 років і приймаю умови»: без неї новий акаунт відхиляється (tests/unit/legal-accept.test.ts). */
+const verifyBody = (fields: Record<string, unknown>) => json({ ...fields, accepted: true });
 
 describe("сесії", () => {
   it("справжній токен дає користувача, без токена гість", async () => {
@@ -177,7 +179,7 @@ describe("cookie сесії", () => {
     delete process.env.AUTH_SECRET;
     const { email, ip } = fresh();
     await startEmailLogin(email, ip);
-    const response = await VERIFY(json({ email, code: codeSentTo(sent, email) }));
+    const response = await VERIFY(verifyBody({ email, code: codeSentTo(sent, email) }));
     expect(response.status).toBe(503);
     expect(cookieJar.get("vm_session")).toBeUndefined();
   });
@@ -192,7 +194,7 @@ describe("режими пошти", () => {
     expect(started.status).toBe(503);
     expect(sent).not.toHaveBeenCalled();
     expect(await getDb().select().from(users).where(eq(users.email, email))).toHaveLength(0);
-    const verified = await VERIFY(json({ email, code: "000000" }));
+    const verified = await VERIFY(verifyBody({ email, code: "000000" }));
     expect(verified.status).toBe(503);
     expect(cookieJar.get("vm_session")).toBeUndefined();
   });
@@ -211,11 +213,11 @@ describe("режими пошти", () => {
     for (const guess of ["000000", "424242"]) {
       // Випадковий справжній код збігся б із вгаданим раз на мільйон.
       if (guess === real) continue;
-      const response = await VERIFY(json({ email, code: guess }));
+      const response = await VERIFY(verifyBody({ email, code: guess }));
       expect(response.status).toBe(400);
     }
     expect(cookieJar.get("vm_session")).toBeUndefined();
-    expect((await VERIFY(json({ email, code: real }))).status).toBe(200);
+    expect((await VERIFY(verifyBody({ email, code: real }))).status).toBe(200);
   });
 
   it("поза продом у тестовому режимі код 000000 працює й підказка повертається (контроль для проду)", async () => {
@@ -224,7 +226,7 @@ describe("режими пошти", () => {
     const { email } = fresh();
     const body = (await (await START(json({ email }))).json()) as Record<string, unknown>;
     expect(body).toMatchObject({ sent: true, mock: true, codeLength: 6, hint: "000000" });
-    expect((await VERIFY(json({ email, code: "000000" }))).status).toBe(200);
+    expect((await VERIFY(verifyBody({ email, code: "000000" }))).status).toBe(200);
   });
 
   it("власний DEV_LOGIN_CODE: підказки немає, 000000 більше не діє", async () => {
@@ -234,8 +236,8 @@ describe("режими пошти", () => {
     const body = (await (await START(json({ email }))).json()) as Record<string, unknown>;
     expect(body).toMatchObject({ mock: true, codeLength: 6 });
     expect("hint" in body).toBe(false);
-    expect((await VERIFY(json({ email, code: "000000" }))).status).toBe(400);
-    expect((await VERIFY(json({ email, code: "424242" }))).status).toBe(200);
+    expect((await VERIFY(verifyBody({ email, code: "000000" }))).status).toBe(400);
+    expect((await VERIFY(verifyBody({ email, code: "424242" }))).status).toBe(200);
   });
 });
 
@@ -247,7 +249,7 @@ describe("маршрути входу: тіло й відповіді", () => {
     expect((await START(json({ email: 42 }))).status).toBe(400);
     const { email } = fresh();
     expect((await VERIFY(json({ email: "bad", code: "123456" }))).status).toBe(400);
-    for (const code of ["", "12", "abcdef", "123456789", 123456]) expect((await VERIFY(json({ email, code }))).status).toBe(400);
+    for (const code of ["", "12", "abcdef", "123456789", 123456]) expect((await VERIFY(verifyBody({ email, code }))).status).toBe(400);
     expect(sent).not.toHaveBeenCalled();
   });
 

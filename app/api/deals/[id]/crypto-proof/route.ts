@@ -15,6 +15,7 @@ import { deleteProof, listDealProofs, proofByHash, saveProof } from "@/lib/serve
 import { claimDirectPayment, getDealById, getDealForOwner } from "@/lib/server/deal-repo";
 import { readVar } from "@/lib/server/env";
 import { featureEnabledFor } from "@/lib/server/features";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { readDealRequisites } from "@/lib/server/requisites-repo";
 import { failure } from "@/lib/server/route";
@@ -42,6 +43,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const limited = await rateLimited("cryptoProof", user.id);
     if (limited) return limited;
     if (!(await featureEnabledFor("crypto_proof", user.email))) return problem(409, "Оплата USDT недоступна", "Оплата USDT ще не відкрита для вашого акаунта.");
+    const refused = await cryptoGate(user.id);
+    if (refused) return refused;
     const hash = (await readJson(request))?.hash;
     if (!isTronTxHash(hash)) return problem(400, "Хеш некоректний", "Хеш транзакції: 64 символи 0-9 і a-f.");
     const txHash = hash.toLowerCase();

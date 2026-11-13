@@ -7,6 +7,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { createInvoice, MonobankError } from "@/lib/monobank/client";
 import { MAX_PAYMENT, MIN_PAYMENT } from "@/lib/placement/tiers";
 import { getSessionUser } from "@/lib/server/auth";
+import { legalGate } from "@/lib/server/legal-gate";
 import { readVar } from "@/lib/server/env";
 import { createPlacementInvoice, newPlacementInvoiceId } from "@/lib/server/placement-invoice-repo";
 import { getPlacement } from "@/lib/server/placement-repo";
@@ -21,6 +22,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
+  const legal = await legalGate(user.id);
+  if (legal) return legal;
   const body = await readJson(request);
   const amount = typeof body?.amount === "number" ? Math.round(body.amount) : NaN;
   if (!Number.isFinite(amount) || amount < MIN_PAYMENT || amount > MAX_PAYMENT) {

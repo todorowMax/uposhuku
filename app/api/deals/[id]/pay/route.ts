@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { reconcilePayment } from "@/lib/server/deal-money";
 import { startStagePayment } from "@/lib/server/deal-pay";
 import { getDealForOwner } from "@/lib/server/deal-repo";
+import { legalGate } from "@/lib/server/legal-gate";
 import { activeStagePayment } from "@/lib/server/payment-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
@@ -21,6 +22,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   try {
     const limited = await rateLimited("dealPay", user.id);
     if (limited) return limited;
+    const legal = await legalGate(user.id);
+    if (legal) return legal;
     const result = await startStagePayment({ user, dealId: (await params).id, origin: new URL(request.url).origin });
     if (!result.ok) return problem(result.status, result.title, result.detail);
     return Response.json({ pageUrl: result.pageUrl, reused: result.reused }, { status: result.reused ? 200 : 201, headers: NO_STORE });

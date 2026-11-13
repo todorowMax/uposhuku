@@ -8,6 +8,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { readVar } from "@/lib/server/env";
 import type { KitServerConfig } from "@/kit/telemetry/core";
 import { ALLOWED_EVENTS } from "./events";
+import { telemetrySalt } from "./salt";
 
 const context = () => {
   try {
@@ -32,7 +33,7 @@ export const telemetryConfig: KitServerConfig = {
     return readVar("RELEASE");
   },
   get salt() {
-    return readVar("AUTH_SECRET") ?? "uposhuku-dev-salt";
+    return telemetrySalt();
   },
   // Немає привʼязки TELEMETRY_DB: телеметрія мовчки вимкнена, застосунок працює як працював.
   db: () => (globalThis as { __TEST_TELEMETRY_D1?: D1Database }).__TEST_TELEMETRY_D1 ?? context()?.env.TELEMETRY_DB ?? null,

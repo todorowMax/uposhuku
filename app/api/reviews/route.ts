@@ -3,6 +3,7 @@
 // відгук по угоді; POST {dealId, stars, text} — лишити відгук після
 // завершеної угоди, один на угоду. verified ставить сервер (lib/deals/verified.ts).
 
+import { legalGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
@@ -34,6 +35,8 @@ export async function POST(request: Request) {
   if (!user) return problem(401, "Потрібен вхід");
   const limited = await rateLimited("reviewCreate", user.id);
   if (limited) return limited;
+  const legal = await legalGate(user.id);
+  if (legal) return legal;
   const body = await readJson(request);
   const dealId = typeof body?.dealId === "string" ? body.dealId : "";
   const deal = (await listDeals(user.id)).find((item) => item.id === dealId);

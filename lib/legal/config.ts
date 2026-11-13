@@ -36,13 +36,34 @@ export const CONTACT_PHONE = "+34 656 940 473";
 /** Скільки робочих днів сторони домовляються самі, перш ніж відкрити спір. */
 export const DISPUTE_TALK_DAYS = 2;
 
+/**
+ * Версії документів, дата зміни змісту (РРРР-ММ-ДД). Піднімаємо вручну, коли змінюється сенс тексту: тоді кожен
+ * користувач має прийняти нову версію ще раз (lib/legal/acceptance.ts). Дрібна правка друкарської помилки версію не чіпає.
+ * `UPDATED` нижче рахується від цих значень, а не навпаки, тож дата на сторінці й версія в базі не розійдуться.
+ */
+export const LEGAL_VERSIONS = {
+  terms: "2026-11-13",
+  privacy: "2026-11-13",
+  offer: "2026-11-13",
+  safeDealOffer: "2026-11-13",
+  cryptoRisk: "2026-11-13",
+} as const;
+
+const MONTHS = ["січня", "лютого", "березня", "квітня", "травня", "червня", "липня", "серпня", "вересня", "жовтня", "листопада", "грудня"];
+
+/** «2026-11-13» у «13 листопада 2026 року». */
+export const formatLegalDate = (version: string): string => {
+  const [year, month, day] = version.split("-").map(Number);
+  return `${day} ${MONTHS[month - 1]} ${year} року`;
+};
+
 /** Дати останньої правки кожного документа. */
 export const UPDATED = {
-  offer: "13 листопада 2026 року",
-  terms: "13 листопада 2026 року",
-  privacy: "13 листопада 2026 року",
+  offer: formatLegalDate(LEGAL_VERSIONS.offer),
+  terms: formatLegalDate(LEGAL_VERSIONS.terms),
+  privacy: formatLegalDate(LEGAL_VERSIONS.privacy),
   contacts: "17 жовтня 2026 року",
-  safeDealOffer: "13 листопада 2026 року",
+  safeDealOffer: formatLegalDate(LEGAL_VERSIONS.safeDealOffer),
 } as const;
 
 /** Частка винагороди Оператора в комісії: комісія мінус резерв банку (резерв рахується від суми платежу, ціна + комісія). */

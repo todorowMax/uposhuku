@@ -3,9 +3,12 @@
 
 import { NextResponse } from "next/server";
 import { problem } from "@/lib/api/problem";
+import { REQUIRED_DOCS } from "@/lib/legal/acceptance";
 import { loginWithGoogle } from "@/lib/server/auth";
+import { termsRequired } from "@/lib/server/legal-gate";
+import { needsTermsAcceptance, recordAcceptance } from "@/lib/server/legal-repo";
 import { readVar } from "@/lib/server/env";
-import { failure } from "@/lib/server/route";
+import { clientIp, failure } from "@/lib/server/route";
 import { googleConfigured, safeNext } from "@/lib/server/google";
 import { EVENTS } from "@/lib/telemetry/events";
 import { serverEvent } from "@/lib/telemetry/log";
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   if (!googleConfigured()) return problem(503, "Вхід через Google ще не підключено");
   const raw = request.headers.get("cookie")?.match(/(?:^|;\s*)vm_google_state=([^;]+)/)?.[1];
-  let saved: { state?: string; next?: string } = {};
+  let saved: { state?: string; next?: string; accepted?: boolean } = {};
   try {
     saved = raw ? (JSON.parse(decodeURIComponent(raw)) as typeof saved) : {};
   } catch {
@@ -43,8 +46,12 @@ export async function GET(request: Request) {
     if (!infoResponse.ok || !info.sub || !info.email || !info.email_verified) {
       return problem(400, "Вхід через Google не вдався", "Google не підтвердив вашу пошту.");
     }
-    const user = await loginWithGoogle({ googleId: info.sub, email: info.email, name: info.name ?? null, picture: info.picture ?? null });
-    serverEvent(EVENTS.authCompleted, { method: "google" }, (user as { id?: string } | undefined)?.id ?? null, "/api/auth/google/callback");
+    const who = { googleId: info.sub, email: info.email.trim().toLowerCase() };
+    const needsTerms = await needsTermsAcceptance(who);
+    if (needsTerms && saved.accepted !== true) return termsRequired();
+    const user = await loginWithGoogle({ ...who, name: info.name ?? null, picture: info.picture ?? null });
+    if (needsTerms) await recordAcceptance({ userId: user.id, docs: REQUIRED_DOCS, source: "signup", ip: clientIp(request) });
+    serverEvent(EVENTS.authCompleted, { method: "google" }, user.id, "/api/auth/google/callback");
     const response = NextResponse.redirect(new URL(safeNext(saved.next), url.origin));
     response.cookies.delete({ name: "vm_google_state", path: "/api/auth/google" });
     return response;

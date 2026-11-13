@@ -13,6 +13,7 @@ import { proposeDirectDeal, SELF_DEAL } from "@/lib/server/deal-repo";
 import { notifyLater } from "@/lib/server/notify";
 import { getProfile } from "@/lib/server/profile-repo";
 import { pushUser } from "@/lib/server/realtime";
+import { cryptoGate, legalGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { dealNotice } from "@/lib/telegram/notices";
@@ -21,10 +22,16 @@ import { serverEvent } from "@/lib/telemetry/log";
 
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-/** Стеля ескроу для угоди цього способу: null для інших способів, відповідь-відмова, коли ескроу недоступне. */
-const escrowLimit = async (method: DealMethod, email: string, performerUserId: string): Promise<number | null | Response> => {
+/**
+ * Стеля ескроу для угоди цього способу: null для інших способів, відповідь-відмова, коли ескроу недоступне.
+ * Перша дія з USDT потребує підтвердження ризиків: його перевіряємо раніше за прапорець.
+ */
+const escrowLimit = async (input: { method: DealMethod; user: { id: string; email: string }; performerUserId: string }): Promise<number | null | Response> => {
+  const { method, user, performerUserId } = input;
   if (method !== "escrow") return null;
-  const gate = await escrowGate({ email, performerUserId });
+  const risk = await cryptoGate(user.id);
+  if (risk) return risk;
+  const gate = await escrowGate({ email: user.email, performerUserId });
   return typeof gate === "string" ? problem(409, "Ескроу недоступне", gate) : gate.max;
 };
 
@@ -32,8 +39,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
   try {
-    const limited = await rateLimited("dealCreate", user.id);
-    if (limited) return limited;
+    const refused = (await rateLimited("dealCreate", user.id)) ?? (await legalGate(user.id));
+    if (refused) return refused;
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
     const { conversation, role } = access;
@@ -43,7 +50,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const safeEnabled = await safeDealEnabledFor(user.email);
     if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
     // Ескроу: прапорець у того, хто створює (будь-яка сторона), фабрика, підтверджений гаманець виконавця й стеля з контракту.
-    const escrow = await escrowLimit(method, user.email, conversation.performerUserId);
+    const escrow = await escrowLimit({ method, user, performerUserId: conversation.performerUserId });
     if (escrow instanceof Response) return escrow;
     const escrowMax = escrow;
     if (conversation.performerUserId === conversation.customerUserId) return problem(400, "Умови не виставлено", SELF_DEAL);

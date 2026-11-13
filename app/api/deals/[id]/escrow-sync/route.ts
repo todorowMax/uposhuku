@@ -9,6 +9,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { dealForParty } from "@/lib/server/deal-access";
 import { ownerOfDeal } from "@/lib/server/deal-repo";
 import { syncEscrowStage } from "@/lib/server/escrow-sync";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { SecretBoxUnavailableError } from "@/lib/server/secret-box";
@@ -28,6 +29,11 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     // Гаманець замовника приймаємо лише від замовника: виконавець не підставить власний другий гаманець.
     const fromCustomer = (await ownerOfDeal(dealId)) === user.id;
     const client = fromCustomer && typeof body?.client === "string" ? body.client : undefined;
+    // Прив'язка гаманця замовника до етапу це перша звірка після внесення USDT: ризик має бути прийнято.
+    if (client) {
+      const refused = await cryptoGate(user.id);
+      if (refused) return refused;
+    }
     const result = await syncEscrowStage({ dealId, stageId, client });
     if (!result.ok) return problem(result.status, result.title, result.detail);
     return Response.json({ deal: result.deal, changed: result.changed, funded: result.funded }, { headers: { "cache-control": "no-store" } });

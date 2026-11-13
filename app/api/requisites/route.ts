@@ -6,6 +6,7 @@ import { validateRequisites, visibleRequisites, type Requisites } from "@/lib/de
 import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
 import { featureEnabledFor } from "@/lib/server/features";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { sendRequisitesChangeNotice } from "@/lib/server/mail";
 import { getOwnRequisites, saveOwnRequisites } from "@/lib/server/requisites-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
@@ -22,6 +23,13 @@ const forUser = async <T extends { requisites: Requisites | null; pending: { req
   const foreign = await featureEnabledFor("foreign_links", email);
   const shown = (value: Requisites) => visibleRequisites(value, { crypto, wallet, foreign });
   return { ...data, crypto, wallet, foreign, requisites: data.requisites && shown(data.requisites), pending: data.pending && { ...data.pending, requisites: shown(data.pending.requisites) } };
+};
+
+/** USDT-адреса й Binance ID: потрібні прапорець `crypto_proof` і підтверджений ризик; null, якщо цих полів немає або все гаразд. */
+const cryptoFieldsRefusal = async (user: { id: string; email: string }, value: Requisites): Promise<Response | null> => {
+  if (!value.usdtTrc20 && !value.binanceId) return null;
+  if (!(await featureEnabledFor("crypto_proof", user.email))) return problem(409, "Крипто-оплата недоступна", "Оплата USDT ще не відкрита для вашого акаунта.");
+  return cryptoGate(user.id);
 };
 
 const unavailable = () => problem(503, "Реквізити тимчасово недоступні", "Зберігання реквізитів ще не налаштоване. Спробуйте пізніше.");
@@ -45,7 +53,8 @@ export const PUT = async (request: Request) => {
   if (limited) return limited;
   const checked = validateRequisites(await readJson(request));
   if (!checked.ok) return problem(400, "Реквізити не збережено", checked.error);
-  if (!(await featureEnabledFor("crypto_proof", user.email)) && (checked.value.usdtTrc20 || checked.value.binanceId)) return problem(409, "Крипто-оплата недоступна", "Оплата USDT ще не відкрита для вашого акаунта.");
+  const cryptoRefused = await cryptoFieldsRefusal(user, checked.value);
+  if (cryptoRefused) return cryptoRefused;
   if (!(await featureEnabledFor("foreign_links", user.email)) && (checked.value.paypalUrl || checked.value.wiseUrl)) return problem(409, "PayPal і Wise недоступні", "Ці способи ще не відкриті для вашого акаунта.");
   try {
     // Адреса гаманця підтверджується лише підписом: з форми її не приймаємо, а раніше підтверджену зберігаємо.

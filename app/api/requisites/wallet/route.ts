@@ -6,6 +6,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { buildWalletMessage, isWalletSignatureValid } from "@/lib/crypto/wallet-sign";
 import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { sendRequisitesChangeNotice } from "@/lib/server/mail";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { attachWalletAddress } from "@/lib/server/requisites-repo";
@@ -21,6 +22,8 @@ export const POST = async (request: Request) => {
     const limited = await rateLimited("walletVerify", user.id);
     if (limited) return limited;
     if (!(await walletConfigFor(user.email))) return problem(409, "Оплата з гаманця недоступна", "Оплата з гаманця ще не відкрита для вашого акаунта.");
+    const refused = await cryptoGate(user.id);
+    if (refused) return refused;
     const body = await readJson(request);
     if (typeof body?.nonce !== "string" || typeof body?.signature !== "string") return problem(400, "Підпис не отримано");
     const challenge = await consumeChallenge({ userId: user.id, nonce: body.nonce });

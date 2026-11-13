@@ -60,8 +60,8 @@ const fakeGoogle = (profile: Record<string, unknown> | null, token: { ok: boolea
   return fetchMock;
 };
 
-const callback = (options: { state?: string; saved?: { state: string; next?: string } | null; code?: string | null } = {}) => {
-  const { state = "good-state", saved = { state: "good-state", next: "/" }, code = "auth-code" } = options;
+const callback = (options: { state?: string; saved?: { state: string; next?: string; accepted?: boolean } | null; code?: string | null } = {}) => {
+  const { state = "good-state", saved = { state: "good-state", next: "/", accepted: true }, code = "auth-code" } = options;
   const url = new URL(`${ORIGIN}/api/auth/google/callback`);
   if (code) url.searchParams.set("code", code);
   if (state) url.searchParams.set("state", state);
@@ -132,7 +132,7 @@ describe("вхід через Google: повернення", () => {
     configure();
     const { email, googleId } = fresh();
     fakeGoogle({ sub: googleId, email, email_verified: true, name: "Олена Коваль", picture: null });
-    const response = await callback({ saved: { state: "good-state", next: "/cabinet?tab=requests" } });
+    const response = await callback({ saved: { state: "good-state", accepted: true, next: "/cabinet?tab=requests" } });
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(`${ORIGIN}/cabinet?tab=requests`);
     expect(response.headers.get("set-cookie")).toContain("vm_google_state=;");
@@ -161,7 +161,7 @@ describe("вхід через Google: повернення", () => {
     for (const next of ["//evil.example/x", "https://evil.example/x", "evil.example", "javascript:alert(1)", "/\\evil.example", "/\t/evil.example"]) {
       const { email, googleId } = fresh();
       fakeGoogle({ sub: googleId, email, email_verified: true });
-      const response = await callback({ saved: { state: "good-state", next } });
+      const response = await callback({ saved: { state: "good-state", accepted: true, next } });
       expect(response.headers.get("location")).toBe(`${ORIGIN}/`);
     }
   });
@@ -198,7 +198,7 @@ describe("прив'язка Google до наявного акаунта", () => 
 
 describe("тестовий акаунт Google", () => {
   it("поза продом без налаштувань вхід відкриває тестовий акаунт (контроль для проду)", async () => {
-    const response = await GOOGLE_START(new Request(`${ORIGIN}/api/auth/google?next=/cabinet`));
+    const response = await GOOGLE_START(new Request(`${ORIGIN}/api/auth/google?next=/cabinet&accepted=1`));
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe(`${ORIGIN}/cabinet`);
     expect(await usersWith(STUB_EMAIL)).toHaveLength(1);

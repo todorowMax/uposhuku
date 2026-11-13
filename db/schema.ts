@@ -483,3 +483,5 @@ export const channelPosts = sqliteTable(
 
 // Платежі безпечної угоди винесено окремо: файл схеми не має перевищувати ліміт рядків.
 export * from "./schema-payments";
+// Згоди з правовими документами: теж окремо.
+export * from "./schema-legal";

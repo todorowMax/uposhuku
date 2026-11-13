@@ -8,6 +8,7 @@ import { checkDelivery } from "@/lib/deals/dispute-aids";
 import { releaseNeedsCode } from "@/lib/deals/limits";
 import { currentStage } from "@/lib/deals/machine";
 import { getSessionUser } from "@/lib/server/auth";
+import { legalGate, riskGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { verifyReleaseCode } from "@/lib/server/release-code";
 import { settleMessage, settleStage } from "@/lib/server/deal-money";
@@ -23,6 +24,8 @@ import { addSystemMessage } from "@/lib/server/chat-repo";
 import { dealNotice } from "@/lib/telegram/notices";
 
 const ACTIONS: DealAction[] = ["fund", "claim_paid", "release", "dispute", "cancel", "accept", "decline"];
+/** Способи оплати «Я оплатив(ла)», що йдуть криптою. */
+const CRYPTO_VIA = ["usdt", "wallet", "binance"];
 const PERFORMER_ACTIONS: PerformerAction[] = ["accept", "decline", "confirm_paid", "deliver", "withdraw"];
 
 /** Рядки стрічки розмови за дією з угодою. */
@@ -82,6 +85,11 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   if (body?.as === "performer") {
     const performerAction = PERFORMER_ACTIONS.find((item) => item === body?.action);
     if (!performerAction) return problem(400, "Невідома дія");
+    // Угоду приймають лише з чинними умовами.
+    if (performerAction === "accept") {
+      const legal = await legalGate(user.id);
+      if (legal) return legal;
+    }
     const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
     const dealId = (await params).id;
     // Результат (пояснення, посилання) прикладається лише до «здати етап»; у інших діях ці поля ігноруємо.
@@ -104,6 +112,15 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   if (!action) return problem(400, "Невідома дія");
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
   const dealId = (await params).id;
+  // Гроші: заморозити, позначити оплату, прийняти умови. Оплата криптою (USDT, гаманець, Binance) потребує ще й ризику.
+  if (action === "fund" || action === "claim_paid" || action === "accept") {
+    const legal = await legalGate(user.id);
+    if (legal) return legal;
+  }
+  if (action === "claim_paid" && CRYPTO_VIA.some((item) => item === body?.via)) {
+    const risk = await riskGate(user.id);
+    if (risk) return risk;
+  }
   if (action === "release") {
     const refused = await releaseCodeGate({ userId: user.id, dealId, stageId, code: body?.code });
     if (refused) return refused;

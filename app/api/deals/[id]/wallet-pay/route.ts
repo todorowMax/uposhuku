@@ -15,6 +15,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
 import { deleteProof, proofByHash, saveProof } from "@/lib/server/crypto-proof-repo";
 import { claimDirectPayment, getDealForOwner } from "@/lib/server/deal-repo";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { readDealRequisites } from "@/lib/server/requisites-repo";
 import { failure } from "@/lib/server/route";
@@ -46,6 +47,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     if (limited) return limited;
     const config = await walletConfigFor(user.email);
     if (!config) return problem(409, "Оплата з гаманця недоступна", "Оплата з гаманця ще не відкрита для вашого акаунта.");
+    const refused = await cryptoGate(user.id);
+    if (refused) return refused;
     const hash = (await readJson(request))?.hash;
     if (!isEvmTxHash(hash)) return problem(400, "Хеш некоректний", "Хеш транзакції: 0x і 64 символи 0-9 та a-f.");
     const txHash = hash.toLowerCase();

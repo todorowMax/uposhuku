@@ -3,8 +3,9 @@
 // Помилки API у форматі RFC 9457 (application/problem+json), як домовились
 // у плані: клієнт показує detail, а за type можна розрізнити причину.
 
-export const problem = (status: number, title: string, detail?: string, type = "about:blank") =>
-  new Response(JSON.stringify({ type, title, status, detail: detail ?? title }), {
+/** `code` — стабільний код для клієнта (`legal_reaccept_required`, `risk_ack_required`): текст змінюється, код ні. */
+export const problem = (status: number, title: string, detail?: string, type = "about:blank", code?: string) =>
+  new Response(JSON.stringify({ type, title, status, detail: detail ?? title, ...(code ? { code } : {}) }), {
     status,
     headers: { "content-type": "application/problem+json" },
   });

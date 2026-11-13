@@ -31,11 +31,24 @@ export const useTestD1 = async () => {
   return { db, telemetry: proxy.env.TELEMETRY_DB, close: () => proxy.dispose() };
 };
 
-/** Сторонній користувач для зовнішніх ключів: id → рядок у users. */
-/** `createdAt` за замовчуванням тепер: тести, яким потрібен «старий» акаунт (ліміт нового), передають свій. */
-export const makeUser = async (db: D1Database, id: string, options: { email?: string; createdAt?: number } = {}) => {
-  const { email = `${id}@example.com`, createdAt = Date.now() } = options;
+/** Усі правові документи, які в тестах вважаються прийнятими (версії беремо з коду: нова версія не ламає тести). */
+const ACCEPTED_DOCS = ["terms", "privacy", "offer", "safeDealOffer", "cryptoRisk"] as const;
+
+const acceptAll = async (db: D1Database, userId: string, at: number) => {
+  const { LEGAL_VERSIONS } = await import("@/lib/legal/config");
+  const insert = db.prepare("insert or ignore into legal_acceptances (id, user_id, doc, version, accepted_at, source) values (?, ?, ?, ?, ?, 'signup')");
+  await db.batch(ACCEPTED_DOCS.map((doc) => insert.bind(`${userId}:${doc}`, userId, doc, LEGAL_VERSIONS[doc], at)));
+};
+
+/**
+ * Сторонній користувач для зовнішніх ключів: id → рядок у users.
+ * `createdAt` за замовчуванням тепер: тести, яким потрібен «старий» акаунт (ліміт нового), передають свій.
+ * `accepted: false` лишає користувача без згод: для тестів, що перевіряють відмову до прийняття умов і ризику крипти.
+ */
+export const makeUser = async (db: D1Database, id: string, options: { email?: string; createdAt?: number; accepted?: boolean } = {}) => {
+  const { email = `${id}@example.com`, createdAt = Date.now(), accepted = true } = options;
   await db.prepare("insert or ignore into users (id, email, created_at) values (?, ?, ?)").bind(id, email, createdAt).run();
+  if (accepted) await acceptAll(db, id, createdAt);
   return id;
 };
 

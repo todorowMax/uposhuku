@@ -44,6 +44,7 @@ export const RATE_RULES = {
   reviewCreate: { max: 10, windowMs: 60 * MINUTE },
   conversationCreate: { max: 30, windowMs: 60 * MINUTE },
   profileSave: { max: 30, windowMs: 60 * MINUTE },
+  legalAccept: { max: 20, windowMs: 60 * MINUTE },
 } as const satisfies Record<string, RateRule>;
 
 export type RateName = keyof typeof RATE_RULES;

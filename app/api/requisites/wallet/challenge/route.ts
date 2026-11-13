@@ -6,6 +6,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { buildWalletMessage } from "@/lib/crypto/wallet-sign";
 import { getSessionUser } from "@/lib/server/auth";
 import { walletConfigFor } from "@/lib/server/crypto-config";
+import { cryptoGate } from "@/lib/server/legal-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { createChallenge } from "@/lib/server/wallet-repo";
@@ -17,6 +18,8 @@ export const POST = async (request: Request) => {
     const limited = await rateLimited("walletChallenge", user.id);
     if (limited) return limited;
     if (!(await walletConfigFor(user.email))) return problem(409, "Оплата з гаманця недоступна", "Оплата з гаманця ще не відкрита для вашого акаунта.");
+    const refused = await cryptoGate(user.id);
+    if (refused) return refused;
     const raw = (await readJson(request))?.address;
     if (typeof raw !== "string" || !isAddress(raw, { strict: false })) return problem(400, "Адреса некоректна", "Потрібна адреса EVM: 0x і 40 символів.");
     const address = getAddress(raw.toLowerCase());
