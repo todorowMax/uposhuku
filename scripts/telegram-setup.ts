@@ -4,12 +4,16 @@
 // після кожного нового деплою на нову адресу (dev, прод) і коли міняється
 // секрет вебхука. Токен і секрет беремо зі змінних оболонки й ніде не друкуємо:
 //
-//   TELEGRAM_BOT_TOKEN=... TELEGRAM_WEBHOOK_SECRET=... \
-//     npm run tg:setup -- --url https://uposhuku-development.uposhuku.workers.dev
+//   npm run tg:setup -- --url https://dev.findlyfy.com
+//
+// Токен і секрет читаються зі змінних оболонки, а якщо їх немає, з .dev.vars
+// (TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET).
 //
 //   npm run tg:setup -- --delete     прибрати вебхук (для локальної розробки без публічної адреси)
 //   npm run tg:setup -- --info       лише показати, що зараз налаштовано
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { callTelegram } from "../lib/telegram/api";
 import { TEXTS } from "../lib/telegram/texts";
 
@@ -19,8 +23,20 @@ const flag = (name: string) => {
   return at >= 0 ? args[at + 1] : undefined;
 };
 
-const token = process.env.TELEGRAM_BOT_TOKEN;
-const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
+// Змінних оболонки немає: беремо з .dev.vars (файл поза git), щоб токен не лишався в історії команд.
+const devVars = (name: string): string | undefined => {
+  try {
+    const line = readFileSync(resolve(process.cwd(), ".dev.vars"), "utf8")
+      .split("\n")
+      .find((row) => row.startsWith(`${name}=`));
+    return line ? line.slice(name.length + 1).trim().replace(/^["']|["']$/g, "") || undefined : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const token = process.env.TELEGRAM_BOT_TOKEN ?? devVars("TELEGRAM_BOT_TOKEN");
+const secret = process.env.TELEGRAM_WEBHOOK_SECRET ?? devVars("TELEGRAM_WEBHOOK_SECRET");
 if (!token) {
   console.error("Потрібна змінна TELEGRAM_BOT_TOKEN (токен від @BotFather).");
   process.exit(1);
@@ -34,8 +50,8 @@ const COMMANDS = [
   { command: "help", description: "Допомога" },
 ];
 
-const DESCRIPTION = "Сповіщення Vibe Map: нові пропозиції на ваш запит, повідомлення в чаті, угоди й запити під ваші теги. Підключається на сайті: Сповіщення → Telegram.";
-const SHORT_DESCRIPTION = "Сповіщення з Vibe Map: пропозиції, повідомлення, угоди.";
+const DESCRIPTION = "Сповіщення Findlyfy: нові пропозиції на ваш запит, повідомлення в чаті, угоди й запити під ваші теги. Підключається на сайті: Сповіщення → Telegram.";
+const SHORT_DESCRIPTION = "Сповіщення з Findlyfy: пропозиції, повідомлення, угоди.";
 
 const show = async () => {
   const info = await callTelegram<{ url: string; pending_update_count: number; last_error_message?: string; last_error_date?: number; allowed_updates?: string[] }>("getWebhookInfo", {}, options);
