@@ -5892,6 +5892,16 @@ html[data-map-ready] .map-skeleton {
     display: none;
   }
 
+  /* Окном по центру ручки нет, а отступы телефона (4 сверху, 16 по бокам) для него тесны: заголовок липнет к краю. */
+  .ui-sheet-title {
+    padding: 24px 24px 12px;
+    font-size: 18px;
+  }
+
+  .ui-sheet-body {
+    padding: 0 24px 24px;
+  }
+
   .ui-sheet[data-state="open"] {
     animation: ui-sheet-pop 180ms var(--ease-out-quint);
   }
