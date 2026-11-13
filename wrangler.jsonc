@@ -28,7 +28,7 @@
         "SITE_URL": "https://dev.findlyfy.com",
         // Telegram: тестовий бот. Username бота (не секрет) дописати після створення в @BotFather.
         // TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET, INTERNAL_TOKEN: лише секретами (wrangler secret put).
-        "TELEGRAM_BOT_USERNAME": "",
+        "TELEGRAM_BOT_USERNAME": "findlyfy_dev_bot",
         // Канал запитів на dev можна перевіряти з короткою затримкою.
         "CHANNEL_DELAY_MIN": "1",
         // Стеля ескроу-угоди, USDT: тестовий контракт, на dev ліміт 1000.
