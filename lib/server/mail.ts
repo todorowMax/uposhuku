@@ -67,6 +67,19 @@ export const sendAdminNotice = async (emails: string[], subject: string, text: s
   for (const to of emails) await deliver({ to, subject, text });
 };
 
+/** Лист з кодом підтвердження видалення акаунта. */
+export const sendDeletionCodeMail = async (email: string, code: string) => {
+  if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {
+    console.log(`[mail:dev] код видалення акаунта для ${email}: ${code}`);
+    return;
+  }
+  await deliver({
+    to: email,
+    subject: `Код для видалення акаунта: ${code}`,
+    text: `Ви видаляєте акаунт у Findlyfy. Код підтвердження: ${code}\n\nВін діє 10 хвилин. Якщо це не ви, нічого не вводьте й змініть спосіб входу в акаунт.`,
+  });
+};
+
 /** Лист замовнику з кодом підтвердження приймання етапу (від 10 000 ₴). */
 export const sendReleaseCodeMail = async (email: string, code: string, dealNumber: string) => {
   if (mailMode() === "dev" || !readVar("RESEND_API_KEY")) {

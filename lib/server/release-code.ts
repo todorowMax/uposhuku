@@ -37,18 +37,25 @@ const whereTarget = (target: CodeTarget) => and(eq(dealReleaseCodes.userId, targ
 
 export type SendOutcome = "sent" | "too_soon";
 
-/** Шле код на пошту замовника. Повторний запит раніше ніж за хвилину нового листа не створює. */
-export const sendReleaseCode = async (input: { target: CodeTarget; email: string; dealNumber: string; now?: number }): Promise<SendOutcome> => {
-  const { target, email, dealNumber, now = Date.now() } = input;
+/**
+ * Створює код для цілі й передає його `deliver` (лист). Повторний запит раніше ніж за хвилину нового коду не створює.
+ * Той самий механізм обслуговує й підтвердження видалення акаунта (lib/server/account-code.ts).
+ */
+export const sendCode = async (input: { target: CodeTarget; deliver: (code: string) => Promise<void>; now?: number }): Promise<SendOutcome> => {
+  const { target, deliver, now = Date.now() } = input;
   const db = getDb();
   const [last] = await db.select().from(dealReleaseCodes).where(whereTarget(target)).limit(1);
   if (last && now - last.createdAt < RESEND_GAP) return "too_soon";
   const code = mailMode() === "dev" ? devCode().code : String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
   await db.delete(dealReleaseCodes).where(whereTarget(target));
   await db.insert(dealReleaseCodes).values({ id: crypto.randomUUID(), ...target, codeHash: await hashOf(target, code), createdAt: now, expiresAt: now + CODE_TTL });
-  await sendReleaseCodeMail(email, code, dealNumber);
+  await deliver(code);
   return "sent";
 };
+
+/** Шле код на пошту замовника для приймання етапу. */
+export const sendReleaseCode = async (input: { target: CodeTarget; email: string; dealNumber: string; now?: number }): Promise<SendOutcome> =>
+  sendCode({ target: input.target, now: input.now, deliver: (code) => sendReleaseCodeMail(input.email, code, input.dealNumber) });
 
 export type VerifyOutcome = "ok" | "wrong" | "expired";
 

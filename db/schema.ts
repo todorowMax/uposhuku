@@ -16,6 +16,12 @@ export const users = sqliteTable("users", {
   avatarUrl: text("avatar_url"),
   createdAt: integer("created_at").notNull(),
   lastLoginAt: integer("last_login_at"),
+  /**
+   * Коли акаунт видалили. Рядок лишається «могилою» (пошта `deleted-<id>@deleted.invalid`, решта особистого порожня), бо на нього
+   * посилаються угоди, платежі й відгуки: фізично `users` не видаляємо (lib/server/account-delete.ts). Каскади `onDelete`
+   * на цю таблицю тому не спрацьовують, а входити в такий акаунт не можна.
+   */
+  deletedAt: integer("deleted_at"),
 });
 
 /** `id` — це jti токена: без рядка в цій таблиці токен недійсний, тож вихід спрацьовує одразу. */

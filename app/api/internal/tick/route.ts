@@ -4,6 +4,8 @@
 
 import { and, lt } from "drizzle-orm";
 import { authAttempts, notificationLog } from "@/db/schema";
+import { isRetentionWindow } from "@/lib/account/deletion";
+import { purgeExpiredRequisites } from "@/lib/server/account-retention";
 import { runDealSweep } from "@/lib/server/deal-sweep";
 import { getDb } from "@/lib/server/db";
 import { readVar } from "@/lib/server/env";
@@ -43,9 +45,11 @@ export const POST = async (request: Request) => {
   const posted = await step("post", () => postDueRequests(now));
   const closed = await step("close", () => closeFinishedPosts(now));
   await step("prune_telegram", () => pruneTelegram(now));
+  // Раз на добу: знімки реквізитів видалених акаунтів, у яких минув строк зберігання (lib/account/deletion.ts).
+  const purged = isRetentionWindow(now) ? await step("purge_requisites", () => purgeExpiredRequisites(now)) : null;
   await step("prune_notifications", () => getDb().delete(notificationLog).where(and(lt(notificationLog.createdAt, now - WEEK_MS))));
   // Лічильники спроб і частоти потрібні лише на своє вікно (найдовше година).
   await step("prune_attempts", () => getDb().delete(authAttempts).where(lt(authAttempts.createdAt, now - ATTEMPTS_KEEP_MS)));
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, closed, sweep }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, closed, sweep, purged }, { status: sweepFailed ? 500 : 200 });
 };

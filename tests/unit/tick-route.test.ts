@@ -12,6 +12,7 @@ const { calls, fail, run } = vi.hoisted(() => {
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
 vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2) }));
+vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
 vi.mock("@/lib/server/telegram-repo", () => ({ pruneTelegram: run("prune_telegram") }));
 vi.mock("@/lib/server/db", () => ({ getDb: () => ({ delete: () => ({ where: run("prune_db") }) }) }));
 vi.mock("@/lib/telemetry/log", () => ({ logServer: vi.fn() }));
@@ -47,6 +48,25 @@ describe("/api/internal/tick", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toMatchObject({ failed: ["sweep"] });
     expect(calls).toEqual(expect.arrayContaining(["post", "close", "prune_telegram"]));
+  });
+
+  it("прибирання за строком зберігання йде раз на добу, у вікні після 03:00 UTC", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(Date.UTC(2026, 10, 14, 12, 0));
+      await tick();
+      expect(calls).not.toContain("purge_requisites");
+      vi.setSystemTime(Date.UTC(2026, 10, 14, 3, 2));
+      const response = await tick();
+      expect(calls).toContain("purge_requisites");
+      expect(await response.json()).toMatchObject({ purged: 2 });
+      fail.step = "purge_requisites";
+      calls.length = 0;
+      expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["purge_requisites"] });
+      expect(calls).toEqual(expect.arrayContaining(["sweep", "prune_telegram"]));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("без токена 401", async () => {

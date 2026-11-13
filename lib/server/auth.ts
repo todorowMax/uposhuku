@@ -104,6 +104,8 @@ export const startEmailLogin = async (email: string, ip: string) => {
   // Новий лист не частіше разу на хвилину; відповідь клієнту та сама.
   const [last] = await db.select().from(emailCodes).where(eq(emailCodes.userId, user.id)).limit(1);
   if (last && Date.now() - last.createdAt < RESEND_GAP) return;
+  // Видалений акаунт («могила») не оживає: лист не йде, відповідь та сама.
+  if (user.deletedAt !== null) return;
 
   const code = mailMode() === "dev" ? devCode().code : String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, "0");
   await db.delete(emailCodes).where(eq(emailCodes.userId, user.id));
@@ -133,7 +135,7 @@ export const verifyEmailLogin = async (email: string, code: string, ip: string):
   const reserved = await reserveAttempts(db, { keys: [`email:${email}`, `ip:${ip}`], kind: "email_verify_fail", max: MAX_FAILS });
   const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
   const [stored] = user ? await db.select().from(emailCodes).where(eq(emailCodes.userId, user.id)).limit(1) : [];
-  if (!user || !stored || stored.expiresAt < Date.now()) throw invalidCode();
+  if (!user || user.deletedAt !== null || !stored || stored.expiresAt < Date.now()) throw invalidCode();
   // Лічильник спроб коду піднімається атомарно до порівняння; немає рядка, отже спроби вичерпано, код не порівнюється.
   const bumped = await db.all<{ id: string }>(sql`UPDATE email_codes SET attempts = attempts + 1 WHERE id = ${stored.id} AND attempts < ${MAX_CODE_TRIES} RETURNING id`);
   if (bumped.length === 0) throw invalidCode();
@@ -211,7 +213,7 @@ export const getSessionUser = async (): Promise<SessionUser | null> => {
       .where(eq(sessions.id, payload.jti))
       .limit(1);
     const now = Date.now();
-    if (!row || row.user.id !== payload.sub || row.session.expiresAt < now || now - row.session.lastSeenAt > IDLE_TTL) return null;
+    if (!row || row.user.deletedAt !== null || row.user.id !== payload.sub || row.session.expiresAt < now || now - row.session.lastSeenAt > IDLE_TTL) return null;
     // lastSeenAt пишемо не частіше разу на добу: менше записів у базу.
     if (now - row.session.lastSeenAt > DAY) await db.update(sessions).set({ lastSeenAt: now }).where(eq(sessions.id, row.session.id));
     return toSessionUser(row.user, row.session.via);

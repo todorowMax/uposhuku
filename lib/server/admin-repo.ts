@@ -4,6 +4,7 @@
 // Нічого не перевіряє про того, хто питає: це робить lib/server/admin.ts у кожному
 // маршруті й на кожній сторінці. Переписку віддаємо лише для угод, де був спір.
 
+import { DELETED_NAME } from "@/lib/account/deletion";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import { conversations, dealRequisites, deals, moderationActions, profiles, requests, users } from "@/db/schema";
 import { dealTimeline } from "@/lib/admin/deal-timeline";
@@ -33,7 +34,7 @@ const requestTexts = async (rows: Deal[]) => {
   return new Map(found.map((item) => [item.id, item.text]));
 };
 
-const userName = (user?: typeof users.$inferSelect) => user?.displayName ?? user?.email.split("@")[0] ?? "Невідомо";
+const userName = (user?: typeof users.$inferSelect) => (user?.deletedAt != null ? DELETED_NAME : (user?.displayName ?? user?.email.split("@")[0] ?? "Невідомо"));
 
 /** Етап, на якому був або є спір: відкритий, а для розв'язаного — той, що в журналі. */
 const stageOfInterest = (deal: Deal, stageId?: string): DealStage => (stageId ? deal.stages.find((item) => item.id === stageId) : undefined) ?? disputedStage(deal) ?? deal.stages[deal.stages.length - 1];

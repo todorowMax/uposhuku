@@ -6,6 +6,7 @@
 
 import { and, asc, desc, eq, gt, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { chatAttachments, conversations, deals, messages, requests, responses, users } from "@/db/schema";
+import { DELETED_NAME } from "@/lib/account/deletion";
 import type { Deal } from "@/lib/deals/types";
 import { needsAction, performerNeeds } from "@/lib/deals/machine";
 import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
@@ -55,6 +56,17 @@ export const accessibleConversation = async (conversationId: string, userId: str
   if (row.performerUserId === userId) return { conversation: row, role: "performer" };
   return null;
 };
+
+/** Чи видалив акаунт співрозмовник: писати йому й виставляти умови більше не можна. */
+export const otherSideGone = async (conversation: Conversation, role: "customer" | "performer"): Promise<boolean> => {
+  const otherId = role === "customer" ? conversation.performerUserId : conversation.customerUserId;
+  if (!otherId) return false;
+  const [row] = await getDb().select({ deletedAt: users.deletedAt }).from(users).where(eq(users.id, otherId)).limit(1);
+  return row?.deletedAt != null;
+};
+
+/** Відповідь для людини, коли співрозмовник видалив акаунт. */
+export const OTHER_SIDE_GONE = "Співрозмовник видалив акаунт. Писати йому більше не можна.";
 
 const attachmentsOf = async (messageIds: string[]) => {
   if (messageIds.length === 0) return [];
@@ -162,10 +174,10 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   const asPerformer = rows.filter((row) => row.performerUserId === userId);
   const customerIds = [...new Set(asPerformer.map((row) => row.customerUserId))];
   const performerUserIds = [...new Set(asCustomer.flatMap((row) => (row.performerUserId ? [row.performerUserId] : [])))];
-  const [lastById, mine, customers, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
+  const [lastById, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
     lastMessages(rows.map((row) => row.id)),
     db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200),
-    inChunks(customerIds, (chunk) => db.select().from(users).where(inArray(users.id, chunk))),
+    inChunks([...customerIds, ...performerUserIds], (chunk) => db.select({ id: users.id, displayName: users.displayName, deletedAt: users.deletedAt }).from(users).where(inArray(users.id, chunk))),
     getProfileCards(performerUserIds),
     latestOffers((chunk) => and(eq(requests.userId, userId), inArray(responses.performerUserId, chunk)), performerUserIds),
     latestOffers((chunk) => and(eq(responses.performerUserId, userId), inArray(requests.userId, chunk)), customerIds),
@@ -179,10 +191,11 @@ export const listConversations = async (userId: string): Promise<ConversationDto
     let other: ConversationDto["other"];
     if (role === "customer") {
       const profile = row.performerUserId ? cards.get(row.performerUserId) : undefined;
-      other = { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
+      const gone = people.some((user) => user.id === row.performerUserId && user.deletedAt !== null);
+      other = gone ? { name: DELETED_NAME } : { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
     } else {
-      const customer = customers.find((user) => user.id === row.customerUserId);
-      other = { name: customer?.displayName ?? "Замовник" };
+      const customer = people.find((user) => user.id === row.customerUserId);
+      other = { name: customer?.deletedAt != null ? DELETED_NAME : (customer?.displayName ?? "Замовник") };
     }
     const dealRow = liveDeals.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
     let deal: ConversationDto["deal"];

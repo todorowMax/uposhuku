@@ -6,7 +6,7 @@ import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { CHAT_PHOTOS_MAX, CHAT_TEXT_MAX } from "@/lib/chat/types";
 import { getSessionUser } from "@/lib/server/auth";
-import { accessibleConversation, addMessage, claimableAttachments, listMessages } from "@/lib/server/chat-repo";
+import { accessibleConversation, addMessage, claimableAttachments, listMessages, OTHER_SIDE_GONE, otherSideGone } from "@/lib/server/chat-repo";
 import { pushUser } from "@/lib/server/realtime";
 import { failure } from "@/lib/server/route";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -43,6 +43,7 @@ export async function POST(request: Request, { params }: Ctx) {
   try {
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
+    if (await otherSideGone(access.conversation, access.role)) return problem(409, "Акаунт видалено", OTHER_SIDE_GONE);
     const attachmentIds = await claimableAttachments(access.conversation.id, user.id, requested);
     if (!text && attachmentIds.length === 0) return problem(400, "Порожнє повідомлення");
     const message = await addMessage(access.conversation.id, access.role, text, { attachmentIds });

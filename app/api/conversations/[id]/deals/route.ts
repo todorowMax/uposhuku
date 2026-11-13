@@ -8,7 +8,7 @@ import { getSessionUser } from "@/lib/server/auth";
 import { hasActivePayout } from "@/lib/server/deal-parties";
 import { escrowGate } from "@/lib/server/escrow-gate";
 import { safeDealEnabledFor } from "@/lib/server/safe-deal";
-import { accessibleConversation, addSystemMessage } from "@/lib/server/chat-repo";
+import { accessibleConversation, addSystemMessage, OTHER_SIDE_GONE, otherSideGone } from "@/lib/server/chat-repo";
 import { proposeDirectDeal, SELF_DEAL } from "@/lib/server/deal-repo";
 import { notifyLater } from "@/lib/server/notify";
 import { getProfile } from "@/lib/server/profile-repo";
@@ -35,6 +35,9 @@ const escrowLimit = async (input: { method: DealMethod; user: { id: string; emai
   return typeof gate === "string" ? problem(409, "Ескроу недоступне", gate) : gate.max;
 };
 
+/** Способ оплати з тіла запиту; невідоме значення означає прямий переказ. */
+const methodOf = (body: Record<string, unknown> | null): DealMethod => (body?.method === "safe" || body?.method === "escrow" ? body.method : "direct");
+
 export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
@@ -44,9 +47,10 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
     const { conversation, role } = access;
+    if (await otherSideGone(conversation, role)) return problem(409, "Акаунт видалено", OTHER_SIDE_GONE);
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
-    const method: DealMethod = body?.method === "safe" || body?.method === "escrow" ? body.method : "direct";
+    const method = methodOf(body);
     const safeEnabled = await safeDealEnabledFor(user.email);
     if (method === "safe" && !safeEnabled) return problem(409, "Безпечна угода ще недоступна");
     // Ескроу: прапорець у того, хто створює (будь-яка сторона), фабрика, підтверджений гаманець виконавця й стеля з контракту.
