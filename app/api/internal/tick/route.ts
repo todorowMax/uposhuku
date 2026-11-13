@@ -1,5 +1,5 @@
 // POST /api/internal/tick — фонові задачі, які викликає cron воркера (раз на 5 хвилин):
-// пости запитів у Telegram-канал, редагування закритих, прибирання старого.
+// пости запитів у Telegram-канал, редагування закритих, прибирання старого (сесії, коди, осиротілі фото чату).
 // Захист: заголовок Authorization: Bearer <INTERNAL_TOKEN>, звіряється за сталий час.
 
 import { and, lt } from "drizzle-orm";
@@ -8,6 +8,7 @@ import { isRetentionWindow } from "@/lib/account/deletion";
 import { purgeExpiredRequisites } from "@/lib/server/account-retention";
 import { runDealSweep } from "@/lib/server/deal-sweep";
 import { getDb } from "@/lib/server/db";
+import { pruneEmailCodes, pruneOrphanAttachments, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
 import { closeFinishedPosts, postDueRequests } from "@/lib/telegram/channel";
@@ -50,6 +51,13 @@ export const POST = async (request: Request) => {
   await step("prune_notifications", () => getDb().delete(notificationLog).where(and(lt(notificationLog.createdAt, now - WEEK_MS))));
   // Лічильники спроб і частоти потрібні лише на своє вікно (найдовше година).
   await step("prune_attempts", () => getDb().delete(authAttempts).where(lt(authAttempts.createdAt, now - ATTEMPTS_KEEP_MS)));
+  // Прострочені сесії, коди входу й приймання, осиротілі фото чату: кожне у своєму кроці, збій одного не чіпає решту.
+  const pruned = {
+    sessions: await step("prune_sessions", () => pruneSessions(now)),
+    emailCodes: await step("prune_email_codes", () => pruneEmailCodes(now)),
+    releaseCodes: await step("prune_release_codes", () => pruneReleaseCodes(now)),
+    chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
+  };
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, closed, sweep, purged }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, closed, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
 };

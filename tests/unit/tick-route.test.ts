@@ -13,6 +13,12 @@ const { calls, fail, run } = vi.hoisted(() => {
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
 vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
+vi.mock("@/lib/server/tick-cleanup", () => ({
+  pruneSessions: run("prune_sessions", 3),
+  pruneEmailCodes: run("prune_email_codes", 2),
+  pruneReleaseCodes: run("prune_release_codes", 1),
+  pruneOrphanAttachments: run("prune_chat_photos", 4),
+}));
 vi.mock("@/lib/server/telegram-repo", () => ({ pruneTelegram: run("prune_telegram") }));
 vi.mock("@/lib/server/db", () => ({ getDb: () => ({ delete: () => ({ where: run("prune_db") }) }) }));
 vi.mock("@/lib/telemetry/log", () => ({ logServer: vi.fn() }));
@@ -66,6 +72,18 @@ describe("/api/internal/tick", () => {
       expect(calls).toEqual(expect.arrayContaining(["sweep", "prune_telegram"]));
     } finally {
       vi.useRealTimers();
+    }
+  });
+
+  it("прибирання сесій, кодів і фото чату: кожен крок окремо, збій одного не чіпає решту", async () => {
+    expect(await (await tick()).json()).toMatchObject({ ok: true, pruned: { sessions: 3, emailCodes: 2, releaseCodes: 1, chatPhotos: 4 } });
+    for (const name of ["prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos"]) {
+      fail.step = name;
+      calls.length = 0;
+      const response = await tick();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ ok: false, failed: [name] });
+      expect(calls).toEqual(expect.arrayContaining(["sweep", "post", "prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos"]));
     }
   });
 
