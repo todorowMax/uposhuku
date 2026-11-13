@@ -1,4 +1,13 @@
+import type * as TelegramRepo from "@/lib/server/telegram-repo";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Збій бази на вимогу: так перевіряємо, що оновлення позначається обробленим лише після успіху.
+const broken = vi.hoisted(() => ({ on: false }));
+vi.mock("@/lib/server/telegram-repo", async () => {
+  const actual = await vi.importActual<typeof TelegramRepo>("@/lib/server/telegram-repo");
+  return { ...actual, consumeLinkToken: (...args: Parameters<typeof actual.consumeLinkToken>) => (broken.on ? Promise.reject(new Error("база недоступна")) : actual.consumeLinkToken(...args)) };
+});
+
 import { telegramLinkTokens, telegramLinks, telegramUpdates } from "@/db/schema";
 import { POST as webhook } from "@/app/api/telegram/webhook/route";
 import { callTelegram, TelegramError } from "@/lib/telegram/api";
@@ -8,7 +17,7 @@ import { escapeHtml, excerpt } from "@/lib/telegram/texts";
 import { DEFAULT_PREFS, mergePrefs, parsePrefs } from "@/lib/notification-prefs";
 import { getPrefs, hasStoredPrefs, savePrefs } from "@/lib/server/notification-prefs-repo";
 import { getDb } from "@/lib/server/db";
-import { LINK_TOKEN_TTL_MS, activeLink, consumeLinkToken, createLinkToken, deactivateByChat, deactivateByUser, getLink, seenUpdate } from "@/lib/server/telegram-repo";
+import { LINK_TOKEN_TTL_MS, activeLink, consumeLinkToken, createLinkToken, deactivateByChat, deactivateByUser, getLink, isUpdateSeen, markUpdateSeen, confirmRelink, cancelRelink } from "@/lib/server/telegram-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 const SECRET = "test-secret-0123456789";
@@ -25,6 +34,7 @@ afterAll(async () => {
 });
 beforeEach(async () => {
   calls = [];
+  broken.on = false;
   process.env.TELEGRAM_BOT_TOKEN = TOKEN;
   process.env.TELEGRAM_WEBHOOK_SECRET = SECRET;
   process.env.TELEGRAM_BOT_USERNAME = "vibemap_test_bot";
@@ -184,12 +194,31 @@ describe("прив'язка акаунта", () => {
     expect((await consumeLinkToken(second.token, { chatId: "1" })).ok).toBe(true);
   });
 
-  it("один Telegram — один акаунт: другий акаунт забирає чат у першого", async () => {
+  it("один Telegram — один акаунт: другий акаунт забирає чат лише після підтвердження власника чату", async () => {
     await consumeLinkToken((await createLinkToken("u1")).token, { chatId: "77" });
-    const result = await consumeLinkToken((await createLinkToken("u2")).token, { chatId: "77" });
-    expect(result).toMatchObject({ ok: true, userId: "u2", replacedOtherAccount: true });
+    const second = await createLinkToken("u2");
+    const asked = await consumeLinkToken(second.token, { chatId: "77" });
+    expect(asked).toMatchObject({ ok: false, confirmId: expect.stringMatching(/^[0-9a-f]{40}$/) });
+    // Нічого не змінено, токен ще живий.
+    expect((await getLink("u1"))?.chatId).toBe("77");
+    expect(await getLink("u2")).toBeNull();
+    const confirmId = (asked as { confirmId: string }).confirmId;
+    expect(await confirmRelink(confirmId, { chatId: "77" })).toMatchObject({ ok: true, userId: "u2", replacedOtherAccount: true });
     expect(await getLink("u1")).toBeNull();
     expect((await getLink("u2"))?.chatId).toBe("77");
+    expect(await confirmRelink(confirmId, { chatId: "77" })).toEqual({ ok: false });
+  });
+
+  it("відмова власника чату спалює токен і лишає прив'язку; кривий і прострочений confirmId не діють", async () => {
+    await consumeLinkToken((await createLinkToken("u1")).token, { chatId: "78" });
+    const second = await createLinkToken("u2", 1_000);
+    const asked = (await consumeLinkToken(second.token, { chatId: "78" }, 2_000)) as { confirmId: string };
+    expect(await confirmRelink(asked.confirmId, { chatId: "78" }, 1_000 + LINK_TOKEN_TTL_MS + 1)).toEqual({ ok: false });
+    expect(await confirmRelink("не-hex", { chatId: "78" })).toEqual({ ok: false });
+    await cancelRelink(asked.confirmId, 2_000);
+    expect(await confirmRelink(asked.confirmId, { chatId: "78" }, 2_000)).toEqual({ ok: false });
+    expect((await getLink("u1"))?.chatId).toBe("78");
+    expect(await getLink("u2")).toBeNull();
   });
 
   it("повторна прив'язка після /stop вмикає знову й знімає блокування", async () => {
@@ -200,12 +229,99 @@ describe("прив'язка акаунта", () => {
     expect(await activeLink("u1")).toMatchObject({ active: true, blockedAt: null });
   });
 
-  it("відключення з сайту повертає чат; seenUpdate розрізняє повтор", async () => {
+  it("відключення з сайту повертає чат; позначка оновлення розрізняє повтор", async () => {
     await consumeLinkToken((await createLinkToken("u1")).token, { chatId: "99" });
     expect((await deactivateByUser("u1"))?.chatId).toBe("99");
     expect(await deactivateByUser("u2")).toBeNull();
-    expect(await seenUpdate(1234)).toBe(false);
-    expect(await seenUpdate(1234)).toBe(true);
+    expect(await isUpdateSeen(1234)).toBe(false);
+    expect(await markUpdateSeen(1234)).toBe(true);
+    expect(await isUpdateSeen(1234)).toBe(true);
+    expect(await markUpdateSeen(1234)).toBe(false);
+  });
+});
+
+const press = (id: number, data: string, chatId = 5551) => ({
+  update_id: id,
+  callback_query: { id: `cb${id}`, from: { id: chatId, first_name: "Оля", username: "olya" }, data, message: { message_id: 9, date: 1, chat: { id: chatId, type: "private" }, text: "…" } },
+});
+const buttons = () => (sent().at(-1)?.body.reply_markup as { inline_keyboard: { text: string; callback_data?: string }[][] }).inline_keyboard[0];
+
+describe("перепривʼязка Telegram за чужим посиланням", () => {
+  /** Чат 5551 належить u1; u2 приходить зі своїм посиланням. */
+  const victimAndStranger = async () => {
+    await consumeLinkToken((await createLinkToken("u1")).token, { chatId: "5551", username: "olya" });
+    const { token } = await createLinkToken("u2");
+    await send(update(100, `/start ${token}`));
+  };
+
+  it("не знімає прив'язку мовчки: бот питає кнопками, нічого не змінюється", async () => {
+    await victimAndStranger();
+    expect(String(sent().at(-1)!.body.text)).toContain("хтось просить підключити");
+    expect(buttons().map((button) => button.callback_data?.split(":")[0])).toEqual(["relink_yes", "relink_no"]);
+    expect(String(sent().at(-1)!.body.text)).not.toContain("акаунт підключено");
+    expect(await activeLink("u1")).toMatchObject({ chatId: "5551" });
+    expect(await getLink("u2")).toBeNull();
+  });
+
+  it("«Так» переносить чат до нового акаунта, друге натискання нічого не дає", async () => {
+    await victimAndStranger();
+    const yes = buttons()[0].callback_data!;
+    await send(press(101, yes));
+    expect(await getLink("u1")).toBeNull();
+    expect(await activeLink("u2")).toMatchObject({ chatId: "5551" });
+    expect(calls.at(-1)?.method).toBe("editMessageText");
+    expect(String(calls.at(-1)?.body.text)).toContain("Попередній акаунт від цього Telegram відключено");
+    await send(press(102, yes));
+    expect(String(calls.at(-1)?.body.text)).toContain("застаріло");
+  });
+
+  it("«Ні» лишає все як було і гасить посилання", async () => {
+    await victimAndStranger();
+    const [yes, no] = buttons().map((button) => button.callback_data!);
+    await send(press(103, no));
+    expect(String(calls.at(-1)?.body.text)).toContain("Нічого не змінили");
+    expect(await activeLink("u1")).toMatchObject({ chatId: "5551" });
+    await send(press(104, yes));
+    expect(await getLink("u2")).toBeNull();
+    expect(await activeLink("u1")).toMatchObject({ chatId: "5551" });
+  });
+
+  it("кнопки з групи чи від чужого чату не працюють", async () => {
+    await victimAndStranger();
+    const yes = buttons()[0].callback_data!;
+    await send({ ...press(105, yes), callback_query: { ...press(105, yes).callback_query, message: { message_id: 9, date: 1, chat: { id: -100, type: "group" } } } });
+    expect(await getLink("u2")).toBeNull();
+    expect(await activeLink("u1")).toMatchObject({ chatId: "5551" });
+  });
+
+  it("власний чат без чужої прив'язки підключається одразу, без питань", async () => {
+    const { token } = await createLinkToken("u1");
+    await send(update(106, `/start ${token}`));
+    expect(String(sent().at(-1)!.body.text)).toContain("акаунт підключено");
+    expect(await activeLink("u1")).toMatchObject({ chatId: "5551" });
+  });
+});
+
+describe("оновлення позначається обробленим після обробки", () => {
+  it("збій у обробці: 500, не позначено; повтор проходить і позначається", async () => {
+    const { token } = await createLinkToken("u1");
+    broken.on = true;
+    expect((await send(update(200, `/start ${token}`))).status).toBe(500);
+    expect(await isUpdateSeen(200)).toBe(false);
+    expect(await getLink("u1")).toBeNull();
+    broken.on = false;
+    expect((await send(update(200, `/start ${token}`))).status).toBe(200);
+    expect(await isUpdateSeen(200)).toBe(true);
+    expect(await getLink("u1")).toMatchObject({ chatId: "5551" });
+    expect(sent()).toHaveLength(1);
+  });
+
+  it("друга невдача поспіль закриває оновлення, щоб воно не крутилося вічно", async () => {
+    broken.on = true;
+    const { token } = await createLinkToken("u1");
+    expect((await send(update(201, `/start ${token}`))).status).toBe(500);
+    expect((await send(update(201, `/start ${token}`))).status).toBe(200);
+    expect(await isUpdateSeen(201)).toBe(true);
   });
 });
 

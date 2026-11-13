@@ -4,14 +4,14 @@
 // Усе, що може піти не так, не кидає: вебхук має відповісти 200, інакше
 // Telegram повторюватиме оновлення.
 
-import { consumeLinkToken, deactivateByChat, linkByChat } from "@/lib/server/telegram-repo";
+import { cancelRelink, confirmRelink, consumeLinkToken, deactivateByChat, linkByChat, type TelegramChatInfo } from "@/lib/server/telegram-repo";
 import { EVENTS } from "@/lib/telemetry/events";
 import { logServer, serverEvent } from "@/lib/telemetry/log";
 import { pushUser } from "@/lib/server/realtime";
-import { answerCallbackQuery, sendMessage, TelegramError } from "./api";
+import { answerCallbackQuery, editMessageText, sendMessage, TelegramError } from "./api";
 import { telegramConfig } from "./config";
 import { TEXTS, escapeHtml } from "./texts";
-import type { InlineKeyboard, TgChatMemberUpdated, TgMessage, TgUpdate } from "./types";
+import type { InlineKeyboard, TgCallbackQuery, TgChatMemberUpdated, TgMessage, TgUpdate } from "./types";
 
 const siteKeyboard = (siteUrl: string, label: string = TEXTS.openSite, path = ""): InlineKeyboard => ({ inline_keyboard: [[{ text: label, url: `${siteUrl}${path}` }]] });
 
@@ -31,6 +31,22 @@ const reply = async (chatId: number | string, text: string, keyboard?: InlineKey
   }
 };
 
+const RELINK_YES = "relink_yes:";
+const RELINK_NO = "relink_no:";
+
+const linkedKeyboard = (siteUrl: string): InlineKeyboard => ({
+  inline_keyboard: [[{ text: TEXTS.openSettings, url: `${siteUrl}/?open=settings` }, { text: TEXTS.openSite, url: siteUrl }]],
+});
+
+/** Чат прив'язано: відповідь людині, оновлення сторінки на сайті, подія в журнал. */
+const announceLinked = async (result: { userId: string; replacedOtherAccount: boolean }, reply: (text: string, keyboard: InlineKeyboard) => Promise<unknown>) => {
+  const config = telegramConfig();
+  await reply(result.replacedOtherAccount ? `${TEXTS.linked}\n\n${TEXTS.linkedReplaced}` : TEXTS.linked, linkedKeyboard(config.siteUrl));
+  // Сайт оновить стан «Підключити» без перезавантаження.
+  pushUser(result.userId, { t: "telegram" });
+  serverEvent(EVENTS.telegramLinked, { replaced: result.replacedOtherAccount }, result.userId, "/api/telegram/webhook");
+};
+
 const onStart = async (message: TgMessage, arg: string) => {
   const config = telegramConfig();
   const chatId = String(message.chat.id);
@@ -39,16 +55,48 @@ const onStart = async (message: TgMessage, arg: string) => {
     return;
   }
   const result = await consumeLinkToken(arg, { chatId, username: message.from?.username ?? null, firstName: message.from?.first_name ?? null });
+  if (!result.ok && result.confirmId) {
+    // Чат уже чий-небудь: чужу прив'язку без згоди власника не знімаємо (за посиланням від чужої людини так відключали б жертву).
+    await reply(chatId, TEXTS.relinkAsk, {
+      inline_keyboard: [[{ text: TEXTS.relinkYes, callback_data: `${RELINK_YES}${result.confirmId}` }, { text: TEXTS.relinkNo, callback_data: `${RELINK_NO}${result.confirmId}` }]],
+    });
+    return;
+  }
   if (!result.ok) {
     await reply(chatId, TEXTS.tokenExpired, siteKeyboard(config.siteUrl));
     return;
   }
-  await reply(chatId, result.replacedOtherAccount ? `${TEXTS.linked}\n\n${TEXTS.linkedReplaced}` : TEXTS.linked, {
-    inline_keyboard: [[{ text: TEXTS.openSettings, url: `${config.siteUrl}/?open=settings` }, { text: TEXTS.openSite, url: config.siteUrl }]],
-  });
-  // Сайт оновить стан «Підключити» без перезавантаження.
-  pushUser(result.userId, { t: "telegram" });
-  serverEvent(EVENTS.telegramLinked, { replaced: result.replacedOtherAccount }, result.userId, "/api/telegram/webhook");
+  await announceLinked(result, (text, keyboard) => reply(chatId, text, keyboard));
+};
+
+/** Кнопки підтвердження перепривʼязки. Натиснути їх може лише той, кому бот показав кнопки: у його приватному чаті. */
+const onCallback = async (query: TgCallbackQuery) => {
+  const message = query.message;
+  const data = query.data ?? "";
+  const confirm = data.startsWith(RELINK_YES);
+  if (!message || message.chat.type !== "private" || (!confirm && !data.startsWith(RELINK_NO))) {
+    await answerCallbackQuery(query.id).catch(() => {});
+    return;
+  }
+  const chatId = String(message.chat.id);
+  const confirmId = data.slice((confirm ? RELINK_YES : RELINK_NO).length);
+  const chat: TelegramChatInfo = { chatId, username: query.from.username ?? null, firstName: query.from.first_name ?? null };
+  const finish = async (text: string, keyboard?: InlineKeyboard) => {
+    await answerCallbackQuery(query.id).catch(() => {});
+    // Кнопки з повідомлення прибираємо: друге натискання нічого не дасть, а текст каже, чим усе скінчилось.
+    await editMessageText(chatId, message.message_id, text, { keyboard }).catch(() => reply(chatId, text, keyboard));
+  };
+  if (!confirm) {
+    await cancelRelink(confirmId);
+    await finish(TEXTS.relinkKept);
+    return;
+  }
+  const result = await confirmRelink(confirmId, chat);
+  if (!result.ok) {
+    await finish(TEXTS.tokenExpired, siteKeyboard(telegramConfig().siteUrl));
+    return;
+  }
+  await announceLinked(result, (text, keyboard) => finish(text, keyboard));
 };
 
 const onMessage = async (message: TgMessage) => {
@@ -99,13 +147,19 @@ const onMemberUpdate = async (update: TgChatMemberUpdated) => {
   }
 };
 
-/** Обробляє одне оновлення. Не кидає. */
-export const handleUpdate = async (update: TgUpdate): Promise<void> => {
+/**
+ * Обробляє одне оновлення. `true`: оброблено, його можна позначати баченим. `false`: збій (база, код), оновлення
+ * треба повторити, тож вебхук не позначає його, а Telegram пришле ще раз. Помилки відправки відповіді сюди не
+ * входять: недоставлена відповідь не причина повторювати дію.
+ */
+export const handleUpdate = async (update: TgUpdate): Promise<boolean> => {
   try {
     if (update.message) await onMessage(update.message);
     else if (update.my_chat_member) await onMemberUpdate(update.my_chat_member);
-    else if (update.callback_query) await answerCallbackQuery(update.callback_query.id).catch(() => {});
+    else if (update.callback_query) await onCallback(update.callback_query);
+    return true;
   } catch (error) {
     logServer({ level: "error", event: "telegram_update_failed", message: error instanceof Error ? error.message : String(error), detail: { updateId: update.update_id, stack: error instanceof Error ? error.stack : null } });
+    return false;
   }
 };

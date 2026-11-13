@@ -2,11 +2,12 @@
 //
 // Захист: заголовок `x-telegram-bot-api-secret-token` має збігтися з
 // TELEGRAM_WEBHOOK_SECRET (звіряємо за сталий час). Оновлення, які вже
-// обробляли (`update_id`), ігноруємо: вебхук можуть повторити. Відповідаємо
-// одразу 200, а обробка добігає після відповіді.
+// обробляли (`update_id`), ігноруємо: вебхук можуть повторити. Позначаємо його
+// обробленим ПІСЛЯ обробки: збій посеред шляху дає 500, і Telegram пришле те саме
+// оновлення ще раз. Одну повторну спробу даємо, другий збій поспіль закриває
+// оновлення, щоб зіпсоване не крутилося вічно.
 
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { seenUpdate } from "@/lib/server/telegram-repo";
+import { isUpdateSeen, markUpdateSeen } from "@/lib/server/telegram-repo";
 import { handleUpdate } from "@/lib/telegram/handle-update";
 import { telegramConfig } from "@/lib/telegram/config";
 import type { TgUpdate } from "@/lib/telegram/types";
@@ -20,7 +21,7 @@ const sameSecret = (given: string, expected: string): boolean => {
   return diff === 0;
 };
 
-export async function POST(request: Request) {
+export const POST = async (request: Request) => {
   const config = telegramConfig();
   if (!config.enabled || !config.webhookSecret) return new Response(null, { status: 404 });
   const given = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
@@ -33,18 +34,14 @@ export async function POST(request: Request) {
     return new Response(null, { status: 200 });
   }
   if (typeof update?.update_id !== "number") return new Response(null, { status: 200 });
-  if (await seenUpdate(update.update_id)) return new Response(null, { status: 200 });
+  if (await isUpdateSeen(update.update_id)) return new Response(null, { status: 200 });
 
-  const work = handleUpdate(update);
-  // У воркері відповідаємо одразу, а обробка добігає після відповіді. Поза воркером (тести, локально) чекаємо.
-  let ctx: ExecutionContext | null = null;
-  try {
-    ctx = getCloudflareContext().ctx;
-  } catch {
-    ctx = null;
+  if (await handleUpdate(update)) {
+    await markUpdateSeen(update.update_id);
+    return new Response(null, { status: 200 });
   }
-  if (ctx) ctx.waitUntil(work);
-  else await work;
+  // Збій: перший раз просимо Telegram повторити (ключ -id пам'ятає спробу), другий закриваємо.
+  if (await markUpdateSeen(-update.update_id)) return new Response(null, { status: 500 });
+  await markUpdateSeen(update.update_id);
   return new Response(null, { status: 200 });
-}
-
+};
