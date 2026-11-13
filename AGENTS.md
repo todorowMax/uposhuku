@@ -63,8 +63,19 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`; крипту (розділ «Крипта» в умовах, отримувачі в політиці) лише коли хоч один із `crypto_proof`, `crypto_wallet`, `crypto_escrow` у режимі `on` (`cryptoPublic()` у `lib/server/safe-deal.ts`); про `foreign_links` вони не кажуть ніде.
   Токени: `MONOBANK_TOKEN` (звичайний термінал) і `MONOBANK_SPLIT_TOKEN` (розщеплення), `MONOBANK_PLATFORM_RECEIVER_ID`.
   «Заморожено» і «виплачено» ставить лише підтверджена банком відповідь (`lib/deals/payment-status.ts`).
-- Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`; CSP лише
-  Report-Only (звіти в `/api/csp-report`), HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
+- Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`. CSP розділено:
+  `Content-Security-Policy` діє й містить лише `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`;
+  повна політика зі `script-src` лишається в `Content-Security-Policy-Report-Only` (звіти в `/api/csp-report`), доки Next вставляє
+  inline-скрипти без nonce. Нове зовнішнє джерело (скрипт, фрейм, мережа) дописується в `contentSecurityPolicy`, а форма з `action`
+  на інший хост порушить `form-action`. HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
+- Turnstile на відправці коду входу (`lib/server/turnstile.ts`, `components/auth/use-turnstile.ts`): `TURNSTILE_SITE_KEY` (публічний,
+  клієнт бере його з `GET /api/auth/turnstile`) і `TURNSTILE_SECRET` (секрет). Без обох перевірка вимкнена (локально, тести), на проді
+  без них у журналі `turnstile_not_configured`. Погана перевірка: 400, siteverify недоступний: 503 (закрито). Для розробки тестові
+  ключі Cloudflare (див. `.dev.vars.example`); тестовий секрет приймає будь-який токен, а відмову дає секрет `2x…AA`.
+- Telegram: чат, уже прив'язаний до іншого акаунта, бот передає лише після кнопки власника чату (`relink_yes`/`relink_no`, токен
+  не витрачається до відповіді); оновлення позначається обробленим після обробки (`isUpdateSeen`, `markUpdateSeen`).
+- Ідентифікатори нових `deal_`, `req_`, `conv_`, `rev_` це префікс і 16 hex (`lib/ids.ts`); старі 8-символьні живуть далі, id за
+  довжиною не розбирають. Решта префіксів (`msg_`, `pay_`, `resp_` та інші) поки 8–12 символів.
   Грошові рішення модератора потребують `ADMIN_TOTP_SECRET`; на проді без нього вони вимкнені.
 - Прапорці функцій (`safe_deal`, `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`, `foreign_links`): режим `off` | `allowlist` | `on`
   і список пошт. `foreign_links` вмикає PayPal і Wise у реквізитах (грошовий: TOTP і лист). Способи оплати виконавця
@@ -97,7 +108,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-476 warnings, Stylelint 5. The numbers only go down: fix findings in the files you touch and lower the
+474 warnings, Stylelint 5. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"
