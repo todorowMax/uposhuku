@@ -1,220 +1,66 @@
 "use client";
 
-import "maplibre-gl/dist/maplibre-gl.css";
-import { useEffect, useRef, useState } from "react";
-import * as maplibregl from "maplibre-gl";
-import { Check, Eraser, MapPin, X } from "@/components/icons";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { CITIES } from "@/lib/map/cities";
-import { nearestCity } from "@/lib/map/nearest-city";
-import type { GeoPoint } from "@/lib/map/types";
-import { PLACE_LABEL_LAYERS } from "@/lib/maplibre/place-labels";
-import { buildMapStyle } from "@/lib/maplibre/style";
+// components/profile/location-picker.tsx
+//
+// Вибір точки на карті. Карту можна наближати й рухати, клік ставить точку, її можна перетягнути. «Зняти» прибирає
+// чернетку точки, «Підтвердити» віддає її профілю. Поки не підтвердили, нічого не збережено: випадкове тикання не
+// псує профіль. Це екран (DESIGN.md, «Шари»), а не шторка: карту тягнуть пальцем, а шторка закривалася б від свайпу.
+// Логіка карти в `use-location-picker.ts`.
 
-type Point = { lat: number; lng: number };
+import { Check, Eraser, MapPin } from "@/components/icons";
+import { useLocationPicker, type LocationPickerTypes } from "@/components/profile/use-location-picker";
+import { Button } from "@/components/ui/button";
+import { Screen } from "@/components/ui/screen";
 
-const UKRAINE_VIEW = { center: [31.2, 48.9] as [number, number], zoom: 5.2 };
-const BOUNDS: [[number, number], [number, number]] = [
-  [21.5, 43.8],
-  [41.2, 53],
-];
-
-const pickStyle = () => {
-  const style = buildMapStyle(window.location.origin);
-  return {
-    ...style,
-    projection: { type: "mercator" as const },
-    sky: undefined,
-    layers: [
-      // Назви вулиць тут потрібні раніше, ніж на головній.
-      ...style.layers.map((layer) =>
-        layer.id === "street-names" ? { ...layer, minzoom: 13 } : layer,
-      ),
-      ...PLACE_LABEL_LAYERS,
-    ],
+export namespace LocationPickerScreenTypes {
+  export type Props = {
+    initial: LocationPickerTypes.Point | null;
+    cityId: string;
+    onConfirm: (point: LocationPickerTypes.Point | null) => void;
+    onClose: () => void;
   };
-};
+}
 
-const marker = () => {
-  const element = document.createElement("div");
-  element.className = "loc-pin";
-  element.innerHTML = '<span class="loc-pin-dot"></span>';
-  return element;
-};
-
-/**
- * Вибір точки на карті. Карту можна наближати й рухати, клік ставить точку,
- * її можна перетягнути. «Зняти» прибирає чернетку точки, «Підтвердити»
- * віддає її профілю. Поки не підтвердили, нічого не збережено: випадкове
- * тикання не псує профіль.
- */
-export function LocationPicker({
-  initial,
-  cityId,
-  onConfirm,
-  onClose,
-}: {
-  initial: Point | null;
-  cityId: string;
-  onConfirm: (point: Point | null) => void;
-  onClose: () => void;
-}) {
-  // Контейнер карти з'являється в порталі пізніше за компонент, тому тримаємо його в стані, а не в ref.
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markerRef = useRef<maplibregl.Marker | null>(null);
-  const [draft, setDraft] = useState<Point | null>(initial);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    if (!container) return;
-    const city = CITIES.find((item) => item.id === cityId);
-    const start = initial ?? city;
-    let map: maplibregl.Map;
-    try {
-      map = new maplibregl.Map({
-        container,
-        // Той самий стиль, що на головній (наші текстури, вулиці, будинки), але плоский:
-        // без глобуса й неба, щоб точку було легко поставити.
-        style: pickStyle(),
-        pitch: 0,
-        maxPitch: 0,
-        center: start ? [start.lng, start.lat] : UKRAINE_VIEW.center,
-        zoom: initial ? 13 : city ? 10.5 : UKRAINE_VIEW.zoom,
-        minZoom: 5,
-        maxZoom: 18,
-        maxBounds: BOUNDS,
-        attributionControl: { compact: true },
-      });
-    } catch {
-      setFailed(true);
-      return;
-    }
-    mapRef.current = map;
-    map.dragRotate.disable();
-    map.touchZoomRotate.disableRotation();
-    map.addControl(
-      new maplibregl.NavigationControl({ showCompass: false }),
-      "top-right",
-    );
-    map.on("click", (event) =>
-      setDraft({ lat: event.lngLat.lat, lng: event.lngLat.lng }),
-    );
-    return () => {
-      markerRef.current?.remove();
-      markerRef.current = null;
-      map.remove();
-      mapRef.current = null;
-    };
-    // Початковий вигляд задаємо один раз; далі карту веде людина.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [container]);
-
-  // Маркер повторює чернетку: поставили, перетягнули, зняли.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    if (!draft) {
-      markerRef.current?.remove();
-      markerRef.current = null;
-      return;
-    }
-    if (!markerRef.current) {
-      const pin = new maplibregl.Marker({
-        element: marker(),
-        draggable: true,
-        anchor: "bottom",
-      })
-        .setLngLat([draft.lng, draft.lat])
-        .addTo(map);
-      pin.on("dragend", () => {
-        const { lat, lng } = pin.getLngLat();
-        setDraft({ lat, lng });
-      });
-      markerRef.current = pin;
-    } else {
-      markerRef.current.setLngLat([draft.lng, draft.lat]);
-    }
-  }, [draft, container]);
-
-  const near = draft ? nearestCity(draft as GeoPoint) : null;
-  const changed =
-    (draft?.lat ?? null) !== (initial?.lat ?? null) ||
-    (draft?.lng ?? null) !== (initial?.lng ?? null);
-  const removing = !draft && Boolean(initial);
-
+export const LocationPicker = ({ initial, cityId, onConfirm, onClose }: LocationPickerScreenTypes.Props) => {
+  const { setContainer, setDraft, draft, near, failed, changed, removing } = useLocationPicker(initial, cityId);
   return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-    <DialogContent variant="full" aria-describedby={undefined} className="loc-overlay">
-      <header className="pe-header">
-        <div className="min-w-0 flex-1">
-          <DialogTitle data-size="lg" className="ui-dialog-title">
-            Де вас показувати
-          </DialogTitle>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
-            Наблизьте карту й торкніться місця. Точку можна перетягнути.
-          </p>
+    <Screen
+      open
+      onOpenChange={(next) => !next && onClose()}
+      title="Де вас показувати"
+      description="Наблизьте карту й торкніться місця. Точку можна перетягнути."
+      desktop="dialog"
+      width="wide"
+      action={
+        <Button variant="quiet" onClick={() => setDraft(null)} disabled={!draft}>
+          <Eraser className="size-4" />
+          Зняти точку
+        </Button>
+      }
+      footer={
+        <Button className="w-full" onClick={() => onConfirm(draft)} disabled={!changed}>
+          <Check className="size-4" />
+          {removing ? "Прибрати точку" : "Підтвердити"}
+        </Button>
+      }
+    >
+      <div className="loc-pane">
+        <div className="loc-map-wrap">
+          <div ref={setContainer} className="loc-map" />
+          {failed && <p className="loc-fail">Карта не завантажилась. Закрийте вікно й оберіть місто зі списку.</p>}
+          {!draft && !failed && <p className="loc-hint">Торкніться карти, щоб поставити точку</p>}
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Закрити без збереження"
-          className="auth-icon-button shrink-0"
-        >
-          <X className="size-5" />
-        </button>
-      </header>
-
-      <div className="loc-map-wrap">
-        <div ref={setContainer} className="loc-map" />
-        {failed && (
-          <p className="loc-fail">
-            Карта не завантажилась. Закрийте вікно й оберіть місто зі списку.
-          </p>
-        )}
-        {!draft && !failed && (
-          <p className="loc-hint">Торкніться карти, щоб поставити точку</p>
-        )}
-      </div>
-
-      <footer className="loc-footer">
         <div className="loc-note">
           <MapPin className="size-4 shrink-0" />
           {draft && near ? (
             <span>
-              {draft.lat.toFixed(3)}, {draft.lng.toFixed(3)} · найближче місто:{" "}
-              {near.city.name}. Точку побачать усі, тож ставте її приблизно, а
-              не біля дверей.
+              {draft.lat.toFixed(3)}, {draft.lng.toFixed(3)} · найближче місто: {near.city.name}. Точку побачать усі, тож ставте її приблизно, а не біля дверей.
             </span>
           ) : (
             <span>Без точки ми поставимо вас біля центру вашого міста.</span>
           )}
         </div>
-        <div className="loc-actions">
-          <button
-            type="button"
-            onClick={() => onConfirm(draft)}
-            disabled={!changed}
-            className="auth-primary"
-          >
-            <Check className="size-4" />
-            {removing ? "Прибрати точку" : "Підтвердити"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setDraft(null)}
-            disabled={!draft}
-            className="auth-secondary"
-          >
-            <Eraser className="size-4" />
-            Зняти точку
-          </button>
-          <button type="button" onClick={onClose} className="auth-secondary">
-            Скасувати
-          </button>
-        </div>
-      </footer>
-    </DialogContent>
-    </Dialog>
+      </div>
+    </Screen>
   );
-}
+};

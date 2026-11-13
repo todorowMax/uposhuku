@@ -24,4 +24,16 @@ const RadioCard = ({ value, id, title, hint, disabled, className }: { value: str
   </label>
 );
 
-export { RadioCard, RadioGroup };
+export namespace RadioTileTypes {
+  export type Props = React.ComponentProps<"label"> & { value: string; id: string; disabled?: boolean };
+}
+
+/** Карта з власним виглядом: саме радіо схховане (дає клавіатуру, стрілки й стан), вигляд задають `className` і вміст. */
+const RadioTile = ({ value, id, disabled, children, ...props }: RadioTileTypes.Props) => (
+  <label htmlFor={id} data-slot="radio-tile" {...props}>
+    <RadioGroupPrimitive.Item id={id} value={value} disabled={disabled} className="ui-radio-tile-input" />
+    {children}
+  </label>
+);
+
+export { RadioCard, RadioGroup, RadioTile };

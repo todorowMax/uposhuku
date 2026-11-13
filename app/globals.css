@@ -472,12 +472,9 @@ html[data-glass] .composer {
   font-weight: 500;
   line-height: 1;
   white-space: nowrap;
-  animation: tag-chip-in 180ms var(--ease-out-quint);
-}
-
-/* Довга назва не з'їдає весь рядок: обрізаємо, повна — у підказці. */
-.tag-chip {
+  /* Довга назва не з'їдає весь рядок: обрізаємо, повна — у підказці. */
   max-width: 190px;
+  animation: tag-chip-in 180ms var(--ease-out-quint);
 }
 
 .tag-chip-label {
@@ -547,25 +544,20 @@ html[data-glass] .composer {
   outline-offset: 2px;
 }
 
-.tag-panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 10;
+/* Поповер «ще +N» на десктопі; у шторці клас стоїть на тілі шторки, а контейнерних стилів немає. */
+.ui-popover.tag-panel {
   display: grid;
   gap: 12px;
-  max-height: 260px;
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(260px, var(--radix-popover-content-available-height, 260px));
   overflow-y: auto;
   padding: 12px;
   border-radius: 16px;
-  box-shadow: 0 18px 40px -18px rgb(47 60 68 / 25%);
-  animation: composer-menu-in 160ms var(--ease-out-quint);
 }
 
 .tag-panel-title {
   margin-bottom: 6px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -915,20 +907,24 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   color: #ffffff;
 }
 
-.filter-panel {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 10;
-  display: grid;
-  gap: 16px;
-  max-height: min(460px, calc(100dvh - 220px));
-  padding: 16px;
-  overflow-y: auto;
+/* Поповер «Фільтри» на десктопі; у шторці на телефоні клас стоїть на тілі шторки, а контейнерних стилів немає. */
+.ui-popover.filter-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(560px, var(--radix-popover-content-available-height, 560px));
   border-radius: 18px;
   background: rgb(255 255 255 / 94%);
   box-shadow: 0 18px 50px rgb(45 60 67 / 18%);
+}
+
+/* Прокручується лише ця частина поповера; «Скинути» й «Показати» під нею стоять. */
+.filter-panel-scroll {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
 }
 
 .filter-panel-title {
@@ -964,61 +960,6 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   text-decoration: underline;
   text-decoration-color: #8aaab4;
   text-underline-offset: 4px;
-}
-
-.filter-switch {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 40px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.filter-switch input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.filter-switch-track {
-  position: relative;
-  flex: none;
-  width: 40px;
-  height: 24px;
-  border-radius: 999px;
-  background: #a7bcc0;
-  transition: background-color 180ms;
-}
-
-.filter-switch-track::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgb(0 54 74 / 25%);
-  transition: transform 180ms ease-out;
-}
-
-.filter-switch input:checked + .filter-switch-track {
-  background: var(--ocean);
-}
-
-.filter-switch input:checked + .filter-switch-track::after {
-  transform: translateX(16px);
-}
-
-.filter-switch input:focus-visible + .filter-switch-track {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
 }
 
 .filter-panel-footer {
@@ -1120,60 +1061,7 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   font-size: 14px;
 }
 
-/* Вхід і публікація запиту: центральна картка над затемненою картою. */
-.auth-dialog-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  isolation: isolate;
-}
-
-.auth-dialog-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  background: rgb(29 38 42 / 48%);
-  -webkit-backdrop-filter: blur(3px);
-  backdrop-filter: blur(3px);
-}
-
-.auth-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: rgb(3 9 13 / 62%);
-  pointer-events: auto;
-}
-
-.auth-panel {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  /* minmax(0, 1fr): без нуля колонка росла до ширини шести клітинок коду й виштовхувала вміст за край панелі. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
-  width: 100%;
-  max-width: 420px;
-  max-height: calc(100dvh - 32px);
-  overflow-y: auto;
-  padding: 28px;
-  border: 1px solid rgb(255 255 255 / 78%);
-  border-radius: 24px;
-  background:
-    radial-gradient(ellipse 110% 215px at 50% 0%, rgb(242 105 60 / 37%) 0%, rgb(242 105 60 / 12%) 56%, transparent 100%),
-    linear-gradient(180deg, #e8f2f0 0%, #fff 60%, #f7faf9 100%);
-  box-shadow: 0 28px 80px rgb(24 35 39 / 29%), inset 0 1px rgb(255 255 255 / 75%);
-  pointer-events: auto;
-}
-
-.auth-panel > div + div {
-  display: grid;
-  gap: 14px;
-}
-
+/* Вхід і публікація запиту: шторка (components/auth/auth-panel.tsx), на десктопі вікно по центру. */
 .auth-dialog-header {
   position: relative;
   display: grid;
@@ -1214,8 +1102,12 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
 .auth-close { right: 0; }
 
 @media (max-width: 480px) {
-  .auth-panel { padding: 24px 20px; }
   .auth-dialog-title { font-size: 18px; }
+}
+
+.auth-sheet-step {
+  display: grid;
+  gap: 14px;
 }
 
 .auth-lead {
@@ -1225,7 +1117,7 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   color: var(--ink-muted);
 }
 
-.auth-panel .auth-input {
+.auth-sheet .auth-input {
   min-height: 50px;
   border-color: rgb(0 54 74 / 11%);
   border-radius: 12px;
@@ -1233,25 +1125,25 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   box-shadow: inset 0 1px 2px rgb(0 54 74 / 3%);
 }
 
-.auth-panel .auth-input:focus {
+.auth-sheet .auth-input:focus {
   border-color: var(--brand);
   background: #fff;
   box-shadow: 0 0 0 3px rgb(242 105 60 / 25%);
 }
 
-.auth-panel .auth-primary {
+.auth-sheet .auth-primary {
   min-height: 50px;
   border-radius: 12px;
 }
 
-.auth-panel .auth-google {
+.auth-sheet .auth-google {
   min-height: 48px;
   border-color: rgb(0 54 74 / 14%);
   border-radius: 12px;
   background: rgb(255 255 255 / 78%);
 }
 
-.auth-panel .auth-google:hover {
+.auth-sheet .auth-google:hover {
   background: var(--hover-blue);
 }
 
@@ -1374,6 +1266,7 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
 }
 
 .auth-secondary {
+  padding: 0 18px;
   border: 1px solid #8aaab4;
   background: #ffffff;
   color: var(--ink);
@@ -1381,6 +1274,11 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
 
 .auth-secondary:hover {
   background: var(--hover-blue);
+}
+
+.auth-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .auth-link {
@@ -2109,101 +2007,22 @@ html[data-glass] .offers-panel {
 }
 
 /*
-  «Стати на карту» (components/placement): модалка над картою, на телефоні
-  шторка знизу. Три розміри показано у справжній пропорції маркерів.
+  «Стати на карту» (components/placement): екран, на десктопі вікно по центру.
+  Три розміри показано у справжній пропорції маркерів.
 */
-.place-scrim {
-  z-index: 44;
-}
-
-/* Контейнер центрує панель сам: translate у стилях GSAP перебив би зсув. */
-.place-wrap {
-  position: fixed;
-  inset: 0;
-  z-index: 45;
-  display: grid;
-  align-items: end;
-  justify-items: center;
-  pointer-events: none;
-}
-
-@media (min-width: 640px) {
-  .place-wrap {
-    align-items: center;
-  }
-}
-
-.place-panel {
-  display: grid;
-  gap: 14px;
-  width: 100%;
-  max-height: 92dvh;
-  padding: 20px 20px max(20px, env(safe-area-inset-bottom));
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  border-radius: 22px 22px 0 0;
-  background: rgb(255 255 255 / 98%);
-  box-shadow: 0 -18px 50px rgb(45 60 67 / 22%);
-  pointer-events: auto;
-}
-
-.place-panel::-webkit-scrollbar {
-  display: none;
-}
-
-.place-panel[data-hero] {
-  display: block;
-  padding: 0;
-  background: #ffffff;
-}
-
 .place-hero {
   position: relative;
   display: grid;
   justify-items: center;
   gap: 11px;
   overflow: hidden;
-  padding: 36px 24px 30px;
+  padding: 28px 20px 24px;
+  border-radius: 20px;
   background:
     radial-gradient(ellipse 150px 110px at 72% 17%, rgb(242 105 60 / 17%), transparent 100%),
     radial-gradient(ellipse 310px 190px at 16% 14%, rgb(106 185 206 / 56%), transparent 100%),
     linear-gradient(180deg, #dce7e4 0%, #f4f8f8 66%, #ffffff 100%);
   text-align: center;
-}
-
-.place-hero-skip,
-.place-header-skip {
-  border-radius: 9px;
-  color: var(--ink-muted);
-  font-size: 12px;
-  font-weight: 600;
-  transition: background-color 150ms, color 150ms;
-}
-
-.place-hero-skip {
-  position: absolute;
-  top: 15px;
-  right: 17px;
-  z-index: 1;
-  padding: 6px 8px;
-}
-
-.place-header-skip {
-  padding: 6px 8px;
-}
-
-.place-hero-skip:hover,
-.place-header-skip:hover {
-  background: rgb(255 255 255 / 70%);
-  color: var(--ink);
-}
-
-.place-hero-title {
-  font-size: 23px;
-  font-weight: 700;
-  line-height: 1.2;
-  color: var(--ink);
 }
 
 .place-hero-lead {
@@ -2277,16 +2096,6 @@ html[data-glass] .offers-panel {
 .place-body {
   display: grid;
   gap: 16px;
-  padding: 2px 20px max(20px, env(safe-area-inset-bottom));
-}
-
-@media (min-width: 640px) {
-  .place-panel {
-    width: 480px;
-    max-height: calc(100dvh - 48px);
-    border-radius: 22px;
-    box-shadow: 0 24px 70px rgb(45 60 67 / 26%);
-  }
 }
 
 .place-dot {
@@ -2328,27 +2137,20 @@ html[data-glass] .offers-panel {
 .place-tier {
   position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 48px;
-  padding: 0 16px;
-  border-radius: 14px;
-  background: rgb(0 54 74 / 4.5%);
-  box-shadow: inset 0 0 0 1.5px transparent;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background-color 150ms, box-shadow 150ms;
-}
-
-.place-panel[data-hero] .place-tier {
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   gap: 4px;
   min-width: 0;
   min-height: 144px;
   padding: 10px 4px;
+  border-radius: 14px;
+  background: rgb(0 54 74 / 4.5%);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  font-size: 14px;
   text-align: center;
+  cursor: pointer;
+  transition: background-color 150ms, box-shadow 150ms;
 }
 
 .place-tier-preview {
@@ -2381,39 +2183,30 @@ html[data-glass] .offers-panel {
   opacity: 1;
 }
 
-.place-tier input {
+.ui-radio-tile-input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
-.place-tier:has(input:focus-visible) {
+.place-tier:has(.ui-radio-tile-input:focus-visible) {
   outline: 2px solid var(--brand);
   outline-offset: 2px;
 }
 
 .place-tier-name {
-  font-weight: 500;
-  color: var(--ink);
-}
-
-.place-panel[data-hero] .place-tier-name {
-  font-size: clamp(11px, 2.8vw, 13px);
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.15;
+  color: var(--ink);
 }
 
 .place-tier-price {
   flex: none;
-  text-align: right;
-  font-size: 13px;
+  text-align: center;
+  font-size: 12px;
   font-variant-numeric: lining-nums proportional-nums;
   color: var(--ink-muted);
-}
-
-.place-panel[data-hero] .place-tier-price {
-  font-size: 12px;
-  text-align: center;
 }
 
 .place-choice-description {
@@ -2714,9 +2507,6 @@ html[data-glass] .offers-panel {
 .pv-layout {
   display: grid;
   gap: 16px;
-  max-width: 760px;
-  margin: 0 auto;
-  padding: 20px 16px 110px;
 }
 
 .pv-head {
@@ -2743,22 +2533,6 @@ html[data-glass] .offers-panel {
   background: rgb(0 54 74 / 4.5%);
 }
 
-.pv-footer {
-  position: absolute;
-  inset: auto 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 10px;
-  padding: 14px 16px max(14px, env(safe-area-inset-bottom));
-  background: linear-gradient(to bottom, transparent, #eef1f1 35%);
-}
-
-.pv-footer > button {
-  min-width: 200px;
-  padding: 0 22px;
-}
-
 /* Умови запиту чипами (components/composer/request-params). */
 .composer-params {
   grid-area: params;
@@ -2777,6 +2551,8 @@ html[data-glass] .offers-panel {
     grid-template-areas:
       "params params params"
       "plus . send";
+    /* Без проміжку рядок чипів майже торкався кнопки «Знайти» (2 px). */
+    row-gap: 8px;
   }
 }
 
@@ -2843,16 +2619,15 @@ html[data-glass] .offers-panel {
   }
 }
 
-.param-pop {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 30;
+/* Поповер умов запиту на десктопі; у шторці вміст лежить у тілі шторки. */
+.ui-popover.param-pop {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   width: min(360px, calc(100vw - 32px));
+  max-height: min(420px, var(--radix-popover-content-available-height, 420px));
   min-width: 0;
+  overflow-y: auto;
   padding: 14px;
   border-radius: 16px;
   background: rgb(255 255 255 / 98%);
@@ -3140,10 +2915,16 @@ html[data-glass] .offers-panel {
 }
 
 .notif-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 56px;
   padding: 6px 4px;
-  align-items: flex-start;
   border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
 }
 
 .notif-row[data-disabled] {
@@ -3481,37 +3262,25 @@ html[data-glass] .offers-panel {
 }
 
 /*
-  Профіль виконавця (components/profile). Оверлей на весь екран: ліворуч
-  форма, праворуч живий перегляд картки. Вужче 1024px — в одну колонку.
+  Профіль виконавця (components/profile). Сам редактор це Screen: ліворуч форма, праворуч живий перегляд картки,
+  вужче 1024px в одну колонку. .pe-overlay лише очікування, поки профіль вантажиться.
 */
 .pe-overlay {
   position: fixed;
   inset: 0;
   z-index: 40;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  place-items: center;
   background: #eef1f1;
-}
-
-.pe-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: max(14px, env(safe-area-inset-top)) 20px 14px;
-  border-bottom: 1px solid rgb(66 116 132 / 50%);
-  background: rgb(255 255 255 / 70%);
-}
-
-.pe-header > div:first-child {
-  flex: 1;
 }
 
 .pe-checks {
   display: none;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 768px) {
   .pe-checks {
     display: flex;
   }
@@ -3525,7 +3294,7 @@ html[data-glass] .offers-panel {
   padding: 0 10px;
   border-radius: 999px;
   background: rgb(0 54 74 / 6%);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--ink-muted);
   transition: background-color 200ms, color 200ms;
@@ -3543,28 +3312,20 @@ html[data-glass] .offers-panel {
   background: #8aaab4;
 }
 
-.pe-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  /* Липкий низ (.pe-footer) не закриває поле, на яке перейшли клавішею Tab. */
-  scroll-padding-bottom: 140px;
+/* Вміст екрана редактора: опис, чипи заповненості й форма в одному стовпці з рівними проміжками. */
+.pe-body {
+  display: grid;
+  gap: 16px;
 }
 
 .pe-layout {
   display: grid;
   gap: 24px;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 20px 16px 48px;
 }
 
 @media (min-width: 1024px) {
   .pe-layout {
-    grid-template-columns: minmax(0, 1fr) 380px;
-    gap: 32px;
-    padding: 28px 24px 64px;
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
 
@@ -3750,65 +3511,9 @@ select.auth-input[data-empty] {
   background: var(--hover-blue);
 }
 
-.pe-footer {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
-  display: grid;
-  gap: 10px;
-  margin: 0 -4px;
-  padding: 14px 4px 12px;
-  background: linear-gradient(to bottom, transparent, #eef1f1 18%);
-}
-
-.pe-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.pe-primary {
-  min-width: 190px;
-  padding: 0 20px;
-}
-
-.auth-secondary {
-  padding: 0 18px;
-}
-
-.auth-secondary:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
 .pe-missing {
   font-size: 12px;
   color: var(--ink-muted);
-}
-
-.pe-saved {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #4d7a5e;
-  opacity: 0;
-  transition: opacity 200ms;
-}
-
-.pe-saved[data-shown] {
-  opacity: 1;
-}
-
-.pe-confirm {
-  display: grid;
-  gap: 10px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 10px 30px -10px rgb(45 60 67 / 30%), inset 0 0 0 1px rgb(66 116 132 / 55%);
 }
 
 .pe-preview {
@@ -3820,8 +3525,8 @@ select.auth-input[data-empty] {
 @media (min-width: 1024px) {
   .pe-preview {
     position: sticky;
-    top: 20px;
-    max-height: calc(100dvh - 120px);
+    top: 0;
+    align-self: start;
   }
 }
 
@@ -4658,19 +4363,20 @@ html[data-map-ready] .map-skeleton {
   color: var(--accent-ink);
 }
 
-.loc-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  display: flex;
-  flex-direction: column;
-  background: #eef1f1;
+/* Екран вибору точки: карта займає все, що лишилось, підпис під нею. */
+.loc-pane {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  height: 100%;
+  min-height: 60dvh;
 }
 
 .loc-map-wrap {
   position: relative;
-  flex: 1;
   min-height: 0;
+  overflow: hidden;
+  border-radius: 16px;
 }
 
 .loc-map,
@@ -4703,14 +4409,6 @@ html[data-map-ready] .map-skeleton {
   pointer-events: auto;
 }
 
-.loc-footer {
-  display: grid;
-  gap: 12px;
-  padding: 14px 20px max(16px, env(safe-area-inset-bottom));
-  border-top: 1px solid rgb(66 116 132 / 50%);
-  background: #f3f8f6;
-}
-
 .loc-note {
   display: flex;
   gap: 8px;
@@ -4718,16 +4416,6 @@ html[data-map-ready] .map-skeleton {
   font-size: 12px;
   line-height: 1.45;
   color: var(--ink-muted);
-}
-
-.loc-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.loc-actions > button {
-  flex: 1 1 140px;
 }
 
 .loc-pin {
@@ -6038,6 +5726,10 @@ html[data-map-ready] .map-skeleton {
     height: fit-content;
     max-height: calc(100dvh - 32px);
     margin: auto;
+  }
+
+  .ui-screen[data-desktop="dialog"][data-width="wide"] {
+    width: min(960px, calc(100vw - 32px));
   }
 
   .ui-screen[data-state="open"] {

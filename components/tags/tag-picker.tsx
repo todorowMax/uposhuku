@@ -29,8 +29,11 @@ export interface TagPickerProps {
   limitReached?: boolean;
   limitHint?: string;
   context: TagPickerContext;
-  /** Кнопка, що відкриває вибір. Типова: чип «+ Додати тег». */
+  /** Кнопка, що відкриває вибір. Типова: чип «+ Додати тег»; `null` без кнопки (вибір відкриває викликач через `open`). */
   trigger?: ReactNode;
+  /** Керований стан: коли вибір відкривається не своєю кнопкою (шторка фільтрів закрилась і відкриває вибір). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   /** Без випадайки: панель стоїть прямо на сторінці (фільтри карти). */
   inline?: boolean;
   /** «Запропонувати „…“», коли нічого не знайшлося. Немає: кнопки в пікері теж немає (гість). */
@@ -199,8 +202,14 @@ function TagPickerPanel({ selected, auto, suggestions = [], labelOf, onToggle, l
  */
 export function TagPicker(props: TagPickerProps) {
   const { trigger, inline, title = "Додати тег", limitReached } = props;
-  const [open, setOpen] = useState(false);
-  const mobile = useMediaQuery("(max-width: 639px)");
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = props.open ?? innerOpen;
+  const setOpen = (next: boolean) => {
+    setInnerOpen(next);
+    props.onOpenChange?.(next);
+  };
+  const desktop = useMediaQuery("(min-width: 768px)");
+  const mobile = !desktop;
 
   useEffect(() => {
     if (open) trackPickerOpened(props.context);
@@ -216,12 +225,12 @@ export function TagPicker(props: TagPickerProps) {
     );
   }
 
-  const button = trigger ?? (
+  const button = trigger === undefined ? (
     <button type="button" className="tag-chip" data-kind="add" data-limit={limitReached || undefined}>
       <Plus className="size-3 shrink-0" />
       <span className="tag-chip-label">Додати тег</span>
     </button>
-  );
+  ) : trigger;
 
   // Escape закриває лише вибір, а не редактор під ним: подію позначаємо як оброблену.
   const closeOnEscape = (event: KeyboardEvent) => {
@@ -232,7 +241,7 @@ export function TagPicker(props: TagPickerProps) {
   if (mobile) {
     return (
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>{button}</SheetTrigger>
+        {button && <SheetTrigger asChild>{button}</SheetTrigger>}
         <SheetContent onEscapeKeyDown={closeOnEscape} size="tall">
           <SheetTitle className="ui-sheet-title">{title}</SheetTitle>
           <SheetDescription className="sr-only">Знайдіть тег пошуком і виберіть його зі списку.</SheetDescription>
@@ -244,7 +253,7 @@ export function TagPicker(props: TagPickerProps) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>{button}</PopoverTrigger>
+      {button && <PopoverTrigger asChild>{button}</PopoverTrigger>}
       <PopoverContent onEscapeKeyDown={closeOnEscape} className="ui-popover-picker" aria-label={title}>
         <TagPickerPanel {...props} />
       </PopoverContent>

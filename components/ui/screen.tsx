@@ -8,7 +8,8 @@
 //   до 768 px: на весь екран, заїжджає справа наліво; шапка «←» і заголовок, одна прокручувана середина,
 //              закріплений низ; відступи safe-area; низ і поле у фокусі над клавіатурою;
 //   від 768 px: desktop="panel" — панель шириною з чат ліворуч від нього, без затемнення, чат поруч робочий
-//              (вужче 900 px панель лягає на чат); desktop="dialog" — вікно по центру із затемненням.
+//              (вужче 900 px панель лягає на чат); desktop="dialog" — вікно по центру із затемненням;
+//              width="wide" робить таке вікно ширшим (форма з переглядом збоку, карта).
 //
 // Системне «назад» закриває верхній шар (`useLayerHistory`). Виклик той самий на всіх екранах:
 //
@@ -29,6 +30,7 @@ import { useMediaQuery } from "@/lib/ui/use-media-query";
 
 export namespace ScreenTypes {
   export type Desktop = "panel" | "dialog";
+  export type Width = "default" | "wide";
   export type Props = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -38,6 +40,8 @@ export namespace ScreenTypes {
     description?: string;
     /** Вид від 768 px: панель біля чату або вікно по центру. */
     desktop?: Desktop;
+    /** Ширина вікна по центру від 768 px; для `panel` не діє. */
+    width?: Width;
     /** Дія справа в шапці (одна кнопка або меню). */
     action?: React.ReactNode;
     /** Закріплений низ з головною кнопкою; без нього низу немає. */
@@ -48,7 +52,7 @@ export namespace ScreenTypes {
 
 const DESKTOP = "(min-width: 768px)";
 
-const Screen = ({ open, onOpenChange, title, description, desktop = "dialog", action, footer, children }: ScreenTypes.Props) => {
+const Screen = ({ open, onOpenChange, title, description, desktop = "dialog", width = "default", action, footer, children }: ScreenTypes.Props) => {
   // Вузли в стані, не в ref: Radix монтує вміст пізніше за перший ефект.
   const [content, setContent] = React.useState<HTMLDivElement | null>(null);
   const [body, setBody] = React.useState<HTMLDivElement | null>(null);
@@ -69,6 +73,7 @@ const Screen = ({ open, onOpenChange, title, description, desktop = "dialog", ac
           variant="panel"
           className="ui-screen"
           data-desktop={desktop}
+          data-width={width}
           {...(description ? {} : { "aria-describedby": undefined })}
           onInteractOutside={(event) => event.preventDefault()}
         >

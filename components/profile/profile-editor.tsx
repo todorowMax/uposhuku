@@ -1,529 +1,134 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { gsap } from "gsap";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Check, Loader2, MapPinned, Plus, X } from "@/components/icons";
-import { PerformerAbout } from "@/components/maplibre/performer-about";
+// components/profile/profile-editor.tsx
+//
+// Профіль виконавця: фото й коротко про себе, «Про себе» вільним текстом і окремо роботи. З обох текстів теги
+// розбираються самі, як у полі запиту: з «Про себе» заявлені навички, з робіт підтверджені (з галочкою).
+// Це екран за DESIGN.md («Шари»): на телефоні на весь екран, від 768 px вікно по центру з переглядом картки збоку.
+// Низ закріплений з однією головною кнопкою; друга дія в шапці. Логіка в `use-profile-editor.ts`, блоки в `parts/`.
+
+import { Check, Loader2 } from "@/components/icons";
+import { ProfileAboutSection } from "@/components/profile/parts/profile-about-section";
+import { ProfileBioSection } from "@/components/profile/parts/profile-bio-section";
+import { ProfileCloseSheet } from "@/components/profile/parts/profile-close-sheet";
+import { ProfilePreview } from "@/components/profile/parts/profile-preview";
+import { ProfileWorksSection } from "@/components/profile/parts/profile-works-section";
 import { LocationPicker } from "@/components/profile/location-picker";
 import { PayoutSection } from "@/components/payouts/payout-section";
 import { RequisitesSection } from "@/components/requisites/requisites-section";
-import { PhotoField } from "@/components/profile/photo-field";
-import { TagChips } from "@/components/profile/tag-chips";
-import { TagPicker } from "@/components/tags/tag-picker";
-import { TaggedField } from "@/components/profile/tagged-field";
-import { WorkEditor } from "@/components/profile/work-editor";
-import { ApiError, sessionStore } from "@/lib/auth/client";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CITIES } from "@/lib/map/cities";
-import { SAME_CITY_KM, distanceKm, nearestCity } from "@/lib/map/nearest-city";
-import { loadPlacement, placementOpenStore, placementStore } from "@/lib/placement/client";
+import { useProfileEditor } from "@/components/profile/use-profile-editor";
+import { Button } from "@/components/ui/button";
+import { Screen } from "@/components/ui/screen";
+import { placementOpenStore } from "@/lib/placement/client";
 import { MIN_PAYMENT } from "@/lib/placement/pricing";
-import { profileEditorStore, profileStore, saveMyProfile } from "@/lib/profile/client";
-import { profileToPerformer } from "@/lib/profile/to-performer";
-import { PROFILE_LIMITS, emptyProfile, emptyWork, missingForPublish, profileTags, provenTags, type Profile, type ProfileWork } from "@/lib/profile/types";
-import { useTagging } from "@/lib/tags/use-tagging";
-import { useStore } from "@/lib/store";
-import { EVENTS, track } from "@/lib/telemetry/track";
-import { useProposals } from "@/lib/tags/proposals-client";
+import { profileEditorStore } from "@/lib/profile/client";
+import { openAfterLayers } from "@/lib/ui/use-layer-history";
 
-const CITY_OPTIONS = [...CITIES].sort((a, b) => a.name.localeCompare(b.name, "uk"));
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const FORM_ID = "pe-form";
 
-const newWork = (): ProfileWork => emptyWork(`w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`);
+const subtitle = (published: boolean, onMap: boolean) => {
+  if (!published) return "Заповніть і опублікуйте: так ви зможете відгукуватися на запити.";
+  return onMap ? "Вас видно на карті. Зміни з'являться після збереження." : "Профіль опубліковано, але на карті вас ще немає.";
+};
 
-/** Те, що людина змінює: без часу збереження, щоб порівнювати «було — стало». */
-const snapshot = (profile: Profile) => JSON.stringify({ ...profile, updatedAt: "" });
-
-/**
- * Профіль виконавця: фото й коротко про себе, «Про себе» вільним текстом і
- * окремо — роботи. З обох текстів теги розбираються самі, як у полі запиту:
- * з «Про себе» — заявлені навички, з робіт — підтверджені (з галочкою).
- * Праворуч живий перегляд тієї самої картки, яку бачать замовники.
- */
-export function ProfileEditor() {
-  const session = useStore(sessionStore);
-  const profileState = useStore(profileStore);
-  const stored = profileState.status === "ready" ? profileState.profile : null;
-  const userName = session.status === "user" ? (session.user.name ?? "") : "";
-  const placement = useStore(placementStore);
-  // Без оплати профіль опубліковано, але на карті людини немає.
-  const onMap = (placement?.tier ?? 1) >= 2;
-
-  useEffect(() => {
-    void loadPlacement();
-    track(EVENTS.profileEditorOpened, { has_profile: Boolean(stored) });
-    // Один раз за відкриття редактора.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [name, setName] = useState(stored?.name ?? userName);
-  const [cityId, setCityId] = useState(stored?.cityId ?? "");
-  const [location, setLocation] = useState<Profile["location"]>(stored?.location ?? null);
-  const [picking, setPicking] = useState(false);
-  const [specialty, setSpecialty] = useState(stored?.specialty ?? "");
-  const [bio, setBio] = useState(stored?.bio ?? "");
-  const [photo, setPhoto] = useState(stored?.photo ?? "");
-  const [works, setWorks] = useState<ProfileWork[]>(stored?.works ?? []);
-  const [busy, setBusy] = useState<"publish" | "draft" | "unpublish" | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [confirmClose, setConfirmClose] = useState(false);
-  // Оверлей з'являється в порталі пізніше за компонент, тому тримаємо його в стані, а не в ref.
-  const [overlay, setOverlay] = useState<HTMLDivElement | null>(null);
-  const firstFieldRef = useRef<HTMLInputElement>(null);
-  const initialSnapshot = useRef<string | null>(null);
-
-  // Спеціальність і «Про себе» — один текст для тегів; підкреслюємо лише в «Про себе».
-  const proposals = useProposals("profile");
-  const tagging = useTagging(`${specialty}\n${bio}`, { tags: stored?.tags, manual: stored?.manualTags, hidden: stored?.hiddenTags }, { maxTags: PROFILE_LIMITS.tags, maxManual: PROFILE_LIMITS.manualTags, context: "profile" });
-  const bioOffset = specialty.length + 1;
-  const bioMentions = tagging.mentions
-    .filter((mention) => mention.start >= bioOffset)
-    .map((mention) => ({ ...mention, start: mention.start - bioOffset, end: mention.end - bioOffset }));
-
-  const draft: Profile = useMemo(
-    () => ({
-      ...emptyProfile(),
-      name,
-      cityId,
-      location,
-      specialty,
-      bio,
-      tags: tagging.tags,
-      manualTags: tagging.manual,
-      hiddenTags: tagging.hidden,
-      works,
-      photo,
-      published: stored?.published ?? false,
-    }),
-    [name, cityId, location, specialty, bio, tagging.tags, tagging.manual, tagging.hidden, works, photo, stored?.published]
-  );
-  const proven = useMemo(() => provenTags(draft), [draft]);
-  const allTags = useMemo(() => profileTags(draft), [draft]);
-  const missing = missingForPublish(draft);
-  const isPublished = Boolean(stored?.published);
-
-  // «Було» запам'ятовуємо, коли словник підвантажився: до того теги ще порожні.
-  useEffect(() => {
-    if (tagging.engine && initialSnapshot.current === null) initialSnapshot.current = snapshot(draft);
-  }, [tagging.engine, draft]);
-  const dirty = initialSnapshot.current !== null && snapshot(draft) !== initialSnapshot.current;
-
-  useEffect(() => {
-    if (saved) {
-      const timer = window.setTimeout(() => setSaved(false), 2400);
-      return () => window.clearTimeout(timer);
-    }
-  }, [saved]);
-
-  useLayoutEffect(() => {
-    if (!overlay || reduced()) return;
-    const tween = gsap.fromTo(overlay, { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" });
-    return () => {
-      tween.kill();
-    };
-  }, [overlay]);
-
-  const requestClose = () => {
-    if (dirty && !busy) setConfirmClose(true);
-    else profileEditorStore.set(false);
+export const ProfileEditor = () => {
+  const editor = useProfileEditor();
+  const { about, isPublished, busy, missing, dirty, onMap, saved, error } = editor;
+  const toPlacement = () => {
+    profileEditorStore.set(false);
+    openAfterLayers(() => placementOpenStore.set(true));
   };
-
-  const save = async (kind: "publish" | "draft" | "unpublish", closeAfter = false) => {
-    setBusy(kind);
-    setError(null);
-    setConfirmClose(false);
-    try {
-      const published = kind === "publish" ? true : kind === "unpublish" ? false : isPublished;
-      await saveMyProfile({ ...draft, published });
-      initialSnapshot.current = snapshot({ ...draft, published });
-      if (kind === "publish" || closeAfter) profileEditorStore.set(false);
-      else setSaved(true);
-      // Опублікувалися, але на карті ще немає: одразу показуємо, як на неї потрапити.
-      if (kind === "publish" && (placementStore.get()?.tier ?? 1) < 2) placementOpenStore.set(true);
-    } catch (reason) {
-      setError(reason instanceof ApiError ? reason.message : "Не вдалося зберегти профіль.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const updateWork = (id: string, patch: Partial<ProfileWork>) =>
-    setWorks((current) => current.map((work) => (work.id === id ? { ...work, ...patch } : work)));
-  const addWork = () => {
-    const work = newWork();
-    setWorks((current) => [...current, work]);
-    window.setTimeout(() => document.getElementById(`work-${work.id}-title`)?.focus(), 60);
-  };
-
-  const preview = useMemo(
-    () => profileToPerformer({ ...draft, cityId: cityId || "kyiv" }, "preview", 0),
-    [draft, cityId]
-  );
-  const cityName = CITIES.find((city) => city.id === cityId)?.name;
-
-  const checks: [string, boolean][] = [
-    ["Фото", Boolean(photo)],
-    ["Ім'я", Boolean(name.trim())],
-    ["Місто", Boolean(cityId)],
-    ["Спеціальність", Boolean(specialty.trim())],
-    [`${PROFILE_LIMITS.minTags}+ теги`, allTags.length >= PROFILE_LIMITS.minTags],
-  ];
-  const done = checks.filter(([, ok]) => ok).length;
-
+  const secondary = isPublished ? { kind: "unpublish" as const, label: "Приховати", name: "Приховати профіль" } : { kind: "draft" as const, label: "Зберегти", name: "Зберегти чернетку" };
+  const primaryDisabled = Boolean(busy) || missing.length > 0 || (isPublished && !dirty);
+  const primaryBusy = isPublished ? busy === "draft" : busy === "publish";
   return (
-    <Dialog open onOpenChange={(next) => !next && requestClose()}>
-    <DialogContent
-      ref={setOverlay}
-      variant="full"
-      aria-describedby={undefined}
-      className="pe-overlay"
-      onOpenAutoFocus={(event) => {
-        // Курсор одразу в першому полі, а не на кнопці «Закрити».
-        event.preventDefault();
-        firstFieldRef.current?.focus({ preventScroll: true });
-      }}
-    >
-      <header className="pe-header">
-        <div className="min-w-0">
-          <DialogTitle asChild>
-            <h1 data-size="lg" className="ui-dialog-title">{isPublished ? "Ваш профіль" : "Профіль виконавця"}</h1>
-          </DialogTitle>
-          <p className="mt-0.5 text-[12px] text-ink-muted">
-            {isPublished
-              ? onMap
-                ? "Вас видно на карті. Зміни з'являться після збереження."
-                : "Профіль опубліковано, але на карті вас ще немає."
-              : "Заповніть і опублікуйте: так ви зможете відгукуватися на запити."}
-          </p>
-        </div>
-        <ul className="pe-checks" aria-label={`Заповнено ${done} з ${checks.length}`}>
-          {checks.map(([label, ok]) => (
-            <li key={label} data-ok={ok || undefined}>
-              {ok ? <Check className="size-3" /> : <span aria-hidden className="pe-check-dot" />}
-              {label}
-            </li>
-          ))}
-        </ul>
-        <button type="button" onClick={requestClose} aria-label="Закрити" className="auth-icon-button shrink-0">
-          <X className="size-5" />
-        </button>
-      </header>
-
-      <div className="pe-scroll">
-        <div className="pe-layout">
-          <form
-            className="pe-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save(isPublished ? "draft" : "publish");
-            }}
-          >
-            <section className="pe-section" aria-labelledby="pe-about-you">
-              <h2 id="pe-about-you" className="pe-title">
-                Про вас
-              </h2>
-              <PhotoField value={photo} name={name} onChange={setPhoto} />
-
-              <div className="pe-grid">
-                <div>
-                  <label htmlFor="pe-name" className="pe-label">
-                    Ім'я
-                  </label>
-                  <input
-                    id="pe-name"
-                    ref={firstFieldRef}
-                    value={name}
-                    maxLength={PROFILE_LIMITS.name}
-                    onChange={(event) => setName(event.target.value)}
-                    autoComplete="name"
-                    placeholder="Олена Ковальчук"
-                    className="auth-input w-full"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="pe-city" className="pe-label">
-                    Місто
-                  </label>
-                  <div className="loc-field">
-                    <Select value={cityId} onValueChange={setCityId}>
-                      <SelectTrigger id="pe-city" className="w-full" data-empty={!cityId || undefined}>
-                        <SelectValue placeholder="Оберіть місто" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CITY_OPTIONS.map((city) => (
-                          <SelectItem key={city.id} value={city.id}>
-                            {city.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <button
-                      type="button"
-                      onClick={() => setPicking(true)}
-                      className="loc-button"
-                      data-set={location ? true : undefined}
-                      aria-label={location ? "Змінити точку на карті" : "Поставити точку на карті"}
-                      title={location ? "Точку задано. Змінити на карті" : "Поставити точку на карті"}
-                    >
-                      <MapPinned className="size-[18px]" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <p className="pe-hint mt-1.5">
-                {location ? "Ваша точка на карті задана. Її видно всім, коли ви на карті." : "Значок праворуч від міста відкриває карту: на ній можна поставити точку точніше."}
-                {!onMap && ` На карті ви з'явитесь після оплати розміщення, від ${MIN_PAYMENT} ₴. Відгукуватися на запити можна й без оплати.`}
+    <>
+      <Screen
+        open
+        onOpenChange={(next) => !next && editor.requestClose()}
+        title={isPublished ? "Ваш профіль" : "Профіль виконавця"}
+        description="Фото, імʼя, місто, про себе й роботи. Праворуч або внизу видно, як вас бачать замовники."
+        desktop="dialog"
+        width="wide"
+        action={
+          <Button variant="quiet" aria-label={secondary.name} disabled={Boolean(busy)} onClick={() => void editor.save(secondary.kind)}>
+            {busy === secondary.kind && <Loader2 className="size-4 animate-spin" />}
+            {secondary.label}
+          </Button>
+        }
+        footer={
+          <div className="grid gap-2 md:justify-items-end">
+            {error && (
+              <p role="alert" className="auth-error md:justify-self-start">
+                {error}
               </p>
-
-              <label htmlFor="pe-specialty" className="pe-label mt-3">
-                Ким працюєте
-              </label>
-              <input
-                id="pe-specialty"
-                value={specialty}
-                maxLength={PROFILE_LIMITS.specialty}
-                onChange={(event) => setSpecialty(event.target.value)}
-                placeholder="Наприклад: UI/UX дизайнер"
-                className="auth-input w-full"
-              />
-              <p className="pe-hint">Коротко, одним рядком: це видно в картці під іменем.</p>
-            </section>
-
-            <section className="pe-section" aria-labelledby="pe-about-me">
-              <h2 id="pe-about-me" className="pe-title">
-                Про себе і чим займаєтесь
-              </h2>
-              <p className="pe-hint -mt-1">
-                Пишіть як людині: що робите, для кого, чим. Ми самі виберемо теги, за якими вас знайдуть, а слова, з яких вони взяті, підкреслимо.
-              </p>
-              <div className="pe-textbox">
-                <TaggedField
-                  id="pe-bio"
-                  value={bio}
-                  onChange={setBio}
-                  mentions={bioMentions}
-                  maxLength={PROFILE_LIMITS.bio}
-                  minRows={5}
-                  describedBy="pe-bio-count"
-                  placeholder="Роблю Telegram-боти й автоматизації для малого бізнесу: салони, клініки, доставка. Працюю з n8n і Python, підключаю Monobank та Нова Пошта. Можу взяти проєкт від ТЗ до запуску."
-                />
-              </div>
-              <p id="pe-bio-count" className="pe-counter">
-                {bio.length}/{PROFILE_LIMITS.bio}
-              </p>
-
-              <h3 className="pe-label mt-1">Ваші теги</h3>
-              <TagChips
-                tags={tagging.tags}
-                suggestions={tagging.suggestions}
-                proven={proven}
-                labelOf={tagging.labelOf}
-                onRemove={tagging.remove}
-                onAdd={tagging.add}
-                emptyHint="Розкажіть про себе вище, і теги з'являться тут самі. Або додайте їх вручну."
-                pending={proposals.items}
-                onRemovePending={(id) => {
-                  const item = proposals.items.find((proposal) => proposal.id === id);
-                  if (item) void proposals.remove(item);
-                }}
-              >
-                <TagPicker
-                  context="profile"
-                  selected={tagging.tags}
-                  auto={tagging.auto}
-                  suggestions={tagging.suggestions}
-                  labelOf={tagging.labelOf}
-                  onToggle={tagging.toggle}
-                  onPropose={proposals.propose}
-                  limitReached={tagging.manualFull}
-                  limitHint={`Вручну можна додати до ${PROFILE_LIMITS.manualTags} тегів. Теги з тексту в цей ліміт не входять.`}
-                />
-              </TagChips>
-              <p className="pe-hint">Галочка стоїть біля тегів, які підтверджує ваша робота. З такими тегами вас покажуть вище.</p>
-            </section>
-
-            <section className="pe-section" aria-labelledby="pe-works">
-              <div className="flex items-end justify-between gap-3">
-                <h2 id="pe-works" className="pe-title">
-                  Роботи
-                </h2>
-                <span className="text-[12px] text-ink-muted">
-                  {works.length}/{PROFILE_LIMITS.works}
-                </span>
-              </div>
-              <p className="pe-hint -mt-1">
-                Окремо від «Про себе»: тут конкретні проєкти. Розкажіть про кожен, і його теги підтвердять ваші навички. Додайте хоча б одну роботу: профілі з роботами довіряють більше.
-              </p>
-              {works.map((work, index) => (
-                <WorkEditor key={work.id} work={work} index={index} onChange={(patch) => updateWork(work.id, patch)} onRemove={() => setWorks((current) => current.filter((item) => item.id !== work.id))} />
-              ))}
-              {works.length < PROFILE_LIMITS.works && (
-                <button type="button" onClick={addWork} className="pe-add">
-                  <Plus className="size-4" />
-                  {works.length ? "Ще одна робота" : "Додати роботу"}
-                </button>
-              )}
-            </section>
-
-            <RequisitesSection />
-
-            <PayoutSection />
-
-            <footer className="pe-footer">
-              {confirmClose ? (
-                <div className="pe-confirm" role="alertdialog" aria-label="Незбережені зміни">
-                  <p className="text-[13px] font-medium text-ink">Є незбережені зміни.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => void save("draft", true)} className="offer-primary">
-                      Зберегти й вийти
-                    </button>
-                    <button type="button" onClick={() => profileEditorStore.set(false)} className="offer-secondary">
-                      Не зберігати
-                    </button>
-                    <button type="button" onClick={() => setConfirmClose(false)} className="offer-secondary">
-                      Лишитись
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {error && (
-                    <p role="alert" className="auth-error w-full">
-                      {error}
-                    </p>
-                  )}
-                  {!isPublished && missing.length > 0 && <p className="pe-missing">Щоб опублікувати профіль, додайте: {missing.join(", ")}.</p>}
-                  {isPublished && !onMap && (
-                    <p className="pe-notice">
-                      Вас не видно на карті, поки не оплачено розміщення від {MIN_PAYMENT} ₴.{" "}
-                      <button
-                        type="button"
-                        className="auth-link text-[12px]"
-                        onClick={() => {
-                          profileEditorStore.set(false);
-                          placementOpenStore.set(true);
-                        }}
-                      >
-                        Стати на карту
-                      </button>
-                    </p>
-                  )}
-                  <div className="pe-actions">
-                    {isPublished ? (
-                      <>
-                        <button type="submit" disabled={Boolean(busy) || missing.length > 0 || !dirty} className="auth-primary pe-primary">
-                          {busy === "draft" && <Loader2 className="size-4 animate-spin" />}
-                          Зберегти зміни
-                        </button>
-                        <button type="button" disabled={Boolean(busy)} onClick={() => void save("unpublish")} className="auth-secondary">
-                          {busy === "unpublish" && <Loader2 className="size-4 animate-spin" />}
-                          Приховати профіль
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="submit" disabled={Boolean(busy) || missing.length > 0} className="auth-primary pe-primary">
-                          {busy === "publish" && <Loader2 className="size-4 animate-spin" />}
-                          Опублікувати профіль
-                        </button>
-                        <button type="button" disabled={Boolean(busy)} onClick={() => void save("draft")} className="auth-secondary">
-                          {busy === "draft" && <Loader2 className="size-4 animate-spin" />}
-                          Зберегти чернетку
-                        </button>
-                      </>
-                    )}
-                    <span role="status" className="pe-saved" data-shown={saved || undefined}>
-                      <Check className="size-3.5" />
-                      Збережено
-                    </span>
-                  </div>
-                </>
-              )}
-            </footer>
-          </form>
-
-          <aside className="pe-preview" aria-label="Так вас бачать замовники">
-            <p className="pe-preview-caption">Так вас бачать замовники</p>
-            <div className="pe-card glass-panel">
-              <div className="flex items-center gap-3">
-                <div
-                  className="pe-card-photo"
-                  role="img"
-                  aria-label={name ? `Фото ${name}` : "Фото"}
-                  style={photo ? { backgroundImage: `url(${photo})` } : undefined}
-                  data-empty={!photo || undefined}
-                />
-                <div className="min-w-0">
-                  <p className="truncate text-[16px] font-semibold leading-tight text-ink">{name.trim() || "Ваше ім'я"}</p>
-                  <p className="mt-1 text-[12px] leading-snug text-ink-muted">{specialty.trim() || "Ваша спеціальність"}</p>
-                  <p className="mt-1 text-[11px] text-ink-muted">{cityName ?? "Місто"}</p>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-3 divide-x divide-[#b8c4c7]/55 rounded-2xl bg-white/45 py-3 text-center">
-                <div>
-                  <p className="text-[16px] font-semibold text-ink">0 міс.</p>
-                  <p className="mt-0.5 text-[10px] text-ink-muted">на платформі</p>
-                </div>
-                <div>
-                  <p className="text-[16px] font-semibold text-ink">0</p>
-                  <p className="mt-0.5 text-[10px] text-ink-muted">замовлень</p>
-                </div>
-                <div>
-                  <p className="text-[16px] font-semibold text-ink">—</p>
-                  <p className="mt-0.5 text-[10px] text-ink-muted">рейтинг</p>
-                </div>
-              </div>
-              {preview && (bio.trim() || works.length > 0) ? (
-                <PerformerAbout key={`${preview.works.length}-${bio.length > 0}`} performer={preview} onOpenWork={() => {}} />
-              ) : (
-                <p className="mt-4 text-[12px] leading-relaxed text-ink-muted">Тут з'являться ваш опис і роботи.</p>
-              )}
-              {allTags.length > 0 && (
-                <div className="mt-4 border-t border-[#b8c4c7]/45 pt-3">
-                  <p className="text-[11px] font-semibold text-ink-muted">Вас знайдуть за тегами</p>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {allTags.map((id) => (
-                      <span key={id} className="auth-draft-tag">
-                        {proven.has(id) && <Check className="mr-1 size-3 text-brand" aria-label="Підтверджено роботою" />}
-                        {tagging.labelOf(id)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <p className="pe-preview-note">
-              Без оплати розміщення вас не видно на карті. Розмір маркера залежить від суми, яку ви платите.{" "}
-              {isPublished && (
-                <button type="button" onClick={() => placementOpenStore.set(true)} className="auth-link text-[11px]">
-                  Стати на карту
-                </button>
-              )}
+            )}
+            <Button type="submit" form={FORM_ID} className="w-full md:w-auto md:min-w-56" disabled={primaryDisabled}>
+              {primaryBusy && <Loader2 className="size-4 animate-spin" />}
+              {isPublished ? "Зберегти зміни" : "Опублікувати профіль"}
+            </Button>
+            <p role="status" className="sr-only">
+              {saved ? "Збережено" : ""}
             </p>
-          </aside>
+          </div>
+        }
+      >
+        <div className="pe-body">
+          <p className="pe-hint">{subtitle(isPublished, onMap)}</p>
+          <ul className="pe-checks" aria-label={`Заповнено ${editor.done} з ${editor.checks.length}`}>
+            {editor.checks.map(([label, ok]) => (
+              <li key={label} data-ok={ok || undefined}>
+                {ok ? <Check className="size-3" /> : <span aria-hidden className="pe-check-dot" />}
+                {label}
+              </li>
+            ))}
+          </ul>
+          <div className="pe-layout">
+            <form
+              id={FORM_ID}
+              className="pe-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void editor.save(isPublished ? "draft" : "publish");
+              }}
+            >
+              <ProfileAboutSection values={about} onMap={onMap} onChange={editor.changeAbout} onPickLocation={() => editor.setPicking(true)} />
+              <ProfileBioSection bio={editor.bio} bioMentions={editor.bioMentions} tagging={editor.tagging} proposals={editor.proposals} proven={editor.proven} onBioChange={editor.setBio} />
+              <ProfileWorksSection works={editor.works} onChange={editor.updateWork} onRemove={editor.removeWork} onAdd={editor.addWork} />
+              <RequisitesSection />
+              <PayoutSection />
+              {!isPublished && missing.length > 0 && <p className="pe-missing">Щоб опублікувати профіль, додайте: {missing.join(", ")}.</p>}
+              {isPublished && !onMap && (
+                <p className="pe-notice">
+                  Вас не видно на карті, поки не оплачено розміщення від {MIN_PAYMENT} ₴.{" "}
+                  <Button variant="link" className="text-xs" onClick={toPlacement}>
+                    Стати на карту
+                  </Button>
+                </p>
+              )}
+            </form>
+            <ProfilePreview
+              about={about}
+              bio={editor.bio}
+              works={editor.works}
+              preview={editor.preview}
+              cityName={editor.cityName}
+              allTags={editor.allTags}
+              proven={editor.proven}
+              isPublished={isPublished}
+              labelOf={editor.tagging.labelOf}
+            />
+          </div>
         </div>
-      </div>
-
-      {picking && (
-        <LocationPicker
-          initial={location}
-          cityId={cityId}
-          onClose={() => setPicking(false)}
-          onConfirm={(point) => {
-            setLocation(point);
-            // Місто обираємо за точкою, якщо його ще нема або точка далеко від вибраного.
-            if (point) {
-              const chosen = CITIES.find((city) => city.id === cityId);
-              if (!chosen || distanceKm(point, chosen) > SAME_CITY_KM) setCityId(nearestCity(point).city.id);
-            }
-            setPicking(false);
-          }}
-        />
-      )}
-    </DialogContent>
-    </Dialog>
+      </Screen>
+      <ProfileCloseSheet
+        open={editor.confirmClose}
+        busy={Boolean(busy)}
+        onOpenChange={editor.setConfirmClose}
+        onSaveAndLeave={() => void editor.save("draft", true)}
+        onLeave={() => profileEditorStore.set(false)}
+      />
+      {editor.picking && <LocationPicker initial={about.location} cityId={about.cityId} onClose={() => editor.setPicking(false)} onConfirm={editor.confirmLocation} />}
+    </>
   );
-}
+};

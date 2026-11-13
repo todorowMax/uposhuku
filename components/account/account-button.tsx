@@ -1,20 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { Bell, Code2, FileText, Inbox, ListChecks, LogOut, MapPinned, Trash2, UserRound } from "@/components/icons";
-import { notificationSettingsStore } from "@/components/account/notification-settings";
-import { deleteScreenStore, exportScreenStore } from "@/lib/account/client";
+import { Code2, MapPinned, UserRound } from "@/components/icons";
+import { AccountMenu } from "@/components/account/account-menu";
 import { LegendButton } from "@/components/map/legend";
-import { Button } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { authFlowStore, loadSession, logout, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
+import { authFlowStore, loadSession, sessionStore } from "@/lib/auth/client";
 import { useStore } from "@/lib/store";
-import { feedCountStore } from "@/lib/feed/client";
-import { setMapMode } from "@/lib/feed/map-requests";
-import { placementOpenStore, placementStore } from "@/lib/placement/client";
-import { TIER_NAMES } from "@/lib/placement/tiers";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
-import { feedCollapsedStore, useIsPerformer } from "@/lib/requests/side-panel";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 /**
@@ -25,12 +17,8 @@ import { EVENTS, track } from "@/lib/telemetry/track";
  */
 export function AccountButton() {
   const session = useStore(sessionStore);
-  const requests = useStore(requestsStore);
   const profileState = useStore(profileStore);
   const profile = profileState.status === "ready" ? profileState.profile : null;
-  const performer = useIsPerformer();
-  const feedCount = useStore(feedCountStore);
-  const placement = useStore(placementStore);
 
   useEffect(() => {
     void loadSession();
@@ -82,69 +70,7 @@ export function AccountButton() {
   const initial = (user.name ?? user.email).trim().charAt(0).toUpperCase();
   return (
     <div className="account-slot">
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="bare" aria-label={`Акаунт ${user.email}`} className="account-avatar">
-            {initial}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="top" align="start" className="account-menu">
-          <div className="px-3 pb-2 pt-1">
-            {user.name && <p className="truncate text-[13px] font-semibold text-ink">{user.name}</p>}
-            <p className="truncate text-[12px] text-ink-muted">{user.email}</p>
-          </div>
-          <DropdownMenuItem onSelect={showMyRequests} disabled={!requests?.length}>
-            <ListChecks className="size-4" />
-            Мої запити
-            {Boolean(requests?.length) && <span className="ml-auto text-[11px] text-ink-muted">{requests?.length}</span>}
-          </DropdownMenuItem>
-          {performer && (
-            <DropdownMenuItem
-              onSelect={() => {
-                setMapMode("requests");
-                feedCollapsedStore.set(false);
-              }}
-            >
-              <Inbox className="size-4" />
-              Запити для вас
-              {feedCount > 0 && <span className="ml-auto text-[11px] text-ink-muted">{feedCount}</span>}
-            </DropdownMenuItem>
-          )}
-          {performer && (
-            <DropdownMenuItem onSelect={() => placementOpenStore.set(true)}>
-              <MapPinned className="size-4" />
-              Стати на карту
-              <span className="ml-auto text-[11px] text-ink-muted">{TIER_NAMES[placement?.tier ?? 1]}</span>
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem
-            onSelect={() => {
-              track(EVENTS.performerCtaClicked, { from: "menu" });
-              profileEditorStore.set(true);
-            }}
-          >
-            <UserRound className="size-4" />
-            {profile ? "Мій профіль" : "Стати виконавцем"}
-            {profile && <span className="ml-auto text-[11px] text-ink-muted">{!profile.published ? "чернетка" : (placement?.tier ?? 1) >= 2 ? "на карті" : "не на карті"}</span>}
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => notificationSettingsStore.set(true)}>
-            <Bell className="size-4" />
-            Сповіщення
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => exportScreenStore.set(true)}>
-            <FileText className="size-4" />
-            Завантажити мої дані
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => deleteScreenStore.set(true)}>
-            <Trash2 className="size-4" />
-            Видалити акаунт
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void logout()}>
-            <LogOut className="size-4" />
-            Вийти
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <AccountMenu initial={initial} name={user.name} email={user.email} />
       {!profile && (
         <button
           type="button"

@@ -1923,7 +1923,7 @@ export default function MapLibreScene() {
       {groupPreview && (
         <div
           ref={groupRef}
-          role="dialog"
+          role="group"
           aria-label={groupTitle(groupPreview)}
           className="group-preview glass-panel"
           onPointerEnter={(event) => trackGroupPointer(event.clientX, event.clientY)}

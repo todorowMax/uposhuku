@@ -8,12 +8,12 @@ import { useStore } from "@/lib/store";
 
 /** Той самий індикатор, що й під час завантаження профілю: без стрибка між двома очікуваннями. */
 const EditorLoading = () => (
-  <div className="pe-overlay grid place-items-center" role="status" aria-label="Завантажуємо профіль">
+  <div className="pe-overlay" role="status" aria-label="Завантажуємо профіль">
     <Loader2 className="size-6 animate-spin text-ink-muted" />
   </div>
 );
 
-// Форму (546 рядків, GSAP, завантаження фото) вантажимо, коли її відкрито.
+// Форму (теги, завантаження фото, карта) вантажимо, коли її відкрито.
 const ProfileEditor = dynamic(() => import("./profile-editor").then((module) => module.ProfileEditor), { ssr: false, loading: EditorLoading });
 
 /** Редактор поверх усього, коли відкритий і людина увійшла. */
