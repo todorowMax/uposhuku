@@ -60,6 +60,8 @@ interface CloudflareEnv {
   NBU_QR_USERS?: string;
   FOREIGN_LINKS_MODE?: string;
   FOREIGN_LINKS_USERS?: string;
+  POSTPAID_FEE_MODE?: string;
+  POSTPAID_FEE_USERS?: string;
   /** Оплати з гаманця (EVM): id мережі, адреса токена USDT (звірити зі сторінкою Tether), FeeRouter, EscrowFactory, RPC для перевірки транзакцій. RPC може містити ключ: секрет. */
   CRYPTO_CHAIN_ID?: string;
   CRYPTO_TOKEN_ADDRESS?: string;

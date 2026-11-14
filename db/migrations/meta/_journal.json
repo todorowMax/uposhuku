@@ -169,6 +169,13 @@
       "when": 1794679421763,
       "tag": "0023_slippery_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1794683515594,
+      "tag": "0024_windy_blur",
+      "breakpoints": true
     }
   ]
 }

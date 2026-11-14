@@ -42,6 +42,8 @@
         "CRYPTO_ESCROW_MODE": "on",
         "NBU_QR_MODE": "on",
         "FOREIGN_LINKS_MODE": "on",
+        // Комісія за фактом: на dev лише для пошт зі списку POSTPAID_FEE_USERS (його задають в /admin/features, у файл не пишемо).
+        "POSTPAID_FEE_MODE": "allowlist",
         // dev: шлемо в Telegram, навіть коли сайт відкритий, щоб бота можна було перевіряти двома акаунтами в одному браузері.
         "NOTIFY_WHEN_ONLINE": "1"
       },

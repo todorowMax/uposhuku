@@ -4,7 +4,7 @@
 // Режими: off (нікому, типово), allowlist (лише пошти зі списку), on (всім). Невідоме значення це off:
 // помилка в змінній не вмикає гроші.
 
-export const FEATURES = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "nbu_qr", "foreign_links"] as const;
+export const FEATURES = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "nbu_qr", "foreign_links", "postpaid_fee"] as const;
 export type FeatureName = (typeof FEATURES)[number];
 
 export type FeatureMode = "off" | "allowlist" | "on";
@@ -22,10 +22,11 @@ export const FEATURE_LABEL: Record<FeatureName, string> = {
   crypto_escrow: "Ескроу-контракт",
   nbu_qr: "QR переказу за форматом НБУ",
   foreign_links: "PayPal і Wise (посилання)",
+  postpaid_fee: "Комісія за фактом (рахунок на акаунті)",
 };
 
 /** Зміна цих прапорців рухає гроші, тож потребує другого фактора (TOTP). QR переказу грошей не рухає. */
-export const MONEY_FEATURES: readonly FeatureName[] = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "foreign_links"];
+export const MONEY_FEATURES: readonly FeatureName[] = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "foreign_links", "postpaid_fee"];
 
 export const isFeatureName = (value: unknown): value is FeatureName => FEATURES.some((name) => name === value);
 export const isMoneyFeature = (name: FeatureName): boolean => MONEY_FEATURES.includes(name);

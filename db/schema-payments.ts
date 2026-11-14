@@ -267,3 +267,54 @@ export const dealComplaints = sqliteTable(
     uniqueIndex("deal_complaints_open_idx").on(table.dealId, table.stageId, table.complainantUserId).where(sql`${table.status} = 'open'`),
   ],
 );
+
+/**
+ * Журнал комісії за фактом (docs/tasks/2026-11-14-postpaid-commission.md). Баланс платника це сума `amount` усіх його
+ * записів: нарахування додатне, оплата від'ємна, коригування будь-яке. Суми в копійках. `deal_id` без зовнішнього ключа:
+ * журнал має пережити угоду. Нарахування за етап можливе лише раз (частковий унікальний індекс), оплата за рахунком банку теж.
+ */
+export const feeEntries = sqliteTable(
+  "fee_entries",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** accrual | payment | adjustment */
+    kind: text("kind").notNull(),
+    amount: integer("amount").notNull(),
+    dealId: text("deal_id"),
+    stageId: text("stage_id"),
+    rateBp: integer("rate_bp"),
+    baseAmount: integer("base_amount"),
+    /** Рахунок банку (`fee_invoices.invoice_id`) для оплати. */
+    invoiceId: text("invoice_id"),
+    note: text("note"),
+    /** `system` або пошта модератора. */
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    index("fee_entries_user_idx").on(table.userId, table.createdAt),
+    uniqueIndex("fee_entries_accrual_idx").on(table.dealId, table.stageId).where(sql`${table.kind} = 'accrual'`),
+    uniqueIndex("fee_entries_payment_idx").on(table.invoiceId).where(sql`${table.kind} = 'payment'`),
+  ],
+);
+
+/** Рахунок Monobank на оплату комісії: за зразком `placement_invoices`, але суми в копійках. */
+export const feeInvoices = sqliteTable(
+  "fee_invoices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    invoiceId: text("invoice_id").notNull(),
+    amount: integer("amount").notNull(),
+    status: text("status").notNull(),
+    modifiedDate: text("modified_date"),
+    paidAt: integer("paid_at"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("fee_invoices_invoice_idx").on(table.invoiceId), index("fee_invoices_user_idx").on(table.userId)],
+);
