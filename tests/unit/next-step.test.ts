@@ -70,6 +70,10 @@ describe("nextStepOf: замовник", () => {
 describe("nextStepOf: виконавець", () => {
   it("прямий переказ: підтвердити оплату, потім здати етап", () => {
     expect(nextStepOf(at("direct", "claimed"), "performer")).toEqual({ action: "confirm_paid", label: "Підтвердити оплату" });
+    // Замовник ще нічого не позначив: виконавець усе одно бачить дію.
+    expect(nextStepOf(at("direct", "pending"), "performer")).toEqual({ action: "confirm_paid", label: "Оплату отримано" });
+    expect(nextStepOf(at("safe", "pending"), "performer")).toBeNull();
+    expect(nextStepOf(at("escrow", "pending"), "performer")).toBeNull();
     expect(nextStepOf(at("direct", "funded"), "performer")).toEqual({ action: "deliver", label: "Здати етап" });
   });
 
@@ -82,7 +86,9 @@ describe("nextStepOf: виконавець", () => {
   });
 
   it.each(["safe", "direct", "escrow"] as const)("%s: у решті станів чекаємо замовника або банк", (method) => {
-    for (const status of ["pending", "delivered", "releasing", "released", "disputed", "refunding", "refunded"] as const) {
+    // Прямий переказ у pending виконавець підтверджує сам: це перевіряє тест вище.
+    const statuses = method === "direct" ? (["delivered", "releasing", "released", "disputed", "refunding", "refunded"] as const) : (["pending", "delivered", "releasing", "released", "disputed", "refunding", "refunded"] as const);
+    for (const status of statuses) {
       expect(nextStepOf(at(method, status), "performer")).toBeNull();
     }
   });

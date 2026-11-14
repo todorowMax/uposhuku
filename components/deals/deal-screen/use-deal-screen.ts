@@ -32,6 +32,8 @@ export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options
   // Шторка підтвердження приймання й екран оплати переказом: обидва відкриває закріплена кнопка.
   const [confirmRelease, setConfirmRelease] = useState(false);
   const [paying, setPaying] = useState(false);
+  // Шторка «Оплату отримано»: виконавець підтверджує, що гроші надійшли.
+  const [confirmReceived, setConfirmReceived] = useState(false);
   // Екрани здачі етапу й ескроу відкривають закріплена кнопка або кнопка в етапі.
   const [delivering, setDelivering] = useState(false);
   const [escrowOpen, setEscrowOpen] = useState(false);
@@ -60,6 +62,7 @@ export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options
     setError(null);
     try {
       onChanged(await performerAction(deal, action, extra));
+      setConfirmReceived(false);
       return true;
     } catch (failure) {
       setError(reason(failure, "Немає зв'язку. Спробуйте ще раз."));
@@ -91,11 +94,11 @@ export const useDealScreen = ({ deal, role, onChanged }: DealScreenState.Options
     if (step.action === "claim") return setPaying(true);
     if (step.action === "deliver") return setDelivering(true);
     if (step.action === "open") return setEscrowOpen(true);
-    if (step.action === "confirm_paid") return void act("confirm_paid");
+    if (step.action === "confirm_paid") return setConfirmReceived(true);
     void answer("accept");
   };
 
   const footerStep = step && FOOTER_STEPS.has(step.action) ? step : null;
 
-  return { busy, error, stage, step, footerStep, confirmRelease, setConfirmRelease, paying, setPaying, delivering, setDelivering, escrowOpen, setEscrowOpen, run, act, answer, doStep };
+  return { busy, error, stage, step, footerStep, confirmRelease, setConfirmRelease, confirmReceived, setConfirmReceived, paying, setPaying, delivering, setDelivering, escrowOpen, setEscrowOpen, run, act, answer, doStep };
 };

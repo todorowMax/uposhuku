@@ -17,6 +17,7 @@ export const PerformerStageActions = ({ deal, stage, screen }: { deal: Deal; sta
   const needs = performerNeeds(deal);
   return (
     <>
+      {needs === "receive" && <p className="pe-hint">Замовник ще не позначив оплату. Якщо гроші вже надійшли, підтвердіть це кнопкою внизу.</p>}
       {needs === "confirm" && deal.method === "direct" && <CryptoProofNote dealId={deal.id} stageId={stage.id} />}
       {needs === "confirm" && deal.conversationId && <ReceiptLink conversationId={deal.conversationId} stage={stage} />}
       {needs === "confirm" && stage.paidVia && <p className="pe-hint">Спосіб оплати, який вказав замовник: {METHOD_LABEL[stage.paidVia]}.</p>}

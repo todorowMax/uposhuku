@@ -165,6 +165,9 @@ export const applyAction = (deal: Deal, action: DealAction, stageId: string | un
       // «Заморожено» ставить лише банк (холд на рахунку), а не клік: оплата йде через POST /api/deals/:id/pay.
       return "Оплата безпечної угоди йде через сторінку банку: натисніть «Перейти до оплати».";
     case "claim_paid":
+      if (deal.method === "direct" && (stage.status === "claimed" || stage.status === "funded" || stage.status === "delivered" || stage.status === "released")) {
+        return stage.status === "claimed" ? "Ви вже позначили оплату: виконавець підтверджує." : "Оплату за цей етап уже відмічено.";
+      }
       if (deal.method !== "direct" || stage.status !== "pending") return "Позначити оплату зараз не можна.";
       updated = { ...stage, status: "claimed", claimedAt: iso(now) };
       break;
@@ -206,7 +209,8 @@ export const applyPerformerAction = (deal: Deal, action: PerformerAction, stageI
   if (deal.method === "escrow" && (action === "confirm_paid" || action === "deliver")) return ESCROW_ONCHAIN;
   let updated: DealStage;
   if (action === "confirm_paid") {
-    if (deal.method !== "direct" || stage.status !== "claimed") return "Замовник ще не позначив оплату.";
+    // Пряма оплата: виконавець підтверджує гроші сам, не чекаючи «Я оплатив(ла)» замовника (pending), або після нього (claimed).
+    if (deal.method !== "direct" || (stage.status !== "pending" && stage.status !== "claimed")) return "Підтвердити оплату зараз не можна.";
     updated = { ...stage, status: "funded", fundedAt: iso(now) };
   } else if (action === "deliver") {
     if (stage.status !== "funded") return "Здати етап можна, коли оплату підтверджено.";
@@ -308,12 +312,14 @@ export const applyHoldExpiryRefund = (deal: Deal, stageId: string, now: number):
 };
 
 /** Чого від виконавця чекає угода зараз: для підказки й кнопок у його вхідних. */
-export const performerNeeds = (deal: Deal): "answer" | "confirm" | "deliver" | null => {
+export const performerNeeds = (deal: Deal): "answer" | "confirm" | "receive" | "deliver" | null => {
   if (deal.status === "proposed") return deal.proposedBy === "performer" ? null : "answer";
   if (deal.status !== "accepted") return null;
   const stage = currentStage(deal);
   if (!stage) return null;
   if (stage.status === "claimed") return "confirm";
+  // Прямий переказ: гроші могли прийти, а замовник не натиснув «Я оплатив(ла)».
+  if (stage.status === "pending" && deal.method === "direct") return "receive";
   if (stage.status === "funded") return "deliver";
   return null;
 };

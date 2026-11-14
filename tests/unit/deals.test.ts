@@ -195,9 +195,22 @@ describe("угода з виконавцем-акаунтом", () => {
     expect(applyPerformerAction(declined, "accept", undefined, NOW + 2)).toMatch(/вже не чекає/);
   });
 
-  it("не можна підтвердити оплату, якої замовник не позначав", () => {
-    const deal = applyPerformerAction(createDeal("d4", real, NOW), "accept", undefined, NOW + 1) as Deal;
-    expect(applyPerformerAction(deal, "confirm_paid", undefined, NOW + 2)).toMatch(/ще не позначив/);
+  it("прямий переказ: виконавець підтверджує оплату без «Я оплатив(ла)» замовника, замовник потім уже нічого не позначає", () => {
+    let deal = applyPerformerAction(createDeal("d4", real, NOW), "accept", undefined, NOW + 1) as Deal;
+    expect(performerNeeds(deal)).toBe("receive");
+    deal = applyPerformerAction(deal, "confirm_paid", undefined, NOW + 2) as Deal;
+    expect(deal.stages[0]).toMatchObject({ status: "funded", fundedAt: new Date(NOW + 2).toISOString() });
+    expect(performerNeeds(deal)).toBe("deliver");
+    expect(applyAction(deal, "claim_paid", undefined, NOW + 3)).toMatch(/уже відмічено/);
+    expect(applyPerformerAction(deal, "confirm_paid", undefined, NOW + 4)).toMatch(/зараз не можна/);
+  });
+
+  it("підтвердження з pending лише для прямого переказу й лише коли попередні етапи завершені", () => {
+    const safe = applyPerformerAction(createDeal("d5", { ...real, method: "safe", performer: { ...real.performer, fop: true } }, NOW), "accept", undefined, NOW + 1) as Deal;
+    expect(performerNeeds(safe)).toBeNull();
+    expect(applyPerformerAction(safe, "confirm_paid", undefined, NOW + 2)).toMatch(/зараз не можна/);
+    const two = applyPerformerAction(createDeal("d6", { ...real, stages: [{ title: "А", amount: 500, days: 2 }, { title: "Б", amount: 500, days: 2 }] }, NOW), "accept", undefined, NOW + 1) as Deal;
+    expect(applyPerformerAction(two, "confirm_paid", two.stages[1].id, NOW + 2)).toMatch(/попередній етап/);
   });
 });
 

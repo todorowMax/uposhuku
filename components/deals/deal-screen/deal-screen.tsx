@@ -24,6 +24,7 @@ import { DeliveryScreen } from "./parts/delivery-screen";
 import { EscrowScreen } from "./parts/escrow-screen";
 import { PaymentScreen } from "./parts/payment-screen";
 import { ProposalNotice } from "./parts/proposal-notice";
+import { ReceivedSheet } from "./parts/received-sheet";
 import { ReleaseSheet } from "./parts/release-sheet";
 import { ReviewForm } from "./parts/review-form";
 import { StageTimeline } from "./parts/stage-timeline";
@@ -88,6 +89,7 @@ export const DealScreen = ({ deal, role, open, onOpenChange, onChanged }: DealSc
         {deal.status === "completed" && role === "customer" && <ReviewForm dealId={deal.id} performerName={deal.performer.name} />}
       </div>
       {stage && <ReleaseSheet deal={deal} stage={stage} screen={screen} />}
+      {role === "performer" && <ReceivedSheet screen={screen} />}
       {screen.delivering && stage && (
         <DeliveryScreen
           dealId={deal.id}

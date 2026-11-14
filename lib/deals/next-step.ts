@@ -37,6 +37,7 @@ const performerStep = (deal: Deal): NextStepTypes.Step | null => {
   const need = performerNeeds(deal);
   if (need === "answer") return step("accept", "Прийняти");
   if (need === "confirm") return step("confirm_paid", "Підтвердити оплату");
+  if (need === "receive") return step("confirm_paid", "Оплату отримано");
   if (need !== "deliver") return null;
   return step(deal.method === "escrow" ? "open" : "deliver", "Здати етап");
 };

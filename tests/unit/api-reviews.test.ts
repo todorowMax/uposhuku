@@ -10,7 +10,7 @@ import { reviews } from "@/db/schema";
 import type { Deal } from "@/lib/deals/types";
 import { getDb } from "@/lib/server/db";
 import { saveProof } from "@/lib/server/crypto-proof-repo";
-import { listDeals, mutateDeal, proposeDeal } from "@/lib/server/deal-repo";
+import { actAsPerformer, actOnDeal, listDeals, mutateDeal, proposeDeal } from "@/lib/server/deal-repo";
 import { exhaust, jsonRequest } from "../helpers/route-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
@@ -34,7 +34,7 @@ const makeDeal = async (customer: string, performerUser: string, status: Deal["s
 
 beforeAll(async () => {
   ctx = await useTestD1();
-  for (const id of ["rv-cust", "rv-perf", "rv-other", "rv-spam", "rv-bad", "rv-ver"]) await makeUser(ctx.db, id);
+  for (const id of ["rv-cust", "rv-perf", "rv-other", "rv-spam", "rv-bad", "rv-ver", "rv-flow"]) await makeUser(ctx.db, id);
 });
 afterAll(async () => {
   await ctx.close();
@@ -82,6 +82,24 @@ describe("POST /api/reviews", () => {
       expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status, status).toBe(409);
       expect(await rowsFor(dealId)).toHaveLength(0);
     }
+  });
+
+  it("відгук можливий лише після підтвердження оплати виконавцем: ні до, ні після самого «Я оплатив(ла)»", async () => {
+    as("rv-flow");
+    const dealId = await makeDeal("rv-flow", "rv-perf", "proposed");
+    const stageId = (await listDeals("rv-flow")).find((deal) => deal.id === dealId)!.stages[0].id;
+    await actAsPerformer("rv-perf", dealId, "accept", undefined);
+    expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(409);
+    await actOnDeal("rv-flow", dealId, "claim_paid", stageId);
+    expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(409);
+    // Без підтвердження виконавця етап не здати, а угоду не завершити.
+    expect(await actAsPerformer("rv-perf", dealId, "deliver", stageId)).toMatch(/оплату підтверджено/);
+    await actAsPerformer("rv-perf", dealId, "confirm_paid", stageId);
+    await actAsPerformer("rv-perf", dealId, "deliver", stageId);
+    expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(409);
+    await actOnDeal("rv-flow", dealId, "release", stageId);
+    expect((await POST(jsonRequest("POST", { dealId, ...GOOD }))).status).toBe(201);
+    expect(await rowsFor(dealId)).toHaveLength(1);
   });
 
   it("один відгук на угоду: другий 409, і перший лишається", async () => {
