@@ -15,7 +15,7 @@ import { escapeHtml, excerpt } from "./texts";
 export type EmailEvent =
   | { type: "message"; fromName: string; open: string }
   | { type: "offer"; title: string; open: string }
-  | { type: "deal"; action: string; open: string };
+  | { type: "deal"; action: string; open: string; stageTitle?: string };
 
 export interface Notice {
   kind: NotificationKind;
@@ -91,6 +91,32 @@ export const DEAL_TEXTS: Record<string, string> = {
 
 /** Про що з угоди пишемо ще й листом: умови запропоновано чи прийнято, роботу прийнято, просять підтвердити оплату. Решта лишається в Telegram і на сайті. */
 export const EMAIL_DEAL_ACTIONS: ReadonlySet<string> = new Set(["proposed", "owner_accept", "accept", "release", "auto_accepted", "claim_paid"]);
+
+/** Нагадування по завислій оплаті етапу прямої угоди: замовнику й виконавцю різні слова. */
+export type PayReminderRole = "customer" | "performer";
+
+const payReminderAction = (role: PayReminderRole) => `pay_remind_${role}`;
+
+/** Текст нагадування за дією з листа чи ключа; undefined, якщо дія не з нагадувань. */
+export const payReminderLead = (action: string, stageTitle: string | undefined): string | undefined => {
+  const title = stageTitle ? ` «${stageTitle}»` : "";
+  if (action === payReminderAction("customer")) return `Ви оплатили етап${title}? Позначте «Я оплатив(ла)» в угоді.`;
+  if (action === payReminderAction("performer")) return `Оплата за етап${title} надійшла? Позначте «Оплату отримано».`;
+  return undefined;
+};
+
+export const payReminderNotice = (input: { dealId: string; stageId: string; stageTitle: string; number: number; role: PayReminderRole; conversationId?: string }): Notice => {
+  const open = input.conversationId ? `chat:${input.conversationId}` : "inbox";
+  const action = payReminderAction(input.role);
+  const title = excerpt(input.stageTitle, 60);
+  return {
+    kind: "deals",
+    key: `deal:${input.dealId}:${action}:${input.stageId}:${input.number}`,
+    html: `Угода: ${escapeHtml(payReminderLead(action, title) ?? "")}`,
+    button: { text: "Відкрити", path: deepLink(open) },
+    email: { type: "deal", action, open, stageTitle: title },
+  };
+};
 
 export const dealNotice = (input: { dealId: string; action: string; conversationId?: string }): Notice | null => {
   const text = DEAL_TEXTS[input.action];

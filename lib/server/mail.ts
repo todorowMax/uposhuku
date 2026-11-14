@@ -4,7 +4,7 @@
 // друкуємо в лог сервера: для розробки цього досить.
 
 import { CONTACT_EMAIL, OPERATOR, SERVICE_NAME } from "@/lib/legal/config";
-import { DEAL_TEXTS, type EmailEvent } from "@/lib/telegram/notices";
+import { DEAL_TEXTS, payReminderLead, type EmailEvent } from "@/lib/telegram/notices";
 import { excerpt } from "@/lib/telegram/texts";
 import { logServer } from "@/lib/telemetry/log";
 import { readVar } from "./env";
@@ -126,7 +126,7 @@ export const renderNoticeMail = ({ event, held, siteUrl, unsubscribeUrl }: Notic
       ? `Нове повідомлення від ${name}.`
       : event.type === "offer"
         ? `Новий відгук на ваш запит «${title}».`
-        : (DEAL_TEXTS[event.action] ?? "Є зміни за вашою угодою.");
+        : (payReminderLead(event.action, event.stageTitle) ?? DEAL_TEXTS[event.action] ?? "Є зміни за вашою угодою.");
   const subject = event.type === "message" ? `Нове повідомлення від ${name}` : event.type === "offer" ? `Новий відгук на ваш запит «${title}»` : "Зміни за вашою угодою у Findlyfy";
   const more = held > 0 ? `Поки вас не було, ще ${held} нових.` : "";
   const link = `${siteUrl}/?open=${encodeURIComponent(event.open)}`;

@@ -8,6 +8,7 @@ import { isRetentionWindow } from "@/lib/account/deletion";
 import { purgeExpiredRequisites } from "@/lib/server/account-retention";
 import { runDealSweep } from "@/lib/server/deal-sweep";
 import { getDb } from "@/lib/server/db";
+import { runPayReminders } from "@/lib/server/pay-reminders";
 import { pruneEmailCodes, pruneOrphanAttachments, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
@@ -43,6 +44,7 @@ export const POST = async (request: Request) => {
   };
   // Звірка грошей безпечної угоди йде першою: її не повинні зачепити збої Telegram чи прибирання.
   const sweep = await step("sweep", () => runDealSweep(now));
+  const payReminders = await step("pay_reminders", () => runPayReminders(now));
   const posted = await step("post", () => postDueRequests(now));
   const removal = await step("remove_posts", () => removeOptedOutPosts(now));
   const edited = await step("edit_posts", () => syncEditedPosts(now));
@@ -62,5 +64,5 @@ export const POST = async (request: Request) => {
     chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
   };
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, sweep, payReminders, purged, pruned }, { status: sweepFailed ? 500 : 200 });
 };

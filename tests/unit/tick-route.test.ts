@@ -11,6 +11,7 @@ const { calls, fail, run } = vi.hoisted(() => {
   return { calls, fail, run };
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
+vi.mock("@/lib/server/pay-reminders", () => ({ runPayReminders: run("pay_reminders", { deals: 0, errors: 0 }) }));
 vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), restoreReopenedPosts: run("reopen_posts", 4), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", { removed: 3, withdrawn: 2 }) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
 vi.mock("@/lib/server/tick-cleanup", () => ({
@@ -38,6 +39,14 @@ describe("/api/internal/tick", () => {
   it("звірка грошей іде першою", async () => {
     expect((await tick()).status).toBe(200);
     expect(calls[0]).toBe("sweep");
+  });
+
+  it("збій нагадувань про оплату не скасовує решту кроків", async () => {
+    fail.step = "pay_reminders";
+    const response = await tick();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: false, failed: ["pay_reminders"] });
+    expect(calls).toEqual(expect.arrayContaining(["sweep", "post", "prune_db"]));
   });
 
   it("збій поста в Telegram не скасовує решту кроків і не дає 500", async () => {
