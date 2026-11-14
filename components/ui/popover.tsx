@@ -11,12 +11,31 @@ const Popover = PopoverPrimitive.Root;
 const PopoverTrigger = PopoverPrimitive.Trigger;
 const PopoverAnchor = PopoverPrimitive.Anchor;
 
-function PopoverContent({ className, align = "start", sideOffset = 8, ...props }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
+// Поповер живе в порталі на <body>, поза модальним Dialog, тож блокування прокрутки (react-remove-scroll) гасить
+// wheel і touchmove на ньому, і список усередині не гортається. Події не піднімаємо до документа, де їх ловить блокування.
+const keepScroll = (event: React.SyntheticEvent) => event.stopPropagation();
+
+const PopoverContent = ({ className, align = "start", sideOffset = 8, onWheel, onTouchMove, ...props }: React.ComponentProps<typeof PopoverPrimitive.Content>) => {
   return (
     <PopoverPrimitive.Portal>
-      <PopoverPrimitive.Content data-slot="popover-content" align={align} sideOffset={sideOffset} collisionPadding={12} className={cn("ui-popover", className)} {...props} />
+      <PopoverPrimitive.Content
+        data-slot="popover-content"
+        align={align}
+        sideOffset={sideOffset}
+        collisionPadding={12}
+        className={cn("ui-popover", className)}
+        onWheel={(event) => {
+          onWheel?.(event);
+          keepScroll(event);
+        }}
+        onTouchMove={(event) => {
+          onTouchMove?.(event);
+          keepScroll(event);
+        }}
+        {...props}
+      />
     </PopoverPrimitive.Portal>
   );
-}
+};
 
 export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger };
