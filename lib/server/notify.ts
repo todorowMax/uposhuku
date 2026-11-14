@@ -13,6 +13,7 @@ import type { Notice } from "@/lib/telegram/notices";
 import { logServer } from "@/lib/telemetry/log";
 import { telemetryConfig } from "@/lib/telemetry/server";
 import { getDb } from "./db";
+import { readVar } from "./env";
 import { getPrefs } from "./notification-prefs-repo";
 import { notifyEmail } from "./notify-email";
 import { isOnline } from "./presence-repo";
@@ -51,7 +52,8 @@ const notifyTelegram = async (userId: string, notice: Notice, now: number): Prom
     if (!link) return "no_link";
     const prefs = await getPrefs(userId);
     if (!prefs.channels.telegram || !prefs.kinds[notice.kind]) return "off";
-    if (SKIP_WHEN_ONLINE.has(notice.kind) && (await isOnline(userId, now))) return "online";
+    // На dev зручно перевіряти бота з відкритим сайтом: NOTIFY_WHEN_ONLINE=1 вимикає правило «не шлемо, поки людина на сайті».
+    if (SKIP_WHEN_ONLINE.has(notice.kind) && readVar("NOTIFY_WHEN_ONLINE") !== "1" && (await isOnline(userId, now))) return "online";
 
     const db = getDb();
     if (notice.kind === "matching") {
@@ -98,7 +100,8 @@ const notifyTelegram = async (userId: string, notice: Notice, now: number): Prom
 /** Не затримує відповідь API: відправка добігає після неї. */
 export const notifyLater = (userId: string | null | undefined, notice: Notice | null): void => {
   if (!userId || !notice) return;
-  const work = notifyUser(userId, notice);
+  // Підсумок у журнал (без тексту й без адрес): інакше «чому не прийшло» не з'ясувати, бо мовчання буває за правилами.
+  const work = notifyUser(userId, notice).then((outcome) => logServer({ level: "info", event: "notify_outcome", message: `${notice.kind}: ${outcome}`, detail: { kind: notice.kind, outcome } }));
   if (telemetryConfig.waitUntil) telemetryConfig.waitUntil(work);
   else void work;
 };

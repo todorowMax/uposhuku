@@ -41,7 +41,9 @@
         "CRYPTO_WALLET_MODE": "on",
         "CRYPTO_ESCROW_MODE": "on",
         "NBU_QR_MODE": "on",
-        "FOREIGN_LINKS_MODE": "on"
+        "FOREIGN_LINKS_MODE": "on",
+        // dev: шлемо в Telegram, навіть коли сайт відкритий, щоб бота можна було перевіряти двома акаунтами в одному браузері.
+        "NOTIFY_WHEN_ONLINE": "1"
       },
       // Явно, щоб wrangler не попереджав: dev-воркер живе на workers.dev, прев'ю-адреси не потрібні.
       "workers_dev": true,

@@ -27,6 +27,8 @@ interface CloudflareEnv {
   TELEGRAM_WEBHOOK_SECRET?: string;
   /** Username бота без @: для посилань t.me/<username>?start=… Не секрет. */
   TELEGRAM_BOT_USERNAME?: string;
+  /** dev: «1» шле сповіщення в Telegram, навіть коли людина на сайті. */
+  NOTIFY_WHEN_ONLINE?: string;
   /** Id публічного каналу запитів (від'ємний, -100…). */
   TELEGRAM_CHANNEL_ID?: string;
   /** Адреса сайту для посилань із бота й каналу. */

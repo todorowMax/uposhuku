@@ -101,6 +101,18 @@ describe("диспетчер сповіщень", () => {
     expect(await notifyUser("u1", notice({ key: "offer:r2:x" }), NOON)).toBe("sent");
   });
 
+  it("NOTIFY_WHEN_ONLINE=1 шле й тоді, коли людина на сайті", async () => {
+    await link();
+    await markPresence(ctx.db, "u1", true, NOON);
+    process.env.NOTIFY_WHEN_ONLINE = "1";
+    try {
+      expect(await notifyUser("u1", notice(), NOON)).toBe("sent");
+    } finally {
+      delete process.env.NOTIFY_WHEN_ONLINE;
+    }
+    expect(await notifyUser("u1", notice({ key: "offer:r9:x" }), NOON)).toBe("online");
+  });
+
   it("той самий ключ удруге не шле; інший ключ шле", async () => {
     await link();
     expect(await notifyUser("u1", notice(), NOON)).toBe("sent");

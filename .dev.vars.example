@@ -99,3 +99,6 @@ CRYPTO_RPC_URL=
 CRYPTO_MAX_DEAL_USDT=
 # Project ID із Reown (WalletConnect), публічний, у збірку: прив'язати до своїх доменів. Без нього WalletConnect у списку немає.
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
+
+# Лише для dev: 1 вимикає правило «не сповіщати в Telegram, поки людина на сайті». На проді не ставити.
+NOTIFY_WHEN_ONLINE=
