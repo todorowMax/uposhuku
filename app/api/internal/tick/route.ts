@@ -44,7 +44,7 @@ export const POST = async (request: Request) => {
   // Звірка грошей безпечної угоди йде першою: її не повинні зачепити збої Telegram чи прибирання.
   const sweep = await step("sweep", () => runDealSweep(now));
   const posted = await step("post", () => postDueRequests(now));
-  const removed = await step("remove_posts", () => removeOptedOutPosts(now));
+  const removal = await step("remove_posts", () => removeOptedOutPosts(now));
   const edited = await step("edit_posts", () => syncEditedPosts(now));
   const closed = await step("close", () => closeFinishedPosts(now));
   await step("prune_telegram", () => pruneTelegram(now));
@@ -61,5 +61,5 @@ export const POST = async (request: Request) => {
     chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
   };
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, removed, edited, closed, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
 };

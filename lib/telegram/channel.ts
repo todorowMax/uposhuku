@@ -6,7 +6,9 @@
 // Коли запит закрито, пост редагується: «Виконавця знайдено». Коли автор змінив відкритий запит,
 // уже опублікований пост оновлюється свіжим текстом; якщо поста ще немає, він береться зі свіжих даних при публікації.
 // Коли автор зняв галочку «в канал» у відкритому запиті, пост видаляється з каналу, а рядок channel_posts стирається:
-// повторне ввімкнення галочки ставить запит у звичайну чергу публікації.
+// повторне ввімкнення галочки ставить запит у звичайну чергу публікації. Видалити можна лише повідомлення молодше 48 годин (Bot API),
+// тому старіший пост (або той, що Telegram не дає видалити) редагується в «Автор прибрав цей запит», рядок лишається зі статусом
+// `withdrawn` і більше не чіпається, а повторна публікація для нього не відбувається.
 
 import { and, asc, eq, gt, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
 import { channelPosts, requestTags, requests } from "@/db/schema";
@@ -42,6 +44,9 @@ export const hashtag = (label: string): string => {
   const clean = label.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "_").replace(/^_+|_+$/g, "");
   return clean ? `#${clean}` : "";
 };
+
+/** Текст поста, який автор прибрав, а видалити його з каналу не вийшло: без змісту запиту й без кнопки. */
+export const WITHDRAWN_POST_HTML = "<b>Автор прибрав цей запит</b>";
 
 /** Текст поста й кнопка. `closed`: запит закрито, кнопки немає. */
 export const formatChannelPost = (request: ChannelRequest, options: { closed?: boolean } = {}): { html: string; button: { text: string; path: string } | null } => {
@@ -93,7 +98,7 @@ export const duePosts = async (config: TelegramConfig, now: number): Promise<Cha
     .select({ userId: requests.userId, total: sql<number>`count(*)` })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
-    .where(and(gt(channelPosts.postedAt, now - DAY_MS), inArray(channelPosts.status, ["posted", "closed"])))
+    .where(and(gt(channelPosts.postedAt, now - DAY_MS), inArray(channelPosts.status, ["posted", "closed", "withdrawn"])))
     .groupBy(requests.userId);
   for (const row of recent) perUser.set(row.userId, Number(row.total));
 
@@ -179,47 +184,89 @@ export const syncEditedPosts = async (now = Date.now(), config = telegramConfig(
 /** Опубліковані пости відкритих запитів, у яких автор зняв галочку «в канал»; спершу ті, що давно не чіпали (щоб один збійний не блокував решту). */
 const optedOutPosts = () =>
   getDb()
-    .select({ requestId: channelPosts.requestId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .select({ requestId: channelPosts.requestId, chatId: channelPosts.chatId, messageId: channelPosts.messageId, postedAt: channelPosts.postedAt })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
     .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), eq(requests.channelOptIn, false), isNotNull(channelPosts.messageId)))
     .orderBy(asc(channelPosts.updatedAt))
     .limit(POSTS_PER_RUN);
 
+/** Bot API: видалити можна повідомлення, надіслане менш ніж 48 годин тому. Далі спроба марна, тож пост лише редагуємо. */
+export const DELETE_WINDOW_MS = 48 * 60 * 60 * 1000;
+
 const alreadyGone = (error: unknown): boolean => error instanceof TelegramError && error.code === 400 && /message to delete not found/i.test(error.message);
 
-/** Видаляє один пост. `removed`: пост зник (або його вже не було); `retry`: помилка записана, повторимо в наступному запуску; `stop`: ліміт Telegram. */
-const removePost = async (row: { requestId: string; chatId: string; messageId: number }, now: number): Promise<"removed" | "retry" | "stop"> => {
-  const db = getDb();
+/**
+ * Telegram відмовив по суті (400, 403: повідомлення не можна видалити, у бота немає права, його вже немає), а не тимчасово
+ * (мережа з кодом 0, 5xx). Текст відповіді в документації не вказано, тому за ним політику не будуємо: лише за кодом.
+ */
+const refused = (error: unknown): boolean => error instanceof TelegramError && (error.code === 400 || error.code === 403);
+
+type RemoveRow = { requestId: string; chatId: string; messageId: number; postedAt: number };
+type RemoveOutcome = "removed" | "withdrawn" | "retry" | "stop";
+
+const saveError = async ({ requestId, now, event, error }: { requestId: string; now: number; event: string; error: unknown }): Promise<void> => {
+  const message = error instanceof Error ? error.message : String(error);
+  await getDb().update(channelPosts).set({ updatedAt: now, error: message.slice(0, 300) }).where(eq(channelPosts.requestId, requestId));
+  logServer({ level: "error", event, message, detail: { requestId } });
+};
+
+/**
+ * Пост, який не вдалося видалити (старший за 48 годин або Telegram відмовив): редагуємо в нейтральний текст без кнопки й
+ * ставимо `withdrawn`; рядок лишається, тож повторної публікації й повторних спроб немає. Якщо й редагування відхилили (наприклад,
+ * повідомлення прибрали вручну), пишемо помилку й ставимо `closed`, теж без повторів. Тимчасова помилка лишає рядок для повтору.
+ */
+const withdrawPost = async (row: RemoveRow, now: number): Promise<RemoveOutcome> => {
+  try {
+    await editMessageText(row.chatId, row.messageId, WITHDRAWN_POST_HTML);
+  } catch (error) {
+    if (error instanceof TelegramError && error.code === 429) return "stop";
+    if (!refused(error)) {
+      await saveError({ requestId: row.requestId, now, event: "channel_withdraw_failed", error });
+      return "retry";
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    await getDb().update(channelPosts).set({ status: "closed", updatedAt: now, error: message.slice(0, 300) }).where(eq(channelPosts.requestId, row.requestId));
+    logServer({ level: "error", event: "channel_withdraw_refused", message, detail: { requestId: row.requestId } });
+    return "withdrawn";
+  }
+  await getDb().update(channelPosts).set({ status: "withdrawn", updatedAt: now, error: null }).where(eq(channelPosts.requestId, row.requestId));
+  return "withdrawn";
+};
+
+/** Прибирає один пост. `removed`: видалено (або вже не було); `withdrawn`: лишився з нейтральним текстом або закритий без повторів; `retry`: тимчасова помилка; `stop`: ліміт Telegram. */
+const removePost = async (row: RemoveRow, now: number): Promise<RemoveOutcome> => {
+  if (now - row.postedAt >= DELETE_WINDOW_MS) return withdrawPost(row, now);
   try {
     await deleteMessage(row.chatId, row.messageId);
   } catch (error) {
     if (error instanceof TelegramError && error.code === 429) return "stop";
     if (!alreadyGone(error)) {
-      const message = error instanceof Error ? error.message : String(error);
-      await db.update(channelPosts).set({ updatedAt: now, error: message.slice(0, 300) }).where(eq(channelPosts.requestId, row.requestId));
-      logServer({ level: "error", event: "channel_remove_failed", message, detail: { requestId: row.requestId } });
+      if (refused(error)) return withdrawPost(row, now);
+      await saveError({ requestId: row.requestId, now, event: "channel_remove_failed", error });
       return "retry";
     }
   }
-  await db.delete(channelPosts).where(eq(channelPosts.requestId, row.requestId));
+  await getDb().delete(channelPosts).where(eq(channelPosts.requestId, row.requestId));
   return "removed";
 };
 
 /**
- * Видаляє з каналу пости відкритих запитів зі знятою галочкою «в канал» і стирає їхні рядки channel_posts. «Повідомлення вже немає»
- * теж вважаємо успіхом. Інша помилка Telegram іде в журнал (без тексту запиту), рядок лишається для повтору в наступному запуску;
- * 429: зупинка до наступного запуску. Закриті запити не чіпаємо: їхній пост «Виконавця знайдено» лишається.
+ * Прибирає з каналу пости відкритих запитів зі знятою галочкою «в канал». Свіжий пост (до 48 годин від публікації) видаляється, рядок
+ * channel_posts стирається; «повідомлення вже немає» теж успіх. Старіший або такий, що Telegram не дає видалити, редагується в «Автор прибрав
+ * цей запит» без кнопки, рядок лишається зі статусом `withdrawn` (або `closed`, якщо відхилено й редагування) і більше не чіпається.
+ * Тимчасова помилка (мережа, 5xx) іде в журнал без тексту запиту, рядок лишається для повтору; 429 зупиняє крок до наступного запуску.
+ * Закриті запити не чіпаємо: їхній пост «Виконавця знайдено» лишається.
  */
-export const removeOptedOutPosts = async (now = Date.now(), config = telegramConfig()): Promise<number> => {
-  if (!channelReady(config)) return 0;
-  let removed = 0;
+export const removeOptedOutPosts = async (now = Date.now(), config = telegramConfig()): Promise<{ removed: number; withdrawn: number }> => {
+  const result = { removed: 0, withdrawn: 0 };
+  if (!channelReady(config)) return result;
   for (const row of await optedOutPosts()) {
-    const outcome = await removePost({ requestId: row.requestId, chatId: row.chatId, messageId: row.messageId as number }, now);
+    const outcome = await removePost({ requestId: row.requestId, chatId: row.chatId, messageId: row.messageId as number, postedAt: row.postedAt }, now);
     if (outcome === "stop") break;
-    if (outcome === "removed") removed++;
+    if (outcome === "removed" || outcome === "withdrawn") result[outcome]++;
   }
-  return removed;
+  return result;
 };
 
 /** Редагує пости закритих запитів: «Виконавця знайдено», без кнопки. */

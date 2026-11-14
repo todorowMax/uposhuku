@@ -11,7 +11,7 @@ const { calls, fail, run } = vi.hoisted(() => {
   return { calls, fail, run };
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
-vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", 3) }));
+vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", { removed: 3, withdrawn: 2 }) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
 vi.mock("@/lib/server/tick-cleanup", () => ({
   pruneSessions: run("prune_sessions", 3),
@@ -59,11 +59,11 @@ describe("/api/internal/tick", () => {
   });
 
   it("пости зі знятою галочкою видаляються до редагування; збій цього кроку не скасовує решту", async () => {
-    expect(await (await tick()).json()).toMatchObject({ ok: true, removed: 3 });
+    expect(await (await tick()).json()).toMatchObject({ ok: true, removed: 3, withdrawn: 2 });
     expect(calls.indexOf("remove_posts")).toBeLessThan(calls.indexOf("edit_posts"));
     fail.step = "remove_posts";
     calls.length = 0;
-    expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["remove_posts"], removed: null });
+    expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["remove_posts"], removed: null, withdrawn: null });
     expect(calls).toEqual(expect.arrayContaining(["edit_posts", "close", "prune_telegram"]));
   });
 

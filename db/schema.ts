@@ -482,7 +482,7 @@ export const channelPosts = sqliteTable(
       .references(() => requests.id, { onDelete: "cascade" }),
     chatId: text("chat_id").notNull(),
     messageId: integer("message_id"),
-    status: text("status", { enum: ["posted", "closed", "failed"] }).notNull(),
+    status: text("status", { enum: ["posted", "closed", "failed", "withdrawn"] }).notNull(),
     postedAt: integer("posted_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
     error: text("error"),
