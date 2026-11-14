@@ -108,7 +108,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 Older code predates some of the shared rules. The linters report it as warnings and
 `npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-465 warnings, Stylelint 5. The numbers only go down: fix findings in the files you touch and lower the
+464 warnings, Stylelint 5. The numbers only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"

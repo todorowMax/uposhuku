@@ -3,7 +3,6 @@
 import {
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -16,8 +15,8 @@ import { applyGlassPreference } from "@/lib/ui/glass";
 import { setRequestTags } from "@/lib/map/request-tags";
 import { setMapMode } from "@/lib/feed/map-requests";
 import { Attachments, type Attachment } from "@/components/composer/attachments";
-import { TagRow } from "@/components/composer/tag-row";
-import { TagPicker } from "@/components/tags/tag-picker";
+import { RequestTagRow } from "@/components/composer/request-tag-row";
+import { useRequestTags } from "@/components/composer/use-request-tags";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
 import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/components/composer/request-params";
 import { AuthPanel } from "@/components/auth/auth-panel";
@@ -30,16 +29,10 @@ import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 import * as tagEngine from "@/lib/tags/engine";
 import { EVENTS, track } from "@/lib/telemetry/track";
-import { trackTagAdded, trackTagRemoved, type TagAddSource } from "@/lib/telemetry/tag-events";
-import { proposeTag } from "@/lib/tags/proposals-client";
 import { useProposeTarget } from "./use-propose-target";
 
 /** Скільки файлів можна прикріпити до запиту. */
 const MAX_FILES = 10;
-/** Скільки сірих пропозицій показуємо поруч із тегами запиту. */
-const MAX_SUGGESTIONS = 6;
-/** Скільки тегів людина може додати вручну до тих, що з тексту. */
-const MAX_MANUAL_TAGS = 10;
 
 /** Скільки рядків поле показує, перш ніж почати прокручуватися всередині. */
 const MAX_ROWS = 5;
@@ -61,11 +54,9 @@ export function RequestComposer() {
   const [narrowing, setNarrowing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [files, setFiles] = useState<Attachment[]>([]);
-  /** Теги, які людина прибрала: знову з тексту їх не додаємо. */
-  const [dismissed, setDismissed] = useState<string[]>([]);
-  /** Теги, додані з пропозицій одним кліком. */
-  const [added, setAdded] = useState<string[]>([]);
   const [params, setParams] = useState<RequestParamsValue>(EMPTY_PARAMS);
+  const tags = useRequestTags(text);
+  const { mentions, selected, suggestions } = tags;
   const authFlow = useStore(authFlowStore);
   const session = useStore(sessionStore);
   const requests = useStore(requestsStore);
@@ -160,25 +151,10 @@ export function RequestComposer() {
   }, [inputPhase, text, files]);
 
   // Порожнє поле — чистий аркуш: прибрані й додані теги забуваємо.
+  const resetTags = tags.reset;
   useEffect(() => {
-    if (text.trim() !== "") return;
-    setDismissed([]);
-    setAdded([]);
-  }, [text]);
-
-  const mentions = useMemo(
-    () => tagEngine.detectTagMentions(text).filter((mention) => !dismissed.includes(mention.tagId)),
-    [text, dismissed]
-  );
-  const selected = useMemo(
-    () => [...new Set([...mentions.map((mention) => mention.tagId), ...added])].filter((id) => !dismissed.includes(id)),
-    [mentions, added, dismissed]
-  );
-  const suggestions = useMemo(
-    () =>
-      tagEngine.suggestTags(selected, { exclude: dismissed, limit: MAX_SUGGESTIONS }).map((suggestion) => suggestion.tagId),
-    [selected, dismissed]
-  );
+    if (text.trim() === "") resetTags();
+  }, [text, resetTags]);
 
   // Перший раз, коли з тексту з'явився тег: чи розуміє словник, що пишуть люди.
   useEffect(() => {
@@ -205,33 +181,6 @@ export function RequestComposer() {
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     if (loadDraft()?.pending) authFlowStore.set({ mode: "publish" });
   }, []);
-
-  const removeTag = (id: string) => {
-    const mention = mentions.find((item) => item.tagId === id);
-    trackTagRemoved("request", id, mention ? "auto" : "manual", mention ? text.slice(mention.start, mention.end) : undefined);
-    setDismissed((current) => [...current, id]);
-    setAdded((current) => current.filter((tag) => tag !== id));
-  };
-  const addTag = (id: string, source: TagAddSource = "suggestion") => {
-    trackTagAdded("request", id, source);
-    setAdded((current) => (current.includes(id) ? current : [...current, id]));
-    setDismissed((current) => current.filter((tag) => tag !== id));
-  };
-  const manualFull = added.length >= MAX_MANUAL_TAGS;
-  /** Для пікера: тег є — знімаємо, нема — додаємо; `false`, коли ручних уже забагато. */
-  const toggleTag = (id: string) => {
-    if (selected.includes(id)) {
-      removeTag(id);
-      return true;
-    }
-    if (mentions.some((mention) => mention.tagId === id)) {
-      addTag(id, "picker");
-      return true;
-    }
-    if (manualFull) return false;
-    addTag(id, "picker");
-    return true;
-  };
 
   // Прев'ю зображень живуть як blob-посилання: звільняємо, коли файл прибрали.
   useEffect(() => () => filesRef.current.forEach((item) => item.url && URL.revokeObjectURL(item.url)), []);
@@ -411,26 +360,7 @@ export function RequestComposer() {
         {expanded && hasTray && (
           <div className="composer-tray">
             <Attachments items={files} onRemove={detach} />
-            <TagRow
-              selected={selected}
-              suggestions={suggestions}
-              labelOf={tagEngine.tagLabel}
-              onRemove={removeTag}
-              onAdd={addTag}
-              action={
-                <TagPicker
-                  context="request"
-                  title="Теги запиту"
-                  selected={selected}
-                  suggestions={suggestions}
-                  labelOf={tagEngine.tagLabel}
-                  onToggle={toggleTag}
-                  onPropose={session.status === "user" ? (value) => proposeTag(value, "request") : undefined}
-                  limitReached={manualFull}
-                  limitHint={`Вручну можна додати до ${MAX_MANUAL_TAGS} тегів. Теги з тексту в цей ліміт не входять.`}
-                />
-              }
-            />
+            <RequestTagRow tags={tags} canPropose={session.status === "user"} />
           </div>
         )}
 

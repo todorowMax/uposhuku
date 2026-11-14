@@ -16,6 +16,7 @@ import { dealPhase } from "@/lib/deals/machine";
 import { setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
 import { Button } from "@/components/ui/button";
 import { ClampedText } from "@/components/ui/clamped-text";
+import { EditRequestScreen } from "@/components/requests/edit-request-screen";
 import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
 import { requestFacts } from "@/lib/requests/format";
 import type { PublishedRequest } from "@/lib/requests/types";
@@ -44,6 +45,8 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [savedNotice, setSavedNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [otherOfferCounts, setOtherOfferCounts] = useState<Record<string, number>>({});
   const rootRef = useRef<HTMLElement>(null);
@@ -132,6 +135,12 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
     setDetailsOpen(false);
   };
 
+  const openEdit = () => {
+    setMenuOpen(false);
+    setSavedNotice(false);
+    setEditing(true);
+  };
+
   const close = async () => {
     setMenuOpen(false);
     setClosing(true);
@@ -217,6 +226,9 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
               </button>
               {menuOpen && (
                 <div className="request-summary-menu glass-panel">
+                  <Button variant="bare" className="account-menu-item" onClick={openEdit}>
+                    Редагувати запит
+                  </Button>
                   <Button variant="bare" className="account-menu-item" onClick={() => void close()}>
                     Закрити запит
                   </Button>
@@ -237,6 +249,8 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       </div>
 
       {error && <p role="alert" className="auth-error request-summary-error">{error}</p>}
+      <p role="status" className="sr-only">{savedNotice ? "Запит збережено" : ""}</p>
+      {editing && !closed && <EditRequestScreen request={active} offers={offers} onClose={() => setEditing(false)} onSaved={() => setSavedNotice(true)} />}
 
       {/* Поки ніхто не відгукнувся, карта виконавців порожня: пояснюємо це й даємо вихід до всіх. */}
       {!closed && offers === 0 && phase === "none" && (

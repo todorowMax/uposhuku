@@ -9,12 +9,19 @@ export interface Attachment {
   url: string | null;
 }
 
+/** Що потрібно, щоб показати вкладення: імʼя й прев'ю. Збережений запит має лише опис файла, без самого файла. */
+export interface AttachmentView {
+  id: string;
+  file: Pick<File, "name">;
+  url: string | null;
+}
+
 /**
  * Прикріплені файли над текстом запиту, як прев'ю фото в месенджерах:
  * зображення — мініатюрою, решта — плашкою з назвою. Поки лише вигляд:
  * файли нікуди не відправляються.
  */
-export function Attachments({ items, onRemove }: { items: Attachment[]; onRemove: (id: string) => void }) {
+export const Attachments = ({ items, onRemove }: { items: AttachmentView[]; onRemove: (id: string) => void }) => {
   if (items.length === 0) return null;
   return (
     <ul className="attachments" aria-label="Прикріплені файли">
@@ -40,4 +47,4 @@ export function Attachments({ items, onRemove }: { items: Attachment[]; onRemove
       ))}
     </ul>
   );
-}
+};
