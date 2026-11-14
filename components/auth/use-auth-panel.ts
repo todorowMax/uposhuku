@@ -9,6 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { gsap } from "gsap";
 import { useTermsConsent } from "@/components/auth/use-terms-consent";
 import { useTurnstile } from "@/components/auth/use-turnstile";
+import { withPhoneGate } from "@/lib/phone/client";
 import { ApiError, addPublishedRequest, authFlowStore, publishRequest, sessionStore, startEmail, verifyEmail } from "@/lib/auth/client";
 import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
@@ -61,7 +62,7 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
     setStep("publishing");
     setError(null);
     try {
-      const request = await publishRequest(draft);
+      const request = await withPhoneGate(() => publishRequest(draft));
       clearDraft();
       onPublished(request);
       addPublishedRequest(request);

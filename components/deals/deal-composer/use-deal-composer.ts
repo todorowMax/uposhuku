@@ -10,6 +10,7 @@ import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import type { StagesEditorTypes } from "@/components/deals/stages-editor";
 import { ApiError } from "@/lib/auth/client";
 import { proposeDeal } from "@/lib/deals/client";
+import { withPhoneGate } from "@/lib/phone/client";
 import { withRiskAck } from "@/lib/legal/client";
 import { feeOf, initialMethod, splitIntoStages, validateDraft } from "@/lib/deals/machine";
 import { totalOf } from "@/lib/deals/price";
@@ -80,7 +81,8 @@ export const useDealComposer = (response: OfferResponse, onDone: (deal: Deal) =>
     setBusy(true);
     setError(null);
     try {
-      const deal = await withRiskAck(() =>
+      const deal = await withPhoneGate(() =>
+        withRiskAck(() =>
         proposeDeal({
           requestId: response.requestId,
           responseId: response.id,
@@ -89,6 +91,7 @@ export const useDealComposer = (response: OfferResponse, onDone: (deal: Deal) =>
           stages,
           ...(criteria.trim() ? { criteria: criteria.trim() } : {}),
         }),
+        ),
       );
       onDone(deal);
     } catch (reason) {

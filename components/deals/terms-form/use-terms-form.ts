@@ -9,6 +9,7 @@ import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import type { StagesEditorTypes } from "@/components/deals/stages-editor";
 import { ApiError } from "@/lib/auth/client";
 import { useFeesEnabled } from "@/lib/fees/client";
+import { withPhoneGate } from "@/lib/phone/client";
 import { withRiskAck } from "@/lib/legal/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { proposeTerms } from "@/lib/deals/client";
@@ -79,7 +80,7 @@ export const useTermsForm = (conversation: Pick<ConversationDto, "id" | "perform
     setBusy(true);
     setError(null);
     try {
-      await withRiskAck(() => proposeTerms(conversation.id, { title: title.trim(), description: description.trim(), criteria: criteria.trim(), method, stages }));
+      await withPhoneGate(() => withRiskAck(() => proposeTerms(conversation.id, { title: title.trim(), description: description.trim(), criteria: criteria.trim(), method, stages })));
       onDone();
     } catch (reason) {
       setError(
