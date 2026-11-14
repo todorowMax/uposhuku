@@ -5,6 +5,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import {
   ArrowUp,
+  Check,
   ChevronDown,
   ChevronsRight,
   Loader2,
@@ -22,7 +23,10 @@ import {
   useOffers,
 } from "@/lib/requests/offers";
 import type { OfferResponse } from "@/lib/requests/types";
+import { conversationsStore } from "@/lib/chat/client";
+import { useDeals } from "@/lib/deals/client";
 import { mapModeStore } from "@/lib/feed/map-requests";
+import { offerStatus, type OfferStatus } from "@/lib/requests/offer-status";
 import { useSidePanel } from "@/lib/requests/side-panel";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
@@ -80,6 +84,8 @@ export function OffersPanel() {
     decline,
     restore,
   } = useOffers(requestOpen ? request : null);
+  const deals = useDeals(request?.id);
+  const conversations = useStore(conversationsStore);
   const [showDeclined, setShowDeclined] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -255,6 +261,7 @@ export function OffersPanel() {
               <OfferCard
                 key={offer.id}
                 offer={offer}
+                status={offerStatus(offer, deals, conversations)}
                 onChat={() => {
                   track(EVENTS.chatOpened, { from: "offers" });
                   // Одна панель за раз: відгуки згортаються, відкривається месенджер.
@@ -342,10 +349,12 @@ function Avatar({
 
 function OfferCard({
   offer,
+  status,
   onChat,
   onDecline,
 }: {
   offer: OfferResponse;
+  status: OfferStatus;
   onChat: () => void;
   onDecline: () => void;
 }) {
@@ -444,23 +453,32 @@ function OfferCard({
         {offer.message}
       </p>
 
+      {status.kind !== "new" && (
+        <div className="offer-status">
+          {status.kind === "deal" ? <Check className="size-3.5" /> : <MessageCircle className="size-3.5" />}
+          {status.kind === "deal" ? status.label : "Чат відкрито"}
+        </div>
+      )}
+
       <div className="mt-3 flex items-center gap-1.5">
-        <button type="button" onClick={onChat} className="offer-primary">
+        <Button variant="offer" onClick={onChat}>
           <MessageCircle className="size-4" />
-          Написати
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            track(EVENTS.offerRejected);
-            onDecline();
-          }}
-          aria-label={`Відхилити пропозицію ${offer.name}`}
-          className="offer-secondary ml-auto"
-        >
-          <X className="size-4" />
-          <span className="sr-only sm:not-sr-only">Відхилити</span>
-        </button>
+          {status.kind === "deal" ? "Відкрити угоду" : status.kind === "chat" ? "Відкрити чат" : "Написати"}
+        </Button>
+        {status.kind !== "deal" && (
+          <Button
+            variant="quiet"
+            onClick={() => {
+              track(EVENTS.offerRejected);
+              onDecline();
+            }}
+            aria-label={`Відхилити пропозицію ${offer.name}`}
+            className="ml-auto"
+          >
+            <X className="size-4" />
+            <span className="sr-only sm:not-sr-only">Відхилити</span>
+          </Button>
+        )}
       </div>
     </article>
   );

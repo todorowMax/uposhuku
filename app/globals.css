@@ -3102,6 +3102,17 @@ html[data-glass] .offers-panel {
 }
 
 /* Власний запит нагорі стрічки виконавця. */
+/* Що з пропозицією: чат відкрито чи є угода. */
+.offer-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ocean);
+}
+
 .feed-own {
   padding: 12px 14px;
   border-radius: 18px;

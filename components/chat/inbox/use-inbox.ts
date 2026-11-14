@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { sessionStore } from "@/lib/auth/client";
-import { fetchConversations, openConversation } from "@/lib/chat/client";
+import { conversationsStore, fetchConversations, openConversation } from "@/lib/chat/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { startPolling } from "@/lib/realtime/client";
 import { useStore } from "@/lib/store";
@@ -44,6 +44,9 @@ export const useInbox = () => {
       setOpen(false);
     }
   }
+
+  // Список розмов бачать і картки пропозицій: «Чат відкрито» без окремого запиту.
+  useEffect(() => conversationsStore.set(items), [items]);
 
   // Запит відкрити вікно (посилання Telegram, профіль, відгук): виконуємо один раз, щойно можна, тобто
   // увійшли, а для запиту без виконавця ще й завантажився список розмов.

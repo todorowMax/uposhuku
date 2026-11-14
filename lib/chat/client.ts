@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notifyTyping, startPolling, useTyping } from "@/lib/realtime/client";
+import { createStore } from "@/lib/store";
 import type { ChatMessageDto, ConversationDto } from "./types";
 
 const POLL_MS = 3500;
@@ -36,6 +37,9 @@ export const uploadChatPhoto = async (conversationId: string, blob: Blob) => {
   if (!response.ok || !data.id || !data.url) throw new Error(data.detail ?? "Фото не завантажилось");
   return { id: data.id, url: data.url };
 };
+
+/** Список розмов, який уже завантажило вікно повідомлень: інші місця (картки пропозицій) читають його, а не питають сервер ще раз. */
+export const conversationsStore = createStore<ConversationDto[]>([]);
 
 export const fetchConversations = async () => (await call<{ conversations: ConversationDto[] }>("/api/conversations")).conversations;
 

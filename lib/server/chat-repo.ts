@@ -151,6 +151,17 @@ const lastMessages = async (conversationIds: string[]): Promise<Map<string, type
   return new Map(rows.map((row) => [row.conversationId, row]));
 };
 
+/** У яких розмовах хтось писав сам: системні рядки («Відгук на…», «Угоду запропоновано») не рахуємо. */
+const talkedIn = async (conversationIds: string[]): Promise<Set<string>> => {
+  const rows = await inChunks(conversationIds, (chunk) =>
+    getDb()
+      .selectDistinct({ id: messages.conversationId })
+      .from(messages)
+      .where(and(inArray(messages.conversationId, chunk), eq(messages.kind, "text"))),
+  );
+  return new Set(rows.map((row) => row.id));
+};
+
 type Offer = { customer: string; performer: string; text: string };
 
 /**
@@ -175,8 +186,9 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   const asPerformer = rows.filter((row) => row.performerUserId === userId);
   const customerIds = [...new Set(asPerformer.map((row) => row.customerUserId))];
   const performerUserIds = [...new Set(asCustomer.flatMap((row) => (row.performerUserId ? [row.performerUserId] : [])))];
-  const [lastById, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
+  const [lastById, talked, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
     lastMessages(rows.map((row) => row.id)),
+    talkedIn(rows.map((row) => row.id)),
     db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200),
     inChunks([...customerIds, ...performerUserIds], (chunk) => db.select({ id: users.id, displayName: users.displayName, deletedAt: users.deletedAt }).from(users).where(inArray(users.id, chunk))),
     getProfileCards(performerUserIds),
@@ -211,7 +223,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
     }
     const offerRow = offerRows.find((item) => item.customer === row.customerUserId && item.performer === row.performerUserId);
     const offer = offerRow ? { title: offerRow.text.length > 40 ? `${offerRow.text.slice(0, 39).trimEnd()}…` : offerRow.text } : undefined;
-    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
+    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, talked: talked.has(row.id), ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
   }
   return result;
 };
