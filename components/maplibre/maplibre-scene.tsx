@@ -467,6 +467,7 @@ const ownRequestOnMap = (request: PublishedRequest, responses: number): MapReque
   budget: request.budget ? `до ${new Intl.NumberFormat("uk-UA").format(request.budget)} ₴` : null,
   deadline: request.deadline ? DEADLINES[request.deadline] : null,
   createdAt: request.createdAt,
+  editedAt: request.editedAt,
   responses,
   matchedTags: 0,
   response: null,

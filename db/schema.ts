@@ -146,6 +146,9 @@ export const requests = sqliteTable(
     /** Можна показати запит у публічному Telegram-каналі (без контактів, з відгуком лише на платформі). */
     channelOptIn: integer("channel_opt_in", { mode: "boolean" }).notNull().default(true),
     createdAt: integer("created_at").notNull(),
+    /** Коли автор востаннє змінив відкритий запит; null — не змінювали. На порядок у списку не впливає. */
+    editedAt: integer("edited_at"),
+    editCount: integer("edit_count").notNull().default(0),
   },
   (table) => [index("requests_user_idx").on(table.userId), index("requests_status_idx").on(table.status, table.createdAt)],
 );

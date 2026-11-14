@@ -40,6 +40,7 @@ export const RATE_RULES = {
   message: { max: 60, windowMs: MINUTE },
   upload: { max: 30, windowMs: 10 * MINUTE },
   requestCreate: { max: 10, windowMs: 60 * MINUTE },
+  requestEdit: { max: 20, windowMs: 60 * MINUTE },
   responseCreate: { max: 30, windowMs: 60 * MINUTE },
   reviewCreate: { max: 10, windowMs: 60 * MINUTE },
   conversationCreate: { max: 30, windowMs: 60 * MINUTE },

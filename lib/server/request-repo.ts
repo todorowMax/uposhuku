@@ -28,8 +28,10 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     cityId: row.cityId,
     tags: tagRows.filter((tag) => tag.requestId === row.id).map((tag) => ({ id: tag.tagId, label: tag.label })),
     files: fileRows.filter((file) => file.requestId === row.id).map((file) => ({ name: file.name, size: file.size, type: file.type })),
+    channelOptIn: row.channelOptIn,
     status: row.status,
     createdAt: new Date(row.createdAt).toISOString(),
+    editedAt: row.editedAt === null ? null : new Date(row.editedAt).toISOString(),
   }));
 };
 
@@ -59,6 +61,31 @@ export const closeRequest = async (userId: string, id: string): Promise<Publishe
   const db = getDb();
   await db.update(requests).set({ status: "closed" }).where(and(eq(requests.id, id), eq(requests.userId, userId)));
   return findRequest(userId, id);
+};
+
+/**
+ * Правка свого відкритого запиту: текст, умови, теги й файли замінюються одним пакетом; `createdAt` не змінюється,
+ * тож порядок у списках лишається. Чужий чи неіснуючий запит — not_found, закритий — closed.
+ */
+export const updateRequest = async (userId: string, id: string, draft: RequestDraft): Promise<PublishedRequest | "not_found" | "closed"> => {
+  const db = getDb();
+  const now = Date.now();
+  const [row] = await db.select().from(requests).where(and(eq(requests.id, id), eq(requests.userId, userId))).limit(1);
+  if (!row) return "not_found";
+  if (row.status !== "open") return "closed";
+  const tags = draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index);
+  const statements = [
+    db
+      .update(requests)
+      .set({ text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, channelOptIn: draft.channelOptIn !== false, editedAt: now, editCount: row.editCount + 1 })
+      .where(and(eq(requests.id, id), eq(requests.status, "open"))),
+    db.delete(requestTags).where(eq(requestTags.requestId, id)),
+    db.delete(requestFiles).where(eq(requestFiles.requestId, id)),
+    ...(tags.length ? [db.insert(requestTags).values(tags)] : []),
+    ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
+  ];
+  await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+  return (await findRequest(userId, id)) ?? "not_found";
 };
 
 /** Відкриті запити інших людей: з них складається стрічка виконавця. */

@@ -95,14 +95,15 @@ describe("PATCH /api/requests/:id", () => {
     expect((await findRequest("ar-other", foreign.id))?.status).toBe("open");
   });
 
-  it("лише status: closed; будь-що інше 400, редагувати текст чи власника через PATCH не можна", async () => {
+  it("без чернетки чи з чужим status 400; userId з тіла правку не перехоплює", async () => {
     const own = await openRequest("ar-cust", "Початковий опис запиту");
-    for (const body of ["{bad", {}, { status: "open" }, { status: "deleted" }, { text: "Підмінений текст", userId: "ar-other" }]) {
+    for (const body of ["{bad", {}, { status: "open" }, { status: "deleted" }]) {
       expect((await PATCH(jsonRequest("PATCH", body), ctxOf({ id: own.id }))).status, JSON.stringify(body)).toBe(400);
     }
-    const after = await findRequest("ar-cust", own.id);
-    expect(after?.text).toBe("Початковий опис запиту");
-    expect(after?.status).toBe("open");
+    expect((await findRequest("ar-cust", own.id))?.text).toBe("Початковий опис запиту");
+    expect((await PATCH(jsonRequest("PATCH", { text: "Оновлений опис запиту", userId: "ar-other" }), ctxOf({ id: own.id }))).status).toBe(200);
+    const [row] = await getDb().select().from(requests).where(eq(requests.id, own.id));
+    expect(row).toMatchObject({ userId: "ar-cust", text: "Оновлений опис запиту", status: "open" });
   });
 
   it("свій запит закривається, і відгукнутися на нього вже не можна", async () => {

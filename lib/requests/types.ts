@@ -45,6 +45,8 @@ export interface PublishedRequest extends RequestDraft {
   status: "open" | "closed";
   /** ISO-час публікації. */
   createdAt: string;
+  /** ISO-час останньої правки автором; null, якщо запит не змінювали. */
+  editedAt: string | null;
 }
 
 export const REQUEST_TEXT_MIN = 3;

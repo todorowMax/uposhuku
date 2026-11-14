@@ -242,3 +242,39 @@ export const addSystemMessage = async (customerUserId: string, performerUserId: 
     // Стрічка — лише зручність; сама дія вже виконана.
   }
 };
+
+export const REQUEST_EDITED_NOTICE = "Замовник оновив запит";
+/** Не частіше одного такого рядка в розмову за це вікно: серія швидких правок не засмічує чат. */
+export const REQUEST_EDITED_NOTICE_WINDOW_MS = 10 * 60_000;
+
+/**
+ * Після правки запиту: службовий рядок «Замовник оновив запит» у кожну наявну розмову з виконавцем, що на нього
+ * відгукнувся (без тексту змін). Нових розмов не створює; помилка запису не ламає саму правку.
+ */
+export const noteRequestEdited = async (customerUserId: string, requestId: string, now = Date.now()): Promise<void> => {
+  try {
+    const db = getDb();
+    const talks = await db
+      .select({ id: conversations.id, performerUserId: conversations.performerUserId })
+      .from(conversations)
+      .innerJoin(responses, and(eq(responses.performerUserId, conversations.performerUserId), eq(responses.requestId, requestId)))
+      .where(eq(conversations.customerUserId, customerUserId));
+    if (talks.length === 0) return;
+    const recent = await inChunks(
+      talks.map((talk) => talk.id),
+      (chunk) =>
+        db
+          .select({ id: messages.conversationId })
+          .from(messages)
+          .where(and(inArray(messages.conversationId, chunk), eq(messages.kind, "system"), eq(messages.contextId, requestId), eq(messages.text, REQUEST_EDITED_NOTICE), gt(messages.createdAt, now - REQUEST_EDITED_NOTICE_WINDOW_MS))),
+    );
+    const skip = new Set(recent.map((row) => row.id));
+    for (const talk of talks.filter((item) => !skip.has(item.id))) {
+      await addMessage(talk.id, "customer", REQUEST_EDITED_NOTICE, { kind: "system", contextId: requestId });
+      pushUser(customerUserId, { t: "message", conversationId: talk.id });
+      if (talk.performerUserId) pushUser(talk.performerUserId, { t: "message", conversationId: talk.id });
+    }
+  } catch {
+    // Службовий рядок лише зручність; сама правка вже збережена.
+  }
+};
