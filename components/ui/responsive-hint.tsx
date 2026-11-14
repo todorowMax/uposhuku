@@ -36,7 +36,8 @@ const ResponsiveHint = ({ trigger, title, popoverClassName, children }: Responsi
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
         <PopoverContent aria-label={title} className={cn("max-w-64 text-sm", popoverClassName)}>
-          {children}
+          {/* Сам поповер без відступів (його ж беруть списки вибору): відступ дає підказка. */}
+          <div className="p-4">{children}</div>
         </PopoverContent>
       </Popover>
     );
