@@ -1,5 +1,5 @@
 // POST /api/internal/tick — фонові задачі, які викликає cron воркера (раз на 5 хвилин):
-// пости запитів у Telegram-канал, видалення постів зі знятою галочкою, редагування закритих, прибирання старого (сесії, коди, осиротілі фото чату).
+// пости запитів у Telegram-канал, видалення постів зі знятою галочкою, редагування закритих і повернення постів відновлених запитів, прибирання старого (сесії, коди, осиротілі фото чату).
 // Захист: заголовок Authorization: Bearer <INTERNAL_TOKEN>, звіряється за сталий час.
 
 import { and, lt } from "drizzle-orm";
@@ -11,7 +11,7 @@ import { getDb } from "@/lib/server/db";
 import { pruneEmailCodes, pruneOrphanAttachments, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
-import { closeFinishedPosts, postDueRequests, removeOptedOutPosts, syncEditedPosts } from "@/lib/telegram/channel";
+import { closeFinishedPosts, postDueRequests, removeOptedOutPosts, restoreReopenedPosts, syncEditedPosts } from "@/lib/telegram/channel";
 import { logServer } from "@/lib/telemetry/log";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -47,6 +47,7 @@ export const POST = async (request: Request) => {
   const removal = await step("remove_posts", () => removeOptedOutPosts(now));
   const edited = await step("edit_posts", () => syncEditedPosts(now));
   const closed = await step("close", () => closeFinishedPosts(now));
+  const reopened = await step("reopen_posts", () => restoreReopenedPosts(now));
   await step("prune_telegram", () => pruneTelegram(now));
   // Раз на добу: знімки реквізитів видалених акаунтів, у яких минув строк зберігання (lib/account/deletion.ts).
   const purged = isRetentionWindow(now) ? await step("purge_requisites", () => purgeExpiredRequisites(now)) : null;
@@ -61,5 +62,5 @@ export const POST = async (request: Request) => {
     chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
   };
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, sweep, purged, pruned }, { status: sweepFailed ? 500 : 200 });
 };

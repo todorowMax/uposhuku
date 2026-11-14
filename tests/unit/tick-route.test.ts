@@ -11,7 +11,7 @@ const { calls, fail, run } = vi.hoisted(() => {
   return { calls, fail, run };
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
-vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", { removed: 3, withdrawn: 2 }) }));
+vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), restoreReopenedPosts: run("reopen_posts", 4), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", { removed: 3, withdrawn: 2 }) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
 vi.mock("@/lib/server/tick-cleanup", () => ({
   pruneSessions: run("prune_sessions", 3),
@@ -65,6 +65,15 @@ describe("/api/internal/tick", () => {
     calls.length = 0;
     expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["remove_posts"], removed: null, withdrawn: null });
     expect(calls).toEqual(expect.arrayContaining(["edit_posts", "close", "prune_telegram"]));
+  });
+
+  it("відновлені пости повертаються після закриття; відповідь має reopened, збій кроку не скасовує решту", async () => {
+    expect(await (await tick()).json()).toMatchObject({ ok: true, reopened: 4 });
+    expect(calls.indexOf("close")).toBeLessThan(calls.indexOf("reopen_posts"));
+    fail.step = "reopen_posts";
+    calls.length = 0;
+    expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["reopen_posts"], reopened: null });
+    expect(calls).toEqual(expect.arrayContaining(["prune_telegram", "prune_db"]));
   });
 
   it("збій звірки дає 500, але решта кроків виконана", async () => {

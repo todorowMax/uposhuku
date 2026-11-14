@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { channelPosts } from "@/db/schema";
 import { POST as tick } from "@/app/api/internal/tick/route";
 import { GET as channelStatus } from "@/app/api/channel/route";
-import { POSTS_PER_RUN, POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, syncEditedPosts, type ChannelRequest } from "@/lib/telegram/channel";
+import { POSTS_PER_RUN, POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, restoreReopenedPosts, syncEditedPosts, type ChannelRequest } from "@/lib/telegram/channel";
 import { telegramConfig } from "@/lib/telegram/config";
 import { getDb } from "@/lib/server/db";
 import { makeUser, useTestD1 } from "../helpers/d1";
@@ -232,6 +232,122 @@ describe("оновлення постів після правки", () => {
     const before = edits().length;
     expect(await syncEditedPosts(NOW + 8 * MIN)).toBe(0);
     expect(edits()).toHaveLength(before);
+  });
+});
+
+describe("повернення постів відновлених запитів", () => {
+  const edits = () => calls.filter((call) => call.method === "editMessageText");
+  const close = (id: string) => ctx.db.prepare("update requests set status = 'closed' where id = ?").bind(id).run();
+  const reopen = (id: string) => ctx.db.prepare("update requests set status = 'open' where id = ?").bind(id).run();
+  const insertPost = (id: string, state: string, over: { error?: string | null; messageId?: number | null } = {}) =>
+    ctx.db
+      .prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at, error) values (?, '-100123', ?, ?, ?, ?, ?)")
+      .bind(id, over.messageId === undefined ? 42 : over.messageId, state, NOW, NOW, over.error ?? null)
+      .run();
+  const errorOf = async (id: string) => (await getDb().select().from(channelPosts)).find((row) => row.requestId === id)?.error;
+
+  it("закритий і знову відкритий запит: пост «Виконавця знайдено» повертається до тексту з кнопкою, статус posted, удруге нічого", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await close("r");
+    await closeFinishedPosts(NOW);
+    expect(await status("r")).toBe("closed");
+    expect(await restoreReopenedPosts(NOW + MIN)).toBe(0);
+    await reopen("r");
+    expect(await restoreReopenedPosts(NOW + 2 * MIN)).toBe(1);
+    expect(edits()).toHaveLength(2);
+    const back = edits()[1].body;
+    expect(back).toMatchObject({ chat_id: "-100123", message_id: 42 });
+    expect(String(back.text)).not.toContain("Виконавця знайдено");
+    expect(String(back.text)).toContain("Telegram-бот");
+    expect(JSON.stringify(back.reply_markup)).toContain("utm_medium=channel");
+    expect(await status("r")).toBe("posted");
+    expect(await restoreReopenedPosts(NOW + 3 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(2);
+  });
+
+  it("помилка колишньої правки не заважає: успішне «Виконавця знайдено» її стирає, і пост після відновлення повертається", async () => {
+    await addRequest("r");
+    await insertPost("r", "posted", { error: "Bad Request: message is not modified" });
+    await close("r");
+    expect(await closeFinishedPosts(NOW)).toBe(1);
+    expect(await errorOf("r")).toBeNull();
+    await reopen("r");
+    expect(await restoreReopenedPosts(NOW + MIN)).toBe(1);
+    expect(await status("r")).toBe("posted");
+  });
+
+  it("закрито, але тік ще не встиг відредагувати пост: нічого зайвого, пост лишається звичайним", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await close("r");
+    await reopen("r");
+    expect(await closeFinishedPosts(NOW + MIN)).toBe(0);
+    expect(await restoreReopenedPosts(NOW + MIN)).toBe(0);
+    expect(edits()).toHaveLength(0);
+    expect(await status("r")).toBe("posted");
+  });
+
+  it("withdrawn, failed, closed із помилкою, без повідомлення й зі знятою галочкою не чіпаємо", async () => {
+    const cases = [
+      { id: "w", state: "withdrawn", over: {} },
+      { id: "f", state: "failed", over: { messageId: null } },
+      { id: "ce", state: "closed", over: { error: "Bad Request: message to edit not found" } },
+      { id: "nm", state: "closed", over: { messageId: null } },
+    ];
+    for (const { id, state, over } of cases) {
+      await addRequest(id, { user: "b" });
+      await insertPost(id, state, over);
+    }
+    await addRequest("optout", { user: "c", optIn: false });
+    await insertPost("optout", "closed");
+    expect(await restoreReopenedPosts(NOW)).toBe(0);
+    expect(edits()).toHaveLength(0);
+    expect(await status("w")).toBe("withdrawn");
+    expect(await status("optout")).toBe("closed");
+  });
+
+  it(`не більше ${POSTS_PER_RUN} постів за запуск; решта в наступному`, async () => {
+    for (let index = 0; index < POSTS_PER_RUN + 2; index++) {
+      await addRequest(`p${index}`, { user: ["a", "b", "c"][index % 3] });
+      await insertPost(`p${index}`, "closed", { messageId: 100 + index });
+    }
+    expect(await restoreReopenedPosts(NOW)).toBe(POSTS_PER_RUN);
+    expect(await restoreReopenedPosts(NOW + MIN)).toBe(2);
+    expect(edits()).toHaveLength(POSTS_PER_RUN + 2);
+  });
+
+  it("відмова Telegram (400): рядок позначається помилкою без повтору; тимчасова помилка повторюється; 429 зупиняє крок; без токена нічого", async () => {
+    await addRequest("r");
+    await insertPost("r", "closed");
+    respond = () => Response.json({ ok: false, error_code: 400, description: "Bad Request: message to edit not found" });
+    expect(await restoreReopenedPosts(NOW)).toBe(0);
+    expect(await status("r")).toBe("closed");
+    expect(await errorOf("r")).toContain("message to edit not found");
+    expect(await restoreReopenedPosts(NOW + MIN)).toBe(0);
+    expect(edits()).toHaveLength(1);
+
+    await addRequest("t", { user: "b" });
+    await insertPost("t", "closed", { messageId: 43 });
+    await addRequest("t2", { user: "c" });
+    await insertPost("t2", "closed", { messageId: 45 });
+    respond = () => Response.json({ ok: false, error_code: 502, description: "Bad Gateway" });
+    expect(await restoreReopenedPosts(NOW + 2 * MIN)).toBe(0);
+    expect(await errorOf("t")).toBeNull();
+    respond = () => Response.json({ ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 30 } });
+    const before = edits().length;
+    expect(await restoreReopenedPosts(NOW + 3 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(before + 1);
+    respond = () => Response.json({ ok: true, result: { message_id: 43 } });
+    expect(await restoreReopenedPosts(NOW + 4 * MIN)).toBe(2);
+    expect(await status("t")).toBe("posted");
+
+    await addRequest("u", { user: "c" });
+    await insertPost("u", "closed", { messageId: 44 });
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const sentBefore = edits().length;
+    expect(await restoreReopenedPosts(NOW + 5 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(sentBefore);
   });
 });
 

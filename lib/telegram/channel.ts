@@ -9,8 +9,10 @@
 // повторне ввімкнення галочки ставить запит у звичайну чергу публікації. Видалити можна лише повідомлення молодше 48 годин (Bot API),
 // тому старіший пост (або той, що Telegram не дає видалити) редагується в «Автор прибрав цей запит», рядок лишається зі статусом
 // `withdrawn` і більше не чіпається, а повторна публікація для нього не відбувається.
+// Автор може відновити закритий запит протягом доби: тоді наш пост «Виконавця знайдено» (статус `closed` без помилки) повертається
+// до звичайного вигляду з кнопкою й статусом `posted`; `withdrawn`, `failed` і `closed` з помилкою (пост прибрано чи недоступний) не чіпаються.
 
-import { and, asc, eq, gt, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, sql } from "drizzle-orm";
 import { channelPosts, requestTags, requests } from "@/db/schema";
 import { stripContacts } from "@/lib/chat/contacts";
 import { CITIES } from "@/lib/map/cities";
@@ -284,7 +286,8 @@ export const closeFinishedPosts = async (now = Date.now(), config = telegramConf
     const source = rows.find((item) => item.id === row.id)!;
     try {
       if (source.messageId !== null) await editMessageText(source.chatId, source.messageId, formatChannelPost(row, { closed: true }).html);
-      await db.update(channelPosts).set({ status: "closed", updatedAt: now }).where(eq(channelPosts.requestId, row.id));
+      // error: null, щоб помилка колишньої правки не заважала відрізнити наш «Виконавця знайдено» від збою (див. restoreReopenedPosts).
+      await db.update(channelPosts).set({ status: "closed", updatedAt: now, error: null }).where(eq(channelPosts.requestId, row.id));
       closed++;
     } catch (error) {
       // «Повідомлення не змінилось» і «повідомлення видалили»: закриваємо запис, щоб не повторювати.
@@ -295,4 +298,50 @@ export const closeFinishedPosts = async (now = Date.now(), config = telegramConf
     }
   }
   return closed;
+};
+
+/** Наші пости «Виконавця знайдено» (статус `closed`, без помилки, повідомлення є), чий запит автор знову відкрив і дозволив для каналу. */
+export const reopenedPosts = async (limit = POSTS_PER_RUN): Promise<(ChannelRequest & { chatId: string; messageId: number })[]> => {
+  const rows = await getDb()
+    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .from(channelPosts)
+    .innerJoin(requests, eq(requests.id, channelPosts.requestId))
+    .where(and(eq(channelPosts.status, "closed"), isNull(channelPosts.error), eq(requests.status, "open"), eq(requests.channelOptIn, true), isNotNull(channelPosts.messageId)))
+    .orderBy(asc(channelPosts.updatedAt))
+    .limit(limit);
+  const tagged = await withTags(rows);
+  return tagged.map((row, index) => ({ ...row, chatId: rows[index].chatId, messageId: rows[index].messageId as number }));
+};
+
+type RestoreOutcome = "restored" | "skipped" | "stop";
+
+/** Один пост: звичайний текст із кнопкою й статус `posted`. Відмова Telegram записується в рядок, тимчасова помилка лише в журнал. */
+const restoreOne = async (row: ChannelRequest & { chatId: string; messageId: number }, now: number, config: TelegramConfig): Promise<RestoreOutcome> => {
+  const { html, button } = formatChannelPost(row);
+  try {
+    await editMessageText(row.chatId, row.messageId, html, { keyboard: keyboard(config, button) });
+  } catch (error) {
+    if (error instanceof TelegramError && error.code === 429) return "stop";
+    if (refused(error)) await saveError({ requestId: row.id, now, event: "channel_reopen_refused", error });
+    else logServer({ level: "error", event: "channel_reopen_failed", message: error instanceof Error ? error.message : String(error), detail: { requestId: row.id } });
+    return "skipped";
+  }
+  await getDb().update(channelPosts).set({ status: "posted", updatedAt: now, error: null }).where(eq(channelPosts.requestId, row.id));
+  return "restored";
+};
+
+/**
+ * Повертає до звичайного вигляду пости відновлених запитів: текст із кнопкою, статус `posted`. Без токена чи каналу нічого не робить.
+ * Відмова Telegram (400, 403: повідомлення прибрали, немає права) іде в журнал без тексту запиту й записується в рядок, тож пост
+ * більше не береться; тимчасова помилка (мережа, 5xx) лише в журнал і повторюється в наступному запуску; 429 зупиняє крок.
+ */
+export const restoreReopenedPosts = async (now = Date.now(), config = telegramConfig()): Promise<number> => {
+  if (!channelReady(config)) return 0;
+  let reopened = 0;
+  for (const row of await reopenedPosts()) {
+    const outcome = await restoreOne(row, now, config);
+    if (outcome === "stop") break;
+    if (outcome === "restored") reopened++;
+  }
+  return reopened;
 };
