@@ -14,6 +14,7 @@ import { canAttachReceipt, checkCriteria, withDelivery, withReceipt } from "@/li
 import { newId } from "@/lib/ids";
 import { addMessage, findChatAttachment } from "./chat-repo";
 import { getDb } from "./db";
+import { accrueFees, feeTermsFor } from "./fee-repo";
 import { snapshotDealRequisites } from "./requisites-repo";
 
 /** Відповідь на спробу укласти угоду із самим собою. */
@@ -40,7 +41,9 @@ const stampAfter = (row: { updatedAt: number }, now: number) => Math.max(now, ro
 
 /**
  * Записує угоду лише якщо рядок не змінювали з моменту читання (`updated_at` той самий). false означає
- * конфлікт: перезапису не було. Усі записи угод ідуть цим шляхом.
+ * конфлікт: перезапису не було. Усі записи змінених угод ідуть цим шляхом (mutateDeal, дії замовника,
+ * виконавця й модератора, ескроу-синхронізація, вебхук і sweep безпечної угоди), тож комісію за фактом
+ * нараховуємо тут один раз для всіх (accrueFees: ідемпотентно, збій не ламає запис).
  */
 const writeGuarded = async (row: typeof deals.$inferSelect, deal: Deal, now: number): Promise<boolean> => {
   const written = await getDb()
@@ -48,7 +51,9 @@ const writeGuarded = async (row: typeof deals.$inferSelect, deal: Deal, now: num
     .set({ status: deal.status, data: JSON.stringify(deal), updatedAt: stampAfter(row, now) })
     .where(and(eq(deals.id, row.id), eq(deals.updatedAt, row.updatedAt)))
     .returning({ id: deals.id });
-  return written.length > 0;
+  if (written.length === 0) return false;
+  await accrueFees({ before: parse(row), after: deal, ownerUserId: row.ownerUserId, now });
+  return true;
 };
 
 const readRow = async (id: string): Promise<typeof deals.$inferSelect | null> => (await getDb().select().from(deals).where(eq(deals.id, id)).limit(1))[0] ?? null;
@@ -90,7 +95,9 @@ export const proposeDeal = async (userId: string, draft: DealDraft, options: { s
   const existing = await readAll(userId);
   // На один відгук одна жива угода: нову можна після відмови чи скасування.
   if (existing.some((deal) => deal.responseId === draft.responseId && deal.status !== "declined" && deal.status !== "cancelled")) return "З цим виконавцем уже є угода.";
-  const deal = createDeal(newId("deal"), { ...draft, criteria: criteria.value }, now);
+  const created = createDeal(newId("deal"), { ...draft, criteria: criteria.value }, now);
+  const fee = await feeTermsFor(userId, draft.method);
+  const deal = fee ? { ...created, fee } : created;
   await getDb().insert(deals).values({
     id: deal.id,
     ownerUserId: userId,
@@ -235,7 +242,9 @@ export const proposeDirectDeal = async (
   if (error) return error;
   const live = (await readAll(conversation.customerUserId)).filter((deal) => deal.conversationId === conversation.id && (deal.status === "proposed" || deal.status === "accepted"));
   if (live.length >= MAX_LIVE_DIRECT) return `У розмові вже ${MAX_LIVE_DIRECT} відкритих замовлень: завершіть одне, щоб додати нове.`;
-  const deal = createDeal(newId("deal"), full, now);
+  const created = createDeal(newId("deal"), full, now);
+  const fee = await feeTermsFor(conversation.customerUserId, draft.method);
+  const deal = fee ? { ...created, fee } : created;
   await getDb().insert(deals).values({
     id: deal.id,
     ownerUserId: conversation.customerUserId,
