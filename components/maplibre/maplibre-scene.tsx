@@ -18,6 +18,7 @@ import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { RequestMapCard } from "@/components/requests/request-map-card";
 import { requestsStore } from "@/lib/auth/client";
 import { allPerformersStore, applyRequestFilter, hoveredFeedRequestStore, mapModeStore, mapRequestsStore, mapSelectedRequest, requestFilterStore } from "@/lib/feed/map-requests";
+import { useProposeWork } from "@/components/maplibre/use-propose-work";
 import { requestPoint } from "@/lib/feed/request-point";
 import type { MapRequest } from "@/lib/feed/types";
 import { DEADLINES, type PublishedRequest } from "@/lib/requests/types";
@@ -1737,6 +1738,9 @@ export default function MapLibreScene() {
     // Розгорнули опис — картка виросла, і її треба знову вмістити в екран.
     const observer = new ResizeObserver(place);
     observer.observe(card);
+    // Поле запиту розгорнулося чи згорнулося — верхній край картки зсувається під нього.
+    const stack = document.querySelector("[data-top-stack]");
+    if (stack) observer.observe(stack);
     return () => {
       map.off("move", place);
       map.off("resize", place);
@@ -1837,12 +1841,6 @@ export default function MapLibreScene() {
     const home = homeRef.current;
     flyToRef.current(map, [home.lng, home.lat], home.zoom, 700);
   };
-  // «Запропонувати роботу»: на телефоні картку закриваємо, щоб не лежала під полем запиту; на ширшому екрані вона стоїть поруч.
-  const proposeWork = () => {
-    if (window.innerWidth < 640) setSelectedId(null);
-    else setCardNotice("Опишіть роботу в полі запиту.");
-    document.getElementById("request")?.focus();
-  };
   const focus = useStore(focusPerformerStore);
   useEffect(() => {
     if (!focus || !ready) return;
@@ -1887,6 +1885,7 @@ export default function MapLibreScene() {
 
   const selected = mapPeople.find((performer) => performer.id === selectedId);
   const selectedCity = CITIES.find((city) => city.id === selected?.cityId);
+  const proposeWork = useProposeWork(selected, () => setSelectedId(null), setCardNotice);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-bg">

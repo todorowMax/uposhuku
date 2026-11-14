@@ -32,6 +32,7 @@ import * as tagEngine from "@/lib/tags/engine";
 import { EVENTS, track } from "@/lib/telemetry/track";
 import { trackTagAdded, trackTagRemoved, type TagAddSource } from "@/lib/telemetry/tag-events";
 import { proposeTag } from "@/lib/tags/proposals-client";
+import { useProposeTarget } from "./use-propose-target";
 
 /** Скільки файлів можна прикріпити до запиту. */
 const MAX_FILES = 10;
@@ -120,6 +121,11 @@ export function RequestComposer() {
       }, 680);
     }, inputPhase === "closed" ? 240 : 0);
   };
+
+  const proposeLabel = useProposeTarget(inputPhase, () => {
+    openInput();
+    inputRef.current?.focus();
+  });
 
   const closeInput = () => {
     if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "" || files.length > 0) return;
@@ -429,7 +435,7 @@ export function RequestComposer() {
         )}
 
         <label htmlFor="request" className="sr-only">
-          Що потрібно створити?
+          {proposeLabel ?? "Що потрібно створити?"}
         </label>
         <div className="composer-field">
           {/* Копія тексту під полем: підкреслює слова, з яких узяті теги. */}
@@ -447,7 +453,7 @@ export function RequestComposer() {
               if (mirrorRef.current) mirrorRef.current.scrollTop = event.currentTarget.scrollTop;
             }}
             rows={1}
-            placeholder="Що потрібно створити?"
+            placeholder={proposeLabel ?? "Що потрібно створити?"}
             className="composer-input relative resize-none bg-transparent text-base leading-6 text-ink outline-none placeholder:text-ink-muted/80"
           />
         </div>

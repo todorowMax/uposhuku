@@ -12,6 +12,7 @@ import { afterLayerHistory } from "@/lib/ui/use-layer-history";
 import { offersMapStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
 import { usePhotoStaging } from "./use-photo-staging";
+import { useProposeIntent } from "./use-propose-intent";
 import { useThreadDeals } from "./use-thread-deals";
 
 /** Шторки над чатом: вибір угоди з кількох і меню «+». */
@@ -63,6 +64,8 @@ export const useThread = (conversation: ConversationDto) => {
     if (only) return setScreen({ kind: "deal", id: only.id });
     setScreen(response ? { kind: "composer" } : { kind: "terms" });
   };
+
+  useProposeIntent(conversation.performerId, dealState.ready, openDeals);
 
   const canSend = (draft.trim().length > 0 || staging.ready.length > 0) && !staging.uploading;
 
