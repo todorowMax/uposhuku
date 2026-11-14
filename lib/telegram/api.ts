@@ -8,7 +8,7 @@
 // тексту й відповіді Telegram.
 
 import { telegramConfig } from "./config";
-import type { InlineKeyboard } from "./types";
+import type { InlineKeyboard, ReplyMarkup } from "./types";
 
 const API = "https://api.telegram.org";
 const TIMEOUT_MS = 10_000;
@@ -62,7 +62,7 @@ export const callTelegram = async <T>(method: string, params: Record<string, unk
 };
 
 export interface SendOptions extends CallOptions {
-  keyboard?: InlineKeyboard;
+  keyboard?: ReplyMarkup;
   /** Без звуку: для нічних годин. */
   silent?: boolean;
   /** Не розгортати попередній перегляд посилання. */
@@ -84,7 +84,7 @@ export const sendMessage = (chatId: string | number, text: string, options: Send
     options
   );
 
-export const editMessageText = (chatId: string | number, messageId: number, text: string, options: SendOptions = {}) =>
+export const editMessageText = (chatId: string | number, messageId: number, text: string, options: CallOptions & { keyboard?: InlineKeyboard } = {}) =>
   callTelegram("editMessageText", { chat_id: chatId, message_id: messageId, text, parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: options.keyboard ?? { inline_keyboard: [] } }, options);
 
 export const deleteMessage = (chatId: string | number, messageId: number, options: CallOptions = {}) => callTelegram("deleteMessage", { chat_id: chatId, message_id: messageId }, options);

@@ -9,6 +9,9 @@ import { telegramLinkTokens, telegramLinks, telegramUpdates } from "@/db/schema"
 import { sha256Hex } from "@/kit/telemetry/core";
 import { getDb } from "./db";
 
+/** Навіщо токен: звичайна прив'язка (null) або прив'язка перед підтвердженням телефону (бот одразу просить контакт). */
+export type LinkPurpose = "phone" | null;
+
 export const LINK_TOKEN_TTL_MS = 15 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -19,12 +22,12 @@ const newToken = (): string => {
 };
 
 /** Новий токен прив'язки. Попередні невикористані токени людини гаснуть. */
-export const createLinkToken = async (userId: string, now = Date.now()): Promise<{ token: string; expiresAt: number }> => {
+export const createLinkToken = async (userId: string, now = Date.now(), purpose: LinkPurpose = null): Promise<{ token: string; expiresAt: number }> => {
   const db = getDb();
   const token = newToken();
   await db.batch([
     db.delete(telegramLinkTokens).where(and(eq(telegramLinkTokens.userId, userId), isNull(telegramLinkTokens.usedAt))),
-    db.insert(telegramLinkTokens).values({ tokenHash: await sha256Hex(token), userId, expiresAt: now + LINK_TOKEN_TTL_MS }),
+    db.insert(telegramLinkTokens).values({ tokenHash: await sha256Hex(token), userId, expiresAt: now + LINK_TOKEN_TTL_MS, purpose }),
   ]);
   return { token, expiresAt: now + LINK_TOKEN_TTL_MS };
 };
@@ -39,7 +42,7 @@ export interface TelegramChatInfo {
  * `ok: false` без `confirmId`: токен недійсний. З `confirmId`: цей чат уже прив'язаний до іншого акаунта, токен ще не
  * витрачено, а бот має спитати власника чату кнопкою (`confirmRelink` / `cancelRelink`).
  */
-export type LinkResult = { ok: true; userId: string; replacedOtherAccount: boolean } | { ok: false; confirmId?: string };
+export type LinkResult = { ok: true; userId: string; replacedOtherAccount: boolean; purpose: LinkPurpose } | { ok: false; confirmId?: string };
 
 /** Скільки символів хеша токена йде в `callback_data` кнопки (ліміт Telegram 64 байти разом із префіксом дії). */
 const CONFIRM_ID_LENGTH = 40;
@@ -47,7 +50,8 @@ const CONFIRM_ID_LENGTH = 40;
 const findLiveToken = async (where: ReturnType<typeof and>) => (await getDb().select().from(telegramLinkTokens).where(and(where, isNull(telegramLinkTokens.usedAt))).limit(1))[0] ?? null;
 
 /** Забирає чат собі: чужу прив'язку цього чату знімає, власну оновлює. Токен уже витрачено. */
-const bindChat = async (userId: string, chat: TelegramChatInfo, now: number): Promise<LinkResult> => {
+const bindChat = async (owner: { userId: string; purpose: LinkPurpose }, chat: TelegramChatInfo, now: number): Promise<LinkResult> => {
+  const { userId, purpose } = owner;
   const db = getDb();
   const others = await db.select({ userId: telegramLinks.userId }).from(telegramLinks).where(and(eq(telegramLinks.chatId, chat.chatId), ne(telegramLinks.userId, userId)));
   const values = { chatId: chat.chatId, username: chat.username ?? null, firstName: chat.firstName ?? null, active: true, linkedAt: now, blockedAt: null };
@@ -55,7 +59,7 @@ const bindChat = async (userId: string, chat: TelegramChatInfo, now: number): Pr
     db.delete(telegramLinks).where(and(eq(telegramLinks.chatId, chat.chatId), ne(telegramLinks.userId, userId))),
     db.insert(telegramLinks).values({ userId, ...values }).onConflictDoUpdate({ target: telegramLinks.userId, set: values }),
   ]);
-  return { ok: true, userId, replacedOtherAccount: others.length > 0 };
+  return { ok: true, userId, replacedOtherAccount: others.length > 0, purpose };
 };
 
 /** Атомарно «забирає» токен: дві паралельні відповіді не пройдуть обидві. */
@@ -63,9 +67,9 @@ const claimToken = async (hash: string, now: number): Promise<boolean> =>
   (await getDb().update(telegramLinkTokens).set({ usedAt: now }).where(and(eq(telegramLinkTokens.tokenHash, hash), isNull(telegramLinkTokens.usedAt))).returning({ tokenHash: telegramLinkTokens.tokenHash })).length > 0;
 
 /** Якщо прив'язка не вдалася після того, як токен забрали, токен повертається: повторне оновлення Telegram спробує ще раз. */
-const bindClaimed = async (row: { tokenHash: string; userId: string }, chat: TelegramChatInfo, now: number): Promise<LinkResult> => {
+const bindClaimed = async (row: { tokenHash: string; userId: string; purpose: string | null }, chat: TelegramChatInfo, now: number): Promise<LinkResult> => {
   try {
-    return await bindChat(row.userId, chat, now);
+    return await bindChat({ userId: row.userId, purpose: row.purpose === "phone" ? "phone" : null }, chat, now);
   } catch (error) {
     await getDb().update(telegramLinkTokens).set({ usedAt: null }).where(eq(telegramLinkTokens.tokenHash, row.tokenHash));
     throw error;

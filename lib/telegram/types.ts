@@ -22,6 +22,14 @@ export interface TgMessage {
   chat: TgChat;
   date: number;
   text?: string;
+  /** Контакт, надісланий кнопкою `request_contact`. `user_id` Telegram ставить, коли контакт має акаунт. */
+  contact?: TgContact;
+}
+
+export interface TgContact {
+  phone_number: string;
+  first_name?: string;
+  user_id?: number;
 }
 
 export interface TgCallbackQuery {
@@ -55,3 +63,16 @@ export interface InlineButton {
 export interface InlineKeyboard {
   inline_keyboard: InlineButton[][];
 }
+
+/** Клавіатура під полем вводу: кнопка «Поділитися номером» (працює лише в приватному чаті). */
+export interface ReplyKeyboard {
+  keyboard: { text: string; request_contact?: boolean }[][];
+  one_time_keyboard?: boolean;
+  resize_keyboard?: boolean;
+}
+
+export interface ReplyKeyboardRemove {
+  remove_keyboard: true;
+}
+
+export type ReplyMarkup = InlineKeyboard | ReplyKeyboard | ReplyKeyboardRemove;

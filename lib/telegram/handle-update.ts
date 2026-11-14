@@ -8,10 +8,12 @@ import { cancelRelink, confirmRelink, consumeLinkToken, deactivateByChat, linkBy
 import { EVENTS } from "@/lib/telemetry/events";
 import { logServer, serverEvent } from "@/lib/telemetry/log";
 import { pushUser } from "@/lib/server/realtime";
+import { normalizePhone } from "@/lib/phone/format";
+import { bindPhone } from "@/lib/server/phone-repo";
 import { answerCallbackQuery, editMessageText, sendMessage, TelegramError } from "./api";
 import { telegramConfig } from "./config";
 import { TEXTS, escapeHtml } from "./texts";
-import type { InlineKeyboard, TgCallbackQuery, TgChatMemberUpdated, TgMessage, TgUpdate } from "./types";
+import type { InlineKeyboard, ReplyKeyboard, ReplyMarkup, TgCallbackQuery, TgChatMemberUpdated, TgMessage, TgUpdate } from "./types";
 
 const siteKeyboard = (siteUrl: string, label: string = TEXTS.openSite, path = ""): InlineKeyboard => ({ inline_keyboard: [[{ text: label, url: `${siteUrl}${path}` }]] });
 
@@ -21,7 +23,7 @@ export const parseCommand = (text: string): { command: string; arg: string } | n
   return match ? { command: match[1].toLowerCase(), arg: match[2] ?? "" } : null;
 };
 
-const reply = async (chatId: number | string, text: string, keyboard?: InlineKeyboard) => {
+const reply = async (chatId: number | string, text: string, keyboard?: ReplyMarkup) => {
   try {
     await sendMessage(chatId, text, { keyboard });
   } catch (error) {
@@ -38,13 +40,18 @@ const linkedKeyboard = (siteUrl: string): InlineKeyboard => ({
   inline_keyboard: [[{ text: TEXTS.openSettings, url: `${siteUrl}/?open=settings` }, { text: TEXTS.openSite, url: siteUrl }]],
 });
 
+/** Кнопка «Поділитися номером»: одноразова, лише в приватному чаті. Сам контакт приходить окремим повідомленням. */
+export const contactKeyboard = (): ReplyKeyboard => ({ keyboard: [[{ text: TEXTS.phoneButton, request_contact: true }]], one_time_keyboard: true, resize_keyboard: true });
+
 /** Чат прив'язано: відповідь людині, оновлення сторінки на сайті, подія в журнал. */
-const announceLinked = async (result: { userId: string; replacedOtherAccount: boolean }, reply: (text: string, keyboard: InlineKeyboard) => Promise<unknown>) => {
+const announceLinked = async (result: { userId: string; replacedOtherAccount: boolean; purpose: "phone" | null }, chatId: string, say: (text: string, keyboard: InlineKeyboard) => Promise<unknown>) => {
   const config = telegramConfig();
-  await reply(result.replacedOtherAccount ? `${TEXTS.linked}\n\n${TEXTS.linkedReplaced}` : TEXTS.linked, linkedKeyboard(config.siteUrl));
+  await say(result.replacedOtherAccount ? `${TEXTS.linked}\n\n${TEXTS.linkedReplaced}` : TEXTS.linked, linkedKeyboard(config.siteUrl));
   // Сайт оновить стан «Підключити» без перезавантаження.
   pushUser(result.userId, { t: "telegram" });
   serverEvent(EVENTS.telegramLinked, { replaced: result.replacedOtherAccount }, result.userId, "/api/telegram/webhook");
+  // Прив'язка почалась з підтвердження телефону: одразу просимо контакт.
+  if (result.purpose === "phone") await reply(chatId, TEXTS.phoneAsk, contactKeyboard());
 };
 
 const onStart = async (message: TgMessage, arg: string) => {
@@ -66,7 +73,7 @@ const onStart = async (message: TgMessage, arg: string) => {
     await reply(chatId, TEXTS.tokenExpired, siteKeyboard(config.siteUrl));
     return;
   }
-  await announceLinked(result, (text, keyboard) => reply(chatId, text, keyboard));
+  await announceLinked(result, chatId, (text, keyboard) => reply(chatId, text, keyboard));
 };
 
 /** Кнопки підтвердження перепривʼязки. Натиснути їх може лише той, кому бот показав кнопки: у його приватному чаті. */
@@ -96,12 +103,41 @@ const onCallback = async (query: TgCallbackQuery) => {
     await finish(TEXTS.tokenExpired, siteKeyboard(telegramConfig().siteUrl));
     return;
   }
-  await announceLinked(result, (text, keyboard) => finish(text, keyboard));
+  await announceLinked(result, chatId, (text, keyboard) => finish(text, keyboard));
+};
+
+const BIND_TEXT = { taken: TEXTS.phoneTaken, blocked: TEXTS.phoneBlocked, unavailable: TEXTS.phoneFailed } as const;
+
+/**
+ * Контакт з кнопки «Поділитися номером». Приймаємо лише з прив'язаного чату й лише свій: `contact.user_id` має збігатися з
+ * `from.id` (чужий контакт можна переслати чи вибрати вручну). Номер у журнал не пишемо.
+ */
+const onContact = async (message: TgMessage, contact: NonNullable<TgMessage["contact"]>) => {
+  const chatId = String(message.chat.id);
+  const link = await linkByChat(chatId);
+  if (!link) {
+    await reply(chatId, TEXTS.notLinked, siteKeyboard(telegramConfig().siteUrl));
+    return;
+  }
+  const phone = typeof contact.user_id === "number" && contact.user_id === message.from?.id ? normalizePhone(contact.phone_number) : null;
+  if (!phone) {
+    await reply(chatId, TEXTS.phoneNotOwn, contactKeyboard());
+    return;
+  }
+  const result = await bindPhone(link.userId, phone);
+  if (result !== "ok") {
+    await reply(chatId, BIND_TEXT[result], { remove_keyboard: true });
+    return;
+  }
+  await reply(chatId, TEXTS.phoneDone, { remove_keyboard: true });
+  // Сайт оновить шторку й меню без перезавантаження.
+  pushUser(link.userId, { t: "phone" });
 };
 
 const onMessage = async (message: TgMessage) => {
   // Бот для особистих сповіщень: у групах, супергрупах і каналах не відповідаємо.
   if (message.chat.type !== "private") return;
+  if (message.contact) return onContact(message, message.contact);
   const chatId = String(message.chat.id);
   const config = telegramConfig();
   const parsed = message.text ? parseCommand(message.text) : null;

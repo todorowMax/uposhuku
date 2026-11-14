@@ -17,6 +17,8 @@ export type RealtimeEvent =
   /** Співрозмовник набирає повідомлення в розмові. */
   | { t: "typing"; conversationId: string }
   /** Telegram підключено чи відключено: сайт оновлює рядок у налаштуваннях сповіщень. */
-  | { t: "telegram" };
+  | { t: "telegram" }
+  /** Телефон підтверджено через бота: сайт оновлює шторку й меню акаунта. */
+  | { t: "phone" };
 
 export type RealtimeType = RealtimeEvent["t"];
