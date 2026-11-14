@@ -1,8 +1,8 @@
 // components/deals/deal-screen/parts/deal-summary.tsx
 //
-// Сводка угоди: назва, сума, спосіб оплати, чи є дія за мною, опис і критерії готовності.
+// Сводка угоди: сума (назва стоїть у шапці екрана), спосіб оплати, чи є дія за мною, опис і критерії готовності.
 
-import { dealAmount, dealName, METHOD_NAME } from "@/lib/deals/summary";
+import { dealAmount, METHOD_NAME } from "@/lib/deals/summary";
 import type { Deal } from "@/lib/deals/types";
 
 const chipText = (deal: Deal, todo: boolean): string => {
@@ -17,8 +17,7 @@ export const DealSummary = ({ deal, todo }: { deal: Deal; todo: boolean }) => (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <p className="text-base font-semibold text-ink">
-          {dealName(deal)}
-          <span className="ml-2 text-sm font-normal tabular-nums text-ink-muted">{dealAmount(deal)}</span>
+          {dealAmount(deal)}
         </p>
         <p className="mt-0.5 text-xs text-ink-muted">{METHOD_NAME[deal.method]}</p>
       </div>

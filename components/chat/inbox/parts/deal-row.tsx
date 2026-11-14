@@ -22,7 +22,7 @@ const MONEY = new Intl.NumberFormat("uk-UA");
 
 const countText = (count: number, waiting: number): string => `${count} ${count < 5 ? "замовлення" : "замовлень"} · ${waiting > 0 ? `${waiting} чекає` : "усі в роботі"}`;
 
-const SingleDeal = ({ deal, role, onOpen, openRef }: { deal: Deal; role: NextStepTypes.Role; onOpen: () => void; openRef: Ref<HTMLButtonElement> }) => {
+const SingleDeal = ({ deal, role, panelOpen, onOpen, openRef }: { deal: Deal; role: NextStepTypes.Role; panelOpen: boolean; onOpen: () => void; openRef: Ref<HTMLButtonElement> }) => {
   const paymentReturn = useStore(paymentReturnStore);
   const step = nextStepOf(deal, role);
   const stage = currentStage(deal);
@@ -39,7 +39,7 @@ const SingleDeal = ({ deal, role, onOpen, openRef }: { deal: Deal; role: NextSte
         </span>
       </Button>
       {step && (
-        <Button variant="offer" onClick={onOpen} className="shrink-0">
+        <Button variant="offer" onClick={onOpen} className="shrink-0" data-panel-open={panelOpen ? "" : undefined}>
           {step.label}
         </Button>
       )}
@@ -52,6 +52,7 @@ export const DealRow = ({
   deals,
   role,
   response,
+  panelOpen,
   onOpen,
   openRef,
 }: {
@@ -59,6 +60,8 @@ export const DealRow = ({
   deals: Deal[];
   role: NextStepTypes.Role;
   response: OfferResponse | undefined;
+  /** Панель угоди відкрита: від 768 px її кнопка кроку стоїть унизу панелі, тут її не дублюємо. */
+  panelOpen: boolean;
   onOpen: () => void;
   /** Кнопка рядка: на неї повертається фокус, коли закрито екран, відкритий зі шторки. */
   openRef: Ref<HTMLButtonElement>;
@@ -71,7 +74,7 @@ export const DealRow = ({
       </div>
     );
   }
-  if (deals.length === 1) return <SingleDeal deal={deals[0]} role={role} onOpen={onOpen} openRef={openRef} />;
+  if (deals.length === 1) return <SingleDeal deal={deals[0]} role={role} panelOpen={panelOpen} onOpen={onOpen} openRef={openRef} />;
   if (deals.length > 1) {
     const waiting = deals.filter((deal) => needsMe(deal, role)).length;
     return (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bumpPanels, panelCountStore, screenDock } from "@/lib/ui/chat-window";
+import { bumpPanels, holdInert, panelCountStore, screenDock } from "@/lib/ui/chat-window";
 
 const base = { desktop: "panel", wide: true, roomy: true, chatOpen: true } as const;
 
@@ -30,5 +30,26 @@ describe("панель угоди й чат", () => {
     bumpPanels(-1);
     expect(panelCountStore.get()).toBe(1);
     bumpPanels(-1);
+  });
+
+  it("чат під панелею, що лягла на нього, inert, поки її не відпустили", () => {
+    const attrs = new Set<string>();
+    const chat = { setAttribute: (name: string) => void attrs.add(name), removeAttribute: (name: string) => void attrs.delete(name) };
+    const release = holdInert(chat);
+    expect(attrs.has("inert")).toBe(true);
+    release();
+    expect(attrs.has("inert")).toBe(false);
+  });
+
+  it("чат оживає, коли відпустили всі панелі (угода, потім оплата), і повторне відпускання нічого не ламає", () => {
+    const attrs = new Set<string>();
+    const chat = { setAttribute: (name: string) => void attrs.add(name), removeAttribute: (name: string) => void attrs.delete(name) };
+    const releaseDeal = holdInert(chat);
+    const releasePay = holdInert(chat);
+    releasePay();
+    releasePay();
+    expect(attrs.has("inert")).toBe(true);
+    releaseDeal();
+    expect(attrs.has("inert")).toBe(false);
   });
 });

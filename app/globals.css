@@ -36,6 +36,10 @@
   --mask-solid: #000;
   --chat-width: 420px;
   --chat-height: min(640px, calc(100dvh - 32px));
+  /* Відступ знизу, над яким стоять чат і панель угоди, поки панель відкрита: нижній край `.bottom-controls` (24px) + її висота (62px) + зазор (12px). */
+  --dock-lift: calc(24px + 62px + 12px);
+  /* Верхня смуга карти (`data-top-stack`: пошук і фільтри) лишається видимою над піднятими вікнами, поки на екрані вистачає висоти. */
+  --dock-top: 126px;
   /* Плаваюче вікно (чат, екран-панель): заокруглення й тінь у одному місці, щоб панель угоди й чат складались в одне вікно. */
   --radius-window: 24px;
   --shadow-window: 0 24px 60px -12px rgb(16 45 55 / 28%);
@@ -5916,6 +5920,26 @@ html[data-map-ready] .map-skeleton {
 */
 @media (min-width: 768px) {
   body:has(.ui-screen[data-desktop="panel"]:not([data-state="closed"])) .inbox-expand {
+    display: none;
+  }
+
+  /*
+    Поки панель угоди стоїть біля чату (стикована чи лягла на нього), обидва вікна підняті над нижньою панеллю
+    (`.bottom-controls`: профіль, «Про сервіс», перемикач) на --dock-lift, а висота вужчає на стільки ж. Селектор
+    тримає й панель, що закривається (data-state="closed"): чат опускається, коли вона зникла. Без руху: вікна
+    просто стають на місце, поки панель з'являється.
+  */
+  body:has(.ui-screen[data-desktop="panel"][data-chat="open"]) {
+    --chat-height: min(640px, calc(100dvh - var(--dock-lift) - 16px), max(calc(100dvh - var(--dock-lift) - var(--dock-top)), 420px));
+  }
+
+  body:has(.ui-screen[data-desktop="panel"][data-chat="open"]) .inbox-panel,
+  .ui-screen[data-desktop="panel"][data-chat="open"] {
+    bottom: var(--dock-lift);
+  }
+
+  /* Кнопка кроку в рядку угоди (чат): поки панель угоди відкрита, та сама кнопка стоїть унизу панелі. */
+  .offer-primary[data-panel-open] {
     display: none;
   }
 }

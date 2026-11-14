@@ -41,3 +41,26 @@ export const screenDock = ({ desktop, wide, roomy, chatOpen }: ChatWindowTypes.I
 export const bumpPanels = (delta: 1 | -1): void => {
   panelCountStore.set(Math.max(0, panelCountStore.get() + delta));
 };
+
+/** Елемент, якому можна ставити й знімати `inert` (у тесті достатньо двох методів). */
+export type InertTarget = { setAttribute: (name: string, value: string) => void; removeAttribute: (name: string) => void };
+
+const inertHolders = new WeakMap<object, number>();
+
+/**
+ * Панель, що лягла на чат (`overlay`), модальна: чат під нею стає `inert`, і Tab та скрінрідер туди не йдуть.
+ * Кілька панелей поспіль (угода, потім оплата) тримають його разом: чат оживає, коли відпустили всі.
+ * Повертає функцію «відпустити».
+ */
+export const holdInert = (target: InertTarget): (() => void) => {
+  inertHolders.set(target, (inertHolders.get(target) ?? 0) + 1);
+  target.setAttribute("inert", "");
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const left = Math.max(0, (inertHolders.get(target) ?? 1) - 1);
+    inertHolders.set(target, left);
+    if (left === 0) target.removeAttribute("inert");
+  };
+};

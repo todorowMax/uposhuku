@@ -27,7 +27,7 @@ import { ArrowLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useStore } from "@/lib/store";
-import { bumpPanels, chatOpenStore, DOCK_QUERY, screenDock } from "@/lib/ui/chat-window";
+import { bumpPanels, CHAT_SELECTOR, chatOpenStore, DOCK_QUERY, holdInert, screenDock } from "@/lib/ui/chat-window";
 import { useDockTabFlow } from "@/lib/ui/use-dock-tab-flow";
 import { useFocusIntoView } from "@/lib/ui/use-focus-into-view";
 import { useKeepFocus } from "@/lib/ui/use-keep-focus";
@@ -80,6 +80,13 @@ const Screen = ({ open, onOpenChange, title, description, desktop = "dialog", wi
     bumpPanels(1);
     return () => bumpPanels(-1);
   }, [counted]);
+  // Панель, що лягла на чат, модальна: чат під нею inert (Tab і скрінрідер туди не йдуть), поки вона відкрита.
+  const covering = open && dock === "overlay";
+  React.useEffect(() => {
+    if (!covering) return;
+    const chat = document.querySelector<HTMLElement>(CHAT_SELECTOR);
+    return chat ? holdInert(chat) : undefined;
+  }, [covering]);
   // Панель поруч із чатом (або сама) не блокує сторінку: чат лишається робочим. Екран, вікно й панель, що лягла
   // на чат, модальні: інакше Tab ішов би в чат під нею.
   const modal = dock === "full" || dock === "overlay";
