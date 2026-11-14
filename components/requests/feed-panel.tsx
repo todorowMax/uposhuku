@@ -33,6 +33,8 @@ const plural = (count: number, one: string, few: string, many: string) => {
   return many;
 };
 
+const EDITED_AT = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
 const daysLabel = (days: number) => `${days} ${plural(days, "день", "дні", "днів")}`;
 const priceLabel = (price: number | null) => (price === null ? "Ціна після обговорення" : `${PRICE.format(price)} ₴`);
 
@@ -280,7 +282,14 @@ export function FeedCard({
           <MapPin className="size-3" />
           {item.place}
         </span>
-        <time dateTime={item.createdAt}>{ago(item.createdAt)}</time>
+        <span className="inline-flex items-center gap-1.5">
+          {item.editedAt && (
+            <time dateTime={item.editedAt} title={`Змінено ${EDITED_AT.format(new Date(item.editedAt))}`} className="rounded-full border border-line px-1.5 py-px font-medium text-ink-muted">
+              Змінено
+            </time>
+          )}
+          <time dateTime={item.createdAt}>{ago(item.createdAt)}</time>
+        </span>
       </div>
 
       <p className={`mt-2 text-[14px] leading-snug text-ink ${more ? "" : "line-clamp-4"}`}>{item.text}</p>

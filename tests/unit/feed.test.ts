@@ -4,7 +4,7 @@ import { responsesFor } from "@/lib/requests/responses";
 import { emptyProfile } from "@/lib/profile/types";
 import { addPayment } from "@/lib/server/placement-repo";
 import { saveProfile } from "@/lib/server/profile-repo";
-import { createRequest } from "@/lib/server/request-repo";
+import { createRequest, updateRequest } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
@@ -157,5 +157,23 @@ describe("запити на карті", () => {
     expect(items.find((item) => item.id === request.id)).toMatchObject({ matchedTags: 2, response: { price: 1000 }, responses: 1 });
     expect((await mapRequests("cust-b", [])).find((item) => item.id === request.id)).toMatchObject({ own: true, place: "Київ" });
     expect((await mapRequests("perf-b", [])).some((item) => item.own)).toBe(false);
+  });
+});
+
+describe("позначка «Змінено»", () => {
+  it("editedAt є у стрічці й на карті лише в зміненого запиту, у нетронутого null", async () => {
+    const touched = await createRequest("cust-a", { ...bot, text: "Бот, який згодом поправлять" });
+    const untouched = await createRequest("cust-a", { ...bot, text: "Бот, який не чіпають" });
+    expect((await feedFor("perf-a", ["telegram-bot"])).find((item) => item.id === touched.id)?.editedAt).toBeNull();
+    const started = Date.now();
+    await updateRequest("cust-a", touched.id, { ...bot, text: "Бот, який уже поправили" });
+    const edited = (await feedFor("perf-a", ["telegram-bot"])).find((item) => item.id === touched.id)!.editedAt!;
+    expect(Date.parse(edited)).toBeGreaterThanOrEqual(started);
+    const feed = await feedFor("perf-a", ["telegram-bot"]);
+    expect(feed.find((item) => item.id === touched.id)).toMatchObject({ editedAt: edited, text: "Бот, який уже поправили", createdAt: touched.createdAt });
+    expect(feed.find((item) => item.id === untouched.id)?.editedAt).toBeNull();
+    const map = await mapRequests("perf-a", ["telegram-bot"]);
+    expect(map.find((item) => item.id === touched.id)?.editedAt).toBe(edited);
+    expect(map.find((item) => item.id === untouched.id)?.editedAt).toBeNull();
   });
 });

@@ -30,6 +30,8 @@ export interface FeedItem {
   /** Коли потрібен результат: «Терміново, до 3 днів». */
   deadline: string | null;
   createdAt: string;
+  /** ISO-час останньої правки автором; null, якщо запит не змінювали. */
+  editedAt: string | null;
   /** Скільки виконавців уже відгукнулось. */
   responses: number;
   /** Скільки тегів запиту закриває профіль. */

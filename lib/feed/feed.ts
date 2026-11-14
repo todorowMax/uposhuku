@@ -29,6 +29,7 @@ interface Raw {
   budget: string | null;
   deadline: string | null;
   createdAt: string;
+  editedAt: string | null;
   responses: number;
   own: boolean;
 }
@@ -48,6 +49,7 @@ const collect = async (userId: string): Promise<Raw[]> => {
     budget: request.budget ? money(request.budget) : null,
     deadline: request.deadline ? DEADLINES[request.deadline] : null,
     createdAt: request.createdAt,
+    editedAt: request.editedAt,
     responses: counts.get(request.id) ?? 0,
     own,
   });
@@ -64,6 +66,7 @@ const toItem = (userId: string | null, raw: Raw, profileTags: string[], mine: Ma
     budget: raw.budget,
     deadline: raw.deadline,
     createdAt: raw.createdAt,
+    editedAt: raw.editedAt,
     responses: raw.responses,
     matchedTags: matched.size,
     response: userId ? (mine.get(raw.id) ?? null) : null,

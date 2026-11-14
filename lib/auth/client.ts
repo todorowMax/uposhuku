@@ -126,6 +126,9 @@ export const closeMyRequest = async (id: string) =>
     body: JSON.stringify({ status: "closed" }),
   })).request;
 
+export const updateMyRequest = async (id: string, draft: RequestDraft) =>
+  (await call<{ request: PublishedRequest }>(`/api/requests/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(draft) })).request;
+
 /** Перший відкритий запит — його й показуємо на місці поля. */
 const firstOpen = (requests: PublishedRequest[]) => requests.find((request) => request.status === "open")?.id ?? null;
 
@@ -159,6 +162,13 @@ export const closeActiveRequest = async (id: string) => {
   const requests = (requestsStore.get() ?? []).map((item) => (item.id === id ? updated : item));
   requestsStore.set(requests);
   if (activeRequestStore.get() === id) activeRequestStore.set(firstOpen(requests));
+};
+
+/** Правка відкритого запиту: збережена версія стає на місце старої в списку «Мої запити», порядок не змінюється. */
+export const updateActiveRequest = async (id: string, draft: RequestDraft): Promise<PublishedRequest> => {
+  const updated = await updateMyRequest(id, draft);
+  requestsStore.set((requestsStore.get() ?? []).map((item) => (item.id === id ? updated : item)));
+  return updated;
 };
 
 /** Показати мої запити на місці поля: активний або найсвіжіший. */
