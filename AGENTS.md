@@ -95,6 +95,7 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   «могилою» (`deleted_at`, пошта `deleted-<id>@deleted.invalid`), бо на нього ведуть `onDelete: cascade` угод, платежів і відгуків. Видалити не можна, поки є угода
   з грошима в русі чи відкрита скарга; людям з угодами потрібен код з пошти (`lib/server/account-code.ts`). Виписка даних: `GET /api/account/export`. Строк зберігання
   `RETENTION_YEARS = 3` (`lib/account/deletion.ts`), прибирання знімків реквізитів раз на добу в `app/api/internal/tick`. У коді немає `DELETE` по `users`, це перевіряє тест.
+- Відновлення закритого запиту (`requests.closed_at`, `reopenRequest` у `lib/server/request-repo.ts`, `PATCH /api/requests/:id {status:"open"}`): автор може відкрити запит знову лише протягом `RESTORE_WINDOW_MS` (24 год, `lib/requests/types.ts`) від **першого** закриття; повторне закриття `closed_at` не міняє, запит, закритий до міграції 0023 (`closed_at` порожній), не відновлюється. Чужий або відкритий запит: 404, доба минула: 409. Відновлення не шле сповіщень «новий запит під ваші теги» і не пише рядків у розмови, `createdAt` лишається. `restoreUntil` у `PublishedRequest` рахує сервер. У каналі крок tick `reopen_posts` повертає наш пост «Виконавця знайдено» (`closed` без `error`) до звичайного вигляду; `withdrawn`, `failed` і `closed` з помилкою не чіпає.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
