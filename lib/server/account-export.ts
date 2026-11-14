@@ -62,7 +62,7 @@ export const buildAccountExport = async (userId: string, now = Date.now()): Prom
   const [profile, requestsList, responseMap, prefs, requisites, payout] = await Promise.all([getProfile(userId), listRequests(userId), myResponses(userId), getPrefs(userId), ownRequisites(userId), ownPayout(userId)]);
   return {
     exportedAt: new Date(now).toISOString(),
-    account: { id: user.id, email: user.email, name: user.displayName, googleConnected: user.googleId !== null, createdAt: iso(user.createdAt), emailVerifiedAt: iso(user.emailVerifiedAt), lastLoginAt: iso(user.lastLoginAt), signIns: sessionRows.map((row) => ({ via: row.via, at: iso(row.createdAt), expiresAt: iso(row.expiresAt) })) },
+    account: { id: user.id, email: user.email, name: user.displayName, googleConnected: user.googleId !== null, createdAt: iso(user.createdAt), emailVerifiedAt: iso(user.emailVerifiedAt), lastLoginAt: iso(user.lastLoginAt), phone: user.phoneVerifiedAt ? { mask: user.phoneMask, verifiedAt: iso(user.phoneVerifiedAt) } : null, signIns: sessionRows.map((row) => ({ via: row.via, at: iso(row.createdAt), expiresAt: iso(row.expiresAt) })) },
     profile,
     requests: requestsList,
     responses: [...responseMap].map(([requestId, response]) => ({ requestId, ...response })),

@@ -14,6 +14,7 @@ import { notifyLater } from "@/lib/server/notify";
 import { getProfile } from "@/lib/server/profile-repo";
 import { pushUser } from "@/lib/server/realtime";
 import { cryptoGate, legalGate } from "@/lib/server/legal-gate";
+import { phoneGateForRole } from "@/lib/server/phone-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { failure } from "@/lib/server/route";
 import { dealNotice } from "@/lib/telegram/notices";
@@ -38,6 +39,13 @@ const escrowLimit = async (input: { method: DealMethod; user: { id: string; emai
 /** Способ оплати з тіла запиту; невідоме значення означає прямий переказ. */
 const methodOf = (body: Record<string, unknown> | null): DealMethod => (body?.method === "safe" || body?.method === "escrow" ? body.method : "direct");
 
+/** Відмова до створення умов: другу сторону видалено, або замовник ще не підтвердив телефон (виконавця, що виставляє умови, ворота не чіпають). */
+const conversationRefusal = async (input: { conversation: Parameters<typeof otherSideGone>[0]; role: "customer" | "performer"; user: { id: string; email: string } }): Promise<Response | null> => {
+  const { conversation, role, user } = input;
+  if (await otherSideGone(conversation, role)) return problem(409, "Акаунт видалено", OTHER_SIDE_GONE);
+  return phoneGateForRole(role, user);
+};
+
 export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
@@ -47,7 +55,8 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
     const { conversation, role } = access;
-    if (await otherSideGone(conversation, role)) return problem(409, "Акаунт видалено", OTHER_SIDE_GONE);
+    const refusal = await conversationRefusal({ conversation, role, user });
+    if (refusal) return refusal;
     if (!conversation.performerUserId) return problem(400, "Умови не виставлено", "З демо-виконавцем угоду оформити не можна.");
     const body = await readJson(request);
     const method = methodOf(body);

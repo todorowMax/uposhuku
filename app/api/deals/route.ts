@@ -5,6 +5,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { cryptoGate, legalGate } from "@/lib/server/legal-gate";
+import { phoneGate } from "@/lib/server/phone-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { escrowGate } from "@/lib/server/escrow-gate";
 import { performerUserId } from "@/lib/deals/parties";
@@ -52,6 +53,8 @@ export const POST = async (request: Request) => {
   if (limited) return limited;
   const legal = await legalGate(user.id);
   if (legal) return legal;
+  const phone = await phoneGate(user);
+  if (phone) return phone;
   const body = await readJson(request);
   const requestId = text(body?.requestId, 40);
   if (!(await findRequest(user.id, requestId))) return problem(404, "Запит не знайдено");

@@ -9,6 +9,7 @@ import { releaseNeedsCode } from "@/lib/deals/limits";
 import { currentStage } from "@/lib/deals/machine";
 import { getSessionUser } from "@/lib/server/auth";
 import { legalGate, riskGate } from "@/lib/server/legal-gate";
+import { phoneGate } from "@/lib/server/phone-gate";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { verifyReleaseCode } from "@/lib/server/release-code";
 import { settleMessage, settleStage } from "@/lib/server/deal-money";
@@ -116,6 +117,11 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   if (action === "fund" || action === "claim_paid" || action === "accept") {
     const legal = await legalGate(user.id);
     if (legal) return legal;
+  }
+  // Замовник приймає умови угоди, лише підтвердивши телефон.
+  if (action === "accept") {
+    const phone = await phoneGate(user);
+    if (phone) return phone;
   }
   if (action === "claim_paid" && CRYPTO_VIA.some((item) => item === body?.via)) {
     const risk = await riskGate(user.id);

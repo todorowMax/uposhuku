@@ -5,7 +5,9 @@
 // пошта `deleted-<id>@deleted.invalid`, ім'я, аватар, Google-id порожні, `deleted_at` стоїть, вхід закритий.
 //
 // Що з кожною таблицею (таблиця з брифу L3, рішення):
-//   users                      обезличити (рядок лишається)
+//   users                      обезличити (рядок лишається); телефон: `phone_hash` лишається (номер із боргом чи блоком не віддається новому
+//                              акаунту, без боргу хеш знімає той, хто підтверджує номер), `phone_mask` і `phone_verified_at` очищені
+//   phone_blocks               лишити (блок-лист номерів, не акаунтів)
 //   sessions, email_codes, deal_release_codes, wallet_challenges, admin_totp_state, presence,
 //   telegram_links, telegram_link_tokens, notification_preferences, notification_log,
 //   tag_proposal_uses, auth_attempts (за поштою)             видалити
@@ -234,7 +236,7 @@ export const deleteAccount = async (userId: string, now = Date.now()): Promise<D
     db.delete(authAttempts).where(eq(authAttempts.key, `email:${user.email}`)),
     db.delete(sessions).where(eq(sessions.userId, userId)),
     // Останнім: рядок користувача лишається, але без особистого.
-    db.update(users).set({ email: tombstoneEmail(userId), displayName: null, avatarUrl: null, googleId: null, emailVerifiedAt: null, lastLoginAt: null, deletedAt: now }).where(and(eq(users.id, userId), sql`${users.deletedAt} is null`)),
+    db.update(users).set({ email: tombstoneEmail(userId), displayName: null, avatarUrl: null, googleId: null, emailVerifiedAt: null, lastLoginAt: null, phoneMask: null, phoneVerifiedAt: null, deletedAt: now }).where(and(eq(users.id, userId), sql`${users.deletedAt} is null`)),
   ];
   await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
   await cleanOutside(userId, outside);

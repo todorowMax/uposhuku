@@ -7,6 +7,7 @@ import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
 import { createRequest, listRequests } from "@/lib/server/request-repo";
 import { parseDraft } from "@/lib/requests/parse-draft";
+import { phoneGate } from "@/lib/server/phone-gate";
 import { pushGlobal } from "@/lib/server/realtime";
 import { EVENTS } from "@/lib/telemetry/events";
 import { serverEvent } from "@/lib/telemetry/log";
@@ -19,6 +20,8 @@ export async function POST(request: Request) {
   if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
   const limited = await rateLimited("requestCreate", user.id);
   if (limited) return limited;
+  const phone = await phoneGate(user);
+  if (phone) return phone;
   const draft = parseDraft(await readJson(request));
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const created = await createRequest(user.id, draft);
