@@ -4913,6 +4913,10 @@ html[data-map-ready] .map-skeleton {
   color: var(--accent-ink);
 }
 
+/*
+  «+», поле й «Надіслати» мають одну висоту 36px (рядок тексту 22px + відступи 7px): у
+  один рядок вони по центру одне одного, а коли текст виріс, кнопки лишаються внизу.
+*/
 .dm-input-row {
   display: flex;
   align-items: flex-end;
@@ -4931,13 +4935,13 @@ html[data-map-ready] .map-skeleton {
   flex: 1;
   min-width: 0;
   max-height: 140px;
-  padding: 8px 0;
+  padding: 7px 0;
   resize: none;
   border: 0;
   outline: none;
   background: transparent;
   font-size: 16px;
-  line-height: 1.4;
+  line-height: 22px;
   color: var(--ink);
   field-sizing: content;
 }
@@ -6025,8 +6029,8 @@ html:not([data-chrome-ready]) :is([data-top-stack], .bottom-controls, .inbox-but
 .dm-attach {
   display: grid;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 999px;
   color: var(--ink-muted);
