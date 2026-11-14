@@ -32,7 +32,16 @@
         // Канал запитів на dev можна перевіряти з короткою затримкою.
         "CHANNEL_DELAY_MIN": "1",
         // Стеля ескроу-угоди, USDT: тестовий контракт, на dev ліміт 1000.
-        "CRYPTO_MAX_DEAL_USDT": "1000"
+        "CRYPTO_MAX_DEAL_USDT": "1000",
+        // Усі способи оплати ввімкнені на dev для перевірки. На проді вони лишаються вимкненими (див. блок production).
+        // Безпечна угода без MONOBANK_SPLIT_TOKEN і MONOBANK_PLATFORM_RECEIVER_ID дає «Оплата тимчасово недоступна»,
+        // гаманець і ескроу без CRYPTO_CHAIN_ID, CRYPTO_TOKEN_ADDRESS, CRYPTO_RPC_URL (і CRYPTO_FACTORY_ADDRESS) вимкнені самі.
+        "SAFE_DEAL_MODE": "on",
+        "CRYPTO_PROOF_MODE": "on",
+        "CRYPTO_WALLET_MODE": "on",
+        "CRYPTO_ESCROW_MODE": "on",
+        "NBU_QR_MODE": "on",
+        "FOREIGN_LINKS_MODE": "on"
       },
       // Явно, щоб wrangler не попереджав: dev-воркер живе на workers.dev, прев'ю-адреси не потрібні.
       "workers_dev": true,
