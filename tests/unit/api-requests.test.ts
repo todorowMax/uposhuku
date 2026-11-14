@@ -97,7 +97,8 @@ describe("PATCH /api/requests/:id", () => {
 
   it("без чернетки чи з чужим status 400; userId з тіла правку не перехоплює", async () => {
     const own = await openRequest("ar-cust", "Початковий опис запиту");
-    for (const body of ["{bad", {}, { status: "open" }, { status: "deleted" }]) {
+    // {status:"open"} тепер означає «відновити» і для відкритого запиту дає 404 (tests/unit/request-restore.test.ts).
+    for (const body of ["{bad", {}, { status: "deleted" }]) {
       expect((await PATCH(jsonRequest("PATCH", body), ctxOf({ id: own.id }))).status, JSON.stringify(body)).toBe(400);
     }
     expect((await findRequest("ar-cust", own.id))?.text).toBe("Початковий опис запиту");

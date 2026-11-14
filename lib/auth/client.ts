@@ -24,6 +24,11 @@ export const requestsStore = createStore<PublishedRequest[] | null>(null);
 
 /** Запит, що стоїть на місці поля запиту. null — показуємо поле. */
 export const activeRequestStore = createStore<string | null>(null);
+/** Запит, який щойно закрили: його «Відновити» стоїть у панелі, поки автор не перейде до іншого запиту чи не сховає блок. */
+export const justClosedRequestStore = createStore<string | null>(null);
+/** Щойно відновлений запит: фокус іде на його меню, а читач екрана чує «Запит відновлено». Скидається за кілька секунд. */
+export const restoredRequestStore = createStore<string | null>(null);
+let restoredNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 /** Коротке підтвердження після публікації, без постійної великої картки. */
 export const recentlyPublishedRequestStore = createStore<string | null>(null);
@@ -107,6 +112,8 @@ export const logout = async () => {
   sessionStore.set({ status: "guest" });
   requestsStore.set(null);
   activeRequestStore.set(null);
+  justClosedRequestStore.set(null);
+  restoredRequestStore.set(null);
   showRequestsListStore.set(false);
   recentlyPublishedRequestStore.set(null);
   if (publishedNoticeTimer) clearTimeout(publishedNoticeTimer);
@@ -124,6 +131,12 @@ export const closeMyRequest = async (id: string) =>
   (await call<{ request: PublishedRequest }>(`/api/requests/${encodeURIComponent(id)}`, {
     method: "PATCH",
     body: JSON.stringify({ status: "closed" }),
+  })).request;
+
+export const reopenMyRequest = async (id: string) =>
+  (await call<{ request: PublishedRequest }>(`/api/requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: "open" }),
   })).request;
 
 export const updateMyRequest = async (id: string, draft: RequestDraft) =>
@@ -162,6 +175,22 @@ export const closeActiveRequest = async (id: string) => {
   const requests = (requestsStore.get() ?? []).map((item) => (item.id === id ? updated : item));
   requestsStore.set(requests);
   if (activeRequestStore.get() === id) activeRequestStore.set(firstOpen(requests));
+  restoredRequestStore.set(null);
+  justClosedRequestStore.set(id);
+};
+
+/** Відновлений запит стає відкритим на своєму місці списку (порядок за createdAt не міняється) і знову активним. */
+export const reopenActiveRequest = async (id: string) => {
+  const updated = await reopenMyRequest(id);
+  requestsStore.set((requestsStore.get() ?? []).map((item) => (item.id === id ? updated : item)));
+  activeRequestStore.set(id);
+  justClosedRequestStore.set(null);
+  restoredRequestStore.set(id);
+  if (restoredNoticeTimer) clearTimeout(restoredNoticeTimer);
+  restoredNoticeTimer = setTimeout(() => {
+    restoredRequestStore.set(null);
+    restoredNoticeTimer = null;
+  }, 3000);
 };
 
 /** Правка відкритого запиту: збережена версія стає на місце старої в списку «Мої запити», порядок не змінюється. */

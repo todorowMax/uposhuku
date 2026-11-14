@@ -8,7 +8,9 @@ import {
   activeRequestStore,
   closeActiveRequest,
   composingStore,
+  justClosedRequestStore,
   recentlyPublishedRequestStore,
+  restoredRequestStore,
   showRequestsListStore,
 } from "@/lib/auth/client";
 import { useDeals } from "@/lib/deals/client";
@@ -17,8 +19,10 @@ import { setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
 import { Button } from "@/components/ui/button";
 import { ClampedText } from "@/components/ui/clamped-text";
 import { EditRequestScreen } from "@/components/requests/edit-request-screen";
+import { useNow, useRestoreRequest } from "@/components/requests/use-restore-request";
 import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
 import { requestFacts } from "@/lib/requests/format";
+import { canRestore, restoreLeftLabel } from "@/lib/requests/restore";
 import type { PublishedRequest } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
 
@@ -41,6 +45,9 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const deals = useDeals(active.id);
   const phase = dealPhase(deals);
   const closed = active.status === "closed";
+  const restoredId = useStore(restoredRequestStore);
+  const { restoringId, error: restoreError, restore } = useRestoreRequest();
+  const now = useNow();
   const [listOpen, setListOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -51,6 +58,12 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const [otherOfferCounts, setOtherOfferCounts] = useState<Record<string, number>>({});
   const rootRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Запит відновили: кнопка «Відновити» зникла, фокус іде на меню відновленого запиту, а не губиться на body (SEM-7).
+  useEffect(() => {
+    if (restoredId === active.id && !closed) menuButtonRef.current?.focus();
+  }, [restoredId, active.id, closed]);
 
   useEffect(() => {
     if (!showRequestedList) return;
@@ -129,6 +142,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
 
   const selectRequest = (id: string) => {
     activeRequestStore.set(id);
+    justClosedRequestStore.set(null);
     setMapMode("performers");
     setListOpen(false);
     setMenuOpen(false);
@@ -154,9 +168,14 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
     }
   };
 
+  const onRestore = async (id: string) => {
+    if (await restore(id)) setListOpen(false);
+  };
+
   const hasOfferAction = !closed && (offers > 0 || phase !== "none");
+  const restoreLabel = closed ? restoreLeftLabel(active.restoreUntil, now) : null;
   const status = closed
-    ? "Запит закрито"
+    ? restoreLabel === null ? "Запит закрито" : `Запит закрито · ${restoreLabel}`
     : recentlyPublished === active.id
       ? "Запит опубліковано · шукаємо виконавців"
       : phase === "done"
@@ -179,6 +198,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       <div className="request-summary-bar">
         <button
           type="button"
+          id="my-requests-switch"
           className="request-summary-switch"
           onClick={() => { setListOpen((value) => !value); setMenuOpen(false); setDetailsOpen(false); }}
           aria-expanded={listOpen}
@@ -212,9 +232,15 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
         </div>
 
         <div className="request-summary-actions">
+          {closed && canRestore(active, now) && (
+            <Button variant="offer" onClick={() => void onRestore(active.id)} disabled={restoringId === active.id}>
+              Відновити
+            </Button>
+          )}
           {!closed && (
             <div className="relative">
               <button
+                ref={menuButtonRef}
                 type="button"
                 className="request-summary-icon"
                 onClick={() => { setMenuOpen((value) => !value); setListOpen(false); setDetailsOpen(false); }}
@@ -248,7 +274,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
         </div>
       </div>
 
-      {error && <p role="alert" className="auth-error request-summary-error">{error}</p>}
+      {(error ?? restoreError) && <p role="alert" className="auth-error request-summary-error">{error ?? restoreError}</p>}
       <p role="status" className="sr-only">{savedNotice ? "Запит збережено" : ""}</p>
       {editing && !closed && <EditRequestScreen request={active} offers={offers} onClose={() => setEditing(false)} onSaved={() => setSavedNotice(true)} />}
 
@@ -282,18 +308,19 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
           <ul className="request-switcher-list" aria-label="Усі мої запити">
             {ordered.map((request) => {
               const count = request.id === active.id ? offers : otherOfferCounts[request.id];
+              const closedLabel = restoreLeftLabel(request.restoreUntil, now);
               const subline = request.status === "closed"
-                ? "Закритий"
+                ? closedLabel === null ? "Закритий" : `Закрито · ${closedLabel}`
                 : count === undefined
                   ? "Шукаємо виконавців"
                   : count === 0
                     ? "Очікує відгуків"
                     : offerLabel(count);
               return (
-                <li key={request.id}>
+                <li key={request.id} className="flex items-center gap-2">
                   <button
                     type="button"
-                    className="request-switcher-row"
+                    className="request-switcher-row min-w-0 flex-1"
                     data-active={request.id === active.id || undefined}
                     data-closed={request.status === "closed" || undefined}
                     aria-current={request.id === active.id ? "true" : undefined}
@@ -306,6 +333,11 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
                     </span>
                     {count !== undefined && count > 0 && request.status === "open" && <span className="request-switcher-offers">{count}</span>}
                   </button>
+                  {canRestore(request, now) && (
+                    <Button variant="offer" className="shrink-0" onClick={() => void onRestore(request.id)} disabled={restoringId === request.id}>
+                      Відновити
+                    </Button>
+                  )}
                 </li>
               );
             })}

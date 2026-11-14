@@ -21,6 +21,7 @@ import { SpecialistFilters } from "@/components/composer/specialist-filters";
 import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/components/composer/request-params";
 import { AuthPanel } from "@/components/auth/auth-panel";
 import { RequestDock } from "@/components/requests/request-dock";
+import { RestoreNotice } from "@/components/requests/restore-notice";
 import { authFlowStore, requestsStore, sessionStore, showMyRequests } from "@/lib/auth/client";
 import { offersCollapsedStore, useActiveRequest } from "@/lib/requests/offers";
 import { useSidePanelOpen, useSidePanelWide } from "@/lib/requests/side-panel";
@@ -345,6 +346,7 @@ export function RequestComposer() {
         sidePanelOpen ? (sidePanelWide ? "lg:pr-[calc(min(50vw,760px)+36px)]" : "lg:pr-[428px]") : ""
       }`}
     >
+      <RestoreNotice />
       {activeRequest && requests && <RequestDock key={activeRequest.id} requests={requests} active={activeRequest} />}
       <form
         hidden={Boolean(activeRequest)}
