@@ -134,7 +134,11 @@ describe("запити на карті", () => {
     expect(items.length).toBeGreaterThan(3);
     expect(items.every((item) => item.matchedTags === 0 && item.response === null && !item.own)).toBe(true);
     expect(items.some((item) => item.point)).toBe(true);
-    expect(items.some((item) => item.place === "Віддалено" && item.point === null)).toBe(true);
+    // Запит без міста теж на карті: у центрі України, з позначкою remote.
+    const remote = items.filter((item) => item.place === "Віддалено");
+    expect(remote.length).toBeGreaterThan(0);
+    expect(remote.every((item) => item.remote && item.point && Math.hypot(item.point.lat - 48.4, (item.point.lng - 31.2) * 0.65) < 0.8)).toBe(true);
+    expect(items.filter((item) => item.place !== "Віддалено").every((item) => !item.remote)).toBe(true);
   });
 
   it("точка поруч із центром міста й стабільна", async () => {

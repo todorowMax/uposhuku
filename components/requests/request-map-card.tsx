@@ -5,11 +5,10 @@ import { forwardRef } from "react";
 import { X } from "@/components/icons";
 import { FeedCard, type RespondGate } from "@/components/requests/feed-panel";
 import { authFlowStore, sessionStore } from "@/lib/auth/client";
-import { mapRequestsStore, mapSelectedRequest, patchMapRequest, setMapMode } from "@/lib/feed/map-requests";
+import { mapRequestsStore, mapSelectedRequest, patchMapRequest } from "@/lib/feed/map-requests";
 import type { MapRequest } from "@/lib/feed/types";
 import { profileEditorStore } from "@/lib/profile/client";
-import { activeRequestStore, composingStore } from "@/lib/auth/client";
-import { offersCollapsedStore } from "@/lib/requests/offers";
+import { openOwnRequestOffers } from "@/lib/requests/open-own-request";
 import { useStore } from "@/lib/store";
 
 const close = () => mapSelectedRequest.set(null);
@@ -29,13 +28,7 @@ export const RequestMapCard = forwardRef<HTMLElement, { item: MapRequest }>(func
     gate = {
       label: "Відкрити пропозиції",
       note: "Це ваш запит. Відгуки виконавців приходять у правій колонці.",
-      onClick: () => {
-        close();
-        activeRequestStore.set(item.id);
-        composingStore.set(false);
-        setMapMode("performers");
-        offersCollapsedStore.set(false);
-      },
+      onClick: () => openOwnRequestOffers(item.id),
     };
   } else if (!performer) {
     gate =

@@ -5,6 +5,8 @@ import { gsap } from "gsap";
 import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
 import { applyRequestFilter, hoveredFeedRequestStore, mapRequestsStore, requestFilterStore } from "@/lib/feed/map-requests";
+import { Button } from "@/components/ui/button";
+import { OwnRequestRow } from "@/components/requests/own-request-row";
 import { filterTags } from "@/lib/map/filters";
 import { sendResponse, useFeed, withdrawResponse } from "@/lib/feed/client";
 import { RESPONSE_LIMITS, type FeedItem, type MyResponse } from "@/lib/feed/types";
@@ -58,8 +60,7 @@ export function FeedPanel() {
   // Список слухається тих самих чипів, що й карта; без даних карти показуємо все.
   const allowed = mapState.loaded && (filter !== "all" || pickedTags.length > 0) ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter, pickedTags).map((item) => item.id)) : null;
   const items = allowed ? allItems.filter((item) => allowed.has(item.id)) : allItems;
-  const others = mapState.items.filter((item) => !item.own);
-  const noCity = mapState.loaded ? others.filter((item) => !item.point).length : 0;
+  const ownOpen = mapState.items.filter((item) => item.own);
   const panelRef = useRef<HTMLElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
@@ -135,9 +136,7 @@ export function FeedPanel() {
             Запити для вас
             {total > 0 && <span className="filter-all-badge">{total}</span>}
           </h2>
-          <p className="mt-0.5 truncate text-[11px] text-ink-muted">
-            {noCity > 0 ? `На карті ${others.length - noCity} · без міста ${noCity}, їх видно лише тут` : "Усі відкриті, найвідповідніші під ваші теги першими"}
-          </p>
+          <p className="offers-header-note">Усі відкриті, найвідповідніші під ваші теги першими</p>
         </div>
         <button type="button" onClick={() => feedCollapsedStore.set(true)} aria-label="Згорнути запити" className="auth-icon-button -mr-1.5">
           <ChevronsRight className="hidden size-4 lg:block" />
@@ -147,10 +146,13 @@ export function FeedPanel() {
 
       <div ref={bodyRef} className="offers-body offers-list">
         {pending.length > 0 && (
-          <button type="button" onClick={reveal} className="offers-new">
-            +{pending.length} {plural(pending.length, "новий", "нові", "нових")}
-          </button>
+          <Button variant="bare" onClick={reveal} className="offers-new offers-new-fresh">
+            +{pending.length} {plural(pending.length, "новий запит", "нові запити", "нових запитів")}. Показати
+          </Button>
         )}
+        {ownOpen.map((item) => (
+          <OwnRequestRow key={item.id} item={item} />
+        ))}
         {loading && (
           <div className="grid justify-items-center py-10">
             <Loader2 className="size-5 animate-spin text-ink-muted" />

@@ -1883,12 +1883,23 @@ html[data-glass] .offers-panel {
   border-bottom: 1px solid rgb(66 116 132 / 40%);
 }
 
+.offers-header-note {
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
 .offers-body {
   min-height: 0;
 }
 
 .offers-list {
   display: grid;
+  /* Колонка не ширшає за панель, навіть коли в картці довгий рядок: інакше картки виїжджають вправо. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 10px;
   padding: 12px 14px 16px;
@@ -1912,6 +1923,26 @@ html[data-glass] .offers-panel {
   font-weight: 600;
   color: #ffffff;
   box-shadow: 0 8px 20px -8px rgb(48 54 56 / 60%);
+}
+
+/* «+N нових» у стрічці: на всю ширину й теплим кольором, щоб не сприйматися як «запиту немає». */
+.offers-new-fresh {
+  justify-self: stretch;
+  justify-content: center;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--brand-solid);
+  font-size: 13px;
+  box-shadow: 0 10px 24px -10px rgb(207 69 25 / 60%);
+}
+
+.offers-new-fresh:hover {
+  background: var(--brand-solid-hover);
+}
+
+.offers-new-fresh:focus-visible {
+  outline: 3px solid var(--ocean);
+  outline-offset: 2px;
 }
 
 .offers-empty {
@@ -3068,6 +3099,45 @@ html[data-glass] .offers-panel {
   padding: 10px 12px;
   border-radius: 12px;
   background: #f1f6f2;
+}
+
+/* Власний запит нагорі стрічки виконавця. */
+.feed-own {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px rgb(242 105 60 / 35%);
+}
+
+.feed-own-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.feed-own-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.feed-own-text {
+  display: -webkit-box;
+  margin-top: 8px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.feed-own-meta {
+  font-size: 12px;
+  color: var(--ink-muted);
 }
 
 .feed-form {

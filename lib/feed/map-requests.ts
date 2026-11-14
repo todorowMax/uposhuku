@@ -83,8 +83,8 @@ export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter, t
   if (filter === "matched") return items.filter((item) => item.matchedTags > 0 && !item.own);
   if (filter === "urgent") return items.filter((item) => item.deadline === "Терміново, до 3 днів" || item.deadline === "Протягом тижня");
   if (filter === "budget") return items.filter((item) => item.budget);
-  // Без міста: піна на карті немає, такі запити живуть лише в списку.
-  if (filter === "remote") return items.filter((item) => !item.point);
+  // Без міста: пин у центрі України з підписом «Віддалено».
+  if (filter === "remote") return items.filter((item) => item.remote);
   return items;
 };
 

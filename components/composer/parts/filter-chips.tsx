@@ -62,7 +62,7 @@ export const RequestChips = () => {
   const pickedTags = useStore(filterTags);
   // Рахуємо чужі запити, як і список «Запити для вас»: свої там не показуємо.
   const others = items.filter((item) => !item.own);
-  const remote = others.filter((item) => !item.point).length;
+  const remote = others.filter((item) => item.remote).length;
 
   const chip = (id: RequestFilter, label: string) => (
     <Button key={id} variant="bare" aria-pressed={filter === id} onClick={() => requestFilterStore.set(id)} className="filter-chip">
@@ -86,7 +86,7 @@ export const RequestChips = () => {
             feedCollapsedStore.set(false);
           }}
           className="filter-chip"
-          title="Запити без міста: на карті їх немає, вони лише в списку «Запити для вас»"
+          title="Запити без міста: на карті вони стоять у центрі України з підписом «Віддалено»"
         >
           Віддалено
           <span className="filter-chip-count">{remote}</span>

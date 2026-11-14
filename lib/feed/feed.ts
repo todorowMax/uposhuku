@@ -8,6 +8,7 @@ import { DEADLINES } from "@/lib/requests/types";
 import { listOthersOpen, listRequests, myResponses, removeResponse, requestOwner, responseCounts, saveResponse } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { MATCH_THRESHOLD, tagSimilarity } from "@/lib/tags/match";
+import { requestPoint } from "./request-point";
 import { RESPONSE_LIMITS, type FeedItem, type MapRequest, type MyResponse } from "./types";
 
 export { removeResponse, saveResponse };
@@ -81,20 +82,6 @@ export const feedFor = async (userId: string, profileTags: string[]): Promise<Fe
     .sort((a, b) => b.matchedTags - a.matchedTags || b.createdAt.localeCompare(a.createdAt));
 };
 
-/** Точка запиту: у межах міста з невеликим стабільним зсувом, щоб запити одного міста не злипались. */
-const pointOf = (raw: Raw): MapRequest["point"] => {
-  const city = CITIES.find((item) => item.id === raw.cityId);
-  if (!city) return null;
-  let hash = 2166136261;
-  for (let index = 0; index < raw.id.length; index++) {
-    hash ^= raw.id.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
-  const radius = 0.03 + (((hash >>> 9) >>> 0) % 50) / 1000;
-  return { lat: city.lat + Math.sin(angle) * radius, lng: city.lng + (Math.cos(angle) * radius) / 0.65 };
-};
-
 /**
  * Запити на карті: бачить кожен, навіть гість, але лише місто (точка
  * зсунута), без особистих даних. Виконавцю додатково видно, що з тегів
@@ -102,7 +89,7 @@ const pointOf = (raw: Raw): MapRequest["point"] => {
  */
 export const mapRequests = async (userId: string | null, profileTags: string[]): Promise<MapRequest[]> => {
   const [raw, mine] = await Promise.all([collect(userId ?? "guest"), userId ? myResponses(userId) : Promise.resolve(new Map<string, MyResponse>())]);
-  return raw.map((item) => ({ ...toItem(userId, item, profileTags, mine), point: pointOf(item), own: item.own })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return raw.map((item) => ({ ...toItem(userId, item, profileTags, mine), point: requestPoint(item.id, item.cityId), remote: !item.cityId, own: item.own })).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 };
 
 /**

@@ -18,6 +18,7 @@ import { getPerformers, usePerformers } from "@/lib/map/performers";
 import { RequestMapCard } from "@/components/requests/request-map-card";
 import { requestsStore } from "@/lib/auth/client";
 import { allPerformersStore, applyRequestFilter, hoveredFeedRequestStore, mapModeStore, mapRequestsStore, mapSelectedRequest, requestFilterStore } from "@/lib/feed/map-requests";
+import { requestPoint } from "@/lib/feed/request-point";
 import type { MapRequest } from "@/lib/feed/types";
 import { DEADLINES, type PublishedRequest } from "@/lib/requests/types";
 import { avatarBackground } from "@/lib/map/avatar-style";
@@ -337,7 +338,8 @@ const pinLabel = (item: MapRequest) => {
   return {
     variant,
     compact: budgetSymbols(item.budget),
-    price: shortBudget(item.budget),
+    // Запит без міста стоїть у центрі України: на пині під курсором підпис «Віддалено» перед ціною.
+    price: item.remote ? `Віддалено · ${shortBudget(item.budget)}` : shortBudget(item.budget),
     fresh: age >= -60_000 && age < 30 * 60_000,
   };
 };
@@ -456,31 +458,21 @@ const requestFeatures = (items: MapRequest[]): FeatureCollection<Point> => ({
 });
 
 /** Власний відкритий запит видно поруч із виконавцями одразу після публікації. */
-const ownRequestOnMap = (request: PublishedRequest, responses: number): MapRequest => {
-  const city = CITIES.find((item) => item.id === request.cityId);
-  let hash = 2166136261;
-  for (let index = 0; index < request.id.length; index++) {
-    hash ^= request.id.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
-  const radius = city ? 0.03 + (((hash >>> 9) >>> 0) % 50) / 1000 : 0.2;
-  const center = city ?? { lat: 48.4, lng: 31.2 };
-  return {
-    id: request.id,
-    text: request.text,
-    tags: request.tags.map((tag) => ({ ...tag, matched: false })),
-    place: city?.name ?? "Віддалено",
-    budget: request.budget ? `до ${new Intl.NumberFormat("uk-UA").format(request.budget)} ₴` : null,
-    deadline: request.deadline ? DEADLINES[request.deadline] : null,
-    createdAt: request.createdAt,
-    responses,
-    matchedTags: 0,
-    response: null,
-    point: { lat: center.lat + Math.sin(angle) * radius, lng: center.lng + (Math.cos(angle) * radius) / 0.65 },
-    own: true,
-  };
-};
+const ownRequestOnMap = (request: PublishedRequest, responses: number): MapRequest => ({
+  id: request.id,
+  text: request.text,
+  tags: request.tags.map((tag) => ({ ...tag, matched: false })),
+  place: CITIES.find((item) => item.id === request.cityId)?.name ?? "Віддалено",
+  budget: request.budget ? `до ${new Intl.NumberFormat("uk-UA").format(request.budget)} ₴` : null,
+  deadline: request.deadline ? DEADLINES[request.deadline] : null,
+  createdAt: request.createdAt,
+  responses,
+  matchedTags: 0,
+  response: null,
+  point: requestPoint(request.id, request.cityId ?? null),
+  remote: !request.cityId,
+  own: true,
+});
 
 const toPeople = (performers: Performer[], requests: MapRequest[] = []): FeatureCollection<Point> => ({
   type: "FeatureCollection",

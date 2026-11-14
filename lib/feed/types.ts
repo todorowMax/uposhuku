@@ -39,9 +39,11 @@ export interface FeedItem {
 
 export const RESPONSE_LIMITS = { message: 600, minDays: 1, maxDays: 365, maxPrice: 10_000_000 } as const;
 
-/** Запит на карті: той самий опис, що в стрічці, плюс точка. Без точки — «Віддалено». */
+/** Запит на карті: той самий опис, що в стрічці, плюс точка. Запит без міста («Віддалено») стоїть у центрі України. */
 export interface MapRequest extends FeedItem {
-  point: { lat: number; lng: number } | null;
+  point: { lat: number; lng: number };
+  /** Без міста: пин у центрі України з підписом «Віддалено». */
+  remote: boolean;
   /** Це запит самої людини: на карті показуємо інакше, відгукнутися на нього не можна. */
   own: boolean;
 }
