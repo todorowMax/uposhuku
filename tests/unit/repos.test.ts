@@ -3,6 +3,8 @@ import { createDeal } from "@/lib/deals/machine";
 import { applyPaymentStatus } from "@/lib/deals/payment-status";
 import { quoteStage } from "@/lib/deals/price";
 import type { Deal, DealDraft } from "@/lib/deals/types";
+import { requestTags, requests } from "@/db/schema";
+import { getDb } from "@/lib/server/db";
 import { emptyProfile } from "@/lib/profile/types";
 import { accessibleConversation, addMessage, claimableAttachments, findChatAttachment, getOrCreateConversation, listConversations, listMessages, performerKnown, saveChatPhoto } from "@/lib/server/chat-repo";
 import { actAsModerator, actAsPerformer, actOnDeal, listDeals, listDealsForPerformer, mutateDeal, proposeDeal, proposeDirectDeal } from "@/lib/server/deal-repo";
@@ -11,7 +13,7 @@ import { closeRequest, createRequest, findRequest, listOthersOpen, listRequests 
 import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/server/review-repo";
 import { findDisputeAttachment, getDisputeCard, listDisputes } from "@/lib/server/admin-repo";
 import { allPerformerStats, performerStatsOf } from "@/lib/server/stats-repo";
-import { makeUser, useTestD1 } from "../helpers/d1";
+import { makeUser, makeUsers, rowChunks, seedProfiles, useTestD1 } from "../helpers/d1";
 
 /** «Заморожено» ставить лише банк: у тесті підставляємо його підтвердження холду. */
 const fundByBank = async (dealId: string, at: number) => {
@@ -262,16 +264,23 @@ describe("фото в чаті", () => {
 
 describe("великі обсяги: у D1 не більше 100 параметрів у запиті", () => {
   it("профілі, проєкти й запити читаються пачками", async () => {
+    // Дані вставляємо пакетами: тест перевіряє читання пачками, а сотні послідовних записів на завантаженій машині тягнуть його за таймаут.
     const ids = Array.from({ length: 160 }, (_, index) => `bulk-${index}`);
-    for (const id of ids) await makeUser(ctx.db, id);
-    for (const id of ids) await saveProfile(id, profile(`Людина ${id}`));
+    const db = getDb();
+    await makeUsers(ctx.db, ids);
+    await seedProfiles(ids.map((id) => ({ userId: id, profile: profile(`Людина ${id}`) })));
     const published = await listPublishedProfiles();
     const bulk = [...published.keys()].filter((id) => id.startsWith("bulk-"));
     expect(bulk).toHaveLength(160);
     expect(published.get("bulk-100")?.works.map((work) => work.id)).toEqual(["w1", "w2"]);
     expect(published.get("bulk-159")?.tags.sort()).toEqual(["landing", "website"]);
 
-    for (const id of ids.slice(0, 120)) await createRequest(id, { text: `Запит від ${id}`, tags: [{ id: "website", label: "Сайт" }], files: [] });
+    const owners = ids.slice(0, 120);
+    const requestSeed = [
+      ...rowChunks(owners, 12).map((chunk) => db.insert(requests).values(chunk.map((id) => ({ id: `req_${id}`, userId: id, text: `Запит від ${id}`, status: "open" as const, createdAt: Date.now() })))),
+      ...rowChunks(owners, 3).map((chunk) => db.insert(requestTags).values(chunk.map((id) => ({ requestId: `req_${id}`, tagId: "website", label: "Сайт" })))),
+    ];
+    await db.batch(requestSeed as [(typeof requestSeed)[number], ...(typeof requestSeed)[number][]]);
     const others = await listOthersOpen("c2");
     expect(others.filter((request) => request.text.startsWith("Запит від bulk-"))).toHaveLength(120);
     expect(others.every((request) => request.tags.length >= 0)).toBe(true);

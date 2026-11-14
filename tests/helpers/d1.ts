@@ -7,6 +7,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getPlatformProxy } from "wrangler";
+import { profiles, profileTags, projectTags, projects } from "@/db/schema";
+import type { Profile } from "@/lib/profile/types";
+import { getDb } from "@/lib/server/db";
 
 const applyMigrations = async (db: D1Database, dir: string) => {
   for (const file of readdirSync(dir).filter((name) => name.endsWith(".sql")).sort()) {
@@ -50,6 +53,40 @@ export const makeUser = async (db: D1Database, id: string, options: { email?: st
   await db.prepare("insert or ignore into users (id, email, created_at) values (?, ?, ?)").bind(id, email, createdAt).run();
   if (accepted) await acceptAll(db, id, createdAt);
   return id;
+};
+
+/** Рядки частинами так, щоб у запиті було не більше 100 параметрів (межа D1). */
+export const rowChunks = <T>(rows: T[], paramsPerRow: number): T[][] => {
+  const size = Math.max(1, Math.floor(100 / paramsPerRow));
+  return Array.from({ length: Math.ceil(rows.length / size) }, (_, index) => rows.slice(index * size, (index + 1) * size));
+};
+
+/** Багато користувачів із прийнятими умовами кількома багаторядковими вставками в одному пакеті: для тестів великих обсягів, де послідовні записи надто повільні. */
+export const makeUsers = async (db: D1Database, ids: string[], createdAt = Date.now()) => {
+  const { LEGAL_VERSIONS } = await import("@/lib/legal/config");
+  const userChunks = rowChunks(ids, 3).map((chunk) => db.prepare(`insert or ignore into users (id, email, created_at) values ${chunk.map(() => "(?, ?, ?)").join(", ")}`).bind(...chunk.flatMap((id) => [id, `${id}@example.com`, createdAt])));
+  const accepted = ids.flatMap((id) => ACCEPTED_DOCS.map((doc) => [`${id}:${doc}`, id, doc, LEGAL_VERSIONS[doc], createdAt]));
+  const acceptChunks = rowChunks(accepted, 5).map((chunk) => db.prepare(`insert or ignore into legal_acceptances (id, user_id, doc, version, accepted_at, source) values ${chunk.map(() => "(?, ?, ?, ?, ?, 'signup')").join(", ")}`).bind(...chunk.flat()));
+  await db.batch([...userChunks, ...acceptChunks]);
+};
+
+/**
+ * Профілі з тегами й роботами багаторядковими вставками в одному пакеті, без `saveProfile` (він робить кілька запитів на людину).
+ * Для тестів великих обсягів, які перевіряють читання. Число параметрів на рядок дорівнює числу колонок таблиці: drizzle підставляє й значення за замовчуванням.
+ */
+export const seedProfiles = async (items: { userId: string; profile: Profile }[]) => {
+  const db = getDb();
+  const now = Date.now();
+  const tagSource = (tagId: string, manualTags: string[]) => (manualTags.includes(tagId) ? ("manual" as const) : ("auto" as const));
+  const seed = [
+    ...rowChunks(items, 10).map((chunk) =>
+      db.insert(profiles).values(chunk.map(({ userId, profile }) => ({ userId, name: profile.name, cityId: profile.cityId, lat: profile.location?.lat ?? null, lng: profile.location?.lng ?? null, specialty: profile.specialty, bio: profile.bio, photo: profile.photo, published: profile.published, updatedAt: now }))),
+    ),
+    ...rowChunks(items.flatMap(({ userId, profile }) => profile.tags.map((tagId) => ({ userId, tagId, source: tagSource(tagId, profile.manualTags) }))), 3).map((chunk) => db.insert(profileTags).values(chunk)),
+    ...rowChunks(items.flatMap(({ userId, profile }) => profile.works.map((work, position) => ({ id: `${userId}:${work.id}`, userId, position, title: work.title, description: work.description, url: work.url }))), 6).map((chunk) => db.insert(projects).values(chunk)),
+    ...rowChunks(items.flatMap(({ userId, profile }) => profile.works.flatMap((work) => work.tags.map((tagId) => ({ projectId: `${userId}:${work.id}`, tagId, source: tagSource(tagId, work.manualTags) })))), 3).map((chunk) => db.insert(projectTags).values(chunk)),
+  ];
+  if (seed.length) await db.batch(seed as [(typeof seed)[number], ...(typeof seed)[number][]]);
 };
 
 /**

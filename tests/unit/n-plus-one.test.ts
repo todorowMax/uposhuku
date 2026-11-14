@@ -10,10 +10,9 @@ import { addPayment, getPlacement, tiersFor } from "@/lib/server/placement-repo"
 import { listConversations } from "@/lib/server/chat-repo";
 import { proposeDirectDeal } from "@/lib/server/deal-repo";
 import { getDb } from "@/lib/server/db";
-import { saveProfile } from "@/lib/server/profile-repo";
 import { createRequest, responsesTo } from "@/lib/server/request-repo";
 import { getReviewStats } from "@/lib/server/review-repo";
-import { countD1Queries, makeUser, useTestD1 } from "../helpers/d1";
+import { countD1Queries, makeUser, makeUsers, seedProfiles, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
@@ -45,9 +44,11 @@ const buildChat = async (p: string, n: number) => {
   const offerRows: (typeof responses.$inferInsert)[] = [];
   const old = await createRequest(customer, { text: "Старий запит", tags: [], files: [] });
   const fresh = await createRequest(customer, { text: LONG_TEXT, tags: [], files: [] });
+  const perfIds = Array.from({ length: n }, (_, i) => `${p}perf${i}`);
+  await makeUsers(ctx.db, perfIds);
+  await seedProfiles(perfIds.flatMap((userId, i) => (i % 4 !== 3 ? [{ userId, profile: profileOf(`${p}Імя${i}`) }] : [])));
   for (let i = 0; i < n; i++) {
-    const perf = await makeUser(ctx.db, `${p}perf${i}`);
-    if (i % 4 !== 3) await saveProfile(perf, profileOf(`${p}Імя${i}`));
+    const perf = perfIds[i];
     convRows.push({ id: `${p}conv${i}`, customerUserId: customer, performerId: `me-${perf}`, performerUserId: perf, createdAt: BASE, updatedAt: BASE + i * 1000 });
     messageRows.push({ id: `${p}m${i}a`, conversationId: `${p}conv${i}`, from: "customer", text: `Перше ${i}`, kind: "text", createdAt: BASE + i * 10 });
     messageRows.push({ id: `${p}m${i}b`, conversationId: `${p}conv${i}`, from: "performer", text: `Останнє ${i}`, kind: i % 6 === 0 ? "system" : "text", contextId: i % 6 === 0 ? "ctx1" : null, createdAt: BASE + i * 10 + 5 });
@@ -137,9 +138,11 @@ const buildOffers = async (p: string, n: number) => {
   const request = await createRequest(customer, { text: "Потрібен лендинг", tags: [], files: [] });
   const responseRows: (typeof responses.$inferInsert)[] = [];
   const reviewRows: (typeof reviews.$inferInsert)[] = [];
+  const perfIds = Array.from({ length: n }, (_, i) => `${p}perf${i}`);
+  await makeUsers(ctx.db, perfIds);
+  await seedProfiles(perfIds.map((userId, i) => ({ userId, profile: profileOf(`${p}Імя${i}`, i % 3 !== 2) })));
   for (let i = 0; i < n; i++) {
-    const perf = await makeUser(ctx.db, `${p}perf${i}`);
-    await saveProfile(perf, profileOf(`${p}Імя${i}`, i % 3 !== 2));
+    const perf = perfIds[i];
     // Час відповіді спадає з i, щоб серед рівних рівнів першими були пізніші i.
     responseRows.push({ id: `${p}r${i}`, requestId: request.id, performerUserId: perf, price: 1000 + i, days: (i % 7) + 1, message: `Текст ${i}`, createdAt: BASE + (n - i) * 1000 });
     if (i % 2 === 0) await addPayment(perf, 100 + i * 10);
@@ -230,8 +233,10 @@ describe("responsesTo: стеля 200", () => {
     const customer = await makeUser(ctx.db, "cap-c");
     const request = await createRequest(customer, { text: "Багато відгуків", tags: [], files: [] });
     const rows: (typeof responses.$inferInsert)[] = [];
+    const perfIds = Array.from({ length: 205 }, (_, i) => `cap-p${i}`);
+    await makeUsers(ctx.db, perfIds);
     for (let i = 0; i < 205; i++) {
-      const perf = await makeUser(ctx.db, `cap-p${i}`);
+      const perf = perfIds[i];
       // Час спадає з i, тож найраніші відгуки у великих i; порядок id не збігається з часом.
       rows.push({ id: `cap-r${i}`, requestId: request.id, performerUserId: perf, price: null, days: 1, message: "m", createdAt: BASE + (1000 - i) * 10 });
     }
