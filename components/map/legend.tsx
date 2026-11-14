@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Info, X } from "@/components/icons";
+import { Info } from "lucide-react";
+import { X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -30,8 +31,7 @@ export function LegendButton() {
 
   const trigger = (
     <Button variant="bare" aria-label="Про сервіс" className="legend-button">
-      <Info className="size-4.5" />
-      <span>Про сервіс</span>
+      <Info className="size-4.5" aria-hidden />
     </Button>
   );
   const close = (
