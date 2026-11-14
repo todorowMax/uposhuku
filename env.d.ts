@@ -62,6 +62,10 @@ interface CloudflareEnv {
   FOREIGN_LINKS_USERS?: string;
   POSTPAID_FEE_MODE?: string;
   POSTPAID_FEE_USERS?: string;
+  PHONE_VERIFY_MODE?: string;
+  PHONE_VERIFY_USERS?: string;
+  /** Ключ HMAC для хешів телефонів (`openssl rand -hex 32`). Секрет: `wrangler secret put PHONE_HASH_KEY`. Не міняти: старі хеші перестануть збігатися. */
+  PHONE_HASH_KEY?: string;
   /** Оплати з гаманця (EVM): id мережі, адреса токена USDT (звірити зі сторінкою Tether), FeeRouter, EscrowFactory, RPC для перевірки транзакцій. RPC може містити ключ: секрет. */
   CRYPTO_CHAIN_ID?: string;
   CRYPTO_TOKEN_ADDRESS?: string;

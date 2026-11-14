@@ -62,6 +62,12 @@ FOREIGN_LINKS_USERS=
 # вписувати через /admin/features чи змінну середовища.
 POSTPAID_FEE_MODE=off
 POSTPAID_FEE_USERS=
+# Телефон замовника через Telegram-бота (off | allowlist | on). Не грошовий. Пошти для allowlist не комітимо.
+PHONE_VERIFY_MODE=off
+PHONE_VERIFY_USERS=
+# Ключ HMAC для хешів телефонів: `openssl rand -hex 32`. Секрет (`wrangler secret put PHONE_HASH_KEY --env development|production`).
+# Без нього підтвердити телефон не можна (503 і запис phone_hash_key_missing). Не міняти: старі хеші перестануть збігатися.
+PHONE_HASH_KEY=
 
 # Ключ TronGrid (необов'язковий): підвищує ліміт запитів при перевірці USDT TRC-20 за хешем. Секрет.
 TRONGRID_API_KEY=

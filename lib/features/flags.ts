@@ -4,7 +4,7 @@
 // Режими: off (нікому, типово), allowlist (лише пошти зі списку), on (всім). Невідоме значення це off:
 // помилка в змінній не вмикає гроші.
 
-export const FEATURES = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "nbu_qr", "foreign_links", "postpaid_fee"] as const;
+export const FEATURES = ["safe_deal", "crypto_proof", "crypto_wallet", "crypto_escrow", "nbu_qr", "foreign_links", "postpaid_fee", "phone_verify"] as const;
 export type FeatureName = (typeof FEATURES)[number];
 
 export type FeatureMode = "off" | "allowlist" | "on";
@@ -23,6 +23,7 @@ export const FEATURE_LABEL: Record<FeatureName, string> = {
   nbu_qr: "QR переказу за форматом НБУ",
   foreign_links: "PayPal і Wise (посилання)",
   postpaid_fee: "Комісія за фактом (рахунок на акаунті)",
+  phone_verify: "Телефон замовника (через Telegram)",
 };
 
 /** Зміна цих прапорців рухає гроші, тож потребує другого фактора (TOTP). QR переказу грошей не рухає. */

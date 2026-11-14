@@ -72,7 +72,7 @@ describe("значення на сервері", () => {
     await getDb().insert(featureFlags).values({ feature: "nbu_qr", mode: "allowlist", users: "max@example.com,secret@x.com", updatedBy: "t", updatedAt: 1 });
     const response = await OWN();
     const text = JSON.stringify(await response.json());
-    expect(JSON.parse(text)).toEqual({ features: { safe_deal: false, crypto_proof: false, crypto_wallet: false, crypto_escrow: false, nbu_qr: true, foreign_links: false, postpaid_fee: false } });
+    expect(JSON.parse(text)).toEqual({ features: { safe_deal: false, crypto_proof: false, crypto_wallet: false, crypto_escrow: false, nbu_qr: true, foreign_links: false, postpaid_fee: false, phone_verify: false } });
     expect(text).not.toContain("secret@x.com");
     expect((await featuresFor("other@x.com")).nbu_qr).toBe(false);
     state.user = null;

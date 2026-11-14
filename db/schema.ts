@@ -5,6 +5,7 @@
 // Таблиці входу: users, sessions, email_codes, auth_attempts
 // (docs/plan-mvp.md, «Фундамент»).
 
+import { sql } from "drizzle-orm";
 import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
@@ -22,7 +23,19 @@ export const users = sqliteTable("users", {
    * на цю таблицю тому не спрацьовують, а входити в такий акаунт не можна.
    */
   deletedAt: integer("deleted_at"),
-});
+  /**
+   * Телефон замовника (lib/server/phone-repo.ts): лише HMAC-SHA256 номера в E.164 з ключем PHONE_HASH_KEY, маска для показу
+   * і час підтвердження через бота. Сам номер не зберігаємо. Хеш лишається в «могилі» видаленого акаунта (маска ні), щоб номер
+   * із боргом чи блоком не можна було прив'язати до нового акаунта; серед живих акаунтів хеш унікальний.
+   */
+  phoneHash: text("phone_hash"),
+  phoneMask: text("phone_mask"),
+  phoneVerifiedAt: integer("phone_verified_at"),
+},
+(table) => [
+  index("users_phone_hash_idx").on(table.phoneHash),
+  uniqueIndex("users_phone_live_idx").on(table.phoneHash).where(sql`${table.deletedAt} is null and ${table.phoneHash} is not null`),
+]);
 
 /** `id` — це jti токена: без рядка в цій таблиці токен недійсний, тож вихід спрацьовує одразу. */
 export const sessions = sqliteTable(
@@ -450,9 +463,19 @@ export const telegramLinkTokens = sqliteTable(
       .references(() => users.id, { onDelete: "cascade" }),
     expiresAt: integer("expires_at").notNull(),
     usedAt: integer("used_at"),
+    /** Навіщо токен: порожньо (звичайна прив'язка) або `phone` (після прив'язки бот одразу просить номер). */
+    purpose: text("purpose"),
   },
   (table) => [index("telegram_link_tokens_user_idx").on(table.userId)]
 );
+
+/** Номери, які не можна підтвердити ні на якому акаунті (хеш, не номер). Керує модератор (ітерація 2). */
+export const phoneBlocks = sqliteTable("phone_blocks", {
+  phoneHash: text("phone_hash").primaryKey(),
+  reason: text("reason").notNull(),
+  createdBy: text("created_by").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
 
 /** Що людина хоче отримувати й де (lib/notification-prefs.ts описує форму JSON). */
 export const notificationPreferences = sqliteTable("notification_preferences", {
