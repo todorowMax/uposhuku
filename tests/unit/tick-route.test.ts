@@ -11,7 +11,7 @@ const { calls, fail, run } = vi.hoisted(() => {
   return { calls, fail, run };
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
-vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2) }));
+vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), syncEditedPosts: run("edit_posts", 1) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
 vi.mock("@/lib/server/tick-cleanup", () => ({
   pruneSessions: run("prune_sessions", 3),
@@ -46,6 +46,16 @@ describe("/api/internal/tick", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ ok: false, failed: ["post"] });
     expect(calls).toEqual(expect.arrayContaining(["sweep", "close", "prune_telegram", "prune_db"]));
+  });
+
+  it("пости після правки оновлюються до закриття; збій цього кроку не скасовує решту", async () => {
+    const response = await tick();
+    expect(await response.json()).toMatchObject({ ok: true, edited: 1, closed: 2 });
+    expect(calls.indexOf("edit_posts")).toBeLessThan(calls.indexOf("close"));
+    fail.step = "edit_posts";
+    calls.length = 0;
+    expect(await (await tick()).json()).toMatchObject({ ok: false, failed: ["edit_posts"], edited: null });
+    expect(calls).toEqual(expect.arrayContaining(["close", "prune_telegram"]));
   });
 
   it("збій звірки дає 500, але решта кроків виконана", async () => {

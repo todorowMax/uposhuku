@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { channelPosts } from "@/db/schema";
 import { POST as tick } from "@/app/api/internal/tick/route";
 import { GET as channelStatus } from "@/app/api/channel/route";
-import { POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, type ChannelRequest } from "@/lib/telegram/channel";
+import { POSTS_PER_RUN, POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, syncEditedPosts, type ChannelRequest } from "@/lib/telegram/channel";
 import { telegramConfig } from "@/lib/telegram/config";
 import { getDb } from "@/lib/server/db";
 import { makeUser, useTestD1 } from "../helpers/d1";
@@ -157,6 +157,81 @@ describe("закриття постів", () => {
     respond = (method) => (method === "editMessageText" ? Response.json({ ok: false, error_code: 400, description: "Bad Request: message to edit not found" }) : Response.json({ ok: true, result: { message_id: 1 } }));
     expect(await closeFinishedPosts(NOW)).toBe(0);
     expect(await status("r")).toBe("closed");
+  });
+});
+
+describe("оновлення постів після правки", () => {
+  const edits = () => calls.filter((call) => call.method === "editMessageText");
+  const editRequest = (id: string, text: string, at: number) => ctx.db.prepare("update requests set text = ?, edited_at = ?, edit_count = edit_count + 1 where id = ?").bind(text, at, id).run();
+
+  it("змінений відкритий запит: пост редагується свіжим текстом із кнопкою, удруге нічого", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    expect(await syncEditedPosts(NOW + MIN)).toBe(0);
+    await editRequest("r", "Тепер потрібен сайт-візитка", NOW + 2 * MIN);
+    expect(await syncEditedPosts(NOW + 3 * MIN)).toBe(1);
+    expect(edits()).toHaveLength(1);
+    expect(edits()[0].body).toMatchObject({ chat_id: "-100123", message_id: 42 });
+    expect(String(edits()[0].body.text)).toContain("сайт-візитка");
+    expect(JSON.stringify(edits()[0].body.reply_markup)).toContain("utm_medium=channel");
+    expect(await status("r")).toBe("posted");
+    expect(await syncEditedPosts(NOW + 4 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(1);
+  });
+
+  it("поста ще немає, закритий запит чи запис failed: нічого не редагуємо", async () => {
+    await addRequest("fresh", { ageMin: 5 });
+    await editRequest("fresh", "Свіжіша версія", NOW);
+    await addRequest("gone");
+    await postDueRequests(NOW);
+    await editRequest("gone", "Правка закритого", NOW + MIN);
+    await ctx.db.prepare("update requests set status = 'closed' where id = 'gone'").run();
+    await addRequest("bad", { ageMin: 40 });
+    await ctx.db.prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at) values ('bad', '-100123', null, 'failed', ?, ?)").bind(NOW, NOW).run();
+    await editRequest("bad", "Правка після відмови", NOW + MIN);
+    expect(await syncEditedPosts(NOW + 2 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(0);
+  });
+
+  it("публікація бере свіжі дані: пост ще не відправлено, а запит уже змінено", async () => {
+    await addRequest("late", { ageMin: 30 });
+    await editRequest("late", "Текст після правки", NOW - MIN);
+    expect((await postDueRequests(NOW)).posted).toBe(1);
+    expect(String(sent()[0].body.text)).toContain("Текст після правки");
+    expect(await syncEditedPosts(NOW + MIN)).toBe(0);
+  });
+
+  it(`не більше ${POSTS_PER_RUN} редагувань за запуск; решта в наступному`, async () => {
+    for (let index = 0; index < POSTS_PER_RUN + 2; index++) {
+      await addRequest(`e${index}`, { user: ["a", "b", "c"][index % 3], ageMin: 30 + index });
+      await ctx.db.prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at) values (?, '-100123', ?, 'posted', ?, ?)").bind(`e${index}`, 100 + index, NOW, NOW).run();
+      await editRequest(`e${index}`, `Правка ${index}`, NOW + MIN + index);
+    }
+    expect(await syncEditedPosts(NOW + 5 * MIN)).toBe(POSTS_PER_RUN);
+    expect(await syncEditedPosts(NOW + 6 * MIN)).toBe(2);
+    expect(edits()).toHaveLength(POSTS_PER_RUN + 2);
+  });
+
+  it("помилка Telegram: журнал і запис оновлено без повтору; 429: зупинка до наступного запуску; без токена нічого", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await editRequest("r", "Нова версія", NOW + MIN);
+    respond = (method) => (method === "editMessageText" ? Response.json({ ok: false, error_code: 400, description: "Bad Request: message to edit not found" }) : Response.json({ ok: true, result: { message_id: 42 } }));
+    expect(await syncEditedPosts(NOW + 2 * MIN)).toBe(0);
+    expect(await syncEditedPosts(NOW + 3 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(1);
+
+    await editRequest("r", "Ще одна версія", NOW + 4 * MIN);
+    respond = () => Response.json({ ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 30 } });
+    expect(await syncEditedPosts(NOW + 5 * MIN)).toBe(0);
+    respond = () => Response.json({ ok: true, result: { message_id: 42 } });
+    expect(await syncEditedPosts(NOW + 6 * MIN)).toBe(1);
+
+    await editRequest("r", "І ще одна", NOW + 7 * MIN);
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    const before = edits().length;
+    expect(await syncEditedPosts(NOW + 8 * MIN)).toBe(0);
+    expect(edits()).toHaveLength(before);
   });
 });
 

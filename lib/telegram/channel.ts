@@ -3,9 +3,10 @@
 // Публічний канал запитів. Запит потрапляє туди через CHANNEL_DELAY_MIN хвилин
 // після публікації (спершу «перша хвиля» виконавцям у особисті), без контактів,
 // з кнопкою «Відгукнутися на Findlyfy»: відгукнутися можна лише на платформі.
-// Коли запит закрито, пост редагується: «Виконавця знайдено».
+// Коли запит закрито, пост редагується: «Виконавця знайдено». Коли автор змінив відкритий запит,
+// уже опублікований пост оновлюється свіжим текстом; якщо поста ще немає, він береться зі свіжих даних при публікації.
 
-import { and, eq, gt, inArray, lt, notInArray, sql } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
 import { channelPosts, requestTags, requests } from "@/db/schema";
 import { stripContacts } from "@/lib/chat/contacts";
 import { CITIES } from "@/lib/map/cities";
@@ -134,6 +135,43 @@ export const postDueRequests = async (now = Date.now(), config = telegramConfig(
     }
   }
   return result;
+};
+
+/** Опубліковані пости відкритих запитів, які автор змінив після останнього оновлення поста: від давніших правок до новіших. */
+export const editedPosts = async (limit = POSTS_PER_RUN): Promise<(ChannelRequest & { chatId: string; messageId: number })[]> => {
+  const rows = await getDb()
+    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .from(channelPosts)
+    .innerJoin(requests, eq(requests.id, channelPosts.requestId))
+    .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), isNotNull(channelPosts.messageId), gt(requests.editedAt, channelPosts.updatedAt)))
+    .orderBy(requests.editedAt)
+    .limit(limit);
+  const tagged = await withTags(rows);
+  return tagged.map((row, index) => ({ ...row, chatId: rows[index].chatId, messageId: rows[index].messageId as number }));
+};
+
+/**
+ * Оновлює в каналі пости запитів, які автор змінив. Без токена чи каналу нічого не робить. Помилка Telegram іде в журнал і
+ * не повторюється щоразу (запис позначається оновленим), крім ліміту 429: тоді зупиняємось до наступного запуску.
+ */
+export const syncEditedPosts = async (now = Date.now(), config = telegramConfig()): Promise<number> => {
+  if (!channelReady(config)) return 0;
+  const db = getDb();
+  let edited = 0;
+  for (const row of await editedPosts()) {
+    const { html, button } = formatChannelPost(row);
+    try {
+      await editMessageText(row.chatId, row.messageId, html, { keyboard: keyboard(config, button) });
+      await db.update(channelPosts).set({ updatedAt: now, error: null }).where(eq(channelPosts.requestId, row.id));
+      edited++;
+    } catch (error) {
+      if (error instanceof TelegramError && error.code === 429) break;
+      const message = error instanceof Error ? error.message : String(error);
+      await db.update(channelPosts).set({ updatedAt: now, error: message.slice(0, 300) }).where(eq(channelPosts.requestId, row.id));
+      logServer({ level: "error", event: "channel_edit_failed", message, detail: { requestId: row.id } });
+    }
+  }
+  return edited;
 };
 
 /** Редагує пости закритих запитів: «Виконавця знайдено», без кнопки. */
