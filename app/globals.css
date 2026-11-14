@@ -1662,11 +1662,12 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   padding: 8px 12px 16px;
 }
 .request-details-text {
-  padding: 4px 9px;
+  /* Відступ зверху й знизу полем, не padding: line-clamp показав би смужку четвертого рядка. */
+  margin: 4px 0;
+  padding: 0 9px;
   color: var(--ink);
   font-size: 14px;
   line-height: 1.5;
-  white-space: pre-wrap;
 }
 .request-details-facts {
   padding: 7px 9px 0;

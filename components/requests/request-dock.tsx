@@ -15,6 +15,7 @@ import { useDeals } from "@/lib/deals/client";
 import { dealPhase } from "@/lib/deals/machine";
 import { setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
 import { Button } from "@/components/ui/button";
+import { ClampedText } from "@/components/ui/clamped-text";
 import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
 import { requestFacts } from "@/lib/requests/format";
 import type { PublishedRequest } from "@/lib/requests/types";
@@ -250,11 +251,11 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       {detailsOpen && (
         <div className="request-details glass-panel" aria-label="Деталі запиту">
           <div className="request-switcher-heading">Деталі запиту</div>
-          <p className="request-details-text">{active.text}</p>
+          <ClampedText text={active.text} className="request-details-text" />
           {facts.length > 0 && <p className="request-details-facts">{facts.join(" · ")}</p>}
           {active.tags.length > 0 && (
             <div className="request-details-tags">
-              {active.tags.map((tag) => <span key={tag.id} className="auth-draft-tag">{tag.label}</span>)}
+              {active.tags.map((tag) => <span key={tag.id} className="auth-draft-tag max-w-full" title={tag.label}><span className="truncate">{tag.label}</span></span>)}
             </div>
           )}
           {active.files.length > 0 && <p className="request-details-facts">Прикріплено файлів: {active.files.length}</p>}
