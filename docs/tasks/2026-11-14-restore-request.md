@@ -2,7 +2,7 @@
 
 - Created: 2026-11-14
 - Project / repo: uposhuku
-- Final status: готово локально; на dev не выложено (нужна миграция 0023 и деплой)
+- Final status: done on dev (version 94dbcc51), waiting for the owner check
 
 ## Goal
 
