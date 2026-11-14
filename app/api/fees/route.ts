@@ -14,6 +14,6 @@ export const GET = async () => {
   if (!enabled && !(await hasFeeEntries(user.id))) {
     return Response.json({ enabled: false, balanceKop: 0, dueAt: null, entries: [] }, { headers: { "cache-control": "no-store" } });
   }
-  const account = await feeAccount(user.id, Date.now());
+  const account = await feeAccount(user.id);
   return Response.json({ enabled, ...account }, { headers: { "cache-control": "no-store" } });
 };

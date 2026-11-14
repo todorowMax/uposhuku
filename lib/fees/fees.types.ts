@@ -46,8 +46,8 @@ export namespace FeeTypes {
 
   export interface Account {
     balanceKop: number;
-    /** ISO: до якого моменту сплатити борг поточного кварталу. */
-    dueAt: string;
+    /** ISO: до якого моменту сплатити найстаріший неоплачений борг; null, коли боргу немає. */
+    dueAt: string | null;
     entries: EntryView[];
   }
 

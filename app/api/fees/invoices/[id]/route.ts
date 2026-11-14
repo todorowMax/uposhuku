@@ -25,6 +25,6 @@ export const GET = async (request: Request, { params }: { params: Promise<{ id: 
       logServer({ level: "warn", event: "fee_invoice_check_failed", message: error.message, detail: { status: error.status, code: error.code }, request });
     }
   }
-  const account = await feeAccount(user.id, Date.now());
+  const account = await feeAccount(user.id);
   return Response.json({ status: invoice.status, balanceKop: account.balanceKop }, { headers: { "cache-control": "no-store" } });
 };

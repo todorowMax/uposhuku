@@ -9,7 +9,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { deals, feeEntries, feeInvoices, users } from "@/db/schema";
 import { accrualsFor, balanceOf, POSTPAID_FEE_BP } from "@/lib/fees/fees";
 import type { FeeTypes } from "@/lib/fees/fees.types";
-import { dueDateFor } from "@/lib/fees/period";
+import { dueDateOf } from "@/lib/fees/due";
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import type { InvoiceStatusResponse } from "@/lib/monobank/client";
 import { logServer } from "@/lib/telemetry/log";
@@ -73,11 +73,11 @@ const dealLabels = async (dealIds: string[]): Promise<Map<string, { number: stri
   );
 };
 
-/** Рахунок людини: баланс (з усього журналу), строк і останні рядки. */
-export const feeAccount = async (userId: string, now: number): Promise<FeeTypes.Account> => {
+/** Рахунок людини: баланс і строк (з усього журналу; строк від найстарішого неоплаченого нарахування) та останні рядки. */
+export const feeAccount = async (userId: string): Promise<FeeTypes.Account> => {
   const db = getDb();
   // Баланс із усього журналу, а не з останніх 100 рядків: записів на людину небагато (кілька на квартал).
-  const amounts = await db.select({ amountKop: feeEntries.amount }).from(feeEntries).where(eq(feeEntries.userId, userId));
+  const amounts = await db.select({ amountKop: feeEntries.amount, createdAt: feeEntries.createdAt }).from(feeEntries).where(eq(feeEntries.userId, userId));
   const rows = await db.select().from(feeEntries).where(eq(feeEntries.userId, userId)).orderBy(desc(feeEntries.createdAt), desc(feeEntries.id)).limit(ENTRIES_LIMIT);
   const labels = await dealLabels([...new Set(rows.flatMap((row) => (row.dealId ? [row.dealId] : [])))]);
   const entries = rows.map((row): FeeTypes.EntryView => {
@@ -95,7 +95,7 @@ export const feeAccount = async (userId: string, now: number): Promise<FeeTypes.
       note: row.note,
     };
   });
-  return { balanceKop: balanceOf(amounts), dueAt: dueDateFor(now), entries };
+  return { balanceKop: balanceOf(amounts), dueAt: dueDateOf(amounts), entries };
 };
 
 /** Чи є в людини хоч один запис журналу (потрібно, щоб показати рахунок, коли прапорець уже вимкнули). */

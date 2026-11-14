@@ -27,7 +27,7 @@ const OWNER = { id: "fee-cust", email: "fee-cust@example.com" };
 beforeAll(async () => {
   process.env.MONOBANK_TOKEN = "test-token";
   ctx = await useTestD1();
-  for (const id of ["fee-cust", "fee-perf", "fee-other", "fee-off"]) await makeUser(ctx.db, id);
+  for (const id of ["fee-cust", "fee-perf", "fee-other", "fee-off", "fee-old"]) await makeUser(ctx.db, id);
   await saveFeatureSetting({ name: "postpaid_fee", setting: { mode: "allowlist", users: [OWNER.email] }, adminEmail: "admin@example.com" });
 });
 afterAll(async () => {
@@ -166,6 +166,31 @@ describe("нарахування комісії за фактом", () => {
     bank.status.mockResolvedValue({ invoiceId: "inv-fee-3", status: "success", amount: 25_000, finalAmount: 25_000, modifiedDate: "2026-11-14T11:00:00Z" });
     const done = await RECONCILE(new Request("https://findlyfy.test/x"), ctxOf({ id }));
     expect(await done.json()).toEqual({ status: "success", balanceKop: 0 });
+  });
+
+  it("«Оплату отримано» від виконавця без «Я оплатив(ла)»: нараховує один раз, пізніше «Я оплатив(ла)» відмовлено й не дублює", async () => {
+    const before = (await account()).entries.length;
+    const deal = await acceptedDeal("fee-cust", 4000);
+    await actAsPerformer("fee-perf", deal.id, "accept", undefined);
+    expect((await account()).entries).toHaveLength(before);
+    const done = await actAsPerformer("fee-perf", deal.id, "confirm_paid", deal.stages[0].id);
+    expect(typeof done).not.toBe("string");
+    let state = await account();
+    expect(state.entries).toHaveLength(before + 1);
+    expect(state.entries[0]).toMatchObject({ kind: "accrual", amountKop: 20_000, dealNumber: deal.number });
+    expect(await actOnDeal("fee-cust", deal.id, "claim_paid", deal.stages[0].id)).toMatch(/уже відмічено/);
+    // Повтор тієї самої зміни не дублює запис (унікальний індекс за угодою й етапом).
+    await accrueFees({ before: null, after: { ...deal, stages: [{ ...deal.stages[0], status: "funded" }] }, ownerUserId: "fee-cust" });
+    state = await account();
+    expect(state.entries).toHaveLength(before + 1);
+  });
+
+  it("GET /api/fees: строк від найстарішого нарахування, а не від поточного кварталу", async () => {
+    const deal = await acceptedDeal("fee-old", 1000);
+    const paid = { ...deal, fee: { rateBp: 500 }, stages: [{ ...deal.stages[0], status: "claimed" as const }] };
+    await accrueFees({ before: null, after: paid, ownerUserId: "fee-old", now: Date.parse("2026-12-10T10:00:00Z") });
+    session.user = { id: "fee-old", email: "fee-old@example.com" };
+    expect((await account()).dueAt).toBe("2027-01-14T21:59:59.999Z");
   });
 
   it("рахунок без входу 401, без згод 409, понад ліміт 429", async () => {

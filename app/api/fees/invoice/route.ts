@@ -32,7 +32,7 @@ export const POST = async (request: Request) => {
   const legal = await legalGate(user.id);
   if (legal) return legal;
   const body = await readJson(request);
-  const amountKop = pickAmount(body?.amountKop, (await feeAccount(user.id, Date.now())).balanceKop);
+  const amountKop = pickAmount(body?.amountKop, (await feeAccount(user.id)).balanceKop);
   if (typeof amountKop === "string") return problem(400, "Сума не підходить", amountKop);
   if (!readVar("MONOBANK_TOKEN")) return problem(503, "Оплата тимчасово недоступна", "Оплата тимчасово недоступна. Спробуйте трохи згодом.");
 
