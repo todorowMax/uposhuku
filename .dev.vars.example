@@ -28,9 +28,10 @@ CHANNEL_DELAY_MIN=20
 # cron нічого не робить, воркер лише пише tick_not_configured у журнал. На dev і проді: `wrangler secret put INTERNAL_TOKEN --env ...`.
 INTERNAL_TOKEN=
 
-# Токен еквайрингу Monobank: термінал без розщеплення, оплата розміщення на карті; безпечна угода піде тим самим вебхуком.
+# Токен еквайрингу Monobank: термінал без розщеплення, оплата комісії за фактом і розміщення на карті; безпечна угода піде тим самим вебхуком.
 # На dev тестовий токен з https://api.monobank.ua/ (гроші не рухаються).
-# На проді: бойовий з кабінету web.monobank.ua, `wrangler secret put MONOBANK_TOKEN --env production`.
+# На проді: бойовий з кабінету web.monobank.ua. Покласти всі ключі Monobank на воркер: `bash scripts/monobank-secrets.sh production`
+# (значення питає wrangler прихованим вводом, у чат і git воно не потрапляє).
 MONOBANK_TOKEN=
 
 # Термінал розщеплення Monobank для безпечної угоди (окремий токен; вебхук підписують ключі обох терміналів).
