@@ -91,7 +91,9 @@ export const EditRequestScreen = ({ request, offers, onClose, onSaved }: EditReq
             <h3 id="edit-request-terms" className="pe-label">
               Умови
             </h3>
-            <RequestParams value={edit.params} onChange={edit.setParams} />
+            <div className="-mx-1">
+              <RequestParams value={edit.params} onChange={edit.setParams} />
+            </div>
           </section>
 
           <section aria-labelledby="edit-request-files" className="min-w-0">
@@ -100,7 +102,7 @@ export const EditRequestScreen = ({ request, offers, onClose, onSaved }: EditReq
             </h3>
             <Attachments items={attachments} onRemove={edit.detach} />
             <FileInput ref={fileInputRef} multiple onChange={edit.attach} />
-            <Button variant="quiet" disabled={edit.files.length >= MAX_FILES} onClick={() => fileInputRef.current?.click()}>
+            <Button variant="quiet" className="-ml-2" disabled={edit.files.length >= MAX_FILES} onClick={() => fileInputRef.current?.click()}>
               <Paperclip className="size-4" aria-hidden />
               Додати файл
             </Button>
