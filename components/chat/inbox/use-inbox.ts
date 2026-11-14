@@ -11,6 +11,7 @@ import { conversationsStore, fetchConversations, openConversation } from "@/lib/
 import type { ConversationDto } from "@/lib/chat/types";
 import { startPolling } from "@/lib/realtime/client";
 import { useStore } from "@/lib/store";
+import { chatOpenStore, panelCountStore } from "@/lib/ui/chat-window";
 import { useKeyboardInset } from "@/lib/ui/use-keyboard-inset";
 import { useLayerHistory } from "@/lib/ui/use-layer-history";
 import { inboxOpenStore } from "./inbox-store";
@@ -32,6 +33,18 @@ export const useInbox = () => {
   useKeyboardInset(motion.panelRef, open);
   // Системне «назад» закриває чат і лишає на карті.
   useLayerHistory(open, motion.close);
+
+  // Панель угоди стає поруч із чатом (lib/ui/chat-window.ts): їй треба знати, що чат відкритий, а розгорнутий чат
+  // стискається, поки панель відкрита, бо поруч із вікном на 1040px для неї місця немає.
+  useEffect(() => {
+    chatOpenStore.set(open);
+    return () => chatOpenStore.set(false);
+  }, [open]);
+  const panelOpen = useStore(panelCountStore) > 0;
+  const { size, toggleSize } = motion;
+  useEffect(() => {
+    if (open && panelOpen && size === "wide") toggleSize();
+  }, [open, panelOpen, size, toggleSize]);
 
   // Вихід з акаунта: чистимо список, відкриту розмову й закриваємо вікно. Змінюємо стан під час відтворення
   // (за зміною входу), а не в ефекті: так немає зайвого проходу з застарілим списком.
