@@ -9,7 +9,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "re
 import { gsap } from "gsap";
 import { useTermsConsent } from "@/components/auth/use-terms-consent";
 import { useTurnstile } from "@/components/auth/use-turnstile";
-import { withPhoneGate } from "@/lib/phone/client";
+import { askPhone } from "@/lib/phone/client";
+import { PHONE_REQUIRED_CODE } from "@/lib/phone/codes";
 import { ApiError, addPublishedRequest, authFlowStore, publishRequest, sessionStore, startEmail, verifyEmail } from "@/lib/auth/client";
 import { profileEditorStore } from "@/lib/profile/client";
 import { clearDraft, loadDraft, saveDraft } from "@/lib/requests/draft";
@@ -24,6 +25,19 @@ export namespace AuthPanelTypes {
 /** Повторний лист — не частіше разу на хвилину, як домовились у плані. */
 const RESEND_SECONDS = 60;
 const emptyCode = (length = 6) => Array.from({ length }, () => "");
+
+/**
+ * Публікація після підтвердження телефона, коли вікно входу вже закрите. Не вдалось (номер не підтвердили чи сервер
+ * відмовив): чернетка лишається в полі запиту, людина опублікує її сама.
+ */
+const publishAfterPhone = async (draft: RequestDraft, finish: (request: PublishedRequest) => void) => {
+  if (!(await askPhone())) return;
+  try {
+    finish(await publishRequest(draft));
+  } catch {
+    // Чернетка не стерта: поле запиту покаже її знову.
+  }
+};
 
 export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) => {
   const flow = useStore(authFlowStore);
@@ -53,6 +67,12 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
     if (step !== "publishing") authFlowStore.set(null);
   };
 
+  const finishPublish = (request: PublishedRequest) => {
+    clearDraft();
+    onPublished(request);
+    addPublishedRequest(request);
+  };
+
   const publish = async () => {
     if (!draft) {
       setError("Чернетка запиту загубилась. Напишіть його ще раз.");
@@ -62,12 +82,16 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
     setStep("publishing");
     setError(null);
     try {
-      const request = await withPhoneGate(() => publishRequest(draft));
-      clearDraft();
-      onPublished(request);
-      addPublishedRequest(request);
+      finishPublish(await publishRequest(draft));
       authFlowStore.set(null);
     } catch (reason) {
+      if (reason instanceof ApiError && reason.code === PHONE_REQUIRED_CODE) {
+        // Шторка над шторкою заборонена (DESIGN.md, «Шари»): вхід закриваємо, чернетка лишається збереженою,
+        // і після підтвердження телефона запит публікується вже без вікна входу.
+        authFlowStore.set(null);
+        void publishAfterPhone(draft, finishPublish);
+        return;
+      }
       setError(reason instanceof ApiError ? reason.message : "Не вдалося опублікувати запит.");
       setStep("failed");
     }
