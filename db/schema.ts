@@ -149,6 +149,8 @@ export const requests = sqliteTable(
     /** Коли автор востаннє змінив відкритий запит; null — не змінювали. На порядок у списку не впливає. */
     editedAt: integer("edited_at"),
     editCount: integer("edit_count").notNull().default(0),
+    /** Коли запит закрили вперше; null — відкритий або закритий до появи цього поля. Від нього рахується доба на відновлення. */
+    closedAt: integer("closed_at"),
   },
   (table) => [index("requests_user_idx").on(table.userId), index("requests_status_idx").on(table.status, table.createdAt)],
 );

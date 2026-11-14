@@ -47,7 +47,12 @@ export interface PublishedRequest extends RequestDraft {
   createdAt: string;
   /** ISO-час останньої правки автором; null, якщо запит не змінювали. */
   editedAt: string | null;
+  /** До якого часу (ISO) закритий запит можна відновити; null, якщо запит відкритий, доба минула або закрито до появи `closed_at`. */
+  restoreUntil: string | null;
 }
+
+/** Скільки після першого закриття автор може відновити запит. Спільна для сервера й клієнта. */
+export const RESTORE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const REQUEST_TEXT_MIN = 3;
 export const REQUEST_TEXT_MAX = 4000;

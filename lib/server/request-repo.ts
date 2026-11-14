@@ -6,11 +6,23 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
-import { isDeadline } from "@/lib/requests/types";
+import { RESTORE_WINDOW_MS, isDeadline } from "@/lib/requests/types";
 import { newId } from "@/lib/ids";
 import { getDb, inChunks } from "./db";
 
 type Row = typeof requests.$inferSelect;
+
+/** Кінець доби на відновлення (ms) для закритого запиту; null, якщо відновлювати нічого або вже пізно. */
+const restoreDeadline = (row: Pick<Row, "status" | "closedAt">, now: number): number | null => {
+  if (row.status !== "closed" || row.closedAt === null) return null;
+  const until = row.closedAt + RESTORE_WINDOW_MS;
+  return until > now ? until : null;
+};
+
+const restoreUntilIso = (row: Pick<Row, "status" | "closedAt">, now: number): string | null => {
+  const until = restoreDeadline(row, now);
+  return until === null ? null : new Date(until).toISOString();
+};
 
 const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
   if (rows.length === 0) return [];
@@ -20,6 +32,7 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     inChunks(ids, (chunk) => db.select().from(requestTags).where(inArray(requestTags.requestId, chunk))),
     inChunks(ids, (chunk) => db.select().from(requestFiles).where(inArray(requestFiles.requestId, chunk))),
   ]);
+  const now = Date.now();
   return rows.map((row) => ({
     id: row.id,
     text: row.text,
@@ -32,6 +45,7 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     status: row.status,
     createdAt: new Date(row.createdAt).toISOString(),
     editedAt: row.editedAt === null ? null : new Date(row.editedAt).toISOString(),
+    restoreUntil: restoreUntilIso(row, now),
   }));
 };
 
@@ -57,10 +71,28 @@ export const findRequest = async (userId: string, id: string): Promise<Published
   return (await hydrate(rows))[0] ?? null;
 };
 
-export const closeRequest = async (userId: string, id: string): Promise<PublishedRequest | null> => {
+/**
+ * Закриває свій запит. `closed_at` ставиться лише коли запит був відкритий: повторне закриття вікно відновлення не продовжує.
+ * Чужий чи неіснуючий запит дає null.
+ */
+export const closeRequest = async (userId: string, id: string, now = Date.now()): Promise<PublishedRequest | null> => {
   const db = getDb();
-  await db.update(requests).set({ status: "closed" }).where(and(eq(requests.id, id), eq(requests.userId, userId)));
+  const own = and(eq(requests.id, id), eq(requests.userId, userId));
+  await db.update(requests).set({ status: "closed", closedAt: now }).where(and(own, eq(requests.status, "open")));
   return findRequest(userId, id);
+};
+
+/**
+ * Відновлює свій закритий запит у межах доби від першого закриття. `createdAt`, правки, теги й файли не міняються.
+ * Чужий, неіснуючий чи відкритий запит: not_found; закритий, але доба минула (або `closed_at` порожній): window_expired.
+ */
+export const reopenRequest = async (userId: string, id: string, now = Date.now()): Promise<PublishedRequest | "not_found" | "window_expired"> => {
+  const db = getDb();
+  const [row] = await db.select().from(requests).where(and(eq(requests.id, id), eq(requests.userId, userId))).limit(1);
+  if (!row || row.status !== "closed") return "not_found";
+  if (restoreDeadline(row, now) === null) return "window_expired";
+  await db.update(requests).set({ status: "open", closedAt: null }).where(and(eq(requests.id, id), eq(requests.status, "closed")));
+  return (await findRequest(userId, id)) ?? "not_found";
 };
 
 /**
