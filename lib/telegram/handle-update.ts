@@ -106,7 +106,7 @@ const onCallback = async (query: TgCallbackQuery) => {
   await announceLinked(result, chatId, (text, keyboard) => finish(text, keyboard));
 };
 
-const BIND_TEXT = { taken: TEXTS.phoneTaken, blocked: TEXTS.phoneBlocked, unavailable: TEXTS.phoneFailed } as const;
+const BIND_TEXT = { taken: TEXTS.phoneTaken, blocked: TEXTS.phoneBlocked, locked: TEXTS.phoneLocked, unavailable: TEXTS.phoneFailed } as const;
 
 /**
  * Контакт з кнопки «Поділитися номером». Приймаємо лише з прив'язаного чату й лише свій: `contact.user_id` має збігатися з

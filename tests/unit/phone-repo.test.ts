@@ -60,6 +60,20 @@ describe("bindPhone", () => {
     expect(await bindPhone("pr-b1", PHONE)).toBe("ok");
   });
 
+  it("підтверджений номер самостійно не міняється: інший номер дає locked, той самий ok без змін", async () => {
+    await makeUser(ctx.db, "pr-l1");
+    await makeUser(ctx.db, "pr-l2");
+    expect(await bindPhone("pr-l1", PHONE, 100)).toBe("ok");
+    expect(await bindPhone("pr-l1", "+380671112233", 200)).toBe("locked");
+    const user = await row("pr-l1");
+    expect(user.phoneHash).toBe(await phoneHash(PHONE, KEY));
+    expect(user.phoneVerifiedAt).toBe(100);
+    expect(await bindPhone("pr-l1", PHONE, 300)).toBe("ok");
+    expect((await row("pr-l1")).phoneVerifiedAt).toBe(100);
+    // Старий номер не звільнився для другого акаунта.
+    expect(await bindPhone("pr-l2", PHONE)).toBe("taken");
+  });
+
   it("могила без боргу віддає номер новому акаунту й втрачає хеш", async () => {
     await makeUser(ctx.db, "pr-c-old");
     await makeUser(ctx.db, "pr-c-new");

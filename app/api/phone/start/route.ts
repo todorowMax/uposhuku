@@ -4,7 +4,7 @@
 
 import { problem } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { phoneKey } from "@/lib/server/phone-repo";
+import { phoneKey, phoneStatus } from "@/lib/server/phone-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { activeLink, createLinkToken } from "@/lib/server/telegram-repo";
 import { sendMessage } from "@/lib/telegram/api";
@@ -18,6 +18,8 @@ export const POST = async () => {
   if (!user) return problem(401, "Потрібен вхід");
   const limited = await rateLimited("phoneStart", user.id);
   if (limited) return limited;
+  // Підтверджений номер самостійно не міняємо: інакше боржник перепривʼязав би акаунт і звільнив старий номер.
+  if ((await phoneStatus(user.id)).verified) return problem(409, "Номер уже підтверджено", TEXTS.phoneLocked);
   const config = telegramConfig();
   if (!config.enabled || !config.username) return problem(503, "Telegram ще не підключено", "Підтвердження телефона з'явиться трохи згодом.");
   // Без ключа хешу номер підтвердити не можна: краще сказати зараз, ніж після того, як людина поділиться номером.

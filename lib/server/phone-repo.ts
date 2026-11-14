@@ -14,7 +14,7 @@ import { getDb } from "./db";
 import { featureEnabledFor } from "./features";
 import { readVar } from "./env";
 
-export type BindResult = "ok" | "taken" | "blocked" | "unavailable";
+export type BindResult = "ok" | "taken" | "blocked" | "locked" | "unavailable";
 
 export interface PhoneStatus {
   verified: boolean;
@@ -45,13 +45,15 @@ const owesFee = async (userIds: string[]): Promise<boolean> => {
 
 /**
  * Прив'язує підтверджений номер (E.164) до акаунта. `taken`: хеш у іншого живого акаунта. `blocked`: блок-лист чи могила з
- * боргом. `unavailable`: немає ключа хешу. Могилу без боргу позбавляємо хеша, щоб власник був один.
+ * боргом. `locked`: у людини вже підтверджений інший номер, самостійно його не міняємо (інакше боржник перепривʼязав би акаунт і звільнив старий номер). `unavailable`: немає ключа хешу. Могилу без боргу позбавляємо хеша, щоб власник був один.
  */
 export const bindPhone = async (userId: string, e164: string, now = Date.now()): Promise<BindResult> => {
   const key = phoneKey();
   if (!key) return "unavailable";
   const hash = await phoneHash(e164, key);
   const db = getDb();
+  const [own] = await db.select({ hash: users.phoneHash }).from(users).where(eq(users.id, userId)).limit(1);
+  if (own?.hash) return own.hash === hash ? "ok" : "locked";
   const [blocked] = await db.select({ hash: phoneBlocks.phoneHash }).from(phoneBlocks).where(eq(phoneBlocks.phoneHash, hash)).limit(1);
   if (blocked) return "blocked";
   const others = await db.select({ id: users.id, deletedAt: users.deletedAt }).from(users).where(and(eq(users.phoneHash, hash), ne(users.id, userId)));

@@ -10,15 +10,17 @@ export interface LegalSectionData {
 
 /**
  * Що з функцій публічно ввімкнено (режим `on`): лише про них пишемо в умовах і політиці.
- * `safeDeal`: безпечна угода; `crypto`: будь-який із `crypto_proof`, `crypto_wallet`, `crypto_escrow`.
+ * `safeDeal`: безпечна угода; `crypto`: будь-який із `crypto_proof`, `crypto_wallet`, `crypto_escrow`;
+ * `phone`: підтвердження телефона замовника (`phone_verify`).
  * PayPal і Wise (`foreign_links`) у публічних текстах не згадуємо взагалі.
  */
 export interface LegalFlags {
   safeDeal: boolean;
   crypto: boolean;
+  phone: boolean;
 }
 
-export const NO_LEGAL_FLAGS: LegalFlags = { safeDeal: false, crypto: false };
+export const NO_LEGAL_FLAGS: LegalFlags = { safeDeal: false, crypto: false, phone: false };
 
 /** Розділи, залежні від прапорця, лишаємо `false`/`undefined` і відсікаємо тут. */
 export const visible = (sections: (LegalSectionData | false | undefined)[]): LegalSectionData[] =>

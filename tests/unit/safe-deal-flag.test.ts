@@ -4,7 +4,7 @@ import { applyAction, SAFE_DEAL_UNAVAILABLE, validateDraft } from "@/lib/deals/m
 import type { Deal, DealDraft } from "@/lib/deals/types";
 import { legalLinks } from "@/lib/legal/links";
 import { proposeDeal } from "@/lib/server/deal-repo";
-import { cryptoPublic, legalFlags, safeDealEnabledFor, safeDealMode, safeDealPublic } from "@/lib/server/safe-deal";
+import { cryptoPublic, legalFlags, phonePublic, safeDealEnabledFor, safeDealMode, safeDealPublic } from "@/lib/server/safe-deal";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 // Режим безпечної угоди: off (типово), allowlist, on. Чиста машина отримує рішення параметром, сервер читає змінні.
@@ -82,13 +82,26 @@ describe("видимість крипти в юридичних текстах",
     delete process.env.CRYPTO_PROOF_USERS;
   });
 
+  it("phonePublic: лише режим on, allowlist і off політику не змінюють", async () => {
+    delete process.env.PHONE_VERIFY_MODE;
+    expect(await phonePublic()).toBe(false);
+    process.env.PHONE_VERIFY_MODE = "allowlist";
+    process.env.PHONE_VERIFY_USERS = "max@example.com";
+    expect(await phonePublic()).toBe(false);
+    process.env.PHONE_VERIFY_MODE = "on";
+    expect(await phonePublic()).toBe(true);
+    expect((await legalFlags()).phone).toBe(true);
+    delete process.env.PHONE_VERIFY_MODE;
+    delete process.env.PHONE_VERIFY_USERS;
+  });
+
   it("legalFlags збирає обидва прапорці незалежно", async () => {
     delete process.env.SAFE_DEAL_MODE;
     process.env.CRYPTO_ESCROW_MODE = "on";
-    expect(await legalFlags()).toEqual({ safeDeal: false, crypto: true });
+    expect(await legalFlags()).toEqual({ safeDeal: false, crypto: true, phone: false });
     process.env.SAFE_DEAL_MODE = "on";
     delete process.env.CRYPTO_ESCROW_MODE;
-    expect(await legalFlags()).toEqual({ safeDeal: true, crypto: false });
+    expect(await legalFlags()).toEqual({ safeDeal: true, crypto: false, phone: false });
     delete process.env.SAFE_DEAL_MODE;
   });
 });

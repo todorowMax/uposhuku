@@ -117,6 +117,23 @@ describe("вебхук: контакт", () => {
     await ctx.db.prepare("update users set phone_hash = null where id = 'pb-other'").run();
   });
 
+  it("уже підтверджений інший номер: бот відповідає locked, нічого не міняє", async () => {
+    await send(contactUpdate({ phone_number: "+380501234567", user_id: CHAT }));
+    calls = [];
+    await send(contactUpdate({ phone_number: "+380671112233", user_id: CHAT }));
+    expect(sent()[0].body.text).toBe("Номер уже підтверджено. Щоб змінити його, напишіть нам.");
+    expect((await phoneOf("pb-me")).phoneHash).toBe(await phoneHash("+380501234567", KEY));
+  });
+
+  it("POST /api/phone/start для підтвердженого: 409 з тим самим текстом, бот нічого не шле", async () => {
+    await send(contactUpdate({ phone_number: "+380501234567", user_id: CHAT }));
+    calls = [];
+    const response = await START();
+    expect(response.status).toBe(409);
+    expect(JSON.stringify(await response.json())).toContain("Щоб змінити його, напишіть нам.");
+    expect(sent()).toHaveLength(0);
+  });
+
   it("без ключа хешу: відповідь «спробуйте пізніше», нічого не записано", async () => {
     delete process.env.PHONE_HASH_KEY;
     await send(contactUpdate({ phone_number: "+380501234567", user_id: CHAT }));

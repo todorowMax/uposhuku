@@ -7,10 +7,10 @@ import { safeDealOfferSections } from "@/lib/legal/safe-deal-offer";
 import { TERMS_INTRO, termsSections } from "@/lib/legal/terms";
 import { type LegalFlags, numbered } from "@/lib/legal/types";
 
-const OFF: LegalFlags = { safeDeal: false, crypto: false };
-const SAFE: LegalFlags = { safeDeal: true, crypto: false };
-const CRYPTO: LegalFlags = { safeDeal: false, crypto: true };
-const ALL: LegalFlags = { safeDeal: true, crypto: true };
+const OFF: LegalFlags = { safeDeal: false, crypto: false, phone: false };
+const SAFE: LegalFlags = { safeDeal: true, crypto: false, phone: false };
+const CRYPTO: LegalFlags = { safeDeal: false, crypto: true, phone: false };
+const ALL: LegalFlags = { safeDeal: true, crypto: true, phone: false };
 
 const textsOf = (sections: { title: string; items: string[] }[]) => sections.flatMap((section) => [section.title, ...section.items]);
 
@@ -113,6 +113,14 @@ describe("правові тексти", () => {
     for (const part of [/неможливо скасувати/, /мережі/, /адрес/, /Комісію мережі/, /приватних ключів/, /не мають статусу засобу платежу/, /заморозити/, /заборонені/]) expect(crypto).toMatch(part);
     const privacy = privacySections(CRYPTO).flatMap((item) => item.items).join("\n");
     for (const part of [/хеш транзакції/, /Reown/, /TronGrid/, /не належать нам/]) expect(privacy).toMatch(part);
+  });
+
+  it("абзац про телефон у політиці є лише з прапорцем phone", () => {
+    const text = (flags: LegalFlags) => privacySections(flags).flatMap((item) => item.items).join("\n");
+    expect(text(OFF)).not.toMatch(/Підтверджений телефон/);
+    expect(text(OFF)).not.toMatch(/підтверджуєте через нього телефон/);
+    const on = text({ ...OFF, phone: true });
+    for (const part of [/Підтверджений телефон замовника/, /захищений хеш/, /двома останніми цифрами/, /«Поділитися номером»/, /3 роки після видалення акаунта/, /підтверджуєте через нього телефон/]) expect(on).toMatch(part);
   });
 
   it("безпечної угоди в умовах і політиці немає, поки режим не on; з нею з'являються її розділи", () => {

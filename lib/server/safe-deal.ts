@@ -21,8 +21,11 @@ export const cryptoPublic = async (): Promise<boolean> => {
   return modes.some((mode) => mode === "on");
 };
 
+/** Підтвердження телефона видно в політиці, коли `phone_verify` у режимі `on`. */
+export const phonePublic = async (): Promise<boolean> => (await featureMode("phone_verify")) === "on";
+
 /** Що з функцій показувати в умовах і політиці. */
 export const legalFlags = async (): Promise<LegalFlags> => {
-  const [safeDeal, crypto] = await Promise.all([safeDealPublic(), cryptoPublic()]);
-  return { safeDeal, crypto };
+  const [safeDeal, crypto, phone] = await Promise.all([safeDealPublic(), cryptoPublic(), phonePublic()]);
+  return { safeDeal, crypto, phone };
 };

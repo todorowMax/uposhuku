@@ -120,7 +120,7 @@ describe("рядок користувача ніколи не видаляєть
 
 describe("політика конфіденційності й код видалення не розходяться", () => {
   it("описує видалення в меню й виписку даних, а не лист на пошту", () => {
-    const text = privacySections({ safeDeal: true, crypto: true }).flatMap((section) => section.items).join("\n");
+    const text = privacySections({ safeDeal: true, crypto: true, phone: false }).flatMap((section) => section.items).join("\n");
     expect(text).toContain("«Видалити акаунт»");
     expect(text).toContain("«Завантажити мої дані»");
     expect(text).not.toContain("напишіть на {email} з пошти акаунта");
