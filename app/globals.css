@@ -62,6 +62,9 @@
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
   --color-online: var(--online);
+  --color-accent-ink: var(--accent-ink);
+  --color-tide: var(--tide);
+  --color-hover-blue: var(--hover-blue);
 
   /* Семантична z-шкала замість випадкових 999 */
   --z-map-overlay: 10;

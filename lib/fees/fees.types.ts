@@ -50,4 +50,27 @@ export namespace FeeTypes {
     dueAt: string;
     entries: EntryView[];
   }
+
+  /** Відповідь GET /api/fees: рахунок із прапорцем, чи комісія взагалі ввімкнена для людини. `dueAt` null, коли нічого немає. */
+  export interface Overview {
+    enabled: boolean;
+    balanceKop: number;
+    dueAt: string | null;
+    entries: EntryView[];
+  }
+
+  /** Відповідь POST /api/fees/invoice: сторінка оплати банку. */
+  export interface InvoiceStart {
+    id: string;
+    pageUrl: string;
+  }
+
+  /** Відповідь GET /api/fees/invoices/[id]: статус рахунку в банку й баланс після нього. */
+  export interface InvoiceCheck {
+    status: string;
+    balanceKop: number;
+  }
+
+  /** Що казати людині про рахунок: оплачено, не вийшло чи банк ще обробляє. */
+  export type InvoiceOutcome = "paid" | "failed" | "pending";
 }

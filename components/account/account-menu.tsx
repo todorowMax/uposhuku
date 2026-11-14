@@ -8,6 +8,7 @@
 import { useState } from "react";
 import { useAccountMenu, type AccountMenuTypes } from "@/components/account/use-account-menu";
 import { Button } from "@/components/ui/button";
+import { refreshFees } from "@/lib/fees/client";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { openAfterLayers } from "@/lib/ui/use-layer-history";
@@ -42,7 +43,7 @@ export const AccountMenu = ({ initial, name, email }: AccountMenuScreenTypes.Pro
 
   if (desktop) {
     return (
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(next) => next && void refreshFees()}>
         <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="account-menu">
           <div className="px-3 pb-2 pt-1">{who}</div>
@@ -59,7 +60,13 @@ export const AccountMenu = ({ initial, name, email }: AccountMenuScreenTypes.Pro
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) void refreshFees();
+      }}
+    >
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent aria-describedby={undefined}>
         <SheetTitle className="ui-sheet-title">Акаунт</SheetTitle>

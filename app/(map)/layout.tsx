@@ -18,6 +18,7 @@ import { RealPerformersSync } from "@/lib/map/performers-sync";
 import { RealtimeSync } from "@/lib/realtime/client";
 import { RequestComposer } from "@/components/composer/request-composer";
 import { FeedPanelGate, OffersPanelGate, PanelPreload } from "@/components/map/lazy-panels";
+import { FeesHost } from "@/components/fees/fees-host";
 import { PlacementPanel } from "@/components/placement/placement-host";
 import { InboxPanel } from "@/components/chat/inbox/inbox-panel";
 import { DirectChatSync } from "@/components/profile/direct-chat-sync";
@@ -55,6 +56,7 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <FeedPanelGate />
       <ProfileEditorHost />
       <PlacementPanel />
+      <FeesHost />
       <DirectChatSync />
       <InboxPanel />
       <PanelPreload />
