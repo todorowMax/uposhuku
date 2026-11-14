@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import { gsap } from "gsap";
 import { CalendarClock, Check, ChevronDown, ChevronsRight, Inbox, Loader2, MapPin, Send, Wallet } from "@/components/icons";
 import { ApiError } from "@/lib/auth/client";
@@ -16,12 +16,14 @@ import { placementOpenStore, placementStore } from "@/lib/placement/client";
 import { TIER_NAMES } from "@/lib/placement/tiers";
 import type { PlacementTier } from "@/lib/map/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
+import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { useStore } from "@/lib/store";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const isPhone = () => window.matchMedia("(max-width: 1023px)").matches;
+const collapseFeed = () => feedCollapsedStore.set(true);
 
 const plural = (count: number, one: string, few: string, many: string) => {
   const tens = count % 100;
@@ -61,9 +63,15 @@ export function FeedPanel() {
   const allowed = mapState.loaded && (filter !== "all" || pickedTags.length > 0) ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter, pickedTags).map((item) => item.id)) : null;
   const items = allowed ? allItems.filter((item) => allowed.has(item.id)) : allItems;
   const ownOpen = mapState.items.filter((item) => item.own);
-  const panelRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [panelNode, setPanelNode] = useState<HTMLElement | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
+  const setPanel = useCallback((node: HTMLElement | null) => {
+    panelRef.current = node;
+    setPanelNode(node);
+  }, []);
+  usePanelSwipe(panelNode, collapseFeed);
 
   useLayoutEffect(() => {
     if (!active || collapsed) hoveredFeedRequestStore.set(null);
@@ -77,7 +85,8 @@ export function FeedPanel() {
     const tween = gsap.fromTo(
       panelRef.current,
       isPhone() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
-      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out" }
+      // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
+      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" }
     );
     return () => {
       tween.kill();
@@ -122,7 +131,7 @@ export function FeedPanel() {
 
   return (
     <aside
-      ref={panelRef}
+      ref={setPanel}
       aria-label="Запити для виконавця"
       className="offers-panel feed-panel glass-panel"
       onPointerLeave={() => hoveredFeedRequestStore.set(null)}
@@ -130,6 +139,7 @@ export function FeedPanel() {
         if (!event.currentTarget.contains(event.relatedTarget as Node | null) && !event.currentTarget.matches(":hover")) hoveredFeedRequestStore.set(null);
       }}
     >
+      <span className="offers-grip" aria-hidden />
       <header className="offers-header">
         <div className="min-w-0 flex-1">
           <h2 className="flex items-center gap-2 text-[16px] font-semibold text-ink">
@@ -138,10 +148,10 @@ export function FeedPanel() {
           </h2>
           <p className="offers-header-note">Усі відкриті, найвідповідніші під ваші теги першими</p>
         </div>
-        <button type="button" onClick={() => feedCollapsedStore.set(true)} aria-label="Згорнути запити" className="auth-icon-button -mr-1.5">
+        <Button variant="icon" onClick={collapseFeed} aria-label="Згорнути запити" className="-mr-1.5">
           <ChevronsRight className="hidden size-4 lg:block" />
           <ChevronDown className="size-4 lg:hidden" />
-        </button>
+        </Button>
       </header>
 
       <div ref={bodyRef} className="offers-body offers-list">

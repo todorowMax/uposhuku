@@ -1825,6 +1825,35 @@ html[data-glass] .filter-chip[aria-pressed="true"] {
   }
 }
 
+/*
+  Нижня панель (до 1024px) тягнеться вниз за пальцем і згортається в язичок: lib/ui/use-panel-swipe.ts.
+  Ручка та сама, що в шторці (.ui-sheet-grip); від 1024px панель колонка праворуч, ручки й жесту немає.
+*/
+.offers-grip {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .offers-panel {
+    transform: translateY(var(--sheet-drag, 0px));
+  }
+
+  .offers-grip {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    display: block;
+    translate: -50% 0;
+  }
+}
+
+/* Після недотягнутого свайпу панель повертається на місце; під пальцем без згладжування. */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .offers-panel:not([data-dragging]) {
+    transition: transform 200ms var(--ease-out-quint);
+  }
+}
+
 html[data-glass] .offers-panel {
   background: rgb(255 255 255 / 84%);
   backdrop-filter: blur(16px);
@@ -1883,11 +1912,9 @@ html[data-glass] .offers-panel {
   border-bottom: 1px solid rgb(66 116 132 / 40%);
 }
 
+/* Підпис переноситься на другий рядок, а не обрізається: на вузькому телефоні він не вміщається в один. */
 .offers-header-note {
   margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 11px;
   color: var(--ink-muted);
 }
@@ -5648,13 +5675,17 @@ html[data-map-ready] .map-skeleton {
   padding: 0 16px 16px;
 }
 
-.ui-sheet-grip {
-  align-self: center;
+.ui-sheet-grip,
+.offers-grip {
   width: 36px;
   height: 4px;
-  margin: 8px 0 4px;
   border-radius: 999px;
   background: rgb(0 54 74 / 18%);
+}
+
+.ui-sheet-grip {
+  align-self: center;
+  margin: 8px 0 4px;
 }
 
 .ui-sheet-title {

@@ -4,10 +4,11 @@
 //
 // Свайп вниз закриває шторку. Тягнемо весь вміст, але лише коли палець починає рух зверху прокручуваного
 // списку (scrollTop 0) і не з поля вводу. Зсув іде змінною `--sheet-drag` (transform), на час жесту
-// ставиться `data-dragging`, щоб CSS не згладжував рух. Від 768 px шторка маленьке вікно, жест вимкнено.
+// ставиться `data-dragging`, щоб CSS не згладжував рух. Від 768 px шторка маленьке вікно, жест вимкнено;
+// нижні панелі карти лежать знизу довше (до 1024 px) і передають свою межу третім параметром.
 
 import { useEffect, useRef } from "react";
-import { dragOffset, shouldDismiss, startsDrag } from "@/lib/ui/sheet-swipe";
+import { canStartSwipe, dragOffset, shouldDismiss, startsDrag } from "@/lib/ui/sheet-swipe";
 
 const DESKTOP = "(min-width: 768px)";
 
@@ -20,7 +21,7 @@ const scrolledAway = (from: EventTarget | null, root: HTMLElement): boolean => {
 
 const isTextField = (target: EventTarget | null): boolean => target instanceof HTMLElement && target.closest("input, textarea, select, [contenteditable=true]") !== null;
 
-export const useSheetSwipe = (root: HTMLElement | null, onDismiss: () => void) => {
+export const useSheetSwipe = (root: HTMLElement | null, onDismiss: () => void, wideQuery = DESKTOP) => {
   const onClose = useRef(onDismiss);
   useEffect(() => {
     onClose.current = onDismiss;
@@ -40,8 +41,13 @@ export const useSheetSwipe = (root: HTMLElement | null, onDismiss: () => void) =
     };
     const onStart = (event: TouchEvent) => {
       const touch = event.touches[0];
-      const blocked = event.touches.length !== 1 || window.matchMedia(DESKTOP).matches || isTextField(event.target) || scrolledAway(event.target, root);
-      start = blocked || !touch ? null : { x: touch.clientX, y: touch.clientY, time: event.timeStamp };
+      const allowed = canStartSwipe({
+        touches: event.touches.length,
+        wide: window.matchMedia(wideQuery).matches,
+        textField: isTextField(event.target),
+        scrolled: scrolledAway(event.target, root),
+      });
+      start = allowed && touch ? { x: touch.clientX, y: touch.clientY, time: event.timeStamp } : null;
     };
     const onMove = (event: TouchEvent) => {
       const touch = event.touches[0];
@@ -86,5 +92,5 @@ export const useSheetSwipe = (root: HTMLElement | null, onDismiss: () => void) =
       root.removeEventListener("touchend", onEnd);
       root.removeEventListener("touchcancel", reset);
     };
-  }, [root]);
+  }, [root, wideQuery]);
 };

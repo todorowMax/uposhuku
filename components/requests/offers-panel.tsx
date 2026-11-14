@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import {
   ArrowUp,
@@ -31,6 +31,7 @@ import { useSidePanel } from "@/lib/requests/side-panel";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
 import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
+import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
 const PRICE = new Intl.NumberFormat("uk-UA");
@@ -56,6 +57,7 @@ const priceLabel = (price: number | null) =>
 const isPhone = () => window.matchMedia("(max-width: 1023px)").matches;
 const reduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const collapseOffers = () => offersCollapsedStore.set(true);
 
 /**
  * Пропозиції виконавців праворуч, поки йде підбір: карта ліворуч
@@ -87,9 +89,15 @@ export function OffersPanel() {
   const deals = useDeals(request?.id);
   const conversations = useStore(conversationsStore);
   const [showDeclined, setShowDeclined] = useState(false);
-  const panelRef = useRef<HTMLElement>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const [panelNode, setPanelNode] = useState<HTMLElement | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const known = useRef(new Set<string>());
+  const setPanel = useCallback((node: HTMLElement | null) => {
+    panelRef.current = node;
+    setPanelNode(node);
+  }, []);
+  usePanelSwipe(panelNode, collapseOffers);
 
   // Інший запит — починаємо зі згорнутої панелі, щоб спершу була видна мапа.
   useEffect(() => {
@@ -126,7 +134,8 @@ export function OffersPanel() {
     const tween = gsap.fromTo(
       panelRef.current,
       isPhone() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
-      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out" },
+      // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
+      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" },
     );
     return () => {
       tween.kill();
@@ -184,7 +193,7 @@ export function OffersPanel() {
 
   return (
     <aside
-      ref={panelRef}
+      ref={setPanel}
       aria-label="Пропозиції виконавців"
       className="offers-panel glass-panel"
       onPointerLeave={() => hoveredOfferStore.set(null)}
@@ -199,25 +208,26 @@ export function OffersPanel() {
     >
       {
         <>
+          <span className="offers-grip" aria-hidden />
           <header className="offers-header">
             <div className="min-w-0">
               <h2 className="flex items-center gap-2 text-[16px] font-semibold text-ink">
                 Пропозиції
                 {total > 0 && <span className="filter-all-badge">{total}</span>}
               </h2>
-              <p className="mt-0.5 truncate text-[11px] text-ink-muted">
+              <p className="offers-header-note">
                 Вище ті, хто оплатив розміщення
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => offersCollapsedStore.set(true)}
+            <Button
+              variant="icon"
+              onClick={collapseOffers}
               aria-label="Згорнути пропозиції"
-              className="auth-icon-button -mr-1.5"
+              className="-mr-1.5"
             >
               <ChevronsRight className="hidden size-4 lg:block" />
               <ChevronDown className="size-4 lg:hidden" />
-            </button>
+            </Button>
           </header>
 
           <div ref={bodyRef} className="offers-body offers-list">

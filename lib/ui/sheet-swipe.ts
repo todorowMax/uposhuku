@@ -21,3 +21,17 @@ export const shouldDismiss = (dy: number, durationMs: number, height: number): b
   const speed = dy / Math.max(1, durationMs);
   return dy >= height * DISMISS_RATIO || (speed >= FLICK_SPEED && dy > DRAG_START_PX * 2);
 };
+
+export interface SwipeStart {
+  /** Скільки пальців на екрані: жест лише одним. */
+  touches: number;
+  /** Екран завширокий для шторки: це вікно чи колонка, свайпу немає. */
+  wide: boolean;
+  /** Дотик почався в полі вводу: палець там виділяє текст і ставить курсор. */
+  textField: boolean;
+  /** Дотик почався всередині вмісту, прокрученого від верху: свайп вниз тут гортає список. */
+  scrolled: boolean;
+}
+
+/** Чи може дотик стати свайпом шторки. Інакше жест не чіпаємо, а прокрутка й поля працюють як завжди. */
+export const canStartSwipe = ({ touches, wide, textField, scrolled }: SwipeStart): boolean => touches === 1 && !wide && !textField && !scrolled;

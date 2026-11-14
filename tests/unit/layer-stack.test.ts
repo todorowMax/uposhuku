@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { closeLayer, emptyStack, openLayer, popLayer, topLayerId } from "@/lib/ui/layer-stack";
-import { dragOffset, shouldDismiss, startsDrag } from "@/lib/ui/sheet-swipe";
+import { canStartSwipe, dragOffset, shouldDismiss, startsDrag } from "@/lib/ui/sheet-swipe";
 
 const open = (ids: string[]) => ids.reduce((stack, id) => openLayer(stack, id).stack, emptyStack);
 
@@ -76,5 +76,14 @@ describe("свайп шторки", () => {
     expect(shouldDismiss(40, 1000, 400)).toBe(false);
     expect(shouldDismiss(60, 80, 400)).toBe(true);
     expect(shouldDismiss(-100, 100, 400)).toBe(false);
+  });
+
+  it("жест починається лише одним пальцем на вузькому екрані, не з поля вводу й не з прокрученого списку", () => {
+    const base = { touches: 1, wide: false, textField: false, scrolled: false };
+    expect(canStartSwipe(base)).toBe(true);
+    expect(canStartSwipe({ ...base, touches: 2 })).toBe(false);
+    expect(canStartSwipe({ ...base, wide: true })).toBe(false);
+    expect(canStartSwipe({ ...base, textField: true })).toBe(false);
+    expect(canStartSwipe({ ...base, scrolled: true })).toBe(false);
   });
 });
