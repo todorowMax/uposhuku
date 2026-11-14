@@ -5,15 +5,17 @@
 // з кнопкою «Відгукнутися на Findlyfy»: відгукнутися можна лише на платформі.
 // Коли запит закрито, пост редагується: «Виконавця знайдено». Коли автор змінив відкритий запит,
 // уже опублікований пост оновлюється свіжим текстом; якщо поста ще немає, він береться зі свіжих даних при публікації.
+// Коли автор зняв галочку «в канал» у відкритому запиті, пост видаляється з каналу, а рядок channel_posts стирається:
+// повторне ввімкнення галочки ставить запит у звичайну чергу публікації.
 
-import { and, eq, gt, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, lt, notInArray, sql } from "drizzle-orm";
 import { channelPosts, requestTags, requests } from "@/db/schema";
 import { stripContacts } from "@/lib/chat/contacts";
 import { CITIES } from "@/lib/map/cities";
 import { DEADLINES, isDeadline } from "@/lib/requests/types";
 import { getDb } from "@/lib/server/db";
 import { logServer } from "@/lib/telemetry/log";
-import { editMessageText, sendMessage, TelegramError } from "./api";
+import { deleteMessage, editMessageText, sendMessage, TelegramError } from "./api";
 import { telegramConfig, type TelegramConfig } from "./config";
 import { deepLink } from "./notices";
 import { escapeHtml, excerpt } from "./texts";
@@ -143,7 +145,7 @@ export const editedPosts = async (limit = POSTS_PER_RUN): Promise<(ChannelReques
     .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
-    .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), isNotNull(channelPosts.messageId), gt(requests.editedAt, channelPosts.updatedAt)))
+    .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), eq(requests.channelOptIn, true), isNotNull(channelPosts.messageId), gt(requests.editedAt, channelPosts.updatedAt)))
     .orderBy(requests.editedAt)
     .limit(limit);
   const tagged = await withTags(rows);
@@ -172,6 +174,52 @@ export const syncEditedPosts = async (now = Date.now(), config = telegramConfig(
     }
   }
   return edited;
+};
+
+/** Опубліковані пости відкритих запитів, у яких автор зняв галочку «в канал»; спершу ті, що давно не чіпали (щоб один збійний не блокував решту). */
+const optedOutPosts = () =>
+  getDb()
+    .select({ requestId: channelPosts.requestId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .from(channelPosts)
+    .innerJoin(requests, eq(requests.id, channelPosts.requestId))
+    .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), eq(requests.channelOptIn, false), isNotNull(channelPosts.messageId)))
+    .orderBy(asc(channelPosts.updatedAt))
+    .limit(POSTS_PER_RUN);
+
+const alreadyGone = (error: unknown): boolean => error instanceof TelegramError && error.code === 400 && /message to delete not found/i.test(error.message);
+
+/** Видаляє один пост. `removed`: пост зник (або його вже не було); `retry`: помилка записана, повторимо в наступному запуску; `stop`: ліміт Telegram. */
+const removePost = async (row: { requestId: string; chatId: string; messageId: number }, now: number): Promise<"removed" | "retry" | "stop"> => {
+  const db = getDb();
+  try {
+    await deleteMessage(row.chatId, row.messageId);
+  } catch (error) {
+    if (error instanceof TelegramError && error.code === 429) return "stop";
+    if (!alreadyGone(error)) {
+      const message = error instanceof Error ? error.message : String(error);
+      await db.update(channelPosts).set({ updatedAt: now, error: message.slice(0, 300) }).where(eq(channelPosts.requestId, row.requestId));
+      logServer({ level: "error", event: "channel_remove_failed", message, detail: { requestId: row.requestId } });
+      return "retry";
+    }
+  }
+  await db.delete(channelPosts).where(eq(channelPosts.requestId, row.requestId));
+  return "removed";
+};
+
+/**
+ * Видаляє з каналу пости відкритих запитів зі знятою галочкою «в канал» і стирає їхні рядки channel_posts. «Повідомлення вже немає»
+ * теж вважаємо успіхом. Інша помилка Telegram іде в журнал (без тексту запиту), рядок лишається для повтору в наступному запуску;
+ * 429: зупинка до наступного запуску. Закриті запити не чіпаємо: їхній пост «Виконавця знайдено» лишається.
+ */
+export const removeOptedOutPosts = async (now = Date.now(), config = telegramConfig()): Promise<number> => {
+  if (!channelReady(config)) return 0;
+  let removed = 0;
+  for (const row of await optedOutPosts()) {
+    const outcome = await removePost({ requestId: row.requestId, chatId: row.chatId, messageId: row.messageId as number }, now);
+    if (outcome === "stop") break;
+    if (outcome === "removed") removed++;
+  }
+  return removed;
 };
 
 /** Редагує пости закритих запитів: «Виконавця знайдено», без кнопки. */

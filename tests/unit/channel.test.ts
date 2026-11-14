@@ -2,7 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { channelPosts } from "@/db/schema";
 import { POST as tick } from "@/app/api/internal/tick/route";
 import { GET as channelStatus } from "@/app/api/channel/route";
-import { POSTS_PER_RUN, POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, syncEditedPosts, type ChannelRequest } from "@/lib/telegram/channel";
+import { POSTS_PER_RUN, POSTS_PER_USER_PER_DAY, closeFinishedPosts, formatChannelPost, hashtag, postDueRequests, removeOptedOutPosts, syncEditedPosts, type ChannelRequest } from "@/lib/telegram/channel";
 import { telegramConfig } from "@/lib/telegram/config";
 import { getDb } from "@/lib/server/db";
 import { makeUser, useTestD1 } from "../helpers/d1";
@@ -235,6 +235,98 @@ describe("оновлення постів після правки", () => {
   });
 });
 
+describe("видалення поста після знятої галочки", () => {
+  const deletes = () => calls.filter((call) => call.method === "deleteMessage");
+  const optOut = (id: string) => ctx.db.prepare("update requests set channel_opt_in = 0 where id = ?").bind(id).run();
+  const rows = async () => (await getDb().select().from(channelPosts)).map((row) => row.requestId);
+
+  it("галочку знято у відкритого запиту: пост видаляється з каналу, рядок стирається, повторно нічого", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await optOut("r");
+    expect(await removeOptedOutPosts(NOW + MIN)).toBe(1);
+    expect(deletes()).toHaveLength(1);
+    expect(deletes()[0].body).toEqual({ chat_id: "-100123", message_id: 42 });
+    expect(await rows()).toEqual([]);
+    expect(await removeOptedOutPosts(NOW + 2 * MIN)).toBe(0);
+    expect(deletes()).toHaveLength(1);
+  });
+
+  it("галочку знову ввімкнено: запит іде в звичайну чергу й постить новий пост", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await optOut("r");
+    await removeOptedOutPosts(NOW + MIN);
+    await ctx.db.prepare("update requests set channel_opt_in = 1 where id = 'r'").run();
+    expect((await postDueRequests(NOW + 2 * MIN)).posted).toBe(1);
+    expect(await status("r")).toBe("posted");
+  });
+
+  it("не чіпає: галочка ввімкнена, запит закритий (пост «Виконавця знайдено»), поста ще немає, запис failed", async () => {
+    await addRequest("on");
+    await addRequest("closed", { user: "b" });
+    await addRequest("fresh", { user: "c", ageMin: 5, optIn: false });
+    await postDueRequests(NOW);
+    await addRequest("bad", { ageMin: 40 });
+    await ctx.db.prepare("update requests set status = 'closed', channel_opt_in = 0 where id = 'closed'").run();
+    await ctx.db.prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at) values ('bad', '-100123', null, 'failed', ?, ?)").bind(NOW, NOW).run();
+    await optOut("bad");
+    expect(await removeOptedOutPosts(NOW + MIN)).toBe(0);
+    expect(deletes()).toHaveLength(0);
+    expect(await rows()).toEqual(expect.arrayContaining(["on", "closed", "bad"]));
+  });
+
+  it("«повідомлення вже немає» (400): рядок стирається, як після успіху", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await optOut("r");
+    respond = (method) => (method === "deleteMessage" ? Response.json({ ok: false, error_code: 400, description: "Bad Request: message to delete not found" }) : Response.json({ ok: true, result: { message_id: 42 } }));
+    expect(await removeOptedOutPosts(NOW + MIN)).toBe(1);
+    expect(await rows()).toEqual([]);
+  });
+
+  it("інша помилка Telegram не кидає: рядок лишається з помилкою для повтору, наступний запуск вдалий", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await optOut("r");
+    respond = (method) => (method === "deleteMessage" ? Response.json({ ok: false, error_code: 400, description: "Bad Request: message can't be deleted" }) : Response.json({ ok: true, result: { message_id: 42 } }));
+    expect(await removeOptedOutPosts(NOW + MIN)).toBe(0);
+    const [row] = await getDb().select().from(channelPosts);
+    expect(row).toMatchObject({ requestId: "r", status: "posted", updatedAt: NOW + MIN });
+    expect(row.error).toContain("can't be deleted");
+    respond = () => Response.json({ ok: true, result: true });
+    expect(await removeOptedOutPosts(NOW + 2 * MIN)).toBe(1);
+    expect(await rows()).toEqual([]);
+  });
+
+  it(`не більше ${POSTS_PER_RUN} за запуск; 429 зупиняє крок; без токена нічого`, async () => {
+    for (let index = 0; index < POSTS_PER_RUN + 2; index++) {
+      await addRequest(`d${index}`, { user: ["a", "b", "c"][index % 3], optIn: false });
+      await ctx.db.prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at) values (?, '-100123', ?, 'posted', ?, ?)").bind(`d${index}`, 100 + index, NOW, NOW).run();
+    }
+    respond = () => Response.json({ ok: false, error_code: 429, description: "Too Many Requests", parameters: { retry_after: 30 } });
+    expect(await removeOptedOutPosts(NOW + MIN)).toBe(0);
+    expect(deletes()).toHaveLength(1);
+    respond = () => Response.json({ ok: true, result: true });
+    expect(await removeOptedOutPosts(NOW + 2 * MIN)).toBe(POSTS_PER_RUN);
+    expect(await removeOptedOutPosts(NOW + 3 * MIN)).toBe(2);
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    await addRequest("late", { optIn: false });
+    await ctx.db.prepare("insert into channel_posts (request_id, chat_id, message_id, status, posted_at, updated_at) values ('late', '-100123', 7, 'posted', ?, ?)").bind(NOW, NOW).run();
+    const before = deletes().length;
+    expect(await removeOptedOutPosts(NOW + 4 * MIN)).toBe(0);
+    expect(deletes()).toHaveLength(before);
+  });
+
+  it("пост із знятою галочкою не редагується після правки запиту", async () => {
+    await addRequest("r");
+    await postDueRequests(NOW);
+    await optOut("r");
+    await ctx.db.prepare("update requests set text = 'Нова версія', edited_at = ? where id = 'r'").bind(NOW + MIN).run();
+    expect(await syncEditedPosts(NOW + 2 * MIN)).toBe(0);
+  });
+});
+
 describe("cron-роут і статус каналу", () => {
   const call = (token?: string) => tick(new Request("https://site.test/api/internal/tick", { method: "POST", headers: token ? { authorization: `Bearer ${token}` } : {} }));
 
@@ -248,8 +340,11 @@ describe("cron-роут і статус каналу", () => {
     expect((await call("tick-token")).status).toBe(401);
     process.env.INTERNAL_TOKEN = "tick-token";
     const body = (await (await call("tick-token")).json()) as Record<string, unknown>;
-    expect(body).toMatchObject({ ok: true, posted: 1, failed: 0, closed: 0 });
+    expect(body).toMatchObject({ ok: true, posted: 1, failed: 0, removed: 0, closed: 0 });
     expect(await status("live")).toBe("posted");
+    await ctx.db.prepare("update requests set channel_opt_in = 0 where id = 'live'").run();
+    expect(await (await call("tick-token")).json()).toMatchObject({ ok: true, posted: 0, removed: 1 });
+    expect(await status("live")).toBeUndefined();
   });
 
   it("/api/channel каже, чи канал працює", async () => {
