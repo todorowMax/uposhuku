@@ -11,7 +11,7 @@ import type { ConversationDto } from "@/lib/chat/types";
 import { TermsForm } from "./terms-form";
 import { useTermsForm } from "./use-terms-form";
 
-export const TermsScreen = ({ conversation, onOpenChange, onDone }: { conversation: Pick<ConversationDto, "id" | "performerId">; onOpenChange: (open: boolean) => void; onDone: () => void }) => {
+export const TermsScreen = ({ conversation, onOpenChange, onDone }: { conversation: Pick<ConversationDto, "id" | "performerId" | "role">; onOpenChange: (open: boolean) => void; onDone: () => void }) => {
   const form = useTermsForm(conversation, onDone);
   return (
     <Screen

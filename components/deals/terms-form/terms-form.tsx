@@ -13,6 +13,8 @@ import { CommissionRow } from "@/components/deals/commission-row";
 import { CriteriaField } from "@/components/deals/criteria-field";
 import { DisputeTips } from "@/components/deals/dispute-tips";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
+import { PaymentModesHint } from "@/components/fees/payment-modes-hint";
+import { PostpaidFeeRow } from "@/components/fees/postpaid-fee-row";
 import { StagesEditor } from "@/components/deals/stages-editor";
 import { money, moneyIn } from "@/lib/deals/format";
 import { COMMISSION_RATE, formatKop } from "@/lib/deals/price";
@@ -27,7 +29,7 @@ export namespace TermsFormTypes {
 
 /** Поля умов; кнопка «Надіслати» стоїть у закріпленому низу екрана (terms-screen.tsx). */
 export const TermsForm = ({ form }: { form: TermsFormTypes.Value }) => {
-  const { ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal } = form;
+  const { postpaidFee, ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal } = form;
   return (
     <div className="deal terms-form">
       <p className="auth-lead">
@@ -109,10 +111,11 @@ export const TermsForm = ({ form }: { form: TermsFormTypes.Value }) => {
               }
             />
           )}
-          <RadioCard id="terms-method-direct" value="direct" title="Прямий переказ" hint="Без комісії, одним платежем або за етапами. Без гарантії платформи." />
+          <RadioCard id="terms-method-direct" value="direct" title="Прямий переказ" hint={postpaidFee ? "Одним платежем або за етапами. Комісія платформи нараховується на ваш рахунок. Без гарантії платформи." : "Без комісії, одним платежем або за етапами. Без гарантії платформи."} />
         </RadioGroup>
         {escrowAvailable && <EscrowMethodOption id="terms-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
+      {postpaidFee && <PaymentModesHint />}
       {method === "direct" && <AcceptedMethods methods={methods} />}
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
@@ -131,6 +134,7 @@ export const TermsForm = ({ form }: { form: TermsFormTypes.Value }) => {
             <dt>Вартість роботи (отримає виконавець)</dt>
             <dd className="tabular-nums">{moneyIn(total, currencyOfMethod(method))}</dd>
           </div>
+          {method === "direct" && postpaidFee && <PostpaidFeeRow totalUah={total} />}
           {method === "safe" && (
             <>
               <CommissionRow amount={money(fee)} />

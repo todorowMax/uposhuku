@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import type { StagesEditorTypes } from "@/components/deals/stages-editor";
 import { ApiError } from "@/lib/auth/client";
+import { useFeesEnabled } from "@/lib/fees/client";
 import { withRiskAck } from "@/lib/legal/client";
 import type { ConversationDto } from "@/lib/chat/types";
 import { proposeTerms } from "@/lib/deals/client";
@@ -16,10 +17,13 @@ import { totalOf } from "@/lib/deals/price";
 import { useSafeDealOptions } from "@/lib/deals/use-safe-deal";
 import type { DealMethod } from "@/lib/deals/types";
 
-export const useTermsForm = (conversation: Pick<ConversationDto, "id" | "performerId">, onDone: () => void) => {
+export const useTermsForm = (conversation: Pick<ConversationDto, "id" | "performerId" | "role">, onDone: () => void) => {
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
   const { ready, safeEnabled, fop, methods } = useSafeDealOptions(conversation.performerId);
   const escrowAvailable = useEscrowAvailable();
+  // Комісія за фактом нараховується замовнику; виконавець рядка не бачить.
+  const feesEnabled = useFeesEnabled();
+  const postpaidFee = feesEnabled && conversation.role === "customer";
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [criteria, setCriteria] = useState("");
@@ -89,5 +93,5 @@ export const useTermsForm = (conversation: Pick<ConversationDto, "id" | "perform
   };
 
 
-  return { ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, busy, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal, submit };
+  return { postpaidFee, ready, safeEnabled, fop, methods, escrowAvailable, title, setTitle, description, setDescription, criteria, setCriteria, amount, setAmount, days, setDays, method, setMethod, custom, setCustom, busy, error, amountNumber, daysNumber, stages, problem, total, fee, payTotal, submit };
 };

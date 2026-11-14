@@ -5,6 +5,7 @@
 // Логіка форми «Запропонувати угоду» за відгуком: суми й етапи, спосіб оплати, перевірка, надсилання.
 
 import { useMemo, useState } from "react";
+import { useFeesEnabled } from "@/lib/fees/client";
 import { useEscrowAvailable } from "@/components/wallet/use-crypto-config";
 import type { StagesEditorTypes } from "@/components/deals/stages-editor";
 import { ApiError } from "@/lib/auth/client";
@@ -20,6 +21,8 @@ export const useDealComposer = (response: OfferResponse, onDone: (deal: Deal) =>
   // Чи доступна безпечна угода цій людині, вирішує сервер. Чи підключив виконавець виплати, він теж перевіряє сам.
   const { ready, safeEnabled, fop, methods } = useSafeDealOptions(response.performerId);
   const escrowAvailable = useEscrowAvailable();
+  // Пропозицію за відгуком робить замовник: комісія за фактом нараховується йому.
+  const postpaidFee = useFeesEnabled();
   // Що людина обрала сама; поки не обирала, «Безпечна угода» лише тоді, коли вона справді доступна для цього виконавця.
   const [picked, setPicked] = useState<DealMethod | null>(null);
   const method: DealMethod = picked ?? initialMethod(safeEnabled, fop);
@@ -99,5 +102,5 @@ export const useDealComposer = (response: OfferResponse, onDone: (deal: Deal) =>
     }
   };
 
-  return { ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, busy, error, amountNumber, daysNumber, stages, total, fee, payTotal, problem, submit };
+  return { postpaidFee, ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, busy, error, amountNumber, daysNumber, stages, total, fee, payTotal, problem, submit };
 };

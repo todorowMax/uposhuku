@@ -13,6 +13,8 @@ import { AcceptedMethods } from "@/components/deals/accepted-methods";
 import { CommissionRow } from "@/components/deals/commission-row";
 import { CriteriaField } from "@/components/deals/criteria-field";
 import { EscrowMethodOption } from "@/components/deals/escrow-method-option";
+import { PaymentModesHint } from "@/components/fees/payment-modes-hint";
+import { PostpaidFeeRow } from "@/components/fees/postpaid-fee-row";
 import { StagesEditor } from "@/components/deals/stages-editor";
 import { money, moneyIn } from "@/lib/deals/format";
 import { COMMISSION_RATE, formatKop } from "@/lib/deals/price";
@@ -33,7 +35,7 @@ export namespace DealComposerTypes {
 
 /** Поля пропозиції; кнопка «Запропонувати угоду» стоїть у закріпленому низу екрана (deal-composer-screen.tsx). */
 export const DealComposer = ({ form }: { form: DealComposerTypes.Value }) => {
-  const { ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, amountNumber, daysNumber, stages, total, fee, payTotal, problem, error } = form;
+  const { postpaidFee, ready, safeEnabled, fop, methods, escrowAvailable, method, setMethod, amount, setAmount, days, setDays, custom, setCustom, criteria, setCriteria, agree, setAgree, amountNumber, daysNumber, stages, total, fee, payTotal, problem, error } = form;
   return (
     <div className="deal">
       <p className="auth-lead">
@@ -110,11 +112,12 @@ export const DealComposer = ({ form }: { form: DealComposerTypes.Value }) => {
                 Прямий переказ
               </span>
             }
-            hint="Без комісії, переказ на рахунок виконавця: одним платежем або за етапами. Без гарантії платформи: у спорі гроші ми не повертаємо."
+            hint={postpaidFee ? "Переказ на рахунок виконавця: одним платежем або за етапами. Комісія платформи нараховується на ваш рахунок. Без гарантії платформи: у спорі гроші ми не повертаємо." : "Без комісії, переказ на рахунок виконавця: одним платежем або за етапами. Без гарантії платформи: у спорі гроші ми не повертаємо."}
           />
         </RadioGroup>
         {escrowAvailable && <EscrowMethodOption id="deal-escrow" selected={method === "escrow"} onChange={(on) => setMethod(on ? "escrow" : null)} />}
       </fieldset>
+      {postpaidFee && <PaymentModesHint />}
       {method === "direct" && <AcceptedMethods methods={methods} />}
       {!safeEnabled && !escrowAvailable && (
         <p className="pe-hint">
@@ -155,10 +158,14 @@ export const DealComposer = ({ form }: { form: DealComposerTypes.Value }) => {
               <dt>Ви платите</dt>
               <dd className="tabular-nums">{moneyIn(total, currencyOfMethod(method))}</dd>
             </div>
-            <div>
-              <dt>Комісія платформи</dt>
-              <dd>{FEE_NOTE[method]}</dd>
-            </div>
+            {method === "direct" && postpaidFee ? (
+              <PostpaidFeeRow totalUah={total} />
+            ) : (
+              <div>
+                <dt>Комісія платформи</dt>
+                <dd>{FEE_NOTE[method]}</dd>
+              </div>
+            )}
           </>
         )}
       </dl>
