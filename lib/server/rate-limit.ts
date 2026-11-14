@@ -19,6 +19,7 @@ export interface RateRule {
 export const RATE_RULES = {
   dealCreate: { max: 20, windowMs: 60 * MINUTE },
   dealAction: { max: 60, windowMs: 10 * MINUTE },
+  feeInvoice: { max: 10, windowMs: 60 * MINUTE },
   dealComplaint: { max: 5, windowMs: 60 * MINUTE },
   dealReceipt: { max: 20, windowMs: 10 * MINUTE },
   dealPay: { max: 10, windowMs: 10 * MINUTE },

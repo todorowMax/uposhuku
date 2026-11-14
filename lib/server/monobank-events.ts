@@ -1,12 +1,13 @@
 // lib/server/monobank-events.ts
 //
 // Розбір події вебхука Monobank за id рахунку. Вебхук один на всі наші рахунки, тож кожен різновид
-// рахунку перевіряє, чи рахунок його: спершу розміщення на карті, потім етап безпечної угоди.
+// рахунку перевіряє, чи рахунок його: спершу розміщення на карті, потім комісія за фактом, потім етап безпечної угоди.
 // Додаючи різновид, дописуйте гілку тут.
 
 import type { InvoiceStatusResponse } from "@/lib/monobank/client";
 import { reconcilePayment } from "./deal-money";
 import { announcePlacementPaid } from "./placement-paid";
+import { applyFeeInvoiceStatus } from "./fee-repo";
 import { applyInvoiceStatus } from "./placement-invoice-repo";
 import { adoptInvoice, findPaymentByInvoice, findPaymentByReference, getPayment } from "./payment-repo";
 
@@ -37,5 +38,8 @@ export const handleInvoiceStatus = async (status: InvoiceStatusResponse): Promis
     if (applied.credited) await announcePlacementPaid(applied.userId, applied.amount, "/api/monobank/webhook");
     return true;
   }
+  // Рахунок комісії за фактом (fee_invoices): оплату в журнал пише лише success. Стоїть перед угодою: рахунок
+  // комісії в `deal_payments` не лежить, і гілка угоди його б просто не знайшла.
+  if (await applyFeeInvoiceStatus(status)) return true;
   return handleDealInvoice(status);
 };
