@@ -154,9 +154,18 @@ export function FeedPanel() {
         </Button>
       </header>
 
-      <div ref={bodyRef} className="offers-body offers-list">
+      <div ref={bodyRef} tabIndex={-1} className="offers-body offers-list outline-none">
         {pending.length > 0 && (
-          <Button variant="bare" onClick={reveal} className="offers-new offers-new-fresh">
+          <Button
+            variant="bare"
+            onClick={() => {
+              reveal();
+              // Кнопка зникає: фокус переходимо на список, щоб він не впав на body, і гортаємо до нових.
+              bodyRef.current?.focus({ preventScroll: true });
+              bodyRef.current?.scrollTo({ top: 0 });
+            }}
+            className="offers-new offers-new-fresh"
+          >
             +{pending.length} {plural(pending.length, "новий запит", "нові запити", "нових запитів")}. Показати
           </Button>
         )}
