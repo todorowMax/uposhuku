@@ -458,12 +458,13 @@ html[data-glass] .composer {
   overflow: hidden;
 }
 
+/* Невидима копія для виміру: ширина по контейнеру й обрізання, інакше чипи в nowrap-рядку роздувають прокрутку предка (екран правки запиту). */
 .tag-row-measure {
   position: absolute;
   inset: 0 auto auto 0;
+  width: 100%;
   visibility: hidden;
   pointer-events: none;
-  overflow: visible;
 }
 
 .tag-chip {
