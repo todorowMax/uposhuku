@@ -31,6 +31,12 @@ export const initialTagState = (mentionIds: readonly string[], tags: readonly Re
   };
 };
 
+/**
+ * Запит без міста в списку й на карті показується «Віддалено»: «віддалено» і «не вказано» в базі одне (`cityId` порожній).
+ * Тому чип «Де» при відкритті правки показує «Віддалено», коли міста немає. Збереження даних не міняє: `cityId` лишається порожнім.
+ */
+export const initialRemote = (cityId: string | null | undefined): boolean => !cityId;
+
 /** Збережений запит у стані форми. */
 export const formFromRequest = (request: RequestDraft): EditForm => ({
   text: request.text,

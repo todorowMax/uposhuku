@@ -27,7 +27,7 @@ export const useProposeWork = (performer: { id: string; name: string } | undefin
     }
     // Поле запиту розгортається само, коли в сховищі з'являється виконавець; на телефоні картка не заважає полю.
     if (phone) closeCard();
-    else setNotice(`${proposeTaskLabel(performer.name)}: опишіть її в полі запиту.`);
+    else setNotice(proposeTaskLabel(performer.name));
     proposeTargetStore.set({ name: performer.name });
   };
 };

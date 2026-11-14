@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canSaveEdit, draftFromForm, editTextValid, formChanged, formFromRequest, initialTagState } from "@/lib/requests/edit-draft";
+import { canSaveEdit, draftFromForm, editTextValid, formChanged, formFromRequest, initialRemote, initialTagState } from "@/lib/requests/edit-draft";
 import { REQUEST_TEXT_MAX, type RequestDraft } from "@/lib/requests/types";
 
 const saved: RequestDraft = {
@@ -80,6 +80,22 @@ describe("правка запиту: чернетка для сервера", ()
       cityId: "lviv",
       channelOptIn: true,
     });
+  });
+});
+
+describe("правка запиту: чип «Де»", () => {
+  it("запит без міста відкривається як «Віддалено»; з містом: місто, не віддалено", () => {
+    expect(initialRemote(null)).toBe(true);
+    expect(initialRemote(undefined)).toBe(true);
+    expect(initialRemote("lviv")).toBe(false);
+  });
+
+  it("збереження без змін дані не міняє: cityId лишається null, форма не вважається зміненою", () => {
+    const remote: RequestDraft = { text: "Потрібен логотип для кав'ярні", tags: [], files: [] };
+    const form = formFromRequest(remote);
+    expect(form.cityId).toBeNull();
+    expect(formChanged(remote, form)).toBe(false);
+    expect(draftFromForm(form, [], (id) => id).cityId).toBeNull();
   });
 });
 

@@ -9,7 +9,7 @@ import { useState, type ChangeEvent } from "react";
 import { EMPTY_PARAMS, type RequestParamsValue } from "@/components/composer/request-params";
 import { useRequestTags } from "@/components/composer/use-request-tags";
 import { ApiError, updateActiveRequest } from "@/lib/auth/client";
-import { canSaveEdit, draftFromForm, editTextValid, formChanged, initialTagState, type EditForm } from "@/lib/requests/edit-draft";
+import { canSaveEdit, draftFromForm, editTextValid, formChanged, initialRemote, initialTagState, type EditForm } from "@/lib/requests/edit-draft";
 import { REQUEST_TEXT_MIN, type PublishedRequest, type RequestFile } from "@/lib/requests/types";
 import { detectTagMentions, tagLabel } from "@/lib/tags/engine";
 
@@ -31,6 +31,7 @@ const paramsOf = (request: PublishedRequest): RequestParamsValue => ({
   budget: request.budget ?? null,
   deadline: request.deadline ?? null,
   cityId: request.cityId ?? null,
+  remote: initialRemote(request.cityId),
   channel: request.channelOptIn !== false,
 });
 
