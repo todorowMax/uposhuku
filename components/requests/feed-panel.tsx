@@ -121,13 +121,13 @@ export function FeedPanel() {
 
   if (collapsed) {
     return (
-      <button type="button" onClick={() => feedCollapsedStore.set(false)} className="offers-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
+      <Button variant="bare" onClick={() => feedCollapsedStore.set(false)} className="offers-tab feed-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
         <Inbox className="size-4" />
         Запити для вас
         {items.length > 0 && <span className="filter-all-badge">{items.length}</span>}
         {pending.length > 0 && <span className="offers-tab-new">+{pending.length} {plural(pending.length, "новий", "нові", "нових")}</span>}
         <ChevronDown className="size-4 lg:hidden" style={{ rotate: "180deg" }} />
-      </button>
+      </Button>
     );
   }
 
