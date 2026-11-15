@@ -307,6 +307,10 @@ export const conversations = sqliteTable(
     performerUserId: text("performer_user_id").references(() => users.id, { onDelete: "cascade" }),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
+    /** Коли замовник востаннє відкрив стрічку (мс). Новіші за мітку повідомлення для нього непрочитані; null — ще не відкривав. */
+    customerReadAt: integer("customer_read_at"),
+    /** Те саме для виконавця. */
+    performerReadAt: integer("performer_read_at"),
   },
   (table) => [
     uniqueIndex("conversations_pair_idx").on(table.customerUserId, table.performerId),

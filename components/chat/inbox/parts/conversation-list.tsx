@@ -6,6 +6,7 @@ import { DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { FileText, Maximize2, Minimize2, X } from "lucide-react";
 import type { ConversationDto } from "@/lib/chat/types";
+import { isUnread } from "@/lib/chat/unread";
 import { EVENTS, track } from "@/lib/telemetry/track";
 import type { InboxFilter } from "../use-inbox";
 import type { InboxSize } from "../use-inbox-motion";
@@ -65,32 +66,42 @@ export const ConversationList = ({
     <ul className="inbox-list">
       {items
         .filter((item) => filter === "all" || item.phase === filter)
-        .map((item) => (
-          <li key={item.id}>
-            <Button
-              variant="bare"
-              onClick={() => {
-                track(EVENTS.chatOpened, { from: "inbox" });
-                onOpen(item);
-              }}
-              className="inbox-row"
-              data-active={activeId === item.id || undefined}
-            >
-              <span className="inbox-name">
-                {item.other.name}
-                <em>{item.role === "performer" ? "замовник" : (item.other.specialty ?? "виконавець")}</em>
-              </span>
-              {item.offer && !item.deal && <span className="inbox-offer-tag">Відгук на «{item.offer.title}»</span>}
-              {item.deal && (
-                <span className="inbox-deal-tag" data-action={item.deal.needsMe || undefined}>
-                  <FileText aria-hidden className="size-3" strokeWidth={2} />
-                  {item.deal.label}
+        .map((item) => {
+          const unread = isUnread(item);
+          return (
+            <li key={item.id}>
+              <Button
+                variant="bare"
+                onClick={() => {
+                  track(EVENTS.chatOpened, { from: "inbox" });
+                  onOpen(item);
+                }}
+                className="inbox-row"
+                data-active={activeId === item.id || undefined}
+                data-unread={unread || undefined}
+              >
+                <span className="inbox-name flex items-center">
+                  {item.other.name}
+                  <em>{item.role === "performer" ? "замовник" : (item.other.specialty ?? "виконавець")}</em>
+                  {item.unread > 0 && (
+                    <span className="inbox-badge ml-auto">
+                      <span className="sr-only">Непрочитаних: </span>
+                      {item.unread}
+                    </span>
+                  )}
                 </span>
-              )}
-              <span className="inbox-preview">{item.lastMessage ? item.lastMessage.text || "📷 Фото" : "Без повідомлень"}</span>
-            </Button>
-          </li>
-        ))}
+                {item.offer && !item.deal && <span className="inbox-offer-tag">Відгук на «{item.offer.title}»</span>}
+                {item.deal && (
+                  <span className="inbox-deal-tag" data-action={item.deal.needsMe || undefined}>
+                    <FileText aria-hidden className="size-3" strokeWidth={2} />
+                    {item.deal.label}
+                  </span>
+                )}
+                <span className="inbox-preview">{item.lastMessage ? item.lastMessage.text || "📷 Фото" : "Без повідомлень"}</span>
+              </Button>
+            </li>
+          );
+        })}
     </ul>
   </aside>
 );

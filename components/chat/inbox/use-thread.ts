@@ -12,6 +12,7 @@ import type { ConversationDto } from "@/lib/chat/types";
 import { afterLayerHistory } from "@/lib/ui/use-layer-history";
 import { offersMapStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
+import { useReadMark } from "./use-read-mark";
 import { usePhotoStaging } from "./use-photo-staging";
 import { useProposeIntent } from "./use-propose-intent";
 import { useThreadDeals } from "./use-thread-deals";
@@ -21,11 +22,12 @@ export type ThreadSheet = "deals" | "attach";
 /** Екрани над чатом: деталі угоди, умови з розмови, пропозиція за відгуком. */
 export type ThreadScreen = { kind: "deal"; id: string } | { kind: "terms" } | { kind: "composer" };
 
-export const useThread = (conversation: ConversationDto) => {
+export const useThread = (conversation: ConversationDto, onRead: (conversationId: string) => void) => {
   // Відгук цього виконавця на відкритий запит замовника: від нього рахується угода.
   const offers = useStore(offersMapStore);
   const response = conversation.role === "customer" ? offers.responses.find((item) => item.performerId === conversation.performerId) : undefined;
   const chat = useRemoteChat(conversation.performerId, true, undefined, { id: conversation.id, role: conversation.role });
+  useReadMark({ conversationId: conversation.id, ready: chat.loaded && !chat.error, version: chat.lines.at(-1)?.id ?? "", onRead });
   const dealState = useThreadDeals(conversation);
   const staging = usePhotoStaging(conversation.id);
   const [draft, setDraft] = useState("");

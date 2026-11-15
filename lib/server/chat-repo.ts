@@ -162,6 +162,38 @@ const talkedIn = async (conversationIds: string[]): Promise<Set<string>> => {
   return new Set(rows.map((row) => row.id));
 };
 
+/** Стеля лічильника в списку: далі «99» нічого не додає. */
+export const UNREAD_CAP = 99;
+
+/** Непрочитане мною в розмовах: текстові від другої сторони й службові рядки, новіші за мою мітку. Один запит на порцію. */
+const unreadIn = async (conversationIds: string[], userId: string): Promise<Map<string, { texts: number; system: number }>> => {
+  const mine = sql`case when ${conversations.customerUserId} = ${userId} then ${conversations.customerReadAt} else ${conversations.performerReadAt} end`;
+  const otherSide = sql`case when ${conversations.customerUserId} = ${userId} then 'performer' else 'customer' end`;
+  const rows = await inChunks(conversationIds, (chunk) =>
+    getDb()
+      .select({
+        id: messages.conversationId,
+        texts: sql<number>`sum(case when ${messages.kind} = 'text' and ${messages.from} = ${otherSide} then 1 else 0 end)`,
+        system: sql<number>`sum(case when ${messages.kind} = 'system' then 1 else 0 end)`,
+      })
+      .from(messages)
+      .innerJoin(conversations, eq(conversations.id, messages.conversationId))
+      .where(and(inArray(messages.conversationId, chunk), sql`${messages.createdAt} > coalesce(${mine}, 0)`))
+      .groupBy(messages.conversationId),
+  );
+  return new Map(rows.map((row) => [row.id, { texts: Number(row.texts), system: Number(row.system) }]));
+};
+
+/** Поля непрочитаного для рядка списку: лічильник текстів (зі стелею) і подія угоди, що чекає на мене. */
+const unreadFields = (counts: { texts: number; system: number } | undefined, needsMe: boolean) => ({ unread: Math.min(counts?.texts ?? 0, UNREAD_CAP), unreadDeal: needsMe && (counts?.system ?? 0) > 0 });
+
+/** Ставить мою мітку прочитання на «зараз»; мітка лише росте. */
+export const markConversationRead = async (conversationId: string, role: "customer" | "performer", now = Date.now()): Promise<void> => {
+  const column = role === "customer" ? conversations.customerReadAt : conversations.performerReadAt;
+  const set = role === "customer" ? { customerReadAt: now } : { performerReadAt: now };
+  await getDb().update(conversations).set(set).where(and(eq(conversations.id, conversationId), or(isNull(column), lt(column, now))));
+};
+
 type Offer = { customer: string; performer: string; text: string };
 
 /**
@@ -186,9 +218,10 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   const asPerformer = rows.filter((row) => row.performerUserId === userId);
   const customerIds = [...new Set(asPerformer.map((row) => row.customerUserId))];
   const performerUserIds = [...new Set(asCustomer.flatMap((row) => (row.performerUserId ? [row.performerUserId] : [])))];
-  const [lastById, talked, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
+  const [lastById, talked, unreadById, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
     lastMessages(rows.map((row) => row.id)),
     talkedIn(rows.map((row) => row.id)),
+    unreadIn(rows.map((row) => row.id), userId),
     db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200),
     inChunks([...customerIds, ...performerUserIds], (chunk) => db.select({ id: users.id, displayName: users.displayName, deletedAt: users.deletedAt }).from(users).where(inArray(users.id, chunk))),
     getProfileCards(performerUserIds),
@@ -227,7 +260,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
     }
     const offerRow = offerRows.find((item) => item.customer === row.customerUserId && item.performer === row.performerUserId);
     const offer = offerRow ? { title: offerRow.text.length > 40 ? `${offerRow.text.slice(0, 39).trimEnd()}…` : offerRow.text } : undefined;
-    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, talked: talked.has(row.id), ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
+    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, talked: talked.has(row.id), ...unreadFields(unreadById.get(row.id), Boolean(deal?.needsMe)), ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
   }
   return result;
 };
