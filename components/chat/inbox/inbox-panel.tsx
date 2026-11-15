@@ -26,7 +26,7 @@ export const InboxPanel = () => {
         onClick={() => setOpen(true)}
         className="inbox-button"
         style={open ? { visibility: "hidden" } : undefined}
-        aria-label={inboxLabel(actionCount)}
+        aria-label={inboxLabel(items)}
       >
         <MessageCircle className="size-4" strokeWidth={1.9} />
         <span className="inbox-label">Повідомлення</span>

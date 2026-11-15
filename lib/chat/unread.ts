@@ -14,7 +14,20 @@ export const isUnread = (item: Pick<ConversationDto, "unread" | "unreadDeal">): 
 export const attentionCount = (items: Counted[]): number => items.filter((item) => isUnread(item) || item.deal?.needsMe).length;
 
 const FORMS = new Intl.PluralRules("uk");
-const WORDS: Partial<Record<Intl.LDMLPluralRule, string>> = { one: "непрочитана", few: "непрочитані", many: "непрочитаних" };
+type Words = Partial<Record<Intl.LDMLPluralRule, string>> & { many: string };
+const UNREAD: Words = { one: "непрочитана", few: "непрочитані", many: "непрочитаних" };
+const WAITING: Words = { one: "розмова чекає вашої дії", few: "розмови чекають вашої дії", many: "розмов чекають вашої дії" };
 
-/** Підпис кнопки: «Повідомлення» без числа, інакше «Повідомлення: 2 непрочитані» (окремо «1 непрочитана», «5 непрочитаних»). */
-export const inboxLabel = (count: number): string => (count > 0 ? `Повідомлення: ${count} ${WORDS[FORMS.select(count)] ?? WORDS.many}` : "Повідомлення");
+const counted = (count: number, words: Words): string => `${count} ${words[FORMS.select(count)] ?? words.many}`;
+
+/**
+ * Підпис кнопки. Без числа, коли нічого не чекає; інакше окремо непрочитані розмови («2 непрочитані») і прочитані,
+ * де угода чекає моєї дії («1 розмова чекає вашої дії»): друге не називаємо непрочитаним. Розмова рахується один раз,
+ * тож сума двох чисел дорівнює бейджу (`attentionCount`).
+ */
+export const inboxLabel = (items: Counted[]): string => {
+  const unread = items.filter(isUnread).length;
+  const waiting = items.filter((item) => !isUnread(item) && item.deal?.needsMe).length;
+  const parts = [...(unread > 0 ? [counted(unread, UNREAD)] : []), ...(waiting > 0 ? [counted(waiting, WAITING)] : [])];
+  return parts.length > 0 ? `Повідомлення: ${parts.join(", ")}` : "Повідомлення";
+};

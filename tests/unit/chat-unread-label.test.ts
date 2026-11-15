@@ -3,18 +3,33 @@ import { attentionCount, inboxLabel, isUnread } from "@/lib/chat/unread";
 
 const item = (over: { unread?: number; unreadDeal?: boolean; needsMe?: boolean }) => ({ unread: over.unread ?? 0, unreadDeal: over.unreadDeal ?? false, ...(over.needsMe === undefined ? {} : { deal: { label: "Угода в роботі", needsMe: over.needsMe } }) });
 
+const many = (count: number, over: Parameters<typeof item>[0]) => Array.from({ length: count }, () => item(over));
+
 describe("підпис кнопки «Повідомлення»", () => {
-  it("без числа, коли непрочитаного немає", () => {
-    expect(inboxLabel(0)).toBe("Повідомлення");
+  it("без числа, коли нічого не чекає", () => {
+    expect(inboxLabel([])).toBe("Повідомлення");
+    expect(inboxLabel([item({}), item({ needsMe: false })])).toBe("Повідомлення");
   });
 
-  it("правильне закінчення за українським множинним числом", () => {
-    expect(inboxLabel(1)).toBe("Повідомлення: 1 непрочитана");
-    expect(inboxLabel(2)).toBe("Повідомлення: 2 непрочитані");
-    expect(inboxLabel(4)).toBe("Повідомлення: 4 непрочитані");
-    expect(inboxLabel(5)).toBe("Повідомлення: 5 непрочитаних");
-    expect(inboxLabel(11)).toBe("Повідомлення: 11 непрочитаних");
-    expect(inboxLabel(21)).toBe("Повідомлення: 21 непрочитана");
+  it("непрочитані розмови: закінчення за українським множинним числом", () => {
+    expect(inboxLabel(many(1, { unread: 3 }))).toBe("Повідомлення: 1 непрочитана");
+    expect(inboxLabel(many(2, { unread: 1 }))).toBe("Повідомлення: 2 непрочитані");
+    expect(inboxLabel(many(4, { unreadDeal: true, needsMe: true }))).toBe("Повідомлення: 4 непрочитані");
+    expect(inboxLabel(many(5, { unread: 1 }))).toBe("Повідомлення: 5 непрочитаних");
+    expect(inboxLabel(many(11, { unread: 1 }))).toBe("Повідомлення: 11 непрочитаних");
+    expect(inboxLabel(many(21, { unread: 1 }))).toBe("Повідомлення: 21 непрочитана");
+  });
+
+  it("прочитана розмова, де угода чекає моєї дії, не називається непрочитаною", () => {
+    expect(inboxLabel(many(1, { needsMe: true }))).toBe("Повідомлення: 1 розмова чекає вашої дії");
+    expect(inboxLabel(many(2, { needsMe: true }))).toBe("Повідомлення: 2 розмови чекають вашої дії");
+    expect(inboxLabel(many(5, { needsMe: true }))).toBe("Повідомлення: 5 розмов чекають вашої дії");
+  });
+
+  it("обидва види разом, кожна розмова рахується один раз", () => {
+    const list = [item({ unread: 2 }), item({ unreadDeal: true, needsMe: true }), item({ needsMe: true }), item({})];
+    expect(inboxLabel(list)).toBe("Повідомлення: 2 непрочитані, 1 розмова чекає вашої дії");
+    expect(attentionCount(list)).toBe(3);
   });
 });
 
