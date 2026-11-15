@@ -27,7 +27,7 @@ export const DealListSheet = ({
 }) => (
   <Sheet open={open} onOpenChange={onOpenChange}>
     <SheetContent aria-describedby={undefined}>
-      <SheetTitle className="ui-sheet-title">Замовлення</SheetTitle>
+      <SheetTitle className="ui-sheet-title">Угоди</SheetTitle>
       <SheetBody>
         <ul className="grid gap-1">
           {deals.map((deal) => (
@@ -44,7 +44,7 @@ export const DealListSheet = ({
           ))}
         </ul>
         <Button variant="link" onClick={onNew} className="mt-2 text-sm">
-          Нове замовлення
+          Нова угода
         </Button>
       </SheetBody>
     </SheetContent>

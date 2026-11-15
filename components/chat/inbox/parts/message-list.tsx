@@ -1,60 +1,80 @@
 // components/chat/inbox/parts/message-list.tsx
 //
-// Стрічка розмови: повідомлення, події, стан завантаження й помилка зв'язку.
+// Стрічка розмови: дні, репліки, події угод, рішення модератора, стан завантаження й помилка зв'язку.
 
-import type { Ref } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, type Ref } from "react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ChatLine } from "@/lib/chat/client";
+import { clockTime } from "@/lib/chat/dates";
+import { buildFeed, resolveDealId } from "@/lib/chat/feed";
+import { DayDivider, DealEvents, ModeratorCard, Pill } from "./feed-items";
 
-const TIME = new Intl.DateTimeFormat("uk-UA", { hour: "2-digit", minute: "2-digit" });
+export namespace MessageListTypes {
+  export type Props = {
+    ref: Ref<HTMLDivElement>;
+    lines: ChatLine[];
+    /** Угоди розмови: за ними чип номера відкриває екран угоди. */
+    deals: { id: string; number: string }[];
+    loaded: boolean;
+    error: boolean;
+    empty: boolean;
+    /** Живий регіон вмикається після першого завантаження, щоб історію не зачитували. */
+    live: boolean;
+    unseen: boolean;
+    onScroll: () => void;
+    onJumpDown: () => void;
+    onPhoto: (url: string) => void;
+    onOpenDeal: (dealId: string) => void;
+  };
+}
 
-export const MessageList = ({
-  ref,
-  lines,
-  loaded,
-  error,
-  empty,
-  onPhoto,
-}: {
-  ref: Ref<HTMLDivElement>;
-  lines: ChatLine[];
-  loaded: boolean;
-  error: boolean;
-  empty: boolean;
-  onPhoto: (url: string) => void;
-}) => (
-  <div ref={ref} className="dm-scroll inbox-thread" aria-live="polite">
-    {!loaded && lines.length === 0 && (
-      <div className="inbox-loading" role="status" aria-label="Завантажуємо переписку">
-        <Loader2 className="size-5 animate-spin" />
-      </div>
-    )}
-    {loaded && lines.length === 0 && empty && !error && (
-      <p className="inbox-hint">Опишіть задачу: що потрібно зробити, строки й бюджет. Домовитесь тут, а коли всі умови зійдуться, оформите угоду.</p>
-    )}
-    {lines.map((line) =>
-      line.kind === "system" ? (
-        <p key={line.id} className="dm-system">
-          {line.text}
-          <time dateTime={line.at}>{TIME.format(new Date(line.at))}</time>
-        </p>
-      ) : (
-        <div key={line.id} className="dm-bubble" data-from={line.from}>
-          {line.photos && (
-            <div className="dm-photos" data-count={line.photos.length}>
-              {line.photos.map((url) => (
-                <Button key={url} variant="bare" className="dm-photo" aria-label="Відкрити фото" onClick={() => onPhoto(url)}>
-                  <img src={url} alt="Фото з чату" loading="lazy" />
-                </Button>
-              ))}
-            </div>
-          )}
-          {line.text && <p>{line.text}</p>}
-          <time dateTime={line.at}>{TIME.format(new Date(line.at))}</time>
+export const MessageList = ({ ref, lines, deals, loaded, error, empty, live, unseen, onScroll, onJumpDown, onPhoto, onOpenDeal }: MessageListTypes.Props) => {
+  const feed = useMemo(() => buildFeed(lines, new Date()), [lines]);
+  const opener = (group: ChatLine[], number: string) => {
+    const id = resolveDealId(group, number, deals);
+    return id ? () => onOpenDeal(id) : undefined;
+  };
+
+  return (
+    <div ref={ref} className="dm-scroll inbox-thread" role="log" aria-label="Переписка" aria-live={live ? "polite" : "off"} onScroll={onScroll}>
+      {!loaded && lines.length === 0 && (
+        <div className="inbox-loading" role="status" aria-label="Завантажуємо переписку">
+          <Loader2 className="size-5 animate-spin" />
         </div>
-      ),
-    )}
-    {error && <p className="dm-warn">Немає зв&apos;язку з сервером. Повідомлення підтягнуться, щойно він повернеться.</p>}
-  </div>
-);
+      )}
+      {loaded && lines.length === 0 && empty && !error && (
+        <p className="inbox-hint">Опишіть задачу: що потрібно зробити, строки й бюджет. Домовитесь тут, а коли всі умови зійдуться, оформите угоду.</p>
+      )}
+      {feed.map((item) => {
+        if (item.type === "day") return <DayDivider key={item.key} label={item.label} />;
+        if (item.type === "pill") return <Pill key={item.key} line={item.line} />;
+        if (item.type === "deal") return <DealEvents key={item.key} number={item.number} lines={item.lines} onOpen={opener(item.lines, item.number)} />;
+        if (item.type === "moderator") return <ModeratorCard key={item.key} line={item.line} decision={item.decision} onOpen={item.decision.number ? opener([item.line], item.decision.number) : undefined} />;
+        const line = item.line;
+        return (
+          <div key={item.key} className="dm-bubble" data-from={line.from}>
+            {line.photos && (
+              <div className="dm-photos" data-count={line.photos.length}>
+                {line.photos.map((url) => (
+                  <Button key={url} variant="bare" className="dm-photo" aria-label="Відкрити фото" onClick={() => onPhoto(url)}>
+                    <img src={url} alt="Фото з чату" loading="lazy" />
+                  </Button>
+                ))}
+              </div>
+            )}
+            {line.text && <p>{line.text}</p>}
+            <time dateTime={line.at}>{clockTime(line.at)}</time>
+          </div>
+        );
+      })}
+      {error && <p className="dm-warn">Немає зв&apos;язку з сервером. Повідомлення підтягнуться, щойно він повернеться.</p>}
+      {unseen && (
+        <Button variant="bare" className="dm-new" onClick={onJumpDown}>
+          <ArrowDown aria-hidden className="size-3.5" strokeWidth={2.4} />
+          Нові повідомлення
+        </Button>
+      )}
+    </div>
+  );
+};

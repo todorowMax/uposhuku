@@ -4,13 +4,11 @@
 
 import { ArrowLeft, Maximize2, Minimize2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { conversationTitle, roleLabel } from "@/lib/chat/display";
 import type { ConversationDto } from "@/lib/chat/types";
 import type { InboxSize } from "../use-inbox-motion";
 
-const statusText = (conversation: ConversationDto, typing: boolean): string => {
-  if (typing) return "друкує…";
-  return conversation.role === "performer" ? "замовник" : (conversation.other.specialty ?? "виконавець");
-};
+const statusText = (conversation: ConversationDto, typing: boolean): string => (typing ? "друкує…" : roleLabel(conversation));
 
 export const ThreadHeader = ({
   conversation,
@@ -32,7 +30,7 @@ export const ThreadHeader = ({
       <ArrowLeft className="size-4" strokeWidth={2.2} />
     </Button>
     <div className="min-w-0 flex-1">
-      <h2 className="truncate">{conversation.other.name}</h2>
+      <h2 className="truncate">{conversationTitle(conversation)}</h2>
       <p className="truncate text-xs leading-tight text-ink-muted">{statusText(conversation, typing)}</p>
     </div>
     <Button

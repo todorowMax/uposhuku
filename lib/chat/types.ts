@@ -22,8 +22,10 @@ export interface ConversationDto {
   /** Моя роль у розмові. */
   role: "customer" | "performer";
   /** Друга сторона: ім'я й фото виконавця для замовника, ім'я замовника для виконавця. */
-  other: { name: string; photo?: string; specialty?: string };
+  other: { name: string; photo?: string; specialty?: string; /** Замовник без імені: у списку й шапці замість «Замовник» показуємо назву запиту. */ nameless?: boolean };
   lastMessage: ChatMessageDto | null;
+  /** Остання репліка людини (не службовий рядок): з неї береться превʼю в списку. */
+  lastHumanMessage: ChatMessageDto | null;
   /** Хтось із двох уже писав сам (не лише системні рядки про відгук чи угоду): тоді картка пропозиції каже «Чат відкрито». */
   talked: boolean;
   /** Найновіша жива угода з цією людиною: щоб у списку було видно, де є угода. */

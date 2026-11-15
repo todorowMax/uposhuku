@@ -3,7 +3,7 @@
 // components/chat/inbox/parts/deal-row.tsx
 //
 // Рядок угоди під шапкою розмови: завжди 56 px. Одна угода: назва, етап і сума, стан, кнопка кроку, якщо він
-// за мною. Кілька: «3 замовлення · 1 чекає». Немає угод: тиха кнопка «Оформити умови». Рядок лише відкриває
+// за мною. Кілька: «3 угоди · 1 чекає». Немає угод: тиха кнопка «Оформити умови». Рядок лише відкриває
 // шар (екран чи шторку), сам нічого не виконує.
 
 import type { Ref } from "react";
@@ -20,7 +20,10 @@ import { useStore } from "@/lib/store";
 const ROW = "flex h-14 shrink-0 items-center gap-3 border-b border-line px-4";
 const MONEY = new Intl.NumberFormat("uk-UA");
 
-const countText = (count: number, waiting: number): string => `${count} ${count < 5 ? "замовлення" : "замовлень"} · ${waiting > 0 ? `${waiting} чекає` : "усі в роботі"}`;
+const FORMS = new Intl.PluralRules("uk");
+const DEAL_WORDS: Partial<Record<Intl.LDMLPluralRule, string>> = { one: "угода", few: "угоди" };
+
+const countText = (count: number, waiting: number): string => `${count} ${DEAL_WORDS[FORMS.select(count)] ?? "угод"} · ${waiting > 0 ? `${waiting} чекає` : "усі в роботі"}`;
 
 const SingleDeal = ({ deal, role, panelOpen, onOpen, openRef }: { deal: Deal; role: NextStepTypes.Role; panelOpen: boolean; onOpen: () => void; openRef: Ref<HTMLButtonElement> }) => {
   const paymentReturn = useStore(paymentReturnStore);
@@ -70,7 +73,7 @@ export const DealRow = ({
     return (
       <div className={ROW} role="status" aria-busy="true">
         <Loader2 aria-hidden className="size-3.5 animate-spin text-ink-muted" />
-        <span className="text-xs text-ink-muted">Завантажуємо замовлення…</span>
+        <span className="text-xs text-ink-muted">Завантажуємо угоди…</span>
       </div>
     );
   }

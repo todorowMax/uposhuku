@@ -12,6 +12,8 @@ import type { ConversationDto } from "@/lib/chat/types";
 import { afterLayerHistory } from "@/lib/ui/use-layer-history";
 import { offersMapStore } from "@/lib/requests/offers";
 import { useStore } from "@/lib/store";
+import { CHAT_TEXT_MAX } from "@/lib/chat/types";
+import { useFeedScroll } from "./use-feed-scroll";
 import { useReadMark } from "./use-read-mark";
 import { usePhotoStaging } from "./use-photo-staging";
 import { useProposeIntent } from "./use-propose-intent";
@@ -38,7 +40,7 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
   const [viewer, setViewer] = useState<string | null>(null);
   const [sheet, setSheet] = useState<ThreadSheet | null>(null);
   const [screen, setScreen] = useState<ThreadScreen | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const feedScroll = useFeedScroll(chat.lines, chat.loaded);
   const rowRef = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frame = useRef<number | null>(null);
@@ -46,10 +48,6 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
     if (timer.current) clearTimeout(timer.current);
     if (frame.current !== null) cancelAnimationFrame(frame.current);
   };
-
-  useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
-  }, [chat.lines.length]);
 
   useEffect(() => cancelOpening, []);
 
@@ -74,7 +72,7 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
 
   useProposeIntent(conversation.performerId, dealState.ready, openDeals);
 
-  const canSend = (draft.trim().length > 0 || staging.ready.length > 0) && !staging.uploading && !sending;
+  const canSend = (draft.trim().length > 0 || staging.ready.length > 0) && draft.length <= CHAT_TEXT_MAX && !staging.uploading && !sending;
 
   /** Поле й фото чистяться лише після успіху: при відмові текст і фото лишаються, а людина бачить причину. */
   const submit = async (event?: FormEvent) => {
@@ -125,7 +123,7 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
     submit,
     canSend,
     sendError,
-    listRef,
+    ...feedScroll,
     rowRef,
     closeScreen,
     viewer,

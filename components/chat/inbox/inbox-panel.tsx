@@ -15,7 +15,7 @@ import { Thread } from "./thread";
 import { useInbox } from "./use-inbox";
 
 export const InboxPanel = () => {
-  const { buttonRef, panelRef, innerRef, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead, size, toggleSize, close } = useInbox();
+  const { buttonRef, panelRef, innerRef, signedIn, items, open, setOpen, active, setActive, filter, setFilter, listError, retry, actionCount, markRead, size, toggleSize, close } = useInbox();
   if (!signedIn || (items.length === 0 && !open)) return null;
 
   return (
@@ -49,6 +49,8 @@ export const InboxPanel = () => {
                 activeId={active?.id}
                 filter={filter}
                 size={size}
+                error={listError}
+                onRetry={retry}
                 onFilter={setFilter}
                 onOpen={setActive}
                 onToggleSize={toggleSize}
