@@ -3,6 +3,7 @@
 - Created: 2026-11-06
 - Project / repo: uposhuku
 - Final status: partly done (код на `development`, не задеплоен)
+- Next step / owner: выложить на dev по явной команде (GIT-4); перед включением `foreign_links` проверить PayPal и Wise на своём аккаунте и спросить юриста; Max. Критерии 1-7 не отмечены, хотя Final status говорит «сделано всё по плану».
 
 ## Goal
 

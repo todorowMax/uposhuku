@@ -3,6 +3,7 @@
 - Created: 2026-10-26
 - Project / repo: uposhuku
 - Final status: in progress
+- Next step / owner: пункты 7-10 в таблице `todo` (маршрут платежа и вебхук, финализация, админка, UI), пункты 12-13 `blocked` (UAPAY). Какие из них закрыты кодом из `2026-11-04-payments-launch-plan.md`, в этом документе не отмечено; Max решает: закрыть как заменённую или сверить пункты (вопрос владельцу в `2026-11-15-harness-docs.md`).
 
 ## Goal
 

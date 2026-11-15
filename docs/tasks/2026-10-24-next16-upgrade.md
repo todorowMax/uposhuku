@@ -3,6 +3,7 @@
 - Created: 2026-10-24
 - Project / repo: uposhuku
 - Final status: partly done
+- Next step / owner: прогнать CI на GitHub (Linux) на `development` и записать результат в критерий «CI пройшов» (единственный открытый пункт); Max, он решает пуш (GIT-1).
 
 ## Goal
 
