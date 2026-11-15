@@ -3,22 +3,18 @@
 // Якщо такий тег уже є, відповідаємо {existing: tagId}: клієнт просто додає його.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { listPendingProposals, proposeTag, type ProposalContext } from "@/lib/server/tag-proposal-repo";
 import { EVENTS } from "@/lib/telemetry/events";
 import { serverEvent } from "@/lib/telemetry/log";
+import { route } from "@/lib/server/route";
 
 const CONTEXTS: ProposalContext[] = ["profile", "work", "request"];
 
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ user }) => {
   return Response.json({ proposals: await listPendingProposals(user.id) }, { headers: { "cache-control": "no-store" } });
-}
+});
 
-export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід", "Увійдіть, щоб запропонувати тег.");
+export const POST = route({ auth: "user", unauthorized: () => problem(401, "Потрібен вхід", "Увійдіть, щоб запропонувати тег.") }, async ({ request, user }) => {
   const body = await readJson(request);
   const context = CONTEXTS.find((item) => item === body?.context);
   if (!context) return problem(400, "Тег не запропоновано", "Невідомий контекст.");
@@ -28,4 +24,4 @@ export async function POST(request: Request) {
   if (result.kind === "existing") return Response.json({ existing: result.tagId });
   serverEvent(EVENTS.tagProposed, { context }, user.id, "/api/tags/proposals");
   return Response.json({ proposal: result.proposal }, { status: 201 });
-}
+});

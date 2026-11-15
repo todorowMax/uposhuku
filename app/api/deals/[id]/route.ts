@@ -7,10 +7,8 @@ import { problem, readJson } from "@/lib/api/problem";
 import { checkDelivery } from "@/lib/deals/dispute-aids";
 import { releaseNeedsCode } from "@/lib/deals/limits";
 import { currentStage } from "@/lib/deals/machine";
-import { getSessionUser } from "@/lib/server/auth";
 import { legalGate, riskGate } from "@/lib/server/legal-gate";
 import { phoneGate } from "@/lib/server/phone-gate";
-import { rateLimited } from "@/lib/server/rate-limit";
 import { verifyReleaseCode } from "@/lib/server/release-code";
 import { settleMessage, settleStage } from "@/lib/server/deal-money";
 import { actAsPerformer, actOnDeal, claimDirectPayment, deliverStage, getDealForOwner, ownerOfDeal } from "@/lib/server/deal-repo";
@@ -23,6 +21,7 @@ import { serverEvent } from "@/lib/telemetry/log";
 import { notifyLater } from "@/lib/server/notify";
 import { addSystemMessage } from "@/lib/server/chat-repo";
 import { dealNotice } from "@/lib/telegram/notices";
+import { route } from "@/lib/server/route";
 
 const ACTIONS: DealAction[] = ["fund", "claim_paid", "release", "dispute", "cancel", "accept", "decline"];
 /** Способи оплати «Я оплатив(ла)», що йдуть криптою. */
@@ -76,11 +75,7 @@ const claimVia = async (input: { userId: string; dealId: string; via: unknown })
   return methods.includes(input.via) ? input.via : problem(409, "Цього способу немає в угоді", "Виконавець не вказав такий спосіб оплати для цієї угоди.");
 };
 
-export const POST = async (request: Request, { params }: { params: Promise<{ id: string }> }) => {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
-  const limited = await rateLimited("dealAction", user.id);
-  if (limited) return limited;
+export const POST = route<"user", undefined, { id: string }>({ auth: "user", rate: "dealAction" }, async ({ request, user, params }) => {
   const body = await readJson(request);
   // as: "performer" — дія виконавця (прийняти, підтвердити оплату, здати етап).
   if (body?.as === "performer") {
@@ -92,7 +87,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
       if (legal) return legal;
     }
     const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
-    const dealId = (await params).id;
+    const dealId = params.id;
     // Результат (пояснення, посилання) прикладається лише до «здати етап»; у інших діях ці поля ігноруємо.
     const delivery = performerAction === "deliver" ? checkDelivery(body?.deliveryText, body?.deliveryLink) : null;
     if (delivery && !delivery.ok) return problem(400, "Результат не прийнято", delivery.error);
@@ -112,7 +107,7 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   const action = ACTIONS.find((item) => item === body?.action);
   if (!action) return problem(400, "Невідома дія");
   const stageId = typeof body?.stageId === "string" ? body.stageId : undefined;
-  const dealId = (await params).id;
+  const dealId = params.id;
   // Гроші: заморозити, позначити оплату, прийняти умови. Оплата криптою (USDT, гаманець, Binance) потребує ще й ризику.
   if (action === "fund" || action === "claim_paid" || action === "accept") {
     const legal = await legalGate(user.id);
@@ -158,4 +153,4 @@ export const POST = async (request: Request, { params }: { params: Promise<{ id:
   notifyLater(userOfPerformer(result.performer.id), dealNotice({ dealId: result.id, action: action === "accept" || action === "decline" ? `owner_${action}` : action }));
   pushUser(userOfPerformer(result.performer.id), { t: "deal", requestId: result.requestId });
   return Response.json({ deal: result });
-};
+});

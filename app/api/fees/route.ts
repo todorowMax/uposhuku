@@ -3,17 +3,15 @@
 // лишились, людина їх бачить і може сплатити борг.
 
 import { problem } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { feeAccount, hasFeeEntries } from "@/lib/server/fee-repo";
 import { featureEnabledFor } from "@/lib/server/features";
+import { route } from "@/lib/server/route";
 
-export const GET = async () => {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ user }) => {
   const enabled = await featureEnabledFor("postpaid_fee", user.email);
   if (!enabled && !(await hasFeeEntries(user.id))) {
     return Response.json({ enabled: false, balanceKop: 0, dueAt: null, entries: [] }, { headers: { "cache-control": "no-store" } });
   }
   const account = await feeAccount(user.id);
   return Response.json({ enabled, ...account }, { headers: { "cache-control": "no-store" } });
-};
+});

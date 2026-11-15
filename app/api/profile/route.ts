@@ -3,27 +3,20 @@
 // опублікувати); DELETE — видалити профіль і зняти з карти.
 // D1: profiles, projects, profile_tags. Фото поки data URL, потім R2.
 
-import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { deleteProfile, getProfile, saveProfile } from "@/lib/server/profile-repo";
 import { pushGlobal } from "@/lib/server/realtime";
 import { deleteByUrl, keyFromUrl, putPhotoFromDataUrl } from "@/lib/server/uploads";
 import { parseProfile } from "@/lib/profile/validate";
 import { EVENTS } from "@/lib/telemetry/events";
 import { serverEvent } from "@/lib/telemetry/log";
+import { route } from "@/lib/server/route";
 
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ user }) => {
   return Response.json({ profile: await getProfile(user.id) }, { headers: { "cache-control": "no-store" } });
-}
+});
 
-export async function PUT(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
-  const limited = await rateLimited("profileSave", user.id);
-  if (limited) return limited;
+export const PUT = route({ auth: "user", rate: "profileSave" }, async ({ request, user }) => {
   const profile = parseProfile(await readJson(request));
   if (typeof profile === "string") return problem(400, "Профіль не збережено", profile);
   const previous = await getProfile(user.id);
@@ -44,12 +37,10 @@ export async function PUT(request: Request) {
   if (previous?.photo && previous.photo !== saved.photo) await deleteByUrl(previous.photo, user.id);
   pushGlobal({ t: "map" });
   return Response.json({ profile: saved });
-}
+});
 
-export async function DELETE() {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const DELETE = route({ auth: "user" }, async ({ user }) => {
   await deleteProfile(user.id);
   pushGlobal({ t: "map" });
   return new Response(null, { status: 204 });
-}
+});

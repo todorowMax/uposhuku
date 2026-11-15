@@ -3,9 +3,10 @@
 
 import { problem } from "@/lib/api/problem";
 import { PHOTO_PREFIX, getBucket } from "@/lib/server/uploads";
+import { route } from "@/lib/server/route";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ key: string[] }> }) {
-  const key = (await params).key.join("/");
+export const GET = route<"none", undefined, { key: string[] }>({}, async ({ params }) => {
+  const key = params.key.join("/");
   if (!key.startsWith(PHOTO_PREFIX) || key.includes("..")) return problem(404, "Файл не знайдено");
   const object = await getBucket().get(key);
   if (!object) return problem(404, "Файл не знайдено");
@@ -16,4 +17,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
       "x-content-type-options": "nosniff",
     },
   });
-}
+});

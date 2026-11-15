@@ -3,10 +3,8 @@
 // GET ?as=performer[&conversation=] — угоди виконавця. D1: угода документом (етапи всередині). Холд і фіналізація через Monobank — пізніше.
 
 import { problem, readJson } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { cryptoGate, legalGate } from "@/lib/server/legal-gate";
 import { phoneGate } from "@/lib/server/phone-gate";
-import { rateLimited } from "@/lib/server/rate-limit";
 import { escrowGate } from "@/lib/server/escrow-gate";
 import { performerUserId } from "@/lib/deals/parties";
 import { safeDealEnabledFor } from "@/lib/server/safe-deal";
@@ -20,6 +18,7 @@ import { serverEvent } from "@/lib/telemetry/log";
 import { notifyLater } from "@/lib/server/notify";
 import { addSystemMessage } from "@/lib/server/chat-repo";
 import { dealNotice } from "@/lib/telegram/notices";
+import { route } from "@/lib/server/route";
 
 /** Стеля ескроу: null для інших способів; відповідь-відмова, коли немає підтвердження ризиків (перша дія з USDT) чи ескроу недоступне. */
 const escrowLimit = async (input: { method: DealMethod; user: { id: string; email: string }; performerUserId: string | null }): Promise<number | null | Response> => {
@@ -34,9 +33,7 @@ const escrowLimit = async (input: { method: DealMethod; user: { id: string; emai
 const optionalText = (value: unknown) => (typeof value === "string" ? value : undefined);
 const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) : "");
 
-export const GET = async (request: Request) => {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ request, user }) => {
   const params = new URL(request.url).searchParams;
   // ?as=performer — угоди, запропоновані мені як виконавцю (за розмовою з замовником).
   if (params.get("as") === "performer") {
@@ -44,13 +41,9 @@ export const GET = async (request: Request) => {
   }
   const requestId = params.get("requestId") ?? undefined;
   return Response.json({ deals: await listDeals(user.id, requestId) }, { headers: { "cache-control": "no-store" } });
-};
+});
 
-export const POST = async (request: Request) => {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
-  const limited = await rateLimited("dealCreate", user.id);
-  if (limited) return limited;
+export const POST = route({ auth: "user", rate: "dealCreate" }, async ({ request, user }) => {
   const legal = await legalGate(user.id);
   if (legal) return legal;
   const phone = await phoneGate(user);
@@ -95,4 +88,4 @@ export const POST = async (request: Request) => {
   const performerUser = userOfPerformer(result.performer.id);
   if (performerUser) await addSystemMessage(user.id, performerUser, `Угоду ${result.number} запропоновано`, result.id);
   return Response.json({ deal: result }, { status: 201 });
-};
+});
