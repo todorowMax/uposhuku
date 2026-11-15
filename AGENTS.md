@@ -22,6 +22,7 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 | Account deletion | `docs/features/account-deletion.md` | `lib/server/account-*.ts`, `lib/account`, `components/account` |
 | Customer phone | `docs/features/phone.md` | `lib/phone`, `lib/server/phone-*.ts`, `components/phone` |
 | Telegram, notifications | `docs/features/telegram.md` | `lib/telegram`, `lib/server/notify*.ts`, `app/api/telegram` |
+| SEO pages (profile, catalog, JSON-LD, sitemap) | `docs/features/seo.md` | `app/(site)`, `app/(map)/@modal`, `lib/seo`, `lib/tags/catalog.ts`, `lib/server/catalog-repo.ts`, `components/profile-page`, `components/catalog-page` |
 | Security (CSP, limits, Turnstile, ids) | `docs/features/security.md` | `lib/security-headers.ts`, `lib/server/rate-limit.ts`, `lib/server/turnstile.ts`, `lib/ids.ts` |
 | Feature flags | `docs/features/feature-flags.md` | `lib/features`, `lib/server/features.ts`, `app/admin/features` |
 

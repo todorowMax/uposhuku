@@ -12,6 +12,7 @@
 | Телефон | [phone.md](phone.md) | `.claude/rules/features/phone.md` | Підтвердження через Telegram-бота, хеш і маска, ворота `phone_required` |
 | Telegram | [telegram.md](telegram.md) | `.claude/rules/features/telegram.md` | Перепривʼязка чату, оновлення бота; про налаштування бота ще [../telegram-bot.md](../telegram-bot.md) |
 | Захист | [security.md](security.md) | `.claude/rules/features/security.md` | CSP, ліміти частоти, Turnstile, формат id, TOTP модератора |
+| Сторінки для пошуку | [seo.md](seo.md) | нема (файл правила не заведено) | Профіль на сервері, каталог `/poslugy`, JSON-LD, sitemap, поріг індексації |
 | Прапорці | [feature-flags.md](feature-flags.md) | `.claude/rules/features/feature-flags.md` | Режими `off` / `allowlist` / `on`, порядок значень, способи оплати виконавця |
 
 ## Як вести

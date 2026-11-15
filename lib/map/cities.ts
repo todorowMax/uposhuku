@@ -36,3 +36,38 @@ export const cityById = (id: string): City => {
   if (!city) throw new Error(`Немає міста ${id}`);
   return city;
 };
+
+/** «Де»: місто з прийменником, для заголовків («Розробка лендингів у Львові»). Ключ це id міста. */
+const LOCATIVES: Record<string, string> = {
+  kyiv: "у Києві",
+  lviv: "у Львові",
+  kharkiv: "у Харкові",
+  dnipro: "у Дніпрі",
+  odesa: "в Одесі",
+  zaporizhzhia: "у Запоріжжі",
+  vinnytsia: "у Вінниці",
+  poltava: "у Полтаві",
+  chernihiv: "у Чернігові",
+  sumy: "у Сумах",
+  zhytomyr: "у Житомирі",
+  rivne: "у Рівному",
+  lutsk: "у Луцьку",
+  ternopil: "у Тернополі",
+  "ivano-frankivsk": "в Івано-Франківську",
+  uzhhorod: "в Ужгороді",
+  chernivtsi: "у Чернівцях",
+  khmelnytskyi: "у Хмельницькому",
+  cherkasy: "у Черкасах",
+  kropyvnytskyi: "у Кропивницькому",
+  mykolaiv: "у Миколаєві",
+  kherson: "у Херсоні",
+  "bila-tserkva": "у Білій Церкві",
+  kremenchuk: "у Кременчуці",
+};
+
+/** Місто в місцевому відмінку з прийменником: «у Львові». Для невідомого id кидає помилку, як `cityById`. */
+export const cityLocative = (id: string): string => {
+  const phrase = LOCATIVES[cityById(id).id];
+  if (!phrase) throw new Error(`Немає місцевого відмінка для ${id}`);
+  return phrase;
+};
