@@ -21,3 +21,22 @@ export const requestLinkStep = (profile: {
   if (profile.status === "loading") return "wait";
   return profile.published ? "open" : "create-profile";
 };
+
+/** Профіль виконавця зі сторінки /p/<id> веде на `/?open=performer:<id>`, де id має вигляд `me-<userId>`. */
+const PERFORMER_ID = /^me-[A-Za-z0-9_-]{1,64}$/;
+
+export const performerLinkHref = (id: string): string => `/?open=${encodeURIComponent(`performer:${id}`)}`;
+
+/** id виконавця з `performer:<id>`; усе, що не схоже на id акаунта, відкидаємо. */
+export const parsePerformerLink = (raw: string): string | null => (PERFORMER_ID.test(raw) ? raw : null);
+
+export type PerformerLinkStep = "wait" | "deal" | "compose";
+
+/**
+ * Що робити з `performer:<id>` для людини, яка вже увійшла. Запити ще вантажаться: чекаємо. Є відкритий запит: пропонуємо
+ * угоду цьому виконавцю (розмова з наміром «угода»). Немає: розгортаємо поле запиту з підказкою, як «Запропонувати роботу».
+ */
+export const performerLinkStep = ({ requests }: { requests: { status: string }[] | null }): PerformerLinkStep => {
+  if (requests === null) return "wait";
+  return requests.some((request) => request.status === "open") ? "deal" : "compose";
+};

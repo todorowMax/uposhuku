@@ -4,6 +4,7 @@ import { ProfilePageReviews } from "@/components/profile-page/parts/profile-page
 import { ProfilePageWorks } from "@/components/profile-page/parts/profile-page-works";
 import { initialsOf } from "@/components/profile-page/utils";
 import { SiteShell, pageLinkClass } from "@/components/site-page/site-shell";
+import { performerLinkHref } from "@/lib/map/deep-link";
 import type { PublicProfile } from "@/lib/profile/public";
 import { catalogPath } from "@/lib/seo/catalog";
 
@@ -53,7 +54,7 @@ export const ProfilePageView = ({ profile }: ProfilePageViewTypes.Props) => (
       </dl>
 
       <p>
-        <Link href="/" className="auth-primary w-full px-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto">
+        <Link href={performerLinkHref(profile.id)} className="auth-primary w-full px-5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto">
           Описати задачу на карті
         </Link>
       </p>

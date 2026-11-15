@@ -5,7 +5,8 @@ import { notificationSettingsStore } from "@/components/account/notification-set
 import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { authFlowStore, activeRequestStore, composingStore, requestsStore, sessionStore, showRequestsListStore } from "@/lib/auth/client";
 import { mapSelectedRequest, setMapMode } from "@/lib/feed/map-requests";
-import { deepLinkNext, requestLinkStep } from "@/lib/map/deep-link";
+import { deepLinkNext, parsePerformerLink, performerLinkStep, requestLinkStep } from "@/lib/map/deep-link";
+import { startProposeWork } from "@/lib/map/performer-link";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
 import { offersCollapsedStore, offersViewStore } from "@/lib/requests/offers";
 import { feedCollapsedStore } from "@/lib/requests/side-panel";
@@ -25,6 +26,17 @@ const openRequestLink = (id: string, profile: Parameters<typeof requestLinkStep>
   setMapMode("requests");
   mapSelectedRequest.set(id);
   feedCollapsedStore.set(false);
+  return true;
+};
+
+/**
+ * `performer:<id>` для того, хто вже увійшов. `false`: запити ще вантажаться, чекаємо. Невалідний id просто відкидаємо.
+ */
+const openPerformerLink = (id: string, requests: { status: string }[] | null): boolean => {
+  const performerId = parsePerformerLink(id);
+  const step = performerLinkStep({ requests });
+  if (step === "wait") return false;
+  if (performerId) void startProposeWork(performerId, step);
   return true;
 };
 
@@ -54,6 +66,7 @@ const openOwnRequestLink = (kind: "offers" | "renew", id: string, requests: { id
  *   offers:<id>     пропозиції на мій запит
  *   renew:<id>      «Ще актуально?» на моєму запиті (Мої запити, запит стає активним)
  *   request:<id>    запит у стрічці виконавця
+ *   performer:<id>  «Запропонувати роботу» виконавцю (id виду me-…); сюди веде кнопка на сторінці профілю /p/<id>
  *
  * Гостя спершу ведемо у вхід і після входу відкриваємо те, що просили (вхід через Google повертає на те саме посилання).
  * Хто увійшов без опублікованого профілю виконавця, для `request:` бачить редактор профілю, а запит відкривається
@@ -93,6 +106,8 @@ export function DeepLinkSync() {
       // Дані запитів ще вантажаться: чекаємо, щоб не відкрити панель порожньою.
       if (requests === null) return;
       openOwnRequestLink(kind, id, requests);
+    } else if (kind === "performer") {
+      if (!openPerformerLink(id, requests)) return;
     } else if (kind === "request") {
       if (!openRequestLink(id, { status: profile.status, published }, editorAsked)) return;
     }
