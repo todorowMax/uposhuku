@@ -4069,6 +4069,180 @@ select.auth-input[data-empty] {
 }
 
 /*
+  Коротка картка виконавця (components/maplibre/performer-short-card.tsx): одна для поповера над маркером,
+  прев'ю поруч зі списком групи й рядка шторки на телефоні.
+*/
+.short-card {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+}
+
+.short-card-photo {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  background-color: var(--foam);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.short-card-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Онлайн не лише кольором: порожнє кільце й слово «Не в мережі» проти заповненої крапки й слова «Онлайн». */
+.short-card-dot {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--ink-muted);
+  border-radius: 999px;
+}
+
+.short-card-status[data-online] .short-card-dot {
+  border-color: var(--online);
+  background: var(--online);
+}
+
+.short-card-facts {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.short-card-tag {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+/* Поповер біля маркера й картка збоку списку групи: лише показ, мишу пропускають крізь себе. */
+.pin-hover,
+.group-preview-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-map-overlay);
+  width: 280px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-window);
+  background: var(--panel);
+  box-shadow: var(--shadow-window);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pin-hover[data-placed],
+.group-preview-card[data-placed] {
+  opacity: 1;
+  animation: short-card-in 140ms var(--ease-out-quint);
+}
+
+@keyframes short-card-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pin-hover[data-placed],
+  .group-preview-card[data-placed] {
+    animation: ui-sheet-fade 100ms ease-out;
+  }
+}
+
+/* Шторка групи на телефоні: шапка з «Наблизити» стоїть, список прокручується. */
+.group-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px 8px;
+}
+
+.group-sheet-list {
+  display: grid;
+}
+
+.group-sheet-item + .group-sheet-item {
+  border-top: 1px solid var(--line);
+}
+
+.group-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.group-sheet-main {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 8px 4px;
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+.group-sheet-main:focus-visible,
+.group-sheet-info:focus-visible {
+  outline: 2px solid var(--tide);
+  outline-offset: 2px;
+}
+
+.group-sheet-avatar,
+.group-sheet-request {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background-color: var(--foam);
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.group-sheet-request {
+  display: grid;
+  place-items: center;
+  background: var(--ocean);
+  color: var(--brand-ink);
+  font-weight: 700;
+}
+
+.group-sheet-info {
+  flex: none;
+  margin-inline: 4px;
+}
+
+.group-sheet-info[data-expanded] {
+  background: var(--hover-blue);
+  color: var(--ink);
+}
+
+.group-sheet-card {
+  margin: 0 4px 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.pin-sheet-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/*
   Серверна заставка карти (components/map-skeleton.tsx). Лише CSS: вона в
   першому HTML і має рухатися ще до завантаження JS. Ховається, коли сцена
   поставила <html data-map-ready>.
