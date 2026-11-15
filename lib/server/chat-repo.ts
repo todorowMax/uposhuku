@@ -141,12 +141,13 @@ export const findChatAttachment = async (conversationId: string, id: string) =>
  * `messages_conversation_idx` (розмова, час). Якщо в розмові два повідомлення з однаковим часом,
  * останнім вважаємо те, чий id більший (тож результат завжди однаковий).
  */
-const lastMessages = async (conversationIds: string[]): Promise<Map<string, typeof messages.$inferSelect>> => {
+const lastMessages = async (conversationIds: string[], textOnly = false): Promise<Map<string, typeof messages.$inferSelect>> => {
+  const humanOnly = textOnly ? sql` and m2.kind = 'text'` : sql``;
   const rows = await inChunks(conversationIds, (chunk) =>
     getDb()
       .select()
       .from(messages)
-      .where(and(inArray(messages.conversationId, chunk), sql`${messages.id} = (select m2.id from messages m2 where m2.conversation_id = ${messages.conversationId} order by m2.created_at desc, m2.id desc limit 1)`)),
+      .where(and(inArray(messages.conversationId, chunk), sql`${messages.id} = (select m2.id from messages m2 where m2.conversation_id = ${messages.conversationId}${humanOnly} order by m2.created_at desc, m2.id desc limit 1)`)),
   );
   return new Map(rows.map((row) => [row.conversationId, row]));
 };
@@ -218,8 +219,9 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   const asPerformer = rows.filter((row) => row.performerUserId === userId);
   const customerIds = [...new Set(asPerformer.map((row) => row.customerUserId))];
   const performerUserIds = [...new Set(asCustomer.flatMap((row) => (row.performerUserId ? [row.performerUserId] : [])))];
-  const [lastById, talked, unreadById, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
+  const [lastById, lastHumanById, talked, unreadById, mine, people, cards, offersAsCustomer, offersAsPerformer] = await Promise.all([
     lastMessages(rows.map((row) => row.id)),
+    lastMessages(rows.map((row) => row.id), true),
     talkedIn(rows.map((row) => row.id)),
     unreadIn(rows.map((row) => row.id), userId),
     db.select().from(deals).where(or(eq(deals.ownerUserId, userId), eq(deals.performerId, `me-${userId}`))).orderBy(desc(deals.createdAt)).limit(200),
@@ -234,6 +236,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
   for (const row of rows) {
     const role = row.customerUserId === userId ? "customer" : "performer";
     const last = lastById.get(row.id);
+    const lastHuman = lastHumanById.get(row.id);
     let other: ConversationDto["other"];
     if (role === "customer") {
       const profile = row.performerUserId ? cards.get(row.performerUserId) : undefined;
@@ -241,7 +244,8 @@ export const listConversations = async (userId: string): Promise<ConversationDto
       other = gone ? { name: DELETED_NAME } : { name: profile?.name ?? "Виконавець", photo: profile?.photo || undefined, specialty: profile?.specialty };
     } else {
       const customer = people.find((user) => user.id === row.customerUserId);
-      other = { name: customer?.deletedAt != null ? DELETED_NAME : (customer?.displayName ?? "Замовник") };
+      const named = customer?.deletedAt == null && Boolean(customer?.displayName?.trim());
+      other = { name: customer?.deletedAt != null ? DELETED_NAME : named ? (customer?.displayName as string) : "Замовник", ...(customer?.deletedAt == null && !named ? { nameless: true } : {}) };
     }
     const pairDeals = liveDeals.filter((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
     let deal: ConversationDto["deal"];
@@ -260,7 +264,7 @@ export const listConversations = async (userId: string): Promise<ConversationDto
     }
     const offerRow = offerRows.find((item) => item.customer === row.customerUserId && item.performer === row.performerUserId);
     const offer = offerRow ? { title: offerRow.text.length > 40 ? `${offerRow.text.slice(0, 39).trimEnd()}…` : offerRow.text } : undefined;
-    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, talked: talked.has(row.id), ...unreadFields(unreadById.get(row.id), Boolean(deal?.needsMe)), ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
+    result.push({ id: row.id, performerId: row.performerId, role, other, lastMessage: last ? toMessage(last) : null, lastHumanMessage: lastHuman ? toMessage(lastHuman) : null, talked: talked.has(row.id), ...unreadFields(unreadById.get(row.id), Boolean(deal?.needsMe)), ...(deal ? { deal } : {}), phase, ...(offer ? { offer } : {}), updatedAt: new Date(row.updatedAt).toISOString() });
   }
   return result;
 };

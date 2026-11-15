@@ -57,11 +57,13 @@ export interface ChatLine {
   at: string;
   /** system — подія в стрічці, малюється по центру без бульбашки. */
   kind?: "text" | "system";
+  /** Id угоди чи запиту, про який службовий рядок. */
+  contextId?: string;
   photos?: string[];
 }
 
 export const toLines = (messages: ChatMessageDto[], myRole: "customer" | "performer"): ChatLine[] =>
-  messages.map((message) => ({ id: message.id, from: message.from === myRole ? "me" : "them", text: message.text, at: message.at, ...(message.kind === "system" ? { kind: "system" as const } : {}), ...(message.attachments?.length ? { photos: message.attachments.map((item) => item.url) } : {}) }));
+  messages.map((message) => ({ id: message.id, from: message.from === myRole ? "me" : "them", text: message.text, at: message.at, ...(message.kind === "system" ? { kind: "system" as const } : {}), ...(message.contextId ? { contextId: message.contextId } : {}), ...(message.attachments?.length ? { photos: message.attachments.map((item) => item.url) } : {}) }));
 
 /**
  * Розмова з виконавцем-акаунтом: знаходить або створює її, опитує нові

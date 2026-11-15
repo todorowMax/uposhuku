@@ -29,6 +29,9 @@ export const useInbox = () => {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState<ConversationDto | null>(null);
   const [filter, setFilter] = useState<InboxFilter>("all");
+  /** Останнє опитування списку не вдалось: показуємо рядок з «Спробувати ще раз». */
+  const [listError, setListError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const signedIn = session.status === "user";
   const motion = useInboxMotion(open, setOpen);
   useKeyboardInset(motion.panelRef, open);
@@ -78,8 +81,12 @@ export const useInbox = () => {
     const load = () => {
       if (document.hidden) return;
       void fetchConversations()
-        .then((list) => !cancelled && setItems(list))
-        .catch(() => {});
+        .then((list) => {
+          if (cancelled) return;
+          setItems(list);
+          setListError(false);
+        })
+        .catch(() => !cancelled && setListError(true));
     };
     load();
     const stop = startPolling(load, POLL_MS, ["message"]);
@@ -87,7 +94,7 @@ export const useInbox = () => {
       cancelled = true;
       stop();
     };
-  }, [signedIn, open]);
+  }, [signedIn, open, attempt]);
 
   // Запит виконано: прибираємо його зі сховища (воно зовнішнє, тож тут це не стан компонента).
   useEffect(() => {
@@ -119,5 +126,7 @@ export const useInbox = () => {
   // Відкрита розмова відмічена прочитаною: гасимо її в списку одразу, не чекаючи наступного опитування.
   const markRead = (conversationId: string) => setItems((list) => list.map((item) => (item.id === conversationId ? { ...item, unread: 0, unreadDeal: false } : item)));
 
-  return { ...motion, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead };
+  const retry = () => setAttempt((value) => value + 1);
+
+  return { ...motion, listError, retry, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead };
 };

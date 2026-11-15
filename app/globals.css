@@ -5291,6 +5291,188 @@ html[data-map-ready] .map-skeleton {
   opacity: 0.7;
 }
 
+/* Розділювач дня: підпис по центру між двома лініями. */
+.dm-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.dm-day::before,
+.dm-day::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+
+/* Подія угоди: ліворуч, з іконкою, чипом номера й часом. */
+.dm-event {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.dm-event p {
+  min-width: 0;
+}
+
+.dm-event time {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.dm-events {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.dm-events-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dm-events-toggle svg {
+  transition: transform 150ms;
+}
+
+.dm-events-toggle svg[data-open] {
+  transform: rotate(180deg);
+}
+
+.dm-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6eef0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dm-chip:not([data-static]):hover {
+  background: var(--hover-blue);
+}
+
+/* Рішення модератора: окрема карточка, найважливіше в розмові. */
+.dm-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.dm-decision h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dm-decision-comment {
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+
+.dm-decision time {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+/* Плашка «Нові повідомлення»: липне до низу стрічки. */
+.dm-new {
+  position: sticky;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-solid);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-window);
+}
+
+.dm-new:hover {
+  background: var(--brand-solid-hover);
+}
+
+.dm-new:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Співрозмовник видалив акаунт: поле вводу замінено текстом. */
+.dm-closed {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(16 45 55 / 6%);
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.dm-counter[data-over] {
+  font-weight: 600;
+}
+
+/* Аватар: коло з фото чи ініціалами (components/ui/avatar.tsx). */
+.ui-avatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--hover-blue);
+}
+
+.ui-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ui-avatar-fallback {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .inbox-header h2 {
   flex: 1;
   font-size: 15px;
@@ -5313,7 +5495,7 @@ html[data-map-ready] .map-skeleton {
   padding: 0 16px;
 }
 
-.inbox-main > :is(.dm-input-row, .dm-warn) {
+.inbox-main > :is(.dm-input-row, .dm-warn, .dm-closed) {
   margin-left: 16px;
   margin-right: 16px;
 }
@@ -5321,8 +5503,8 @@ html[data-map-ready] .map-skeleton {
 .inbox-row {
   display: flex;
   width: 100%;
-  flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
   text-align: left;
@@ -5338,6 +5520,40 @@ html[data-map-ready] .map-skeleton {
   font-weight: 500;
 }
 
+/* Рядок розмови: аватар ліворуч, тіло праворуч. */
+.inbox-row-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inbox-avatar {
+  margin-top: 2px;
+}
+
+.inbox-time {
+  padding-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.inbox-list-note {
+  padding: 4px 16px 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.inbox-list-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 8px 8px;
+}
+
 .inbox-name em {
   margin-left: 8px;
   font-size: 11px;
@@ -5347,6 +5563,7 @@ html[data-map-ready] .map-skeleton {
 }
 
 .inbox-preview {
+  min-width: 0;
   overflow: hidden;
   font-size: 13px;
   color: var(--ink-muted);

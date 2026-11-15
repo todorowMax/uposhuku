@@ -8,6 +8,7 @@
 import { DealComposerScreen } from "@/components/deals/deal-composer/deal-composer-screen";
 import { DealScreen } from "@/components/deals/deal-screen/deal-screen";
 import { TermsScreen } from "@/components/deals/terms-form/terms-screen";
+import { isOtherGone } from "@/lib/chat/display";
 import { CHAT_PHOTOS_MAX, type ConversationDto } from "@/lib/chat/types";
 import { AttachSheet } from "./parts/attach-sheet";
 import { Composer } from "./parts/composer";
@@ -34,7 +35,7 @@ export const Thread = ({
   onClose: () => void;
   onToggleSize: () => void;
 }) => {
-  const { chat, screen, setScreen, selectedDeal, response, listRef, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation, onRead);
+  const { chat, screen, setScreen, selectedDeal, response, listRef, onScroll, unseen, live, toBottom, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation, onRead);
   const role = conversation.role;
   const emptyChat = chat.lines.length === 0 && !conversation.lastMessage;
 
@@ -42,7 +43,20 @@ export const Thread = ({
     <>
       <ThreadHeader conversation={conversation} typing={chat.typing} size={size} onBack={onBack} onToggleSize={onToggleSize} onClose={onClose} />
       <DealRow ready={ready} deals={deals} role={role} response={response} panelOpen={Boolean(selectedDeal)} onOpen={openDeals} openRef={rowRef} />
-      <MessageList ref={listRef} lines={chat.lines} loaded={chat.loaded} error={Boolean(chat.error)} empty={emptyChat} onPhoto={setViewer} />
+      <MessageList
+        ref={listRef}
+        lines={chat.lines}
+        deals={deals}
+        loaded={chat.loaded}
+        error={Boolean(chat.error)}
+        empty={emptyChat}
+        live={live}
+        unseen={unseen}
+        onScroll={onScroll}
+        onJumpDown={toBottom}
+        onPhoto={setViewer}
+        onOpenDeal={(id) => openScreenAfterClose({ kind: "deal", id })}
+      />
       <Composer
         draft={draft}
         placeholder={emptyChat ? "Опишіть задачу" : "Повідомлення"}
@@ -50,6 +64,7 @@ export const Thread = ({
         photoError={photoError}
         sendError={sendError}
         canSend={canSend}
+        gone={isOtherGone(conversation)}
         fileRef={fileRef}
         onType={type}
         onSubmit={() => void submit()}
