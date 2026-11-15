@@ -34,19 +34,19 @@ export const PerformerShortCard = ({ performer, cityName, className, ...props }:
         </span>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-ink">{performer.name}</p>
+          <p className="truncate text-xs text-ink-muted">{performer.specialty}</p>
           <p className="truncate text-xs text-ink-muted">
-            {performer.specialty}
-            {cityName && ` · ${cityName}`}
+            {cityName && `${cityName} · `}
+            {performer.online ? "Онлайн" : "Не в мережі"}
           </p>
-          <p className="text-xs text-ink-muted">{performer.online ? "Онлайн" : "Не в мережі"}</p>
         </div>
       </div>
       <dl className="short-card-stats grid grid-cols-3 divide-x divide-line text-center">
         {stats.map((stat, index) => (
-          <div key={STAT_NAMES[index]} className="px-1">
+          <div key={STAT_NAMES[index]} className="min-w-0 px-1">
             <dt className="sr-only">{STAT_NAMES[index]}</dt>
-            <dd className="text-base font-semibold text-ink">{stat.value}</dd>
-            <dd className="mt-0.5 text-xs text-ink-muted">{stat.label}</dd>
+            <dd className="truncate text-base font-semibold text-ink">{stat.value}</dd>
+            <dd className="mt-0.5 truncate text-xs text-ink-muted">{stat.label}</dd>
           </div>
         ))}
       </dl>

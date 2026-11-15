@@ -32,7 +32,9 @@ export const PinHoverCard = ({
     const node = ref.current;
     const container = containerRef.current;
     if (!node || !container) return;
-    const bounds = container.getBoundingClientRect();
+    const box = container.getBoundingClientRect();
+    // Видима частина карти: контейнер буває ширшим чи вищим за вікно, і поповер ставився за краєм екрана.
+    const bounds = { ...box.toJSON(), width: Math.min(box.width, window.innerWidth - box.left), height: Math.min(box.height, window.innerHeight - box.top) };
     const { width, height } = node.getBoundingClientRect();
     const { anchor } = state;
     const first = placeBeside({ anchor, size: { width, height }, bounds, gap: GAP, margin: MARGIN, topEdge: topEdgeUnderStack(bounds, anchor.left, width) });

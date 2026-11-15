@@ -4,6 +4,8 @@
 */
 .short-card {
   display: grid;
+  /* Одна колонка не ширша за картку: без minmax(0) довгий підзаголовок чи теги розпирали сітку, і третій стовпчик цифр вилазив за край. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 10px;
   width: 100%;
 }
@@ -58,7 +60,9 @@
   top: 0;
   left: 0;
   z-index: var(--z-map-overlay);
-  width: 280px;
+  overflow: hidden;
+  width: 300px;
+  max-width: calc(100vw - 32px);
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-window);

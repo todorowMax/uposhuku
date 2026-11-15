@@ -56,8 +56,10 @@ export const GroupPreviewPanel = ({ members, requests, listRef, panelRef, onScro
     const panelBox = panel.getBoundingClientRect();
     const rowBox = row.getBoundingClientRect();
     const { width, height } = card.getBoundingClientRect();
-    const room = panel.offsetParent?.clientWidth ?? window.innerWidth;
-    const right = panelBox.right - (panelBox.left - panel.offsetLeft) + PREVIEW_GAP + width <= room - EDGE;
+    // Рахуємо від вікна, а не від батька панелі: батько (сцена карти) буває ширшим за видиму частину, і картка праворуч обрізалась краєм екрана.
+    const fitsRight = panelBox.right + PREVIEW_GAP + width <= window.innerWidth - EDGE;
+    const fitsLeft = panelBox.left - PREVIEW_GAP - width >= EDGE;
+    const right = fitsRight || !fitsLeft;
     const top = Math.min(Math.max(rowBox.top - panelBox.top + rowBox.height / 2 - height / 2, 0), Math.max(0, panelBox.height - height));
     card.style.left = `${right ? panelBox.width + PREVIEW_GAP : -(width + PREVIEW_GAP)}px`;
     card.style.top = `${Math.round(top)}px`;
