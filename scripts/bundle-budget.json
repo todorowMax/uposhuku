@@ -1,0 +1,11 @@
+{
+  "_comment": "Стеля first-load JS (без стиснення, байти) за маршрутами; міряється після `npx next build` у .next/diagnostics/route-bundle-stats.json. Піднімати лише свідомо, разом із рядком у AGENTS.md.",
+  "budgets": {
+    "/": 1650000,
+    "/(.)p/[id]": 1700000,
+    "/p/[id]": 550000,
+    "/zapyt/[id]": 550000,
+    "/poslugy/[tag]": 550000,
+    "/poslugy/[tag]/[city]": 550000
+  }
+}

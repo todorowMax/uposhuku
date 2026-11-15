@@ -25,7 +25,13 @@ jobs:
       - run: npm install --no-audit --no-fund
       # Лінт: помилки валять збірку, а число попереджень не може зростати (храповик у lint:ci).
       - run: npm run lint:ci
+      # Мертвий код і залежності (knip): виходить із кодом 0, якщо нічого зайвого.
+      - run: npm run deadcode
       # Типи: `next-env.d.ts` і `cloudflare-env.d.ts` у репозиторії або генеруються збіркою.
       - run: npm run typecheck
       # Тести репозиторіїв піднімають справжні D1 і R2 у пам'яті (wrangler getPlatformProxy).
       - run: npm test
+      # Збірка на проді й стеля first-load JS за маршрутами (scripts/bundle-budget.json). Секрети збірці не потрібні:
+      # маршрути читають змінні під час запиту, а не при збірці.
+      - run: npm run build
+      - run: npm run budget
