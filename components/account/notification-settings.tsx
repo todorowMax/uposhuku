@@ -9,6 +9,7 @@
 
 import { Bell, Mail, Send } from "@/components/icons";
 import { BarChart3, Moon } from "lucide-react";
+import { MatchingSettings } from "@/components/account/parts/matching-settings";
 import { NotificationRow } from "@/components/account/parts/notification-row";
 import { TelegramRow } from "@/components/account/parts/telegram-row";
 import { useNotificationSettings } from "@/components/account/use-notification-settings";
@@ -59,6 +60,7 @@ const NotificationSettingsBody = () => {
           <NotificationRow icon={<Send className="size-4.5" />} title="Мої пропозиції тегів" hint="Тег, який ви просили, додано до словника." checked={prefs.kinds.tags} onChange={(tags) => setPrefs({ kinds: { tags } })} />
           <NotificationRow icon={<Moon className="size-4.5" />} title="Тихі години" hint="З 23:00 до 08:00 за Києвом сповіщення в Telegram приходять без звуку." checked={prefs.quietHours} onChange={(quietHours) => setPrefs({ quietHours })} />
         </div>
+        {prefs.kinds.matching && <MatchingSettings matching={prefs.matching} />}
         <p className="pe-hint">Кількість нового видно й у заголовку вкладки: «(3) Findlyfy».</p>
 
         <h3 className="pe-label mt-2">Приватність</h3>

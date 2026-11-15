@@ -3026,18 +3026,6 @@ html[data-glass] .offers-panel {
   color: #ffffff;
 }
 
-.mode-count {
-  padding: 0 6px;
-  border-radius: 7px;
-  background: rgb(255 255 255 / 22%);
-  font-size: 11px;
-  font-variant-numeric: lining-nums proportional-nums;
-}
-
-.mode-switch button:not([aria-pressed="true"]) .mode-count {
-  background: rgb(0 54 74 / 8%);
-}
-
 /* Перемикач стоїть поруч із меню, у спільному нижньому ряду. */
 .mode-dock {
   position: relative;

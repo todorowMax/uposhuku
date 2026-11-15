@@ -25,6 +25,10 @@ export interface FeedItem {
   tags: FeedTag[];
   /** Місто замовника або «Віддалено». */
   place: string;
+  /** Без міста («Віддалено»). */
+  remote: boolean;
+  /** Місто запиту збігається з містом профілю виконавця. */
+  sameCity: boolean;
   /** Бюджет, якщо замовник його вказав. */
   budget: string | null;
   /** Коли потрібен результат: «Терміново, до 3 днів». */
@@ -44,8 +48,13 @@ export const RESPONSE_LIMITS = { message: 600, minDays: 1, maxDays: 365, maxPric
 /** Запит на карті: той самий опис, що в стрічці, плюс точка. Запит без міста («Віддалено») стоїть у центрі України. */
 export interface MapRequest extends FeedItem {
   point: { lat: number; lng: number };
-  /** Без міста: пин у центрі України з підписом «Віддалено». */
-  remote: boolean;
   /** Це запит самої людини: на карті показуємо інакше, відгукнутися на нього не можна. */
   own: boolean;
+}
+
+/** Сторінка стрічки: наступний курсор (null, коли далі нічого) і скільки всього відкритих чужих запитів. */
+export interface FeedPage {
+  items: FeedItem[];
+  next: string | null;
+  total: number;
 }

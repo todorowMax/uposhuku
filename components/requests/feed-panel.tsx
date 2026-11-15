@@ -57,13 +57,13 @@ export function FeedPanel() {
   const { kind } = useSidePanel();
   const active = kind === "feed";
   const collapsed = useStore(feedCollapsedStore);
-  const { loading, error, items: allItems, pending, reveal, patch } = useFeed(active);
+  const { loading, error, items: allItems, pending, total, hasMore, loadingMore, loadMore, reveal, patch } = useFeed(active);
   const mapState = useStore(mapRequestsStore);
   const filter = useStore(requestFilterStore);
   const pickedTags = useStore(filterTags);
-  // Список слухається тих самих чипів, що й карта; без даних карти показуємо все.
-  const allowed = mapState.loaded && (filter !== "all" || pickedTags.length > 0) ? new Set(applyRequestFilter(mapState.items.filter((item) => !item.own), filter, pickedTags).map((item) => item.id)) : null;
-  const items = allowed ? allItems.filter((item) => allowed.has(item.id)) : allItems;
+  // Список слухається тих самих чипів, що й карта, і фільтрує завантажені сторінки.
+  const filtered = filter !== "all" || pickedTags.length > 0;
+  const items = filtered ? applyRequestFilter(allItems, filter, pickedTags) : allItems;
   const ownOpen = mapState.items.filter((item) => item.own);
   const panelRef = useRef<HTMLElement | null>(null);
   const [panelNode, setPanelNode] = useState<HTMLElement | null>(null);
@@ -117,14 +117,13 @@ export function FeedPanel() {
   }, [feedShown]);
 
   if (!active) return null;
-  const total = allItems.length + pending.length;
 
   if (collapsed) {
     return (
       <Button variant="bare" onClick={() => feedCollapsedStore.set(false)} className="offers-tab feed-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
         <Inbox className="size-4" />
         Запити для вас
-        {items.length > 0 && <span className="filter-all-badge">{items.length}</span>}
+        {total > 0 && <span className="filter-all-badge">{total}</span>}
         {pending.length > 0 && <span className="offers-tab-new">+{pending.length} {plural(pending.length, "новий", "нові", "нових")}</span>}
         <ChevronDown className="size-4 lg:hidden" style={{ rotate: "180deg" }} />
       </Button>
@@ -184,26 +183,37 @@ export function FeedPanel() {
             {error}
           </p>
         )}
-        {allowed && (
-          <button type="button" onClick={() => requestFilterStore.set("all")} className="offers-new">
+        {filtered && (
+          <Button variant="bare" onClick={() => requestFilterStore.set("all")} className="offers-new">
             Фільтр: показано {items.length} з {allItems.length}. Скинути
-          </button>
+          </Button>
         )}
-        {!loading && !error && items.length === 0 && pending.length === 0 && !allowed && (
+        {!loading && !error && items.length === 0 && pending.length === 0 && !filtered && (
           <div className="offers-empty">
             <span aria-hidden className="request-live-dot" />
             <p>
-              Поки немає запитів під ваші теги.{" "}
-              <button type="button" onClick={() => profileEditorStore.set(true)} className="auth-link">
+              Поки немає відкритих запитів.{" "}
+              <Button variant="link" onClick={() => profileEditorStore.set(true)}>
                 Додайте теги й роботи в профілі
-              </button>
-              , щоб бачити більше.
+              </Button>
+              , і ми повідомимо, коли з&apos;явиться запит під ваші теги.
             </p>
           </div>
         )}
         {items.map((item) => (
           <FeedCard key={item.id} item={item} onChange={(change) => patch(item.id, change)} onHover={() => hoveredFeedRequestStore.set(item.id)} />
         ))}
+        {hasMore && (
+          <div className="grid justify-items-center gap-1 py-2">
+            <Button variant="bare" disabled={loadingMore} onClick={() => void loadMore()} className="offers-new">
+              {loadingMore && <Loader2 className="size-4 animate-spin" />}
+              Показати ще
+            </Button>
+            <p role="status" className="pe-hint">
+              Показано {allItems.length} з {total}
+            </p>
+          </div>
+        )}
       </div>
     </aside>
   );

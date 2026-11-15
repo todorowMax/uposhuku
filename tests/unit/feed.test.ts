@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { feedFor, mapRequests, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
+import { feedPage, mapRequests, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
 import { responsesFor } from "@/lib/requests/responses";
 import { emptyProfile } from "@/lib/profile/types";
 import { addPayment } from "@/lib/server/placement-repo";
@@ -7,6 +7,9 @@ import { saveProfile } from "@/lib/server/profile-repo";
 import { createRequest, updateRequest } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { makeUser, useTestD1 } from "../helpers/d1";
+
+/** Вся стрічка однією сторінкою: для перевірок, що не про сторінки. */
+const feedFor = async (userId: string, tags: string[], cityId: string | null = null) => (await feedPage(userId, { viewer: { tags, cityId }, size: 1000 })).items;
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
@@ -130,7 +133,7 @@ describe("умови запиту словами", () => {
 describe("запити на карті", () => {
   it("гостю видно запити лише з містом і текстом: без акаунта, збігів і відгуків", async () => {
     await createRequest("cust-a", { text: "Потрібна допомога з дизайном", tags: [], files: [] });
-    const items = await mapRequests(null, []);
+    const items = await mapRequests(null, { tags: [], cityId: null });
     expect(items.length).toBeGreaterThan(3);
     expect(items.every((item) => item.matchedTags === 0 && item.response === null && !item.own)).toBe(true);
     expect(items.some((item) => item.point)).toBe(true);
@@ -143,20 +146,20 @@ describe("запити на карті", () => {
 
   it("точка поруч із центром міста й стабільна", async () => {
     const { CITIES } = await import("@/lib/map/cities");
-    const items = await mapRequests(null, []);
+    const items = await mapRequests(null, { tags: [], cityId: null });
     const lviv = CITIES.find((city) => city.id === "lviv")!;
     const placed = items.find((item) => item.place === "Львів")!;
     expect(Math.hypot(placed.point!.lat - lviv.lat, (placed.point!.lng - lviv.lng) * 0.65)).toBeLessThan(0.1);
-    expect((await mapRequests(null, [])).find((item) => item.id === placed.id)!.point).toEqual(placed.point);
+    expect((await mapRequests(null, { tags: [], cityId: null })).find((item) => item.id === placed.id)!.point).toEqual(placed.point);
   });
 
   it("виконавцю додаємо збіг і його відгук, а власний запит позначено own", async () => {
     const request = await createRequest("cust-b", { text: "Потрібен інтернет-магазин", tags: [{ id: "online-store", label: "Інтернет-магазин" }, { id: "cart-checkout", label: "Кошик" }], files: [], cityId: "kyiv" });
     await saveResponse("perf-b", request.id, { price: 1000, days: 3, message: "Добрий день, зроблю." });
-    const items = await mapRequests("perf-b", ["online-store", "cart-checkout"]);
+    const items = await mapRequests("perf-b", { tags: ["online-store", "cart-checkout"], cityId: null });
     expect(items.find((item) => item.id === request.id)).toMatchObject({ matchedTags: 2, response: { price: 1000 }, responses: 1 });
-    expect((await mapRequests("cust-b", [])).find((item) => item.id === request.id)).toMatchObject({ own: true, place: "Київ" });
-    expect((await mapRequests("perf-b", [])).some((item) => item.own)).toBe(false);
+    expect((await mapRequests("cust-b", { tags: [], cityId: null })).find((item) => item.id === request.id)).toMatchObject({ own: true, place: "Київ" });
+    expect((await mapRequests("perf-b", { tags: [], cityId: null })).some((item) => item.own)).toBe(false);
   });
 });
 
@@ -172,7 +175,7 @@ describe("позначка «Змінено»", () => {
     const feed = await feedFor("perf-a", ["telegram-bot"]);
     expect(feed.find((item) => item.id === touched.id)).toMatchObject({ editedAt: edited, text: "Бот, який уже поправили", createdAt: touched.createdAt });
     expect(feed.find((item) => item.id === untouched.id)?.editedAt).toBeNull();
-    const map = await mapRequests("perf-a", ["telegram-bot"]);
+    const map = await mapRequests("perf-a", { tags: ["telegram-bot"], cityId: null });
     expect(map.find((item) => item.id === touched.id)?.editedAt).toBe(edited);
     expect(map.find((item) => item.id === untouched.id)?.editedAt).toBeNull();
   });

@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { createStore, useStore } from "@/lib/store";
 import { profileStore } from "@/lib/profile/client";
 import { requestsStore, sessionStore } from "@/lib/auth/client";
-import { onRealtime, startPolling } from "@/lib/realtime/client";
+import { onRealtimeEvent, startPolling } from "@/lib/realtime/client";
 import type { FeedItem, MapRequest } from "./types";
 
 export type MapMode = "performers" | "requests";
@@ -52,7 +52,7 @@ export const mapSelectedRequest = createStore<string | null>(null);
 /** Остання картка під курсором у відкритій панелі запитів. */
 export const hoveredFeedRequestStore = createStore<string | null>(null);
 
-export type RequestFilter = "all" | "matched" | "urgent" | "budget" | "remote";
+export type RequestFilter = "all" | "matched" | "city" | "urgent" | "budget" | "remote";
 export const requestFilterStore = createStore<RequestFilter>("all");
 
 const POLL_MS = 6000;
@@ -76,11 +76,16 @@ export const patchMapRequest = (id: string, change: (item: FeedItem) => FeedItem
   mapRequestsStore.set({ ...current, items: current.items.map((item) => (item.id === id ? { ...item, ...change(item) } : item)) });
 };
 
+/** Що потрібно знати про запит, щоб фільтр його пропустив чи ні (є і в стрічці, і на карті). */
+export type FilterableRequest = Pick<FeedItem, "tags" | "matchedTags" | "sameCity" | "deadline" | "budget" | "remote"> & { own?: boolean };
+
 /** Які запити лишити під вибраний фільтр. */
-export const applyRequestFilter = (items: MapRequest[], filter: RequestFilter, tags: readonly string[] = []): MapRequest[] => {
+export const applyRequestFilter = <T extends FilterableRequest>(items: T[], filter: RequestFilter, tags: readonly string[] = []): T[] => {
   // Теги з пошуку звужують запити за точним збігом: у запитів теги зі словника, словник тут не вантажимо.
   if (tags.length) items = items.filter((item) => item.tags.some((tag) => tags.includes(tag.id)));
   if (filter === "matched") return items.filter((item) => item.matchedTags > 0 && !item.own);
+  // Своє місто: місто запиту збігається з містом профілю виконавця.
+  if (filter === "city") return items.filter((item) => item.sameCity && !item.own);
   if (filter === "urgent") return items.filter((item) => item.deadline === "Терміново, до 3 днів" || item.deadline === "Протягом тижня");
   if (filter === "budget") return items.filter((item) => item.budget);
   // Без міста: пин у центрі України з підписом «Віддалено».
@@ -134,7 +139,7 @@ export function MapRequestsSync() {
     if (!canViewRequests()) return;
     void loadMapRequests();
     // Новий чи закритий запит оновлює лічильник на перемикачі одразу, у будь-якому режимі.
-    return onRealtime((event) => event.t === "feed" && void loadMapRequests());
+    return onRealtimeEvent(["feed"], () => void loadMapRequests());
   }, [session.status, profile]);
 
   useEffect(() => {

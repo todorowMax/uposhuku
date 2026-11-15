@@ -232,10 +232,10 @@ describe("кому слати «запит під теги»", () => {
       ["parent", { tags: ["chat-bot"] }],
       ["other", { tags: ["figma"] }],
     ]);
-    expect(pickMatching(["telegram-bot"], profiles, "author")).toEqual(["best", "parent"]);
-    expect(pickMatching([], profiles, "author")).toEqual([]);
+    expect(pickMatching({ tags: ["telegram-bot"] }, profiles, "author")).toEqual(["best", "parent"]);
+    expect(pickMatching({ tags: [] }, profiles, "author")).toEqual([]);
 
     const many = new Map<string, { tags: string[] }>(Array.from({ length: 50 }, (_, index) => [`p${String(index).padStart(2, "0")}`, { tags: ["telegram-bot"] }]));
-    expect(pickMatching(["telegram-bot"], many, "nobody")).toHaveLength(MATCH_NOTIFY_MAX);
+    expect(pickMatching({ tags: ["telegram-bot"] }, many, "nobody")).toHaveLength(MATCH_NOTIFY_MAX);
   });
 });
