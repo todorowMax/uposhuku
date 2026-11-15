@@ -17,26 +17,15 @@ import { TIER_NAMES } from "@/lib/placement/tiers";
 import type { PlacementTier } from "@/lib/map/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
+import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
+import { daysLabel, plural, priceLabel } from "@/lib/requests/format";
 import { useStore } from "@/lib/store";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
-const PRICE = new Intl.NumberFormat("uk-UA");
-const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-const isPhone = () => window.matchMedia("(max-width: 1023px)").matches;
 const collapseFeed = () => feedCollapsedStore.set(true);
-
-const plural = (count: number, one: string, few: string, many: string) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  if (ones === 1 && tens !== 11) return one;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return few;
-  return many;
-};
 
 const EDITED_AT = new Intl.DateTimeFormat("uk-UA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
-const daysLabel = (days: number) => `${days} ${plural(days, "день", "дні", "днів")}`;
-const priceLabel = (price: number | null) => (price === null ? "Ціна після обговорення" : `${PRICE.format(price)} ₴`);
 
 /** «щойно», «12 хв тому», «3 год тому», «вчора». */
 const ago = (iso: string, now = Date.now()) => {
@@ -83,10 +72,10 @@ export function FeedPanel() {
   useEffect(() => () => hoveredFeedRequestStore.set(null), []);
 
   useLayoutEffect(() => {
-    if (!active || !panelRef.current || reduced()) return;
+    if (!active || !panelRef.current || prefersReducedMotion()) return;
     const tween = gsap.fromTo(
       panelRef.current,
-      isPhone() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
+      isPhoneViewport() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
       // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
       { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" }
     );
@@ -101,7 +90,7 @@ export function FeedPanel() {
     if (!body) return;
     const fresh = [...body.querySelectorAll<HTMLElement>("[data-feed]")].filter((card) => !known.current.has(card.dataset.feed ?? ""));
     for (const card of fresh) known.current.add(card.dataset.feed ?? "");
-    if (!fresh.length || reduced()) return;
+    if (!fresh.length || prefersReducedMotion()) return;
     const tween = gsap.fromTo(fresh, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.06, ease: "power2.out" });
     return () => {
       tween.kill();
@@ -251,7 +240,7 @@ export function FeedCard({
   const formRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
-    if (!formOpen || !formRef.current || reduced()) return;
+    if (!formOpen || !formRef.current || prefersReducedMotion()) return;
     const tween = gsap.fromTo(formRef.current, { height: 0, opacity: 0 }, { height: "auto", opacity: 1, duration: 0.26, ease: "power2.out" });
     return () => {
       tween.kill();
