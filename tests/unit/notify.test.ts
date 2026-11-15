@@ -6,7 +6,7 @@ import { MATCH_NOTIFY_MAX, pickMatching } from "@/lib/server/notify-matching";
 import { savePrefs } from "@/lib/server/notification-prefs-repo";
 import { markPresence } from "@/lib/server/presence-sql";
 import { consumeLinkToken, createLinkToken, getLink } from "@/lib/server/telegram-repo";
-import { DEAL_TEXTS, bucket, dealNotice, deepLink, matchNotice, messageNotice, offerNotice, WINDOW_MS } from "@/lib/telegram/notices";
+import { DEAL_TEXTS, bucket, dealNotice, deepLink, matchNotice, messageNotice, offerNotice, requestLink, WINDOW_MS } from "@/lib/telegram/notices";
 import { stripContacts } from "@/lib/chat/contacts";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
@@ -206,6 +206,10 @@ describe("тексти сповіщень", () => {
     expect(dealNotice({ dealId: "d", action: "щось" })).toBeNull();
     expect(deepLink("chat:abc")).toBe("/?open=chat%3Aabc&utm_source=telegram&utm_medium=bot");
     expect(deepLink("request:r1", "channel")).toContain("utm_medium=channel");
+    // Запит відкривається публічною сторінкою, а не `/?open=request:`: гість і не виконавець теж її бачать.
+    expect(requestLink("r1")).toBe("/zapyt/r1?utm_source=telegram&utm_medium=bot");
+    expect(requestLink("r1", "channel")).toBe("/zapyt/r1?utm_source=telegram&utm_medium=channel");
+    expect(matchNotice({ requestId: "r1", userId: "u1", text: "Потрібен сайт", place: "Київ" }).button).toEqual({ text: "Подивитися", path: "/zapyt/r1?utm_source=telegram&utm_medium=bot" });
   });
 });
 

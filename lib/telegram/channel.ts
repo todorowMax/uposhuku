@@ -21,7 +21,7 @@ import { getDb } from "@/lib/server/db";
 import { logServer } from "@/lib/telemetry/log";
 import { deleteMessage, editMessageText, sendMessage, TelegramError } from "./api";
 import { telegramConfig, type TelegramConfig } from "./config";
-import { deepLink } from "./notices";
+import { requestLink } from "./notices";
 import { escapeHtml, excerpt } from "./texts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -67,7 +67,7 @@ export const formatChannelPost = (request: ChannelRequest, options: { closed?: b
   ]
     .filter((part) => part !== null && part !== "")
     .join("\n\n");
-  return { html, button: options.closed ? null : { text: "Відгукнутися на Findlyfy", path: deepLink(`request:${request.id}`, "channel") } };
+  return { html, button: options.closed ? null : { text: "Відгукнутися на Findlyfy", path: requestLink(request.id, "channel") } };
 };
 
 const keyboard = (config: TelegramConfig, button: { text: string; path: string } | null) => (button ? { inline_keyboard: [[{ text: button.text, url: `${config.siteUrl}${button.path}` }]] } : undefined);
