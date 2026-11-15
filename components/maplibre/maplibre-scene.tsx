@@ -8,7 +8,12 @@ import type { GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature } from "mapli
 import { gsap } from "gsap";
 import type { FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
-import { ChevronRight } from "@/components/icons";
+import { GroupPreviewPanel } from "@/components/maplibre/group-preview-panel";
+import { PinHoverCard } from "@/components/maplibre/pin-hover-card";
+import { TouchSheets } from "@/components/maplibre/touch-sheets";
+import type { TouchSheetsTypes } from "@/components/maplibre/use-touch-sheets";
+import { useTouchSheets } from "@/components/maplibre/use-touch-sheets";
+import { usePinHover } from "@/components/maplibre/use-pin-hover";
 import { PerformerAbout } from "@/components/maplibre/performer-about";
 import { AVATAR_ATLAS, AVATAR_COUNT, PORTRAIT_SIZE, createPortraitCanvas, drawPortrait } from "@/lib/map/portrait";
 import { FONT_BOLD, UKRAINE_TRACE_RING, buildMapStyle } from "@/lib/maplibre/style";
@@ -29,6 +34,8 @@ import { setMapReady } from "@/lib/map/ready";
 import { getRequestTags, getServerRequestTags, subscribeRequestTags } from "@/lib/map/request-tags";
 import type { Performer, PlacementTier } from "@/lib/map/types";
 import { cityFilter, filterTags, groupFilter, onlineFilter, tagMatches, useStore } from "@/lib/map/filters";
+import { bottomEdgeAboveControls, topEdgeUnderStack } from "@/lib/maplibre/stack-edges";
+import { groupTitle } from "@/lib/map/short-card";
 import { whenStyleReady } from "@/lib/maplibre/style-ready";
 import { isChromium } from "@/lib/ui/glass";
 import { filterPerformers } from "@/lib/map/groups";
@@ -272,44 +279,6 @@ interface GroupPreview {
   box: { left: number; top: number; width: number; height: number };
 }
 
-/** «1 виконавець», «4 виконавці», «12 виконавців». */
-const performerCount = (count: number) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  if (ones === 1 && tens !== 11) return `${count} виконавець`;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return `${count} виконавці`;
-  return `${count} виконавців`;
-};
-const groupTitle = ({ members, requests }: GroupPreview) => {
-  const tens = requests.length % 100;
-  const ones = requests.length % 10;
-  const word = ones === 1 && tens !== 11 ? "запит" : ones >= 2 && ones <= 4 && (tens < 12 || tens > 14) ? "запити" : "запитів";
-  const jobs = `${requests.length} ${word}`;
-  return [members.length ? performerCount(members.length) : null, requests.length ? jobs : null].filter(Boolean).join(" · ");
-};
-
-/**
- * Нижче чого панель над картою не заходить зверху: поле запиту, картка
- * запиту й фільтри — лише якщо вона під ними по ширині.
- */
-const topEdgeUnderStack = (bounds: DOMRect, left: number, width: number) => {
-  let edge = 104;
-  for (const item of document.querySelector("[data-top-stack]")?.children ?? []) {
-    const box = item.getBoundingClientRect();
-    if (box.height && box.right - bounds.left > left && box.left - bounds.left < left + width) {
-      edge = Math.max(edge, box.bottom - bounds.top + 12);
-    }
-  }
-  return edge;
-};
-
-/** Нижня межа картки: над нижніми кнопками, якщо картка стоїть над ними, інакше відступ від краю. */
-const bottomEdgeAboveControls = (bounds: DOMRect, left: number, width: number) => {
-  const box = document.querySelector(".bottom-controls")?.getBoundingClientRect();
-  const overlaps = box && box.right - bounds.left > left && box.left - bounds.left < left + width;
-  return overlaps ? box.top - bounds.top - 12 : bounds.height - 16;
-};
-
 const budgetNumbers = (budget: string | null) =>
   [...(budget ?? "").matchAll(/\d[\d\s\u00a0]*/g)].map((match) => Number(match[0].replace(/\D/g, "")));
 
@@ -547,6 +516,9 @@ export default function MapLibreScene() {
   const lensControlRef = useRef({ hide: (_instant?: boolean) => {}, enterPanel: () => {}, leavePanel: () => {} });
   /** Список людей групи під курсором і де стоїть сама група на екрані. */
   const [groupPreview, setGroupPreview] = useState<GroupPreview | null>(null);
+  /** Тап по маркеру на дотик і наведення на одиночний маркер: стан у хуках, сюди дістаємо через ref. */
+  const touchTapRef = useRef<(feature: MapGeoJSONFeature) => void>(() => {});
+  const pinHoverControlRef = useRef<{ show: ReturnType<typeof usePinHover>["show"]; hide: () => void }>({ show: () => {}, hide: () => {} });
   /** Теги з поля запиту: карта лишає лише тих, хто під них підходить. */
   const requestTags = useSyncExternalStore(subscribeRequestTags, getRequestTags, getServerRequestTags);
   const matches = useStore(tagMatches);
@@ -1160,6 +1132,7 @@ export default function MapLibreScene() {
         hideLens();
       };
       const hideLens = (instant = false, keepGroupPanel = false) => {
+        pinHoverControlRef.current.hide();
         keepLens();
         window.clearTimeout(switchTimer);
         pendingKey = "";
@@ -1314,7 +1287,14 @@ export default function MapLibreScene() {
         groupOpen = false;
         groupPointerInsideRef.current = false;
         setGroupPreview(null);
-        if (!cluster) return;
+        if (!cluster) {
+          pinHoverControlRef.current.show({
+            id: String(feature.properties?.id),
+            anchor: { left: point.x - (width * target) / 2, top: point.y - height * target, width: width * target, height: height * target },
+          });
+          return;
+        }
+        pinHoverControlRef.current.hide();
         const box = {
           left: point.x - (width * target) / 2,
           top: point.y - (height * target) / 2,
@@ -1349,6 +1329,11 @@ export default function MapLibreScene() {
         );
         if (!feature) return;
         hideLens(true);
+        // Без миші тап відкриває шторку (use-touch-sheets); наближення — кнопка в ній або подвійний тап.
+        if (!canHover) {
+          touchTapRef.current(feature);
+          return;
+        }
         if (feature.layer.id === "people-clusters") void expandCluster(feature);
         else selectPerson(feature);
       });
@@ -1874,6 +1859,26 @@ export default function MapLibreScene() {
     mapSelectedRequest.set(request.id);
   };
 
+  const openCardFromSheet = (id: string) => {
+    mapSelectedRequest.set(null);
+    setSelectedId(id);
+    setCardNotice(null);
+  };
+  const touchHandlers = useRef<TouchSheetsTypes.Handlers>({ clearSelection: () => {} });
+  const touchSheets = useTouchSheets({ mapRef, mapReady: ready, people: mapPeopleRef, requests: ownMapRequestsRef, handlers: touchHandlers, flyToRef });
+  const pinHover = usePinHover();
+  useEffect(() => {
+    touchHandlers.current = {
+      clearSelection: () => {
+        setSelectedId(null);
+        mapSelectedRequest.set(null);
+      },
+    };
+    touchTapRef.current = touchSheets.tap;
+    pinHoverControlRef.current = pinHover;
+  });
+  const pinHoverPerson = pinHover.state ? mapPeople.find((performer) => performer.id === pinHover.state?.id) : undefined;
+
   useEffect(() => {
     if (!selectedId && !selectedRequestId) return;
     const onKey = (event: KeyboardEvent) => {
@@ -1923,7 +1928,7 @@ export default function MapLibreScene() {
         <div
           ref={groupRef}
           role="group"
-          aria-label={groupTitle(groupPreview)}
+          aria-label={groupTitle(groupPreview.members.length, groupPreview.requests.length)}
           className="group-preview glass-panel"
           onPointerEnter={(event) => trackGroupPointer(event.clientX, event.clientY)}
           onPointerMove={(event) => trackGroupPointer(event.clientX, event.clientY)}
@@ -1932,51 +1937,21 @@ export default function MapLibreScene() {
             lensControlRef.current.leavePanel();
           }}
         >
-          <p className="group-preview-title">{groupTitle(groupPreview)}</p>
-          <ul ref={groupListRef} className="group-preview-list" style={{ "--rows": groupPreview.members.length + groupPreview.requests.length } as React.CSSProperties} onScroll={updateGroupStack} aria-label="Виконавці й запити у групі">
-            {groupPreview.members.map((performer) => {
-              return (
-                <li key={performer.id}>
-                  <button
-                    type="button"
-                    className="group-preview-row"
-                    onClick={() => openFromGroup(performer)}
-                    onFocus={(event) => {
-                      const list = groupListRef.current;
-                      const item = event.currentTarget.parentElement;
-                      const firstItem = list?.querySelector("li");
-                      if (list && item && firstItem) list.scrollTo({ top: item.offsetTop - firstItem.offsetTop, behavior: reduced() ? "auto" : "smooth" });
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      className="group-preview-avatar"
-                      style={avatarBackground(performer, 48)}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] font-semibold leading-tight text-ink">{performer.name}</span>
-                      <span className="block truncate text-[11px] leading-snug text-ink-muted">{performer.specialty}</span>
-                    </span>
-                    <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" />
-                  </button>
-                </li>
-              );
-            })}
-            {groupPreview.requests.map((request) => (
-              <li key={request.id}>
-                <button type="button" className="group-preview-row" onClick={() => openRequestFromGroup(request)}>
-                  <span aria-hidden className="group-preview-request-avatar">$</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] font-semibold leading-tight text-ink">Ваш запит</span>
-                    <span className="block truncate text-[11px] leading-snug text-ink-muted">{request.text}</span>
-                  </span>
-                  <ChevronRight aria-hidden className="group-preview-chevron size-4 shrink-0" />
-                </button>
-              </li>
-            ))}
-          </ul>
+          <GroupPreviewPanel
+            key={groupPreview.key}
+            members={groupPreview.members}
+            requests={groupPreview.requests}
+            listRef={groupListRef}
+            panelRef={groupRef}
+            onScroll={updateGroupStack}
+            onOpenPerson={openFromGroup}
+            onOpenRequest={openRequestFromGroup}
+          />
         </div>
       )}
+
+      {pinHover.state && pinHoverPerson && <PinHoverCard state={pinHover.state} performer={pinHoverPerson} containerRef={containerRef} />}
+      <TouchSheets state={touchSheets.state} onOpenPerson={openFromGroup} onOpenCard={openCardFromSheet} onOpenRequest={openRequestFromGroup} onClose={touchSheets.close} onZoomGroup={(feature) => void touchSheets.zoomGroup(feature)} />
 
       {/* Плашка догрузки по центру внизу, над перемикачем режиму карти. */}
       <div
