@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ClampedText } from "@/components/ui/clamped-text";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import {
@@ -27,6 +28,7 @@ import { conversationsStore } from "@/lib/chat/client";
 import { useDeals } from "@/lib/deals/client";
 import { mapModeStore } from "@/lib/feed/map-requests";
 import { offerStatus, type OfferStatus } from "@/lib/requests/offer-status";
+import { proposeDealIntentStore } from "@/lib/requests/propose-work";
 import { useSidePanel } from "@/lib/requests/side-panel";
 import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
@@ -59,6 +61,23 @@ const reduced = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const collapseOffers = () => offersCollapsedStore.set(true);
 
+/** Вище стоять обрані й ті, кого замовник уже вибрав; решта за оплатою, як і було (сортування стабільне). */
+const decisionRank = (offer: OfferResponse) => (offer.status === "chosen" ? 2 : offer.status === "shortlisted" ? 1 : 0);
+
+/** Одна панель за раз: відгуки згортаються, відкривається месенджер із цим виконавцем. */
+const openOfferChat = (offer: OfferResponse) => {
+  track(EVENTS.chatOpened, { from: "offers" });
+  offersCollapsedStore.set(true);
+  inboxOpenStore.set({ conversationId: null, performerId: offer.performerId });
+};
+
+/** «Обрати»: статус на сервері, чат із виконавцем і те саме оформлення угоди, що в рядку угоди (виконавець у чаті відкриває його сам). */
+const chooseOffer = (offer: OfferResponse, choose: (offer: OfferResponse) => Promise<boolean>) => {
+  void choose(offer);
+  proposeDealIntentStore.set(offer.performerId);
+  openOfferChat(offer);
+};
+
 /**
  * Пропозиції виконавців праворуч, поки йде підбір: карта ліворуч
  * лишається вільною. Порядок — за оплатою розміщення, у платних позначка
@@ -83,8 +102,12 @@ export function OffersPanel() {
     pending,
     all,
     revealPending,
+    statusError,
+    shortlist,
+    unshortlist,
     decline,
     restore,
+    choose,
   } = useOffers(requestOpen ? request : null);
   const deals = useDeals(request?.id);
   const conversations = useStore(conversationsStore);
@@ -267,21 +290,21 @@ export function OffersPanel() {
               </div>
             )}
 
-            {offers.map((offer) => (
+            {statusError && (
+              <p role="alert" className="auth-error">
+                {statusError}
+              </p>
+            )}
+
+            {[...offers].sort((a, b) => decisionRank(b) - decisionRank(a)).map((offer) => (
               <OfferCard
                 key={offer.id}
                 offer={offer}
                 status={offerStatus(offer, deals, conversations)}
-                onChat={() => {
-                  track(EVENTS.chatOpened, { from: "offers" });
-                  // Одна панель за раз: відгуки згортаються, відкривається месенджер.
-                  offersCollapsedStore.set(true);
-                  inboxOpenStore.set({
-                    conversationId: null,
-                    performerId: offer.performerId,
-                  });
-                }}
-                onDecline={() => decline(offer.id)}
+                onChat={() => openOfferChat(offer)}
+                onChoose={() => chooseOffer(offer, choose)}
+                onShortlist={() => void (offer.status === "shortlisted" ? unshortlist(offer) : shortlist(offer))}
+                onDecline={() => void decline(offer)}
               />
             ))}
 
@@ -307,7 +330,7 @@ export function OffersPanel() {
                       </span>
                       <button
                         type="button"
-                        onClick={() => restore(offer.id)}
+                        onClick={() => void restore(offer)}
                         className="auth-link text-[12px]"
                       >
                         Повернути
@@ -361,11 +384,15 @@ function OfferCard({
   offer,
   status,
   onChat,
+  onChoose,
+  onShortlist,
   onDecline,
 }: {
   offer: OfferResponse;
   status: OfferStatus;
   onChat: () => void;
+  onChoose: () => void;
+  onShortlist: () => void;
   onDecline: () => void;
 }) {
   const openProfile = useOpenProfile();
@@ -459,9 +486,14 @@ function OfferCard({
           {daysLabel(offer.days)}
         </span>
       </p>
-      <p className="mt-1.5 line-clamp-3 text-[13px] leading-snug text-ink/85">
-        {offer.message}
-      </p>
+      <ClampedText text={offer.message} moreLabel="Показати повністю" className="mt-1.5 text-[13px] leading-snug text-ink/85" />
+
+      {(offer.status === "chosen" || offer.status === "shortlisted") && (
+        <div className="offer-status">
+          {offer.status === "chosen" ? <Check className="size-3.5" /> : <Star className="size-3.5 fill-current" />}
+          {offer.status === "chosen" ? "Обрано" : "В обраних"}
+        </div>
+      )}
 
       {status.kind !== "new" && (
         <div className="offer-status">
@@ -470,11 +502,28 @@ function OfferCard({
         </div>
       )}
 
-      <div className="mt-3 flex items-center gap-1.5">
-        <Button variant="offer" onClick={onChat}>
-          <MessageCircle className="size-4" />
-          {status.kind === "deal" ? "Відкрити угоду" : status.kind === "chat" ? "Відкрити чат" : "Написати"}
-        </Button>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {status.kind === "deal" ? (
+          <Button variant="offer" onClick={onChat}>
+            <MessageCircle className="size-4" />
+            Відкрити угоду
+          </Button>
+        ) : (
+          <>
+            <Button variant="offer" onClick={onChoose}>
+              <Check className="size-4" />
+              Обрати
+            </Button>
+            <Button variant="quiet" onClick={onChat}>
+              <MessageCircle className="size-4" />
+              {status.kind === "chat" ? "Відкрити чат" : "Написати"}
+            </Button>
+            <Button variant="quiet" onClick={onShortlist} aria-pressed={offer.status === "shortlisted"} aria-label={`${offer.status === "shortlisted" ? "Прибрати з обраних" : "В обрані"}: ${offer.name}`}>
+              <Star className="size-4" />
+              <span className="sr-only sm:not-sr-only">{offer.status === "shortlisted" ? "Прибрати" : "В обрані"}</span>
+            </Button>
+          </>
+        )}
         {status.kind !== "deal" && (
           <Button
             variant="quiet"

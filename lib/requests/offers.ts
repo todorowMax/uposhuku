@@ -2,14 +2,14 @@
 //
 // Пропозиції виконавців у браузері: який запит зараз на місці поля,
 // відгуки на нього (опитування раз на кілька секунд, поки немає
-// WebSocket), що людина відхилила і з ким листується. Відхилення й
-// листування поки лише в цьому браузері (localStorage), у D1 — пізніше.
+// WebSocket) і рішення щодо них. Статус відгуку (новий, в обраних,
+// відхилено, обрано) живе на сервері, тож однаковий на всіх пристроях.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { activeRequestStore, authFlowStore, composingStore, requestsStore, sessionStore } from "@/lib/auth/client";
 import { startPolling } from "@/lib/realtime/client";
 import { createStore, useStore } from "@/lib/store";
-import type { OfferResponse, PublishedRequest } from "./types";
+import type { OfferResponse, PublishedRequest, ResponseStatus } from "./types";
 
 /** Запит, що стоїть на місці поля, або null — тоді показуємо поле. */
 export const useActiveRequest = (): PublishedRequest | null => {
@@ -45,22 +45,6 @@ export const hoveredOfferStore = createStore<{ requestId: string; performerId: s
 
 const POLL_MS = 4000;
 
-const readSet = (key: string): string[] => {
-  try {
-    return JSON.parse(window.localStorage.getItem(key) ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-};
-
-const writeSet = (key: string, value: string[]) => {
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Без сховища відхилення живе до перезавантаження.
-  }
-};
-
 /**
  * Відгуки на запит. Перший список показуємо одразу, а ті, що прийшли
  * потім, чекають у pending: панель не стрибає під рукою, людина сама
@@ -69,7 +53,8 @@ const writeSet = (key: string, value: string[]) => {
 export const useOffers = (request: PublishedRequest | null) => {
   const [shown, setShown] = useState<OfferResponse[] | null>(null);
   const [pending, setPending] = useState<OfferResponse[]>([]);
-  const [declined, setDeclined] = useState<string[]>([]);
+  /** Не вдалося зберегти рішення: показуємо причину, а список лишається як був. */
+  const [statusError, setStatusError] = useState<string | null>(null);
   /** Перший список не завантажився: показуємо помилку з повтором замість вічного спінера. */
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -81,7 +66,7 @@ export const useOffers = (request: PublishedRequest | null) => {
     setShown(null);
     setFailed(false);
     setPending([]);
-    setDeclined(requestId ? readSet(`vm:declined:${requestId}`) : []);
+    setStatusError(null);
     offersMapStore.set({ requestId, responses: [] });
     if (!requestId) return;
     let cancelled = false;
@@ -114,6 +99,9 @@ export const useOffers = (request: PublishedRequest | null) => {
           setPending([]);
           return;
         }
+        // Статуси з іншого пристрою підтягуємо в уже показані картки; новий масив лише коли щось справді змінилось.
+        const fresh = new Map(responses.map((item) => [item.id, item.status]));
+        setShown((current) => (current?.some((item) => fresh.has(item.id) && fresh.get(item.id) !== item.status) ? current.map((item) => ({ ...item, status: fresh.get(item.id) ?? item.status })) : current));
         setPending(responses.filter((item) => !shownIds.current.has(item.id)));
       } catch {
         // Мережа моргнула: наступний запит за таймером спробує знову, а поки показуємо помилку, якщо списку ще немає.
@@ -139,21 +127,48 @@ export const useOffers = (request: PublishedRequest | null) => {
     setPending([]);
   };
 
-  const setDeclinedFor = (next: string[]) => {
-    setDeclined(next);
-    if (requestId) writeSet(`vm:declined:${requestId}`, next);
+  /** Рішення замовника: одразу на екрані, на сервері наступним кроком; збій повертає старий статус. */
+  const setStatus = async (offer: OfferResponse, status: ResponseStatus): Promise<boolean> => {
+    if (!requestId) return false;
+    const apply = (value: ResponseStatus) => {
+      const patch = (list: OfferResponse[]) => list.map((item) => (item.id === offer.id ? { ...item, status: value } : item));
+      setShown((current) => (current === null ? current : patch(current)));
+      setPending(patch);
+    };
+    const previous = offer.status;
+    apply(status);
+    setStatusError(null);
+    try {
+      const response = await fetch(`/api/requests/${encodeURIComponent(requestId)}/responses/${encodeURIComponent(offer.performerId)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (response.ok) return true;
+      apply(previous);
+      setStatusError("Не вдалося зберегти рішення. Спробуйте ще раз.");
+      return false;
+    } catch {
+      apply(previous);
+      setStatusError("Не вдалося зберегти рішення. Спробуйте ще раз.");
+      return false;
+    }
   };
 
   return {
     loading: shown === null && Boolean(requestId) && !failed,
     error: shown === null && failed,
     retry: () => setAttempt((value) => value + 1),
-    offers: (shown ?? []).filter((item) => !declined.includes(item.id)),
-    declinedOffers: (shown ?? []).filter((item) => declined.includes(item.id)),
+    offers: (shown ?? []).filter((item) => item.status !== "declined"),
+    declinedOffers: (shown ?? []).filter((item) => item.status === "declined"),
+    statusError,
     pending,
     all,
     revealPending,
-    decline: (id: string) => setDeclinedFor([...declined, id]),
-    restore: (id: string) => setDeclinedFor(declined.filter((item) => item !== id)),
+    shortlist: (offer: OfferResponse) => setStatus(offer, "shortlisted"),
+    unshortlist: (offer: OfferResponse) => setStatus(offer, "new"),
+    decline: (offer: OfferResponse) => setStatus(offer, "declined"),
+    restore: (offer: OfferResponse) => setStatus(offer, "new"),
+    choose: (offer: OfferResponse) => setStatus(offer, "chosen"),
   };
 };

@@ -113,21 +113,33 @@ export interface NoticeMailInput {
   unsubscribeUrl: string;
 }
 
+/** Тема й перший рядок листа за видом події; тексту повідомлень тут немає (лише ім'я чи назва запиту). */
+const noticeTexts = (event: EmailEvent): { lead: string; subject: string } => {
+  if (event.type === "message") {
+    const name = excerpt(event.fromName, 40);
+    return { lead: `Нове повідомлення від ${name}.`, subject: `Нове повідомлення від ${name}` };
+  }
+  if (event.type === "offer") {
+    const title = excerpt(event.title, 60);
+    return { lead: `Новий відгук на ваш запит «${title}».`, subject: `Новий відгук на ваш запит «${title}»` };
+  }
+  if (event.type === "renew") {
+    const title = excerpt(event.title, 60);
+    return {
+      lead: `Ще актуально? Ваш запит «${title}» висить уже 14 днів. Якщо не відповісти за 3 дні, він закриється, його можна буде відновити протягом 7 днів.`,
+      subject: `Ще актуально? Запит «${title}»`,
+    };
+  }
+  return { lead: payReminderLead(event.action, event.stageTitle) ?? DEAL_TEXTS[event.action] ?? "Є зміни за вашою угодою.", subject: "Зміни за вашою угодою у Findlyfy" };
+};
+
 /**
  * Єдиний шаблон листа-сповіщення (повідомлення, відгук, угода). Лише факт події, ім'я співрозмовника з профілю чи назва
  * власного запиту, посилання на сайт і відписка; тексту повідомлень, пошти й телефонів немає. Без картинок і трекерів.
  * Підпис і реквізити Оператора з lib/legal/config.ts. Чиста функція: тести читають її результат.
  */
 export const renderNoticeMail = ({ event, held, siteUrl, unsubscribeUrl }: NoticeMailInput): { subject: string; text: string; html: string } => {
-  const name = excerpt(event.type === "message" ? event.fromName : "", 40);
-  const title = excerpt(event.type === "offer" ? event.title : "", 60);
-  const lead =
-    event.type === "message"
-      ? `Нове повідомлення від ${name}.`
-      : event.type === "offer"
-        ? `Новий відгук на ваш запит «${title}».`
-        : (payReminderLead(event.action, event.stageTitle) ?? DEAL_TEXTS[event.action] ?? "Є зміни за вашою угодою.");
-  const subject = event.type === "message" ? `Нове повідомлення від ${name}` : event.type === "offer" ? `Новий відгук на ваш запит «${title}»` : "Зміни за вашою угодою у Findlyfy";
+  const { lead, subject } = noticeTexts(event);
   const more = held > 0 ? `Поки вас не було, ще ${held} нових.` : "";
   const link = `${siteUrl}/?open=${encodeURIComponent(event.open)}`;
   const operator = [SERVICE_NAME, `${OPERATOR.entity}, РНОКПП ${OPERATOR.taxId}`, OPERATOR.address, CONTACT_EMAIL];

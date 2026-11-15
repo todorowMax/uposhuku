@@ -1,5 +1,6 @@
 // PATCH /api/requests/:id
 // {status: "closed"} — закрити свій запит; {status: "open"} — відновити закритий протягом доби;
+// {renew: true} — «ще актуально»: строк життя (14 днів) іде заново;
 // повна чернетка (ті самі поля, що в POST) — змінити свій відкритий запит.
 
 import { problem, readJson } from "@/lib/api/problem";
@@ -8,7 +9,25 @@ import { getSessionUser } from "@/lib/server/auth";
 import { noteRequestEdited } from "@/lib/server/chat-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { pushGlobal } from "@/lib/server/realtime";
+import { renewRequest } from "@/lib/server/request-lifetime";
 import { closeRequest, reopenRequest, updateRequest } from "@/lib/server/request-repo";
+
+/** «Так, ще актуально»: строк життя заново; виконавцям нічого не йде, стрічка не змінюється. */
+const renewResponse = async (userId: string, id: string) => {
+  const renewed = await renewRequest(userId, id);
+  if (renewed === "not_found") return problem(404, "Запит не знайдено");
+  if (renewed === "closed") return problem(409, "Запит закрито", "Закритий запит спершу відновіть.");
+  return Response.json({ request: renewed });
+};
+
+/** Відновлення не шле «новий запит під ваші теги» і не пише службових рядків у розмови. */
+const reopenResponse = async (userId: string, id: string) => {
+  const reopened = await reopenRequest(userId, id);
+  if (reopened === "not_found") return problem(404, "Запит не знайдено");
+  if (reopened === "window_expired") return problem(409, "Вікно відновлення минуло", "Запит уже не відновити: вікно відновлення минуло.");
+  pushGlobal({ t: "feed" });
+  return Response.json({ request: reopened });
+};
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSessionUser();
@@ -22,14 +41,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   const limited = await rateLimited("requestEdit", user.id);
   if (limited) return limited;
-  if (body?.status === "open") {
-    // Відновлення не шле «новий запит під ваші теги» і не пише службових рядків у розмови.
-    const reopened = await reopenRequest(user.id, id);
-    if (reopened === "not_found") return problem(404, "Запит не знайдено");
-    if (reopened === "window_expired") return problem(409, "Вікно відновлення минуло", "Минуло понад добу: запит уже не відновити.");
-    pushGlobal({ t: "feed" });
-    return Response.json({ request: reopened });
-  }
+  if (body?.renew === true) return renewResponse(user.id, id);
+  if (body?.status === "open") return reopenResponse(user.id, id);
   const draft = parseDraft(body);
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const updated = await updateRequest(user.id, id, draft);

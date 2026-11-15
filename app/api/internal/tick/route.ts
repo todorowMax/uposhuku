@@ -1,5 +1,5 @@
 // POST /api/internal/tick — фонові задачі, які викликає cron воркера (раз на 5 хвилин):
-// пости запитів у Telegram-канал, видалення постів зі знятою галочкою, редагування закритих і повернення постів відновлених запитів, прибирання старого (сесії, коди, осиротілі фото чату).
+// строк життя запитів (питання «Ще актуально?» і закриття без відповіді), пости запитів у Telegram-канал, видалення постів зі знятою галочкою, редагування закритих і повернення постів відновлених запитів, прибирання старого (сесії, коди, осиротілі фото чату).
 // Захист: заголовок Authorization: Bearer <INTERNAL_TOKEN>, звіряється за сталий час.
 
 import { and, lt } from "drizzle-orm";
@@ -9,6 +9,8 @@ import { purgeExpiredRequisites } from "@/lib/server/account-retention";
 import { runDealSweep } from "@/lib/server/deal-sweep";
 import { getDb } from "@/lib/server/db";
 import { runPayReminders } from "@/lib/server/pay-reminders";
+import { pushGlobal } from "@/lib/server/realtime";
+import { askRenewals, expireUnanswered } from "@/lib/server/request-lifetime";
 import { pruneEmailCodes, pruneOrphanAttachments, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
@@ -45,6 +47,13 @@ export const POST = async (request: Request) => {
   // Звірка грошей безпечної угоди йде першою: її не повинні зачепити збої Telegram чи прибирання.
   const sweep = await step("sweep", () => runDealSweep(now));
   const payReminders = await step("pay_reminders", () => runPayReminders(now));
+  // Строк життя запитів: питання «Ще актуально?» через 14 днів, закриття без відповіді за 3 дні. Закриті тут пости каналу гасить крок `close` нижче.
+  const renewalsAsked = await step("ask_renewals", () => askRenewals(now));
+  const expired = await step("expire_requests", async () => {
+    const closedCount = await expireUnanswered(now);
+    if (closedCount > 0) pushGlobal({ t: "feed" });
+    return closedCount;
+  });
   const posted = await step("post", () => postDueRequests(now));
   const removal = await step("remove_posts", () => removeOptedOutPosts(now));
   const edited = await step("edit_posts", () => syncEditedPosts(now));
@@ -64,5 +73,5 @@ export const POST = async (request: Request) => {
     chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
   };
   const sweepFailed = failed.includes("sweep");
-  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, sweep, payReminders, purged, pruned }, { status: sweepFailed ? 500 : 200 });
+  return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, renewalsAsked, expired, sweep, payReminders, purged, pruned }, { status: sweepFailed ? 500 : 200 });
 };

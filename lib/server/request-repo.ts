@@ -6,7 +6,8 @@ import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
-import { RESTORE_WINDOW_MS, isDeadline } from "@/lib/requests/types";
+import { answerDeadline, restoreWindowMs } from "@/lib/requests/lifetime";
+import { RESTORE_WINDOW_MS, isDeadline, type ResponseStatus } from "@/lib/requests/types";
 import { newId } from "@/lib/ids";
 import { stripContacts } from "@/lib/chat/contacts";
 import type { PublicRequest } from "@/lib/requests/public";
@@ -15,13 +16,13 @@ import { getDb, inChunks } from "./db";
 type Row = typeof requests.$inferSelect;
 
 /** Кінець доби на відновлення (ms) для закритого запиту; null, якщо відновлювати нічого або вже пізно. */
-const restoreDeadline = (row: Pick<Row, "status" | "closedAt">, now: number): number | null => {
+const restoreDeadline = (row: Pick<Row, "status" | "closedAt" | "closeReason">, now: number): number | null => {
   if (row.status !== "closed" || row.closedAt === null) return null;
-  const until = row.closedAt + RESTORE_WINDOW_MS;
+  const until = row.closedAt + restoreWindowMs(row.closeReason, RESTORE_WINDOW_MS);
   return until > now ? until : null;
 };
 
-const restoreUntilIso = (row: Pick<Row, "status" | "closedAt">, now: number): string | null => {
+const restoreUntilIso = (row: Pick<Row, "status" | "closedAt" | "closeReason">, now: number): string | null => {
   const until = restoreDeadline(row, now);
   return until === null ? null : new Date(until).toISOString();
 };
@@ -48,14 +49,17 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     createdAt: new Date(row.createdAt).toISOString(),
     editedAt: row.editedAt === null ? null : new Date(row.editedAt).toISOString(),
     restoreUntil: restoreUntilIso(row, now),
+    closeReason: row.closeReason,
+    renewalDeadline: row.status === "open" && row.renewalAskedAt !== null ? new Date(answerDeadline(row.renewalAskedAt) as number).toISOString() : null,
   }));
 };
 
 export const createRequest = async (userId: string, draft: RequestDraft): Promise<PublishedRequest> => {
   const db = getDb();
   const id = newId("req");
+  const now = Date.now();
   const statements = [
-    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: Date.now() }),
+    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: now, renewedAt: now }),
     ...(draft.tags.length ? [db.insert(requestTags).values(draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index))] : []),
     ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
   ];
@@ -85,7 +89,7 @@ export const closeRequest = async (userId: string, id: string, now = Date.now())
 };
 
 /**
- * Відновлює свій закритий запит у межах доби від першого закриття. `createdAt`, правки, теги й файли не міняються.
+ * Відновлює свій закритий запит у межах доби від першого закриття (7 діб, якщо його закрито через строк життя). `createdAt`, правки, теги й файли не міняються.
  * Чужий, неіснуючий чи відкритий запит: not_found; закритий, але доба минула (або `closed_at` порожній): window_expired.
  */
 export const reopenRequest = async (userId: string, id: string, now = Date.now()): Promise<PublishedRequest | "not_found" | "window_expired"> => {
@@ -93,7 +97,8 @@ export const reopenRequest = async (userId: string, id: string, now = Date.now()
   const [row] = await db.select().from(requests).where(and(eq(requests.id, id), eq(requests.userId, userId))).limit(1);
   if (!row || row.status !== "closed") return "not_found";
   if (restoreDeadline(row, now) === null) return "window_expired";
-  await db.update(requests).set({ status: "open", closedAt: null }).where(and(eq(requests.id, id), eq(requests.status, "closed")));
+  // Строк життя починається заново: інакше запит, закритий через строк, закрився б знову в найближчий tick.
+  await db.update(requests).set({ status: "open", closedAt: null, closeReason: null, renewedAt: now, renewalAskedAt: null }).where(and(eq(requests.id, id), eq(requests.status, "closed")));
   return (await findRequest(userId, id)) ?? "not_found";
 };
 
@@ -197,8 +202,8 @@ export const RESPONSES_CAP = 200;
  * Справжні відгуки виконавців на запит: хто відповів і що. Для пропозицій замовника.
  * Не більше RESPONSES_CAP, найраніші першими (серед однакових за часом за id), тож вибірка стабільна.
  */
-export const responsesTo = async (requestId: string): Promise<{ userId: string; response: MyResponse }[]> =>
-  (await getDb().select().from(responses).where(eq(responses.requestId, requestId)).orderBy(asc(responses.createdAt), asc(responses.id)).limit(RESPONSES_CAP)).map((row) => ({ userId: row.performerUserId, response: toMine(row) }));
+export const responsesTo = async (requestId: string): Promise<{ userId: string; response: MyResponse; status: ResponseStatus }[]> =>
+  (await getDb().select().from(responses).where(eq(responses.requestId, requestId)).orderBy(asc(responses.createdAt), asc(responses.id)).limit(RESPONSES_CAP)).map((row) => ({ userId: row.performerUserId, response: toMine(row), status: row.status }));
 
 /** Скільки справжніх відгуків на кожен із запитів. */
 export const responseCounts = async (requestIds: string[]): Promise<Map<string, number>> => {

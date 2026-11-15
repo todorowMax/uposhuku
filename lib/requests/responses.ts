@@ -19,7 +19,7 @@ export const responsesFor = async (request: PublishedRequest): Promise<OfferResp
   // Усе пачками: профілі, рівні й оцінки для всіх відповідей разом, а не по запиту на кожну.
   const userIds = list.map(({ userId }) => userId);
   const [profiles, tiers, stats] = await Promise.all([getProfiles(userIds), tiersFor(userIds), reviewStatsFor(userIds.map((userId) => `me-${userId}`))]);
-  const offers = list.map(({ userId, response }): OfferResponse | null => {
+  const offers = list.map(({ userId, response, status }): OfferResponse | null => {
     const profile = profiles.get(userId);
     if (!profile?.published) return null;
     const tier = tiers.get(userId) ?? 1;
@@ -40,6 +40,7 @@ export const responsesFor = async (request: PublishedRequest): Promise<OfferResp
       days: response.days,
       message: response.message,
       createdAt: response.createdAt,
+      status,
     };
   });
   return offers.filter((offer): offer is OfferResponse => offer !== null).sort((a, b) => b.tier - a.tier || a.createdAt.localeCompare(b.createdAt));

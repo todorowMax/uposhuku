@@ -164,6 +164,12 @@ export const requests = sqliteTable(
     editCount: integer("edit_count").notNull().default(0),
     /** Коли запит закрили вперше; null — відкритий або закритий до появи цього поля. Від нього рахується доба на відновлення. */
     closedAt: integer("closed_at"),
+    /** З якого моменту йде строк життя (14 днів): публікація або останнє «Ще актуально»; null читається як `created_at`. */
+    renewedAt: integer("renewed_at"),
+    /** Коли автору поставили питання «Ще актуально?»; null — не питали. Без відповіді за 3 дні запит закривається. */
+    renewalAskedAt: integer("renewal_asked_at"),
+    /** Чому закрито: `expired` — не відповів на «Ще актуально?»; null — закрив сам автор (або запит відкритий). */
+    closeReason: text("close_reason", { enum: ["expired"] }),
   },
   (table) => [index("requests_user_idx").on(table.userId), index("requests_status_idx").on(table.status, table.createdAt)],
 );
@@ -211,6 +217,8 @@ export const responses = sqliteTable(
     days: integer("days").notNull(),
     message: text("message").notNull(),
     createdAt: integer("created_at").notNull(),
+    /** Рішення замовника щодо відгуку; виконавцю воно не показується. */
+    status: text("status", { enum: ["new", "shortlisted", "declined", "chosen"] }).notNull().default("new"),
   },
   (table) => [uniqueIndex("responses_pair_idx").on(table.requestId, table.performerUserId), index("responses_performer_idx").on(table.performerUserId)],
 );
