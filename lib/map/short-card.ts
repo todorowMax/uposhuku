@@ -22,31 +22,33 @@ const REVIEWS: Forms = ["відгук", "відгуки", "відгуків"];
 
 export const dealsLabel = (orders: number) => pluralUk(orders, DEALS);
 
-/** Менше місяця — «Новий на Findlyfy», далі «На Findlyfy 8 міс.». */
-export const platformLabel = (months: number) => (months < 1 ? "Новий на Findlyfy" : `На Findlyfy ${months} міс.`);
-
 export const ratingLabel = (rating: number) => RATING.format(rating);
-
-export interface ShortFacts {
-  /** «★ 4,8 · 12 відгуків» або «Ще без відгуків». */
-  reviewsLine: string;
-  /** «3 перевірених»; null, коли таких відгуків немає. */
-  verifiedLine: string | null;
-  dealsLine: string;
-  platformLine: string;
-}
 
 const hasReviews = (stats: PerformerStats | undefined): stats is PerformerStats & { rating: number } =>
   stats !== undefined && stats.rating !== null && stats.reviews > 0;
 
-export const shortFacts = (stats: PerformerStats | undefined): ShortFacts => {
-  const verified = stats?.verifiedReviews ?? 0;
-  return {
-    reviewsLine: hasReviews(stats) ? `★ ${ratingLabel(stats.rating)} · ${pluralUk(stats.reviews, REVIEWS)}` : "Ще без відгуків",
-    verifiedLine: verified > 0 ? `${verified} перевірених` : null,
-    dealsLine: dealsLabel(stats?.orders ?? 0),
-    platformLine: platformLabel(stats?.months ?? 0),
-  };
+/** Лише слово у потрібній формі: «угода», «угоди», «угод». */
+export const pluralWordUk = (count: number, forms: Forms) => pluralUk(count, forms).slice(String(count).length + 1);
+
+export interface ShortStat {
+  /** Велике значення зверху: «★ 4,7», «12», «8 міс.». */
+  value: string;
+  /** Підпис під ним: «3 відгуки», «угод», «на Findlyfy». */
+  label: string;
+}
+
+/**
+ * Три цифри короткої картки рядком, як у профілі: рейтинг, угоди, час на платформі.
+ * Без відгуків рейтинг «—» з підписом «без відгуків»; менше місяця — «новий».
+ */
+export const shortStats = (stats: PerformerStats | undefined): [ShortStat, ShortStat, ShortStat] => {
+  const orders = stats?.orders ?? 0;
+  const months = stats?.months ?? 0;
+  return [
+    hasReviews(stats) ? { value: `★ ${ratingLabel(stats.rating)}`, label: pluralUk(stats.reviews, REVIEWS) } : { value: "—", label: "без відгуків" },
+    { value: String(orders), label: pluralWordUk(orders, DEALS) },
+    months < 1 ? { value: "новий", label: "на Findlyfy" } : { value: `${months} міс.`, label: "на Findlyfy" },
+  ];
 };
 
 const PERFORMERS: Forms = ["виконавець", "виконавці", "виконавців"];

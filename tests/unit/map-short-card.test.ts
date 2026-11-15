@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dealsLabel, groupTitle, platformLabel, pluralUk, rowLine, shortFacts } from "@/lib/map/short-card";
+import { dealsLabel, groupTitle, pluralUk, pluralWordUk, rowLine, shortStats } from "@/lib/map/short-card";
 import { placeBeside } from "@/lib/maplibre/place-beside";
 import type { PerformerStats } from "@/lib/map/types";
 
@@ -20,29 +20,7 @@ describe("множина українською", () => {
   });
 });
 
-describe("час на платформі", () => {
-  it("менше місяця — новий", () => {
-    expect(platformLabel(0)).toBe("Новий на Findlyfy");
-  });
-  it("від місяця — з цифрою", () => {
-    expect(platformLabel(8)).toBe("На Findlyfy 8 міс.");
-  });
-});
-
-describe("підписи короткої картки", () => {
-  it("рейтинг з комою й відгуки", () => {
-    expect(shortFacts(stats()).reviewsLine).toBe("★ 4,8 · 12 відгуків");
-    expect(shortFacts(stats({ rating: 5, reviews: 1 })).reviewsLine).toBe("★ 5,0 · 1 відгук");
-  });
-  it("без відгуків", () => {
-    expect(shortFacts(stats({ rating: null, reviews: 0 })).reviewsLine).toBe("Ще без відгуків");
-    expect(shortFacts(undefined).reviewsLine).toBe("Ще без відгуків");
-    expect(shortFacts(undefined).platformLine).toBe("Новий на Findlyfy");
-  });
-  it("перевірені лише коли є", () => {
-    expect(shortFacts(stats()).verifiedLine).toBeNull();
-    expect(shortFacts(stats({ verifiedReviews: 3 })).verifiedLine).toBe("3 перевірених");
-  });
+describe("рядок у списку групи", () => {
   it("рядок списку", () => {
     expect(rowLine(stats())).toBe("★ 4,8 · 7 угод");
     expect(rowLine(stats({ rating: null, reviews: 0, orders: 1 }))).toBe("Ще без відгуків · 1 угода");
@@ -72,5 +50,30 @@ describe("placeBeside", () => {
   });
   it("не заходить під поле запиту", () => {
     expect(placeBeside({ ...base, anchor: { left: 100, top: 20, width: 40, height: 40 } }).top).toBe(120);
+  });
+});
+
+describe("цифри короткої картки рядком", () => {
+  const stats = (over: Partial<PerformerStats>): PerformerStats => ({ months: 0, orders: 0, rating: null, reviews: 0, verifiedReviews: 0, ...over });
+
+  it("рейтинг із числом відгуків, угоди словом у формі, місяці на платформі", () => {
+    expect(shortStats(stats({ rating: 4.7, reviews: 3, orders: 0, months: 1 }))).toEqual([
+      { value: "★ 4,7", label: "3 відгуки" },
+      { value: "0", label: "угод" },
+      { value: "1 міс.", label: "на Findlyfy" },
+    ]);
+    expect(shortStats(stats({ rating: 5, reviews: 1, orders: 1, months: 14 }))[1]).toEqual({ value: "1", label: "угода" });
+    expect(shortStats(stats({ orders: 3 }))[1].label).toBe("угоди");
+  });
+
+  it("без відгуків і новачок: прочерк і «новий», а не нулі", () => {
+    const [rating, , platform] = shortStats(undefined);
+    expect(rating).toEqual({ value: "—", label: "без відгуків" });
+    expect(platform).toEqual({ value: "новий", label: "на Findlyfy" });
+  });
+
+  it("слово без числа", () => {
+    expect(pluralWordUk(21, ["угода", "угоди", "угод"])).toBe("угода");
+    expect(pluralWordUk(12, ["угода", "угоди", "угод"])).toBe("угод");
   });
 });

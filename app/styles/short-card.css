@@ -8,42 +8,41 @@
   width: 100%;
 }
 
-.short-card-photo {
+.short-card-photo-wrap {
+  position: relative;
   flex: none;
+}
+
+.short-card-photo {
+  display: block;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius);
+  border-radius: 999px;
   background-color: var(--foam);
   background-repeat: no-repeat;
   box-shadow: inset 0 0 0 1px var(--line);
 }
 
-.short-card-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-/* Онлайн не лише кольором: порожнє кільце й слово «Не в мережі» проти заповненої крапки й слова «Онлайн». */
-.short-card-dot {
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid var(--ink-muted);
+/* Онлайн: зелена крапка на фото й слово «Онлайн» поруч, не лише колір. */
+.short-card-online {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--panel);
   border-radius: 999px;
-}
-
-.short-card-status[data-online] .short-card-dot {
-  border-color: var(--online);
   background: var(--online);
 }
 
-.short-card-facts {
-  display: grid;
-  gap: 4px;
-  padding: 8px 10px;
-  border-radius: var(--radius);
-  background: var(--surface);
+/* Три цифри рядком, як у профілі: межі між стовпцями, без сірої підкладки. */
+.short-card-stats {
+  padding-block: 8px;
+  border-block: 1px solid var(--line);
+}
+
+.short-card-verified {
+  color: var(--online);
 }
 
 .short-card-tag {
