@@ -184,7 +184,7 @@ export const useAuthPanel = (onPublished: (request: PublishedRequest) => void) =
     setError(null);
   };
 
-  const googleNext = mode === "publish" ? "/?auth=google" : mode === "performer" ? "/?auth=performer" : "/";
+  const googleNext = mode === "publish" ? "/?auth=google" : mode === "performer" ? "/?auth=performer" : (flow?.next ?? "/");
   const googleHref = `/api/auth/google?next=${encodeURIComponent(googleNext)}&accepted=1`;
   const title =
     step === "code"

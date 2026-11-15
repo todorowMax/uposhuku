@@ -14,9 +14,10 @@ export const sessionStore = createStore<SessionState>({ status: "loading" });
 
 /**
  * Панель входу: «login» — просто увійти, «publish» — увійти й одразу
- * опублікувати чернетку запиту (lib/requests/draft.ts).
+ * опублікувати чернетку запиту (lib/requests/draft.ts). `next`: внутрішній шлях, куди повернути
+ * після входу через Google (посилання `/?open=…`, яке гість не встиг виконати).
  */
-export type AuthFlow = { mode: "login" | "publish" | "performer" } | null;
+export type AuthFlow = { mode: "login" | "publish" | "performer"; next?: string } | null;
 export const authFlowStore = createStore<AuthFlow>(null);
 
 /** Мої запити, нові першими; null — ще не завантажені або гість. */
