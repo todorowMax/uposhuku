@@ -54,23 +54,29 @@ export const GroupPreviewPanel = ({ members, requests, listRef, panelRef, onScro
     setActiveId(centered?.dataset.person ?? null);
   };
 
-  // Картка стоїть навпроти рядка, з зовнішнього боку панелі (від групи).
+  // Картка стоїть навпроти рядка, з зовнішнього боку панелі (від групи). Місце рахуємо кадром пізніше: при відкритті
+  // сцена ставить саму панель у своєму ефекті, який іде після нашого, і без затримки бік рахувався від старого місця
+  // панелі, тож картка першого рядка опинялась за краєм екрана.
   useLayoutEffect(() => {
-    const card = cardRef.current;
-    const panel = panelRef.current;
-    const row = activeId ? panel?.querySelector<HTMLElement>(`[data-person="${CSS.escape(activeId)}"]`) : null;
-    if (!card || !panel || !row) return;
-    const panelBox = panel.getBoundingClientRect();
-    const rowBox = row.getBoundingClientRect();
-    const { width, height } = card.getBoundingClientRect();
-    // Рахуємо від вікна, а не від батька панелі: батько (сцена карти) буває ширшим за видиму частину, і картка праворуч обрізалась краєм екрана.
-    const fitsRight = panelBox.right + PREVIEW_GAP + width <= window.innerWidth - EDGE;
-    const fitsLeft = panelBox.left - PREVIEW_GAP - width >= EDGE;
-    const right = fitsRight || !fitsLeft;
-    const top = Math.min(Math.max(rowBox.top - panelBox.top + rowBox.height / 2 - height / 2, 0), Math.max(0, panelBox.height - height));
-    card.style.left = `${right ? panelBox.width + PREVIEW_GAP : -(width + PREVIEW_GAP)}px`;
-    card.style.top = `${Math.round(top)}px`;
-    card.dataset.placed = "true";
+    const place = () => {
+      const card = cardRef.current;
+      const panel = panelRef.current;
+      const row = activeId ? panel?.querySelector<HTMLElement>(`[data-person="${CSS.escape(activeId)}"]`) : null;
+      if (!card || !panel || !row) return;
+      const panelBox = panel.getBoundingClientRect();
+      const rowBox = row.getBoundingClientRect();
+      const { width, height } = card.getBoundingClientRect();
+      // Рахуємо від вікна, а не від батька панелі: батько (сцена карти) буває ширшим за видиму частину.
+      const fitsRight = panelBox.right + PREVIEW_GAP + width <= window.innerWidth - EDGE;
+      const fitsLeft = panelBox.left - PREVIEW_GAP - width >= EDGE;
+      const right = fitsRight || !fitsLeft;
+      const top = Math.min(Math.max(rowBox.top - panelBox.top + rowBox.height / 2 - height / 2, 0), Math.max(0, panelBox.height - height));
+      card.style.left = `${right ? panelBox.width + PREVIEW_GAP : -(width + PREVIEW_GAP)}px`;
+      card.style.top = `${Math.round(top)}px`;
+      card.dataset.placed = "true";
+    };
+    const frame = requestAnimationFrame(place);
+    return () => cancelAnimationFrame(frame);
   }, [activeId, panelRef]);
 
   return (
