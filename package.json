@@ -10,7 +10,7 @@
     "start": "next start -p ${PORT:-3031}",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . && stylelint \"**/*.css\"",
-    "lint:ci": "eslint . --max-warnings 436 && stylelint \"**/*.css\" --max-warnings 5",
+    "lint:ci": "eslint . --max-warnings 434 && stylelint \"**/*.css\" --max-warnings 5",
     "deadcode": "knip --include files,dependencies,unlisted,unresolved",
     "test": "npm run test:unit",
     "test:unit": "vitest run --config vitest.config.mts tests/unit",
@@ -49,6 +49,7 @@
     "db:unseed:development": "tsx scripts/seed-dev.ts --clean && wrangler d1 execute DB --remote --env development --file .cache/seed.sql"
   },
   "dependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.4.4",
     "@metamask/connect-evm": "2.1.0",
     "@opennextjs/cloudflare": "^1.20.13",
     "@tailwindcss/postcss": "^4.3.3",
@@ -80,6 +81,7 @@
     "@cloudflare/workers-types": "^5.20260928.1",
     "@napi-rs/canvas": "^1.0.9",
     "@next/eslint-plugin-next": "^16.4.3",
+    "@types/geojson": "7946.0.16",
     "@types/node": "^24.19.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
