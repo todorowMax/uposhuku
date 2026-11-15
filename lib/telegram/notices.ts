@@ -15,7 +15,8 @@ import { escapeHtml, excerpt } from "./texts";
 export type EmailEvent =
   | { type: "message"; fromName: string; open: string }
   | { type: "offer"; title: string; open: string }
-  | { type: "deal"; action: string; open: string; stageTitle?: string };
+  | { type: "deal"; action: string; open: string; stageTitle?: string }
+  | { type: "renew"; title: string; open: string };
 
 export interface Notice {
   kind: NotificationKind;
@@ -49,7 +50,19 @@ export const offerNotice = (input: { requestId: string; requestText: string; pri
   email: { type: "offer", title: excerpt(stripContacts(input.requestText), 60), open: `offers:${input.requestId}` },
 });
 
-export const messageNotice = (input: { conversationId: string; toUserId: string; fromName: string; text: string; now?: number }): Notice => ({
+/**
+ * «Ще актуально?»: запит прожив 14 днів, без відповіді за 3 дні він закриється (його можна відновити протягом 7 днів).
+ * Ключ містить одержувача й початок строку: після «Так, ще актуально» наступне питання має інший ключ. Вид `offers`: окремого перемикача немає.
+ */
+export const renewNotice = (input: { requestId: string; userId: string; since: number; title: string }): Notice => ({
+  kind: "offers",
+  key: `renew:${input.requestId}:${input.userId}:${input.since}`,
+  html: `Ще актуально? Ваш запит «${escapeHtml(input.title)}» висить уже 14 днів. Якщо не відповісти за 3 дні, він закриється, його можна буде відновити протягом 7 днів.`,
+  button: { text: "Відповісти", path: deepLink(`renew:${input.requestId}`) },
+  email: { type: "renew", title: input.title, open: `renew:${input.requestId}` },
+});
+
+export const messageNotice =(input: { conversationId: string; toUserId: string; fromName: string; text: string; now?: number }): Notice => ({
   kind: "messages",
   key: `msg:${input.conversationId}:${input.toUserId}:${bucket(input.now ?? Date.now())}`,
   html: `<b>${escapeHtml(excerpt(input.fromName, 40))}</b>: ${escapeHtml(excerpt(input.text, 100))}`,

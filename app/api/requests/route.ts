@@ -5,7 +5,7 @@
 import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
 import { getSessionUser } from "@/lib/server/auth";
-import { createRequest, listRequests } from "@/lib/server/request-repo";
+import { createRequest, listRequests, responseCounts } from "@/lib/server/request-repo";
 import { parseDraft } from "@/lib/requests/parse-draft";
 import { phoneGate } from "@/lib/server/phone-gate";
 import { pushGlobal } from "@/lib/server/realtime";
@@ -38,5 +38,8 @@ export async function POST(request: Request) {
 export async function GET() {
   const user = await getSessionUser();
   if (!user) return problem(401, "Потрібен вхід");
-  return Response.json({ requests: await listRequests(user.id) }, { headers: { "cache-control": "no-store" } });
+  const list = await listRequests(user.id);
+  // Лічильники відгуків для «Моїх запитів»: клієнту не треба питати /responses по кожному запиту окремо.
+  const counts = await responseCounts(list.filter((item) => item.status === "open").map((item) => item.id));
+  return Response.json({ requests: list, responseCounts: Object.fromEntries(counts) }, { headers: { "cache-control": "no-store" } });
 }

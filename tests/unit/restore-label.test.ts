@@ -12,6 +12,11 @@ describe("restoreLeftLabel", () => {
     expect(restoreLeftLabel(at(HOUR), NOW)).toBe("можна відновити ще 1 год");
   });
 
+  it("вікно протермінованого запиту (7 днів) рахується в днях, а не в сотнях годин", () => {
+    expect(restoreLeftLabel(at(6 * 24 * HOUR + 3 * HOUR), NOW)).toBe("можна відновити ще 6 днів");
+    expect(restoreLeftLabel(at(47 * HOUR), NOW)).toBe("можна відновити ще 47 год");
+  });
+
   it("менше години: «менше години»", () => {
     expect(restoreLeftLabel(at(HOUR - 1), NOW)).toBe("можна відновити ще менше години");
     expect(restoreLeftLabel(at(1000), NOW)).toBe("можна відновити ще менше години");

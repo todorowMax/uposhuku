@@ -179,6 +179,7 @@ describe("responsesFor: відповідь не змінилась", () => {
         days: (i % 7) + 1,
         message: `Текст ${i}`,
         createdAt: new Date(BASE + (12 - i) * 1000).toISOString(),
+        status: "new",
       });
     }
     // Порядок: рівень за спаданням, серед рівних хто відповів раніше.

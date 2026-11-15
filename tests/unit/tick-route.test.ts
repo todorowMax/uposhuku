@@ -11,6 +11,8 @@ const { calls, fail, run } = vi.hoisted(() => {
   return { calls, fail, run };
 });
 vi.mock("@/lib/server/deal-sweep", () => ({ runDealSweep: run("sweep", { released: 0 }) }));
+vi.mock("@/lib/server/request-lifetime", () => ({ askRenewals: run("ask_renewals", 1), expireUnanswered: run("expire_requests", 0) }));
+vi.mock("@/lib/server/realtime", () => ({ pushGlobal: vi.fn() }));
 vi.mock("@/lib/server/pay-reminders", () => ({ runPayReminders: run("pay_reminders", { deals: 0, errors: 0 }) }));
 vi.mock("@/lib/telegram/channel", () => ({ postDueRequests: run("post", { posted: 1 }), closeFinishedPosts: run("close", 2), restoreReopenedPosts: run("reopen_posts", 4), syncEditedPosts: run("edit_posts", 1), removeOptedOutPosts: run("remove_posts", { removed: 3, withdrawn: 2 }) }));
 vi.mock("@/lib/server/account-retention", () => ({ purgeExpiredRequisites: run("purge_requisites", 2) }));
@@ -39,6 +41,15 @@ describe("/api/internal/tick", () => {
   it("звірка грошей іде першою", async () => {
     expect((await tick()).status).toBe(200);
     expect(calls[0]).toBe("sweep");
+  });
+
+  it("строк життя запитів: спершу питання й закриття, потім пости каналу; збій питання не скасовує закриття", async () => {
+    fail.step = "ask_renewals";
+    const response = await tick();
+    expect(await response.json()).toMatchObject({ ok: false, failed: ["ask_renewals"] });
+    expect(calls.indexOf("expire_requests")).toBeGreaterThan(-1);
+    expect(calls.indexOf("expire_requests")).toBeLessThan(calls.indexOf("post"));
+    expect(calls.indexOf("expire_requests")).toBeLessThan(calls.indexOf("close"));
   });
 
   it("збій нагадувань про оплату не скасовує решту кроків", async () => {

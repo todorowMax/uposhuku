@@ -49,9 +49,13 @@ export interface PublishedRequest extends RequestDraft {
   editedAt: string | null;
   /** До якого часу (ISO) закритий запит можна відновити; null, якщо запит відкритий, доба минула або закрито до появи `closed_at`. */
   restoreUntil: string | null;
+  /** Чому запит закрито: `expired` — автор не відповів на «Ще актуально?»; null — закрив сам або запит відкритий. */
+  closeReason: "expired" | null;
+  /** До якого часу (ISO) автор може відповісти на «Ще актуально?», інакше запит закриється; null, якщо питання не ставили. */
+  renewalDeadline: string | null;
 }
 
-/** Скільки після першого закриття автор може відновити запит. Спільна для сервера й клієнта. */
+/** Скільки після першого закриття автор може відновити запит (для «протермінованого» інакше, див. `lib/requests/lifetime.ts`). Спільна для сервера й клієнта. */
 export const RESTORE_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export const REQUEST_TEXT_MIN = 3;
@@ -82,4 +86,10 @@ export interface OfferResponse {
   days: number;
   message: string;
   createdAt: string;
+  /** Рішення замовника: нове, у обраних, відхилено, обрано. Бачить лише він. */
+  status: ResponseStatus;
 }
+
+export const RESPONSE_STATUSES = ["new", "shortlisted", "declined", "chosen"] as const;
+export type ResponseStatus = (typeof RESPONSE_STATUSES)[number];
+export const isResponseStatus = (value: unknown): value is ResponseStatus => typeof value === "string" && (RESPONSE_STATUSES as readonly string[]).includes(value);

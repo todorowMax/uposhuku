@@ -74,7 +74,7 @@ describe("відновлення закритого запиту", () => {
     expect(await reopenRequest("rs-cust", own.id, Date.now())).toBe("window_expired");
     const response = await send(own.id, "open");
     expect(response.status).toBe(409);
-    expect((await body(response)).detail).toBe("Минуло понад добу: запит уже не відновити.");
+    expect((await body(response)).detail).toBe("Запит уже не відновити: вікно відновлення минуло.");
     const stored = await findRequest("rs-cust", own.id);
     expect(stored).toMatchObject({ status: "closed", restoreUntil: null });
     expect(await closedAtOf(own.id)).toBe(closedAt);

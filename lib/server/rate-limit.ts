@@ -46,6 +46,8 @@ export const RATE_RULES = {
   requestCreate: { max: 10, windowMs: 60 * MINUTE },
   requestEdit: { max: 20, windowMs: 60 * MINUTE },
   responseCreate: { max: 30, windowMs: 60 * MINUTE },
+  // Замовник розбирає відгуки: «в обрані», «відхилити», «повернути»; одна дія на відгук, кілька десятків відгуків за годину нормальні.
+  responseStatus: { max: 120, windowMs: 60 * MINUTE },
   reviewCreate: { max: 10, windowMs: 60 * MINUTE },
   conversationCreate: { max: 30, windowMs: 60 * MINUTE },
   profileSave: { max: 30, windowMs: 60 * MINUTE },
