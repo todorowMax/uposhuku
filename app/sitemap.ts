@@ -1,12 +1,12 @@
 // app/sitemap.ts
 //
 // Карта сайту: головна, юридичні сторінки й опубліковані профілі виконавців. Оферту безпечної угоди не вносимо:
-// її читає банк, у пошуку вона не потрібна. Рядок `Sitemap:` у robots.ts додасть той, хто відкриє індексацію (пакет C).
+// її читає банк, у пошуку вона не потрібна. Адреса береться зі SITE_URL (прод або dev), профілі беремо лише за id.
+// Рядок `Sitemap:` у robots.ts з'являється, лише коли індексацію відкрито (lib/seo/indexing.ts).
 
 import type { MetadataRoute } from "next";
-import { listPublishedProfiles } from "@/lib/server/profile-repo";
-
-const SITE = "https://findlyfy.com";
+import { listPublishedProfileIds } from "@/lib/server/profile-repo";
+import { siteUrl } from "@/lib/server/env";
 
 // Профілі беремо з бази під час запиту.
 export const dynamic = "force-dynamic";
@@ -14,11 +14,12 @@ export const dynamic = "force-dynamic";
 const PAGES = ["/", "/offer", "/legal/terms", "/legal/privacy", "/contacts"];
 
 const sitemap = async (): Promise<MetadataRoute.Sitemap> => {
-  const profiles = await listPublishedProfiles().catch(() => new Map());
+  const site = siteUrl();
+  const ids = await listPublishedProfileIds().catch(() => []);
   return [
-    ...PAGES.map((path) => ({ url: `${SITE}${path === "/" ? "" : path}` })),
-    // Демо-виконавці з сіда вигадані й закриті від пошуку на їхніх сторінках: у карту їх не вносимо.
-    ...[...profiles.keys()].filter((userId) => !userId.startsWith("demo-")).map((userId) => ({ url: `${SITE}/p/${encodeURIComponent(`me-${userId}`)}` })),
+    ...PAGES.map((path) => ({ url: `${site}${path === "/" ? "" : path}` })),
+    // Демо-виконавці з сіда (demo-…) вигадані й закриті від пошуку на їхніх сторінках: listPublishedProfileIds їх не віддає.
+    ...ids.map((userId) => ({ url: `${site}/p/${encodeURIComponent(`me-${userId}`)}` })),
   ];
 };
 

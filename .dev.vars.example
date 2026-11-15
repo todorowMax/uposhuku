@@ -114,3 +114,10 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
 
 # Лише для dev: 1 вимикає правило «не сповіщати в Telegram, поки людина на сайті». На проді не ставити.
 NOTIFY_WHEN_ONLINE=
+
+# Адреса сайту без кінцевого слеша: посилання з бота, каналу й листів, canonical, Open Graph, карта сайту.
+# Прод https://findlyfy.com, dev https://dev.findlyfy.com (обидва в wrangler.jsonc); локально порожньо: http://localhost:3031.
+SITE_URL=
+# Індексація пошуковиками: відкрита лише коли DEPLOY_ENV=production і SEO_INDEXING=on. Інакше robots Disallow, meta robots
+# і X-Robots-Tag noindex. Типово закрито всюди; на dev і локально значення нічого не міняє. Перемикач: lib/seo/indexing.ts.
+SEO_INDEXING=
