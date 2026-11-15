@@ -327,13 +327,14 @@ describe("оновлення позначається обробленим пі�
 
 describe("налаштування сповіщень", () => {
   it("значення за замовчуванням: пошта й Telegram увімкнені, пуш ні, всі види й тихі години", () => {
-    expect(DEFAULT_PREFS).toEqual({ channels: { email: true, push: false, telegram: true }, kinds: { offers: true, messages: true, deals: true, matching: true, tags: true }, quietHours: true });
+    expect(DEFAULT_PREFS).toEqual({ channels: { email: true, push: false, telegram: true }, kinds: { offers: true, messages: true, deals: true, matching: true, tags: true }, matching: { minMatch: 0.6, minBudget: 0, area: "all", cityIds: [] }, quietHours: true });
   });
 
   it("merge бере лише відомі булеві поля; старий плоский формат localStorage переноситься", () => {
     expect(mergePrefs(DEFAULT_PREFS, { channels: { push: true, hacker: true, email: "так" }, kinds: { offers: false }, quietHours: false, extra: 1 })).toEqual({
       channels: { email: true, push: true, telegram: true },
       kinds: { ...DEFAULT_PREFS.kinds, offers: false },
+      matching: DEFAULT_PREFS.matching,
       quietHours: false,
     });
     expect(parsePrefs({ email: false, push: true, telegram: false }).channels).toEqual({ email: false, push: true, telegram: false });
