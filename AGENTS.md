@@ -31,25 +31,27 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 - Next.js 16 App Router (Turbopack), React 19, TypeScript strict. Runs on Cloudflare Workers through OpenNext
   (`worker/index.ts` wraps the OpenNext worker and adds WebSockets on a Durable Object).
 - Tailwind CSS v4, configured in CSS: the tokens and the `@theme inline` block live in
-  `app/globals.css`. There is no `tailwind.config`.
+  `app/styles/tokens.css`, imported by `app/globals.css` together with the feature sections. There is no `tailwind.config`.
 - Radix (the combined `radix-ui` package), cmdk and lucide-react; primitives in `components/ui`.
 - Map: MapLibre GL in a globe projection (`lib/map`, `components/map`, `components/maplibre`).
 - Data: Drizzle ORM on Cloudflare D1 (`db/`, migrations in `db/migrations`), a second D1 for telemetry
   (`kit/telemetry`), R2 for uploads. API routes read and check the request body by hand (`readJson` in
-  `lib/api/problem.ts`); zod is used in `lib/notification-prefs.ts` and `lib/monobank/client.ts` only.
+  `lib/api/problem.ts`); `route()` in `lib/server/route.ts` (session, rate limit, zod body, `failure()` logging) wraps a handler and new routes use it; zod is used in `lib/notification-prefs.ts` and `lib/monobank/client.ts` only.
 - Wallets: wagmi 3 + viem + react-query (`components/wallet`, `lib/crypto/pay-flow.ts`). They load only through
   `next/dynamic` in the payment and requisites panels; nothing imports them on the home page or the map. The
   end-to-end check against a local Hardhat node is `npm run test:chain` (needs `contracts` built). Escrow rules:
   `docs/features/deals-payments.md`.
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
-- Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
+- Tests: Vitest with two projects, `unit` (`tests/unit`, node; repositories run against in-memory D1 and R2) and `hooks`
+  (`tests/hooks/**/*.test.tsx`, jsdom + `@testing-library/react`, modules mocked at the boundary). `npm test` runs both. No Playwright yet.
 - `@next/eslint-plugin-next` follows the Next major (`^16.4.3`); the shared lint config in
   `config/agent-rules` reads both the 15.x and the 16.x plugin shape.
 
 ## Choices the profile leaves to the project (RULES-5)
 
-- Token file: `app/globals.css`. Current state: tokens (`:root`, `@theme inline`) share the file
-  with feature CSS; splitting them is pending.
+- Token file: `app/styles/tokens.css` (`:root`, `@theme inline`). `app/globals.css` only imports `app/styles/*.css`, one
+  section per feature, in cascade order: do not reorder the imports. Current state: the feature files still carry raw
+  colours (Stylelint treats them like the token file, see `stylelint.config.mjs`); replacing them with tokens is pending.
 - Forms: React Hook Form + Yup through controlled wrappers (FORM-1) is the target. Current state: neither is
   installed, forms keep their own state and validate by hand; migration pending.
 - Types: namespaces in the component file (COMP-16..18).
@@ -67,11 +69,13 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 - Languages: rules and `AGENTS.md` are in English; task documents (`docs/tasks`) in Russian with the statuses
   from the template (todo, in progress, done, blocked, dropped); UI text in Ukrainian. Feature docs in
   `docs/features` stay in Ukrainian, as they were written.
-- First-load JS budget: the home page `/` is 1.55 MB uncompressed. Measure it after `npx next build` with
-  `node -p "require('./.next/diagnostics/route-bundle-stats.json').find(r=>r.route==='/').firstLoadUncompressedJsBytes"`.
-  The side panels (offers, feed, profile editor, placement dialog) load through `next/dynamic` when opened
-  (`components/map/lazy-panels.tsx`); the inbox panel stays in the first load because it polls for conversations.
-  A bigger number means something heavy landed in `app/(map)/layout.tsx`: load it lazily or raise the budget here on purpose.
+- First-load JS budget (uncompressed, bytes): the budgets live in `scripts/bundle-budget.json` and CI checks them after
+  `npx next build` with `npm run budget` (`scripts/check-bundle-budget.mjs`). Measured on 2026-11-16: `/` 1 622 809
+  (budget 1 650 000), the intercepting `/(.)p/[id]` 1 637 829 (1 700 000), `/p/[id]`, `/poslugy/...` about 496 000 and
+  `/zapyt/[id]` 483 000 (550 000 each). The side panels (offers, feed, profile editor, placement dialog) load through
+  `next/dynamic` when opened (`components/map/lazy-panels.tsx`); the inbox panel stays in the first load because it polls for
+  conversations. A bigger number means something heavy landed in `app/(map)/layout.tsx`: load it lazily or raise the budget
+  in `scripts/bundle-budget.json` on purpose and update the numbers here.
 
 ## Environments and deploy
 
@@ -87,7 +91,7 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
   `PHONE_HASH_KEY`, `ADMIN_TOTP_SECRET`) are set in `wrangler.jsonc` or as secrets; what each does and the values
   per environment: the feature docs in the map above. Variable names with placeholders: `.dev.vars.example`.
 - Індексація й адреса сайту (`lib/seo/indexing.ts`, `lib/server/seo.ts`): сайт відкритий для пошуковиків лише коли `DEPLOY_ENV=production` і змінна `SEO_INDEXING=on`; типово закрито всюди, на dev і локально `on` нічого не відкриває. Від одного перемикача залежать `app/robots.ts` (`Sitemap:` лише коли відкрито), `robots` у `generateMetadata` кореневого layout і заголовок `X-Robots-Tag` у `worker/index.ts` (відкрито: не ставиться, щоб не перекрити `noindex` окремих сторінок, наприклад закритого запиту). `SITE_URL` (прод `https://findlyfy.com`, dev `https://dev.findlyfy.com`, у `wrangler.jsonc`) дає `metadataBase`, canonical і карту сайту; без нього `http://localhost:3031`. Карта сайту бере з бази лише id профілів.
-- `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
+- `.github/workflows/ci.yml` only checks (lint:ci, deadcode, typecheck, tests, `next build` + `npm run budget`) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 
 ## Styles

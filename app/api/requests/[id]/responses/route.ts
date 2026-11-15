@@ -3,14 +3,12 @@
 // з Durable Object запиту, а цей маршрут лишиться запасним.
 
 import { problem } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { responsesFor } from "@/lib/requests/responses";
 import { findRequest } from "@/lib/server/request-repo";
+import { route } from "@/lib/server/route";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
-  const request = await findRequest(user.id, (await params).id);
+export const GET = route<"user", undefined, { id: string }>({ auth: "user" }, async ({ user, params }) => {
+  const request = await findRequest(user.id, params.id);
   if (!request) return problem(404, "Запит не знайдено");
   return Response.json({ responses: await responsesFor(request) }, { headers: { "cache-control": "no-store" } });
-}
+});

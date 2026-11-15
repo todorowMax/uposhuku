@@ -5,16 +5,14 @@
 // `feed` (з випадковою затримкою, див. lib/realtime/client.tsx).
 
 import { problem } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { feedPage } from "@/lib/feed/feed";
 import { getProfile } from "@/lib/server/profile-repo";
 import { profileTags } from "@/lib/profile/types";
+import { route } from "@/lib/server/route";
 
-export const GET = async (request: Request) => {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ request, user }) => {
   const profile = await getProfile(user.id);
   if (!profile?.published) return problem(403, "Стрічка з'явиться після публікації профілю", "Опублікуйте профіль виконавця, і ми покажемо запити під ваші теги.");
   const cursor = new URL(request.url).searchParams.get("cursor");
   return Response.json(await feedPage(user.id, { viewer: { tags: profileTags(profile), cityId: profile.cityId || null }, cursor }), { headers: { "cache-control": "no-store" } });
-};
+});

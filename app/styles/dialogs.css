@@ -1,0 +1,374 @@
+/* Шар під діалогом (components/ui/dialog.tsx): затемнення й розташування панелі. */
+.ui-dialog-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgb(29 38 42 / 48%);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+
+.ui-dialog-layer[data-variant="bottom"] {
+  align-items: end;
+  padding: 0;
+  background: rgb(3 9 13 / 62%);
+}
+
+@media (min-width: 640px) {
+  .ui-dialog-layer[data-variant="bottom"] {
+    align-items: center;
+    padding: 16px;
+  }
+}
+
+.ui-dialog-layer[data-variant="full"] {
+  display: block;
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+[data-slot="dialog-content"] {
+  outline: none;
+}
+
+/* Заголовок діалогу (DialogTitle): два розміри, як були в панелях. */
+.ui-dialog-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ui-dialog-title[data-size="lg"] {
+  font-size: 18px;
+}
+
+.ui-dialog-title[data-size="sm"] {
+  font-size: 14px;
+}
+
+/* Вхід і публікація запиту: шторка (components/auth/auth-panel.tsx), на десктопі вікно по центру. */
+.auth-dialog-header {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.auth-hero-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgb(255 255 255 / 85%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 75%);
+  box-shadow: 0 6px 18px rgb(126 79 51 / 12%);
+  color: var(--accent-ink);
+}
+
+.auth-dialog-title {
+  max-width: 330px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+/* Двічі клас: `.auth-icon-button` нижче задає `position: relative`, і без цього кнопки вставали в потік, а не в кути. */
+.auth-icon-button.auth-back,
+.auth-icon-button.auth-close {
+  position: absolute;
+  top: 0;
+}
+
+.auth-back { left: 0; }
+.auth-close { right: 0; }
+
+@media (max-width: 480px) {
+  .auth-dialog-title { font-size: 18px; }
+}
+
+.auth-sheet-step {
+  display: grid;
+  gap: 14px;
+}
+
+/* У шторці входу заголовка немає, тож верхній відступ дає лише ручка (телефон) або нічого (вікно): іконка липла до краю. */
+.ui-sheet-body.auth-sheet {
+  padding-top: 12px;
+}
+
+.auth-lead {
+  font-size: 13px;
+  line-height: 1.55;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.auth-sheet .auth-input {
+  min-height: 50px;
+  border-color: rgb(0 54 74 / 11%);
+  border-radius: 12px;
+  background: rgb(220 231 228 / 70%);
+  box-shadow: inset 0 1px 2px rgb(0 54 74 / 3%);
+}
+
+.auth-sheet .auth-input:focus {
+  border-color: var(--brand);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgb(242 105 60 / 25%);
+}
+
+.auth-sheet .auth-primary {
+  min-height: 50px;
+  border-radius: 12px;
+}
+
+.auth-sheet .auth-google {
+  min-height: 48px;
+  border-color: rgb(0 54 74 / 14%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 78%);
+}
+
+.auth-sheet .auth-google:hover {
+  background: var(--hover-blue);
+}
+
+.auth-icon-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+/* Видима кнопка 30px, а зона дотику 44px: ::after виходить за межі й не зсуває розкладку. */
+.auth-icon-button::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+}
+
+.auth-icon-button:hover {
+  background: rgb(0 54 74 / 7%);
+  color: var(--ink);
+}
+
+.auth-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid #8aaab4;
+  border-radius: 14px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: border-color 150ms, background-color 150ms;
+}
+
+.auth-google:hover {
+  background: var(--hover-blue);
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgb(66 116 132 / 60%);
+}
+
+.auth-input {
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid #a7bcc0;
+  border-radius: 14px;
+  background: #ffffff;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.auth-input:focus {
+  border-color: #427484;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+/* Багаторядкове поле: вертикальні відступи й міжрядковий інтервал, щоб текст не липнув до рамки. */
+.auth-input.auth-textarea {
+  padding: 12px 14px;
+  line-height: 1.45;
+}
+
+.auth-input[aria-invalid="true"] {
+  border-color: #c0705a;
+}
+
+.auth-error {
+  font-size: 12px;
+  color: #a4513c;
+}
+
+.auth-primary,
+.auth-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms, border-color 150ms, opacity 150ms;
+}
+
+.auth-primary {
+  background: var(--brand-solid);
+  color: var(--brand-ink);
+}
+
+.auth-primary:hover {
+  background: var(--brand-solid-hover);
+}
+
+.auth-primary:disabled {
+  background: #f4cdbd;
+  color: #8a3416;
+  cursor: default;
+}
+
+.auth-secondary {
+  padding: 0 18px;
+  border: 1px solid #8aaab4;
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.auth-secondary:hover {
+  background: var(--hover-blue);
+}
+
+.auth-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.auth-link {
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: #8aaab4;
+  text-underline-offset: 4px;
+}
+
+.auth-link:disabled {
+  color: var(--ink-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
+.auth-mock {
+  padding: 10px 12px;
+  border: 1px dashed #d6b8a2;
+  border-radius: 12px;
+  background: #fbf5f0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #7a5a44;
+}
+
+.code-input {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  /* Предок з grid і auto-колонкою інакше росте до ширини шести клітинок (324 px) і виходить за панель. */
+  min-width: 0;
+}
+
+.code-cell {
+  /* flex-basis 46px, але вужче, якщо не вміщаємось: шість клітинок і проміжок на 375 px не вміщалися (324 проти 303) і шоста виходила за край. */
+  flex: 0 1 46px;
+  min-width: 0;
+  height: 54px;
+  border: 1px solid #a7bcc0;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+
+.code-cell[data-gap] {
+  margin-left: 8px;
+}
+
+.code-cell:focus {
+  border-color: #427484;
+  box-shadow: 0 0 0 3px rgb(78 98 98 / 14%);
+}
+
+.code-input[data-invalid] .code-cell {
+  border-color: #c0705a;
+}
+
+.code-cell:disabled {
+  opacity: 0.6;
+}
+
+.auth-draft {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgb(0 54 74 / 5%);
+}
+
+.auth-draft-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(66 116 132 / 70%);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.auth-success {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 6px rgb(242 105 60 / 12%);
+  color: var(--accent-ink);
+}

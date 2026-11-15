@@ -7,12 +7,13 @@ import { getPlacement } from "@/lib/server/placement-repo";
 import { getProfile } from "@/lib/server/profile-repo";
 import { isOnline } from "@/lib/server/presence-repo";
 import { performerStatsOf } from "@/lib/server/stats-repo";
+import { route } from "@/lib/server/route";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export const GET = route<"none", undefined, { id: string }>({}, async ({ params }) => {
+  const { id } = params;
   const userId = id.startsWith("me-") ? id.slice(3) : "";
   const profile = userId ? await getProfile(userId) : null;
   if (!profile?.published) return problem(404, "Профіль не знайдено");
   const { name, cityId, location, specialty, bio, tags, works, photo } = profile;
   return Response.json({ profile: { name, cityId, location, specialty, bio, tags, works, photo }, tier: (await getPlacement(userId)).tier, stats: await performerStatsOf(userId), online: await isOnline(userId), userId });
-}
+});

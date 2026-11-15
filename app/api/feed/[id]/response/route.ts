@@ -15,6 +15,7 @@ import { serverEvent } from "@/lib/telemetry/log";
 import { notifyLater } from "@/lib/server/notify";
 import { addSystemMessage } from "@/lib/server/chat-repo";
 import { offerNotice } from "@/lib/telegram/notices";
+import { route } from "@/lib/server/route";
 
 /** Замовник бачить відгук одразу, а всі — лічильник відгуків у стрічці. */
 const notifyOffer = async (requestId: string) => {
@@ -31,8 +32,8 @@ const authorize = async (id: string) => {
   return { user };
 };
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export const PUT = route<"none", undefined, { id: string }>({}, async ({ request, params }) => {
+  const { id } = params;
   const auth = await authorize(id);
   if (auth.error) return auth.error;
   const limited = await rateLimited("responseCreate", auth.user.id);
@@ -52,13 +53,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     await addSystemMessage(brief.userId, auth.user.id, `Відгук на «${title}»: ${terms}`, id);
   }
   return Response.json({ response: saved });
-}
+});
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export const DELETE = route<"none", undefined, { id: string }>({}, async ({ params }) => {
+  const { id } = params;
   const auth = await authorize(id);
   if (auth.error) return auth.error;
   await removeResponse(auth.user.id, id);
   await notifyOffer(id);
   return new Response(null, { status: 204 });
-}
+});

@@ -1,0 +1,171 @@
+/* Умови запиту чипами (components/composer/request-params). */
+.composer-params {
+  grid-area: params;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 4px;
+}
+
+/* На телефоні чипи отримують свій рядок: біля кнопки «Знайти» їм тісно. */
+@media (max-width: 639px) {
+  .composer-actions {
+    grid-template-areas:
+      "params params"
+      ". send";
+    /* Без проміжку рядок чипів майже торкався кнопки «Знайти» (2 px). */
+    row-gap: 8px;
+  }
+}
+
+.param-chip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 32px;
+  border-radius: 10px;
+  background: rgb(0 54 74 / 6%);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.param-chip:hover,
+.param-chip[data-open] {
+  background: rgb(0 54 74 / 11%);
+  color: var(--ink);
+}
+
+.param-chip[data-filled] {
+  background: var(--accent-soft);
+  color: #6f4a33;
+}
+
+.param-chip-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  padding: 0 11px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.param-chip[data-filled] .param-chip-main {
+  padding-right: 4px;
+}
+
+.param-chip-label {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.param-chip-clear {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+  border-radius: 999px;
+}
+
+.param-chip-clear:hover {
+  background: rgb(111 74 51 / 14%);
+}
+
+@media (max-width: 639px) {
+  .param-chip-main .param-chip-label {
+    max-width: 90px;
+  }
+}
+
+/* Поповер умов запиту на десктопі; у шторці вміст лежить у тілі шторки. */
+.ui-popover.param-pop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: min(420px, var(--radix-popover-content-available-height, 420px));
+  min-width: 0;
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 98%);
+  box-shadow: 0 16px 44px rgb(45 60 67 / 22%), inset 0 0 0 1px rgb(66 116 132 / 50%);
+}
+
+.param-presets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  min-width: 0;
+}
+
+.param-presets .param-option {
+  justify-content: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.param-custom-amount {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.param-custom-amount .auth-input {
+  width: 0;
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.param-custom-amount .offer-primary {
+  flex: none;
+}
+
+.param-pop-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.param-pop-hint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.param-option,
+.param-row {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgb(0 54 74 / 5%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  text-align: left;
+  transition: background-color 150ms;
+}
+
+.param-row {
+  width: 100%;
+}
+
+.param-option:hover,
+.param-row:hover {
+  background: rgb(0 54 74 / 10%);
+}
+
+.param-option[data-on],
+.param-row[data-on] {
+  background: var(--accent-soft);
+  color: #6f4a33;
+}

@@ -10,6 +10,7 @@ import { getDb } from "@/lib/server/db";
 import { siteUrl } from "@/lib/server/env";
 import { savePrefs } from "@/lib/server/notification-prefs-repo";
 import { verifyUnsubscribeToken } from "@/lib/server/unsubscribe-token";
+import { route } from "@/lib/server/route";
 
 const page = (status: number, title: string, text: string) =>
   new Response(
@@ -27,14 +28,14 @@ const unsubscribe = async (token: string | null): Promise<boolean> => {
   return true;
 };
 
-export const GET = async (request: Request) => {
+export const GET = route({}, async ({ request }) => {
   if (await unsubscribe(new URL(request.url).searchParams.get("token"))) {
     return page(200, "Ви відписалися від листів", "Листів про нові повідомлення, відгуки й угоди більше не буде. Увімкнути їх знову можна в налаштуваннях сповіщень.");
   }
   return page(400, "Посилання не спрацювало", "Воно пошкоджене або не від нас. Вимкнути листи можна в налаштуваннях сповіщень на сайті.");
-};
+});
 
-export const POST = async (request: Request) => {
+export const POST = route({}, async ({ request }) => {
   if (await unsubscribe(new URL(request.url).searchParams.get("token"))) return new Response(null, { status: 200, headers: { "cache-control": "no-store" } });
   return problem(400, "Посилання не спрацювало", "Токен відписки пошкоджений або не від нас.");
-};
+});

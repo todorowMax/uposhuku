@@ -2,14 +2,12 @@
 // замовнику й виконавцю цієї розмови, кеш приватний.
 
 import { problem } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { accessibleConversation, findChatAttachment } from "@/lib/server/chat-repo";
 import { getBucket } from "@/lib/server/uploads";
+import { route } from "@/lib/server/route";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string; attachmentId: string }> }) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
-  const { id, attachmentId } = await params;
+export const GET = route<"user", undefined, { id: string; attachmentId: string }>({ auth: "user" }, async ({ user, params }) => {
+  const { id, attachmentId } = params;
   const access = await accessibleConversation(id, user.id);
   if (!access) return problem(404, "Файл не знайдено");
   const row = await findChatAttachment(access.conversation.id, attachmentId);
@@ -19,4 +17,4 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new Response(object.body, {
     headers: { "content-type": row.mime, "cache-control": "private, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
   });
-}
+});

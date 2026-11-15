@@ -34,31 +34,17 @@ import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
 import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
+import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
+import { daysLabel, plural, priceLabel } from "@/lib/requests/format";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
-const PRICE = new Intl.NumberFormat("uk-UA");
 const TIME = new Intl.DateTimeFormat("uk-UA", {
   hour: "2-digit",
   minute: "2-digit",
 });
 
-const plural = (count: number, one: string, few: string, many: string) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  if (ones === 1 && tens !== 11) return one;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return few;
-  return many;
-};
-
 export const offersWord = (count: number) =>
   plural(count, "пропозиція", "пропозиції", "пропозицій");
-const daysLabel = (days: number) =>
-  `за ${days} ${plural(days, "день", "дні", "днів")}`;
-const priceLabel = (price: number | null) =>
-  price === null ? "Ціна після обговорення" : `${PRICE.format(price)} ₴`;
-const isPhone = () => window.matchMedia("(max-width: 1023px)").matches;
-const reduced = () =>
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const collapseOffers = () => offersCollapsedStore.set(true);
 
 /** Вище стоять обрані й ті, кого замовник уже вибрав; решта за оплатою, як і було (сортування стабільне). */
@@ -153,10 +139,10 @@ export function OffersPanel() {
 
   // Панель виїжджає збоку (на телефоні — знизу), коли з'являється або розгортається.
   useLayoutEffect(() => {
-    if (!panelRef.current || reduced()) return;
+    if (!panelRef.current || prefersReducedMotion()) return;
     const tween = gsap.fromTo(
       panelRef.current,
-      isPhone() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
+      isPhoneViewport() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
       // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
       { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" },
     );
@@ -173,7 +159,7 @@ export function OffersPanel() {
       ...body.querySelectorAll<HTMLElement>("[data-offer]"),
     ].filter((card) => !known.current.has(card.dataset.offer ?? ""));
     for (const card of fresh) known.current.add(card.dataset.offer ?? "");
-    if (!fresh.length || reduced()) return;
+    if (!fresh.length || prefersReducedMotion()) return;
     const tween = gsap.fromTo(
       fresh,
       { opacity: 0, y: 10 },
@@ -418,7 +404,7 @@ function OfferCard({
       at: Date.now(),
       toggle: true,
     });
-    if (isPhone()) offersCollapsedStore.set(true);
+    if (isPhoneViewport()) offersCollapsedStore.set(true);
   };
   return (
     <article
@@ -483,7 +469,7 @@ function OfferCard({
           {priceLabel(offer.price)}
         </span>
         <span className="text-[12px] text-ink-muted">
-          {daysLabel(offer.days)}
+          за {daysLabel(offer.days)}
         </span>
       </p>
       <ClampedText text={offer.message} moreLabel="Показати повністю" className="mt-1.5 text-[13px] leading-snug text-ink/85" />

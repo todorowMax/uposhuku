@@ -1,0 +1,80 @@
+
+/* Deep, Ocean, Tide, Wave і Foam з помаранчевим акцентом. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Кольори карти живуть окремо в lib/map/palette.ts: MapLibre не читає CSS-змінних. */
+:root {
+  color-scheme: light;
+  --radius: 0.875rem;
+
+  --deep: #03090d;
+  --ocean: #00364a;
+  --tide: #427484;
+  --wave: #6ba0b2;
+  --foam: #dce7e4;
+  --hover-blue: #d2e7ec;
+  --accent-soft: #fde5d9;
+  --accent-ink: #a53e1b;
+  --bg: var(--deep);
+  --surface: var(--foam);
+  --ink: #102d37;
+  --ink-muted: #46646e;
+  --line: rgb(66 116 132 / 34%);
+  --brand: #f2693c;
+  /* Оранжевий під текст: білий на ньому дає контраст 4.6:1, на фірмовому #f2693c було б лише 3:1. */
+  --brand-solid: #cf4519;
+  --brand-solid-hover: #b93c14;
+  --brand-ink: #ffffff;
+  --online: var(--wave);
+  /* Шари (DESIGN.md, «Шари»): фон екрана й шторки, затемнення, розмір чату, за яким рівняється панель екрана. */
+  --panel: #ffffff;
+  --scrim: rgb(3 9 13 / 45%);
+  /* Згасання країв стрічок, що гортаються (фільтри під полем запиту): ширина й «непрозорий» колір маски (маска читає лише альфу). */
+  --fade-width: 40px;
+  --mask-solid: #000;
+  --chat-width: 420px;
+  --chat-height: min(640px, calc(100dvh - 32px));
+  /* Відступ знизу, над яким стоять чат і панель угоди, поки панель відкрита: нижній край `.bottom-controls` (24px) + її висота (62px) + зазор (12px). */
+  --dock-lift: calc(24px + 62px + 12px);
+  /* Верхня смуга карти (`data-top-stack`: пошук і фільтри) лишається видимою над піднятими вікнами, поки на екрані вистачає висоти. */
+  --dock-top: 126px;
+  /* Плаваюче вікно (чат, екран-панель): заокруглення й тінь у одному місці, щоб панель угоди й чат складались в одне вікно. */
+  --radius-window: 24px;
+  --shadow-window: 0 24px 60px -12px rgb(16 45 55 / 28%);
+  --font-ui: var(--font-fixel), system-ui, sans-serif;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-ui);
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
+  --color-online: var(--online);
+  --color-accent-ink: var(--accent-ink);
+  --color-tide: var(--tide);
+  --color-hover-blue: var(--hover-blue);
+
+  /* Семантична z-шкала замість випадкових 999 */
+  --z-map-overlay: 10;
+  --z-controls: 20;
+  --z-screen: 70;
+  --z-skip-link: 100;
+
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+}

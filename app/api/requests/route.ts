@@ -2,9 +2,7 @@
 // POST — опублікувати (лише з сесією: гість спершу вводить код з пошти);
 // GET — мої запити, нові першими.
 
-import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
-import { getSessionUser } from "@/lib/server/auth";
 import { createRequest, listRequests, responseCounts } from "@/lib/server/request-repo";
 import { parseDraft } from "@/lib/requests/parse-draft";
 import { phoneGate } from "@/lib/server/phone-gate";
@@ -14,12 +12,9 @@ import { serverEvent } from "@/lib/telemetry/log";
 import { recordUnknownTerms } from "@/lib/server/tag-term-repo";
 import { telemetryConfig } from "@/lib/telemetry/server";
 import { notifyMatchingPerformers } from "@/lib/server/notify-matching";
+import { route } from "@/lib/server/route";
 
-export async function POST(request: Request) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.");
-  const limited = await rateLimited("requestCreate", user.id);
-  if (limited) return limited;
+export const POST = route({ auth: "user", rate: "requestCreate", unauthorized: () => problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.") }, async ({ request, user }) => {
   const phone = await phoneGate(user);
   if (phone) return phone;
   const draft = parseDraft(await readJson(request));
@@ -33,13 +28,11 @@ export async function POST(request: Request) {
   serverEvent(EVENTS.requestPublished, { request_id: created.id, tags: created.tags.length, has_budget: Boolean(created.budget), remote: !created.cityId }, user.id, "/api/requests");
   pushGlobal({ t: "feed" });
   return Response.json({ request: created }, { status: 201 });
-}
+});
 
-export async function GET() {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const GET = route({ auth: "user" }, async ({ user }) => {
   const list = await listRequests(user.id);
   // Лічильники відгуків для «Моїх запитів»: клієнту не треба питати /responses по кожному запиту окремо.
   const counts = await responseCounts(list.filter((item) => item.status === "open").map((item) => item.id));
   return Response.json({ requests: list, responseCounts: Object.fromEntries(counts) }, { headers: { "cache-control": "no-store" } });
-}
+});

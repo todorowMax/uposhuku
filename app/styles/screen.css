@@ -1,0 +1,133 @@
+/*
+  Екран (components/ui/screen.tsx). До 768px на весь екран і заїжджає справа; від 768px панель біля чату
+  (data-desktop="panel") або вікно по центру (data-desktop="dialog"). Шапка й низ стоять, скролиться
+  лише .ui-screen-body. Висоту обмежує --kb (клавіатура) з use-keyboard-inset.
+*/
+.ui-screen {
+  position: fixed;
+  inset: 0 0 var(--kb, 0px) 0;
+  z-index: var(--z-screen);
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  color: var(--ink);
+  outline: none;
+}
+
+.ui-screen[data-state="open"] {
+  animation: ui-screen-in 280ms var(--ease-out-quint);
+}
+
+.ui-screen[data-state="closed"] {
+  animation: ui-screen-in 200ms ease-in reverse;
+}
+
+.ui-screen-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 12px) 8px calc(env(safe-area-inset-left) + 12px);
+  border-bottom: 1px solid var(--line);
+}
+
+.ui-screen-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.ui-screen-action {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.ui-screen-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 16px calc(env(safe-area-inset-right) + 16px) 16px calc(env(safe-area-inset-left) + 16px);
+}
+
+/* Низ с головною кнопкою; відступ safe-area зникає, коли над низом уже клавіатура. */
+.ui-screen-footer {
+  flex: none;
+  padding: 12px calc(env(safe-area-inset-right) + 16px) max(12px, calc(env(safe-area-inset-bottom) - var(--kb, 0px))) calc(env(safe-area-inset-left) + 16px);
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.ui-screen-scrim {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .ui-screen {
+    inset: auto 16px 16px auto;
+    width: var(--chat-width);
+    height: var(--chat-height);
+    border-radius: var(--radius-window);
+    box-shadow: var(--shadow-window);
+    overflow: hidden;
+  }
+
+  .ui-screen[data-desktop="dialog"] {
+    inset: 0;
+    width: min(520px, calc(100vw - 32px));
+    height: fit-content;
+    max-height: calc(100dvh - 32px);
+    margin: auto;
+  }
+
+  .ui-screen[data-desktop="dialog"][data-width="wide"] {
+    width: min(960px, calc(100vw - 32px));
+  }
+
+  .ui-screen[data-state="open"] {
+    animation: ui-screen-rise 220ms var(--ease-out-quint);
+  }
+
+  .ui-screen[data-state="closed"] {
+    animation: ui-screen-rise 160ms ease-in reverse;
+  }
+
+  .ui-screen-header {
+    padding: 8px 16px;
+  }
+
+  .ui-screen-body,
+  .ui-screen-footer {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .ui-screen-footer {
+    padding-bottom: 12px;
+  }
+
+  .ui-screen-scrim[data-desktop="dialog"] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-screen);
+    background: var(--scrim);
+  }
+
+  .ui-screen-scrim[data-state="open"] {
+    animation: ui-sheet-fade 200ms ease-out;
+  }
+
+  .ui-screen-scrim[data-state="closed"] {
+    animation: ui-sheet-fade 140ms ease-in reverse;
+  }
+}

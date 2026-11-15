@@ -1,0 +1,226 @@
+/* Легенда карти рядом з акаунтом. */
+.legend {
+  position: relative;
+}
+
+.legend-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 48px;
+  min-width: 48px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 10px 28px -14px rgb(47 60 68 / 30%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  transition: background-color 150ms;
+}
+
+.account-slot .legend-button {
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  gap: 5px;
+  font-size: 12px;
+}
+
+.account-slot .legend-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.legend-button:hover,
+.legend-button[aria-expanded="true"] {
+  background: var(--hover-blue);
+}
+
+.legend-panel,
+.legend-sheet {
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+.legend-body {
+  display: grid;
+  gap: 12px;
+}
+
+.ui-popover.legend-panel {
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(520px, calc(100dvh - 100px));
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 18px 44px rgb(45 60 67 / 20%);
+}
+
+.legend-lead {
+  font-size: 12px;
+  line-height: 1.625;
+  color: var(--ink-muted);
+}
+
+.legend-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.legend-sheet {
+  overflow-y: auto;
+  padding: 0 16px 16px;
+}
+
+.legend-list {
+  display: grid;
+  gap: 12px;
+}
+
+.legend-list li {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.legend-list li > span:last-child {
+  min-width: 0;
+}
+
+.legend-list b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.legend-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 52px;
+  min-height: 34px;
+}
+
+.legend-photo {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #aab9c3, #d9a07a);
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-group {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Піни запитів у легенді повторюють справжні з карти (components/maplibre). */
+.legend-icon-wide {
+  width: 96px;
+}
+
+.legend-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 4px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(145 169 157 / 55%), 0 2px 6px rgb(48 68 64 / 20%);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: #2f3a3e;
+}
+
+.legend-pin::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--wave);
+}
+
+.legend-pin[data-variant="match"] {
+  background: var(--brand);
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-pin[data-variant="match"]::before {
+  background: #ffffff;
+}
+
+.legend-pin[data-variant="own"] {
+  background: var(--ocean);
+  box-shadow: 0 2px 6px rgb(48 68 64 / 25%);
+}
+
+.legend-pin[data-variant="own"]::before {
+  background: #ffffff;
+}
+
+.legend-pin[data-variant="sent"] {
+  background: #e5efe8;
+  box-shadow: 0 0 0 1px rgb(145 169 157 / 55%), 0 2px 6px rgb(48 68 64 / 15%);
+}
+
+.legend-pin[data-variant="sent"]::before {
+  background: #4d7a5e;
+}
+
+.legend-pin-sm {
+  padding: 4px 11px 4px 4px;
+}
+
+.legend-pins {
+  gap: 4px;
+}
+
+.legend-group-req {
+  background: #7e9d90;
+  box-shadow: 0 0 0 2px #ffffff;
+  color: #ffffff;
+}
+
+.legend-switch-note {
+  padding-top: 10px;
+  border-top: 1px solid rgb(66 116 132 / 45%);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.notif-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 6px 0;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.notif-row[data-disabled] {
+  opacity: 0.6;
+  cursor: default;
+}

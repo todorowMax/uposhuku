@@ -29,6 +29,7 @@ import { canRestore, restoreLeftLabel } from "@/lib/requests/restore";
 import { requestSubline } from "@/lib/requests/subline";
 import type { PublishedRequest } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
+import { prefersReducedMotion } from "@/lib/ui/media";
 
 /** Один активний запит над мапою; решта доступні у списку, не займаючи екран. */
 export function RequestDock({ requests, active }: { requests: PublishedRequest[]; active: PublishedRequest }) {
@@ -69,7 +70,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   }, [showRequestedList]);
 
   useLayoutEffect(() => {
-    if (!rootRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!rootRef.current || prefersReducedMotion()) return;
     const tween = gsap.fromTo(rootRef.current, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
     return () => {
       tween.kill();
@@ -77,7 +78,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   }, [active.id]);
 
   useLayoutEffect(() => {
-    if (!listOpen || !listRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!listOpen || !listRef.current || prefersReducedMotion()) return;
     const tween = gsap.fromTo(listRef.current, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" });
     return () => {
       tween.kill();

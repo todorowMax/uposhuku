@@ -5,12 +5,12 @@
 
 import { problem, readJson } from "@/lib/api/problem";
 import { parseDraft } from "@/lib/requests/parse-draft";
-import { getSessionUser } from "@/lib/server/auth";
 import { noteRequestEdited } from "@/lib/server/chat-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { pushGlobal } from "@/lib/server/realtime";
 import { renewRequest } from "@/lib/server/request-lifetime";
 import { closeRequest, reopenRequest, updateRequest } from "@/lib/server/request-repo";
+import { route } from "@/lib/server/route";
 
 /** «Так, ще актуально»: строк життя заново; виконавцям нічого не йде, стрічка не змінюється. */
 const renewResponse = async (userId: string, id: string) => {
@@ -29,11 +29,9 @@ const reopenResponse = async (userId: string, id: string) => {
   return Response.json({ request: reopened });
 };
 
-export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await getSessionUser();
-  if (!user) return problem(401, "Потрібен вхід");
+export const PATCH = route<"user", undefined, { id: string }>({ auth: "user" }, async ({ request, user, params }) => {
   const body = await readJson(request);
-  const { id } = await params;
+  const { id } = params;
   if (body?.status === "closed") {
     const closed = await closeRequest(user.id, id);
     if (closed) pushGlobal({ t: "feed" });
@@ -52,4 +50,4 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await noteRequestEdited(user.id, id);
   pushGlobal({ t: "feed" });
   return Response.json({ request: updated });
-}
+});

@@ -2,8 +2,9 @@
 // показує перемикач «У Telegram-каналі» лише тоді, коли канал справді працює.
 
 import { telegramConfig } from "@/lib/telegram/config";
+import { route } from "@/lib/server/route";
 
-export async function GET() {
+export const GET = route({}, async () => {
   const config = telegramConfig();
   return Response.json({ enabled: config.enabled && config.channelEnabled && Boolean(config.channelId) }, { headers: { "cache-control": "no-store" } });
-}
+});

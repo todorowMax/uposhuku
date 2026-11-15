@@ -1,0 +1,232 @@
+/*
+  Фільтри під полем запиту (components/composer/specialist-filters), завширшки
+  як саме поле: 560px, розкрите — 720px, з тим самим переходом. Чипи
+  гортаються вбік, кнопка «Фільтри» праворуч стоїть на місці.
+*/
+.filter-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+  margin-top: 10px;
+  pointer-events: auto;
+  transition: max-width 680ms cubic-bezier(0.22, 0.75, 0.25, 1);
+}
+
+.filter-bar[data-expanded="true"] {
+  max-width: 720px;
+}
+
+.filter-strip {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding-block: 16px;
+  margin-block: -16px;
+  scrollbar-width: none;
+  /* Справа м'яке згасання до прозорого: натяк, що чипів більше, і плавний край біля «Фільтрів», а не різкий зріз. */
+  mask-image: linear-gradient(90deg, var(--mask-solid) calc(100% - var(--fade-width)), transparent 100%);
+}
+
+/* Зліва згасання лише коли стрічку вже прогорнули: на початку перший чип нічим не перекритий. */
+.filter-strip[data-scrolled="true"] {
+  mask-image: linear-gradient(90deg, transparent 0, var(--mask-solid) calc(var(--fade-width) / 2), var(--mask-solid) calc(100% - var(--fade-width)), transparent 100%);
+}
+
+.filter-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-strip-inner {
+  display: flex;
+  gap: 6px;
+  width: max-content;
+  /* Праворуч запас на ширину згасання: останній чип можна прогорнути з-під нього. */
+  padding: 2px var(--fade-width) 2px 0;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgb(255 255 255 / 86%);
+  box-shadow: 0 4px 14px rgb(54 65 73 / 8%);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--ink);
+  transition: background-color 150ms, color 150ms, border-color 150ms;
+}
+
+.filter-chip:hover {
+  background: var(--hover-blue);
+}
+
+.filter-chip:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.filter-chip-count {
+  font-size: 12px;
+  font-variant-numeric: lining-nums proportional-nums;
+  color: var(--ink-muted);
+}
+
+.filter-chip[aria-pressed="true"] {
+  border-color: var(--ocean);
+  background: var(--ocean);
+  color: #ffffff;
+}
+
+.filter-chip[aria-pressed="true"] .filter-chip-count {
+  color: rgb(255 255 255 / 70%);
+}
+
+html[data-glass] .filter-chip {
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(12px);
+}
+
+html[data-glass] .filter-chip:hover:not([aria-pressed="true"]) {
+  background: var(--hover-blue);
+}
+
+html[data-glass] .filter-chip[aria-pressed="true"] {
+  background: var(--ocean);
+}
+
+.filter-all {
+  flex: none;
+  margin-top: 0;
+}
+
+.filter-action {
+  margin-left: auto;
+}
+
+.filter-all[data-active="true"],
+.filter-all[aria-expanded="true"] {
+  border-color: #427484;
+  background: #ffffff;
+}
+
+.filter-all-badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--ocean);
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+/* Поповер «Фільтри» на десктопі; у шторці на телефоні клас стоїть на тілі шторки, а контейнерних стилів немає. */
+.ui-popover.filter-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(560px, var(--radix-popover-content-available-height, 560px));
+  border-radius: 18px;
+  background: rgb(255 255 255 / 94%);
+  box-shadow: 0 18px 50px rgb(45 60 67 / 18%);
+}
+
+/* Прокручується лише ця частина поповера; «Скинути» й «Показати» під нею стоять. */
+.filter-panel-scroll {
+  display: grid;
+  gap: 16px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.filter-panel-title {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.filter-panel-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filter-panel .filter-chip {
+  border-color: transparent;
+  background: rgb(0 54 74 / 7.5%);
+  box-shadow: none;
+}
+
+.filter-panel .filter-chip:hover {
+  background: var(--hover-blue);
+}
+
+.filter-panel .filter-chip[aria-pressed="true"] {
+  background: var(--ocean);
+}
+
+.filter-panel .filter-chip-more {
+  background: none;
+  color: var(--ink-muted);
+  text-decoration: underline;
+  text-decoration-color: #8aaab4;
+  text-underline-offset: 4px;
+}
+
+.filter-panel-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgb(66 116 132 / 45%);
+}
+
+.filter-reset {
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: color 150ms, background-color 150ms;
+}
+
+.filter-reset:hover {
+  background: rgb(0 54 74 / 6%);
+  color: var(--ink);
+}
+
+.filter-apply {
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--brand-solid);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--brand-ink);
+  transition: background-color 150ms;
+}
+
+.filter-apply:hover {
+  background: var(--brand-solid-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-bar,
+  .filter-switch-track,
+  .filter-switch-track::after {
+    transition: none;
+  }
+}

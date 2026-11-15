@@ -1,0 +1,295 @@
+/*
+  Пропозиції виконавців (components/requests/offers-panel). На широкому
+  екрані — колонка праворуч над кнопками масштабу, карта ліворуч вільна.
+  Вужче 1024px — шторка знизу; згорнута — язичок.
+*/
+.offers-panel {
+  position: absolute;
+  inset: auto 0 0;
+  z-index: var(--z-controls);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: min(78dvh, 640px);
+  border-radius: 22px 22px 0 0;
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 -18px 50px rgb(45 60 67 / 18%);
+}
+
+@media (min-width: 1024px) {
+  .offers-panel {
+    inset: 56px 24px 88px auto;
+    width: 392px;
+    height: auto;
+    border-radius: 22px;
+    box-shadow: 0 22px 60px rgb(45 60 67 / 18%);
+  }
+}
+
+/* Чат у правій колонці розтягується вліво до половини екрана. */
+@media (min-width: 1024px) {
+  .offers-panel {
+    transition: width 340ms var(--ease-out-quint);
+  }
+
+  .offers-panel[data-wide] {
+    width: min(50vw, 760px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offers-panel {
+    transition: none;
+  }
+}
+
+/*
+  Нижня панель (до 1024px) тягнеться вниз за пальцем і згортається в язичок: lib/ui/use-panel-swipe.ts.
+  Ручка та сама, що в шторці (.ui-sheet-grip); від 1024px панель колонка праворуч, ручки й жесту немає.
+*/
+.offers-grip {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .offers-panel {
+    transform: translateY(var(--sheet-drag, 0px));
+  }
+
+  .offers-grip {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    display: block;
+    translate: -50% 0;
+  }
+}
+
+/* Після недотягнутого свайпу панель повертається на місце; під пальцем без згладжування. */
+@media (max-width: 1023px) and (prefers-reduced-motion: no-preference) {
+  .offers-panel:not([data-dragging]) {
+    transition: transform 200ms var(--ease-out-quint);
+  }
+}
+
+html[data-glass] .offers-panel {
+  background: rgb(255 255 255 / 84%);
+  backdrop-filter: blur(16px);
+}
+
+.offers-tab {
+  white-space: nowrap;
+  position: absolute;
+  /* Над нижньою панеллю з запасом: при 76 px кнопка торкалася її верхнього краю на планшетній ширині (640–1023). */
+  bottom: 94px;
+  left: 50%;
+  z-index: var(--z-controls);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: rgb(255 255 255 / 94%);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  translate: -50% 0;
+  box-shadow: 0 12px 30px -12px rgb(47 60 68 / 30%);
+  transition: background-color 150ms;
+}
+
+.offers-tab:hover {
+  background: var(--hover-blue);
+}
+
+@media (min-width: 1024px) {
+  /* «Пропозиції» стоять у ряду «Мої запити». «Запити для вас» (.feed-tab) лишаються внизу над нижньою панеллю, як на вужчих екранах; саме вікно відкривається праворуч. */
+  .offers-tab:not(.feed-tab) {
+    /* По центру ряду «Мої запити», а не по верхньому краю картки. */
+    top: 68px;
+    right: 24px;
+    bottom: auto;
+    left: auto;
+    translate: none;
+  }
+}
+
+.offers-tab-new {
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.offers-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px 10px;
+  border-bottom: 1px solid rgb(66 116 132 / 40%);
+}
+
+/* Підпис переноситься на другий рядок, а не обрізається: на вузькому телефоні він не вміщається в один. */
+.offers-header-note {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.offers-body {
+  min-height: 0;
+}
+
+.offers-list {
+  display: grid;
+  /* Колонка не ширшає за панель, навіть коли в картці довгий рядок: інакше картки виїжджають вправо. */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 10px;
+  padding: 12px 14px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.offers-new {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--ocean);
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  box-shadow: 0 8px 20px -8px rgb(48 54 56 / 60%);
+}
+
+/* «+N нових» у стрічці: на всю ширину й теплим кольором, щоб не сприйматися як «запиту немає». */
+.offers-new-fresh {
+  justify-self: stretch;
+  justify-content: center;
+  height: 40px;
+  border-radius: 14px;
+  background: var(--brand-solid);
+  font-size: 13px;
+  box-shadow: 0 10px 24px -10px rgb(207 69 25 / 60%);
+}
+
+.offers-new-fresh:hover {
+  background: var(--brand-solid-hover);
+}
+
+.offers-new-fresh:focus-visible {
+  outline: 3px solid var(--ocean);
+  outline-offset: 2px;
+}
+
+.offers-empty {
+  display: flex;
+  gap: 10px;
+  padding: 18px 6px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.offers-empty .request-live-dot {
+  margin-top: 6px;
+}
+
+.offer-card {
+  padding: 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(66 116 132 / 45%), 0 4px 14px -8px rgb(48 68 64 / 18%);
+  transition: box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.offer-card:hover,
+.offer-card:focus-within {
+  background: var(--hover-blue);
+  box-shadow: inset 0 0 0 1px rgb(66 116 132 / 34%), 0 6px 20px -8px rgb(0 54 74 / 20%);
+}
+
+.offer-avatar {
+  display: block;
+  flex: none;
+  border-radius: 999px;
+  background-color: #dce7e4;
+  background-size: 400% 400%;
+  box-shadow: 0 0 0 2px #ffffff, 0 2px 6px rgb(48 68 64 / 18%);
+}
+
+.offer-promoted {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent-ink);
+}
+
+.offer-primary,
+.offer-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 11px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 150ms, color 150ms, opacity 150ms;
+}
+
+.offer-primary {
+  background: var(--ocean);
+  color: #ffffff;
+}
+
+.offer-primary:hover {
+  background: var(--tide);
+}
+
+.offer-secondary {
+  color: var(--ink);
+}
+
+.offer-secondary:hover:not(:disabled) {
+  background: var(--hover-blue);
+}
+
+.offer-secondary:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.offers-declined-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+.offers-declined-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 4px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
