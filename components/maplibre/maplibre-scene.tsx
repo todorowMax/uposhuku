@@ -1762,7 +1762,9 @@ export default function MapLibreScene() {
       const last = items[items.length - 1];
       list.style.setProperty("--stack-edge", "0px");
       const fits = last.offsetTop + last.offsetHeight + 20 <= list.clientHeight;
-      list.style.setProperty("--stack-edge", `${fits ? 0 : Math.max(0, list.clientHeight - first.offsetHeight - 28)}px`);
+      const style = getComputedStyle(list);
+      const padding = Number.parseFloat(style.paddingTop) + Number.parseFloat(style.paddingBottom);
+      list.style.setProperty("--stack-edge", `${fits ? 0 : Math.max(0, list.clientHeight - first.offsetHeight - padding)}px`);
       list.style.scrollSnapType = "none";
       list.scrollTop = 0;
       updateGroupStack();
@@ -1790,8 +1792,9 @@ export default function MapLibreScene() {
     list.dataset.scrolled = String(list.scrollTop > 2);
     for (const item of items) {
       const distance = Math.abs(item.offsetTop + item.offsetHeight / 2 - focus) / Math.max(item.offsetHeight - 6, 1);
-      item.style.setProperty("--stack-scale", String(Math.max(0.76, 1 - distance * 0.095)));
-      item.style.setProperty("--stack-opacity", String(Math.max(0.26, 1 - distance * 0.27)));
+      // Активний рядок чіткий, сусіди помітно відступають: так ясно, на кому зупинились.
+      item.style.setProperty("--stack-scale", String(Math.max(0.76, 1 - distance * 0.1)));
+      item.style.setProperty("--stack-opacity", String(Math.max(0.2, 1 - distance * 0.4)));
       item.style.zIndex = String(Math.max(0, 20 - Math.round(distance * 4)));
       item.dataset.centered = distance < 0.5 ? "true" : "false";
     }

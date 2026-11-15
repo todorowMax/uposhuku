@@ -33,18 +33,19 @@
   flex-direction: column;
   /* Висота за вмістом (84px рядок, крок 72px), але не вище за межу: 2 людини не тягнуть порожній список. */
   height: min(350px, calc(100dvh - 240px), calc(var(--rows, 3) * 72px + 40px));
-  padding: 8px 36px 20px;
+  /* Зверху місце під край попереднього рядка: видно, що вище ще хтось є. Активний рядок стоїть під ним. */
+  padding: 36px 36px 20px;
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-snap-type: y mandatory;
-  scroll-padding-top: 8px;
+  scroll-padding-top: 36px;
   scrollbar-width: none;
   mask-image: linear-gradient(to bottom, #000, #000 88%, transparent);
 }
 
-/* Згасання зверху з'являється, коли верхні рядки вже прогорнули. */
+/* Прогорнули: край попереднього рядка лишається видимим, лише трохи згасає до верху. */
 .group-preview-list[data-scrolled="true"] {
-  mask-image: linear-gradient(to bottom, transparent, #000 11%, #000 89%, transparent);
+  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 35%), #000 40px, #000 89%, transparent);
 }
 
 .group-preview-list::-webkit-scrollbar {
@@ -89,16 +90,16 @@
   transition: background-color 150ms, box-shadow 150ms, border-color 150ms;
 }
 
+/* Активний рядок (той, що став нагору прокруткою) видно одразу: білий, з рамкою й тінню; решта відступає. */
 .group-preview-list > li[data-centered="true"] .group-preview-row {
+  border-color: var(--tide);
   background: #ffffff;
-  box-shadow: 0 15px 34px rgb(0 54 74 / 20%);
+  box-shadow: 0 15px 34px rgb(0 54 74 / 22%);
 }
 
-.group-preview-row:hover,
 .group-preview-row:focus-visible {
-  background: var(--hover-blue);
-  box-shadow: 0 15px 34px rgb(0 54 74 / 20%);
-  outline: none;
+  outline: 2px solid var(--tide);
+  outline-offset: 2px;
 }
 
 .group-preview-avatar {
@@ -126,8 +127,7 @@
   font-weight: 700;
 }
 
-.group-preview-row:hover .group-preview-avatar,
-.group-preview-row:focus-visible .group-preview-avatar {
+.group-preview-list > li[data-centered="true"] .group-preview-avatar {
   transform: scale(1.08);
   box-shadow: 0 0 0 2px #ffffff, 0 0 0 3.5px rgb(242 105 60 / 55%), 0 3px 8px rgb(48 68 64 / 20%);
 }
@@ -139,8 +139,7 @@
   transition: opacity 150ms, transform 150ms;
 }
 
-.group-preview-row:hover .group-preview-chevron,
-.group-preview-row:focus-visible .group-preview-chevron {
+.group-preview-list > li[data-centered="true"] .group-preview-chevron {
   opacity: 1;
   transform: none;
 }

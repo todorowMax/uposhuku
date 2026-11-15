@@ -2,10 +2,10 @@
 
 // components/maplibre/group-preview-panel.tsx
 //
-// Содержимое списка людей группы под курсором (десктоп): заголовок, прокручиваемая стопка рядков и
-// коротка картка людини, на яку наведено мишу чи фокус. Саму панель (місце, поява, відстеження
-// курсора) веде сцена; тут лише розмітка. Картка не ловить мишу, щоб перехід курсора до неї не
-// закривав список.
+// Список людей групи під курсором (десктоп): заголовок, прокручувана стопка рядків і коротка картка
+// активного рядка, тобто того, що прокрутка поставила нагору (data-centered від сцени). Наведення мишею
+// картку не перемикає. Саму панель (місце, поява, відстеження курсора) веде сцена; тут лише розмітка.
+// Картка не ловить мишу, щоб перехід курсора до неї не закривав список.
 
 import { useLayoutEffect, useRef, useState } from "react";
 import type { RefObject, UIEventHandler } from "react";
@@ -43,15 +43,22 @@ const scrollRowIntoStack = (list: HTMLUListElement | null, item: HTMLElement | n
 };
 
 export const GroupPreviewPanel = ({ members, requests, listRef, panelRef, onScroll, onOpenPerson, onOpenRequest }: GroupPreviewPanelTypes.Props) => {
-  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(members[0]?.id ?? null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const hovered = members.find((performer) => performer.id === hoverId);
+  const active = members.find((performer) => performer.id === activeId);
+
+  // Активний той, кого сцена позначила data-centered після прокрутки (вона рахує стопку в тому ж onScroll).
+  const handleScroll: UIEventHandler<HTMLUListElement> = (event) => {
+    onScroll(event);
+    const centered = event.currentTarget.querySelector<HTMLElement>('li[data-centered="true"]');
+    setActiveId(centered?.dataset.person ?? null);
+  };
 
   // Картка стоїть навпроти рядка, з зовнішнього боку панелі (від групи).
   useLayoutEffect(() => {
     const card = cardRef.current;
     const panel = panelRef.current;
-    const row = hoverId ? panel?.querySelector<HTMLElement>(`[data-person="${CSS.escape(hoverId)}"]`) : null;
+    const row = activeId ? panel?.querySelector<HTMLElement>(`[data-person="${CSS.escape(activeId)}"]`) : null;
     if (!card || !panel || !row) return;
     const panelBox = panel.getBoundingClientRect();
     const rowBox = row.getBoundingClientRect();
@@ -64,23 +71,19 @@ export const GroupPreviewPanel = ({ members, requests, listRef, panelRef, onScro
     card.style.left = `${right ? panelBox.width + PREVIEW_GAP : -(width + PREVIEW_GAP)}px`;
     card.style.top = `${Math.round(top)}px`;
     card.dataset.placed = "true";
-  }, [hoverId, panelRef]);
+  }, [activeId, panelRef]);
 
   return (
     <>
       <p className="group-preview-title">{groupTitle(members.length, requests.length)}</p>
-      <ul ref={listRef} className="group-preview-list" style={{ "--rows": members.length + requests.length } as React.CSSProperties} onScroll={onScroll} aria-label="Виконавці й запити у групі">
+      <ul ref={listRef} className="group-preview-list" style={{ "--rows": members.length + requests.length } as React.CSSProperties} onScroll={handleScroll} aria-label="Виконавці й запити у групі">
         {members.map((performer) => (
           <li key={performer.id} data-person={performer.id}>
             <Button
               variant="bare"
               className="group-preview-row"
               onClick={() => onOpenPerson(performer)}
-              onPointerEnter={() => setHoverId(performer.id)}
-              onFocus={(event) => {
-                setHoverId(performer.id);
-                scrollRowIntoStack(listRef.current, event.currentTarget.parentElement);
-              }}
+              onFocus={(event) => scrollRowIntoStack(listRef.current, event.currentTarget.parentElement)}
             >
               <span aria-hidden className="group-preview-avatar" style={avatarBackground(performer, 48)} />
               <span className="min-w-0 flex-1">
@@ -104,9 +107,9 @@ export const GroupPreviewPanel = ({ members, requests, listRef, panelRef, onScro
           </li>
         ))}
       </ul>
-      {hovered && (
-        <div key={hovered.id} ref={cardRef} aria-hidden className="group-preview-card glass-panel">
-          <PerformerShortCard performer={hovered} cityName={CITIES.find((city) => city.id === hovered.cityId)?.name} />
+      {active && (
+        <div key={active.id} ref={cardRef} aria-hidden className="group-preview-card glass-panel">
+          <PerformerShortCard performer={active} cityName={CITIES.find((city) => city.id === active.cityId)?.name} />
         </div>
       )}
     </>
