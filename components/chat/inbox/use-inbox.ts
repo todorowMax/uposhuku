@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { conversationsStore, fetchConversations, openConversation } from "@/lib/chat/client";
 import type { ConversationDto } from "@/lib/chat/types";
+import { attentionCount } from "@/lib/chat/unread";
 import { startPolling } from "@/lib/realtime/client";
 import { useStore } from "@/lib/store";
 import { chatOpenStore, panelCountStore } from "@/lib/ui/chat-window";
@@ -112,8 +113,11 @@ export const useInbox = () => {
     };
   }, [handled]);
 
-  // Бейдж: розмови, де щось чекає на мене (угода), а якщо таких немає, то де я виконавець.
-  const actionCount = items.filter((item) => item.deal?.needsMe).length || items.filter((item) => item.role === "performer").length;
+  // Бейдж: розмови з непрочитаним і ті, де угода чекає на мене.
+  const actionCount = attentionCount(items);
 
-  return { ...motion, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount };
+  // Відкрита розмова відмічена прочитаною: гасимо її в списку одразу, не чекаючи наступного опитування.
+  const markRead = (conversationId: string) => setItems((list) => list.map((item) => (item.id === conversationId ? { ...item, unread: 0, unreadDeal: false } : item)));
+
+  return { ...motion, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead };
 };

@@ -5217,6 +5217,15 @@ html[data-map-ready] .map-skeleton {
   background: rgb(16 45 55 / 7%);
 }
 
+/* Непрочитана розмова: ім'я жирніше, превʼю темніше; число в пілюлі (.inbox-badge) лише коли є текст від співрозмовника. */
+.inbox-row[data-unread] .inbox-name {
+  font-weight: 700;
+}
+
+.inbox-row[data-unread] .inbox-preview {
+  color: var(--ink);
+}
+
 .inbox-panel[data-size="wide"] {
   width: min(1040px, calc(100vw - 32px));
   height: calc(100dvh - 32px);
@@ -5325,7 +5334,7 @@ html[data-map-ready] .map-skeleton {
 
 .inbox-name {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .inbox-name em {

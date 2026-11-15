@@ -39,6 +39,8 @@ export const RATE_RULES = {
   cspReport: { max: 60, windowMs: 10 * MINUTE },
   // Щедрі для живої людини, але не безмежні: стеля проти скриптів.
   message: { max: 60, windowMs: MINUTE },
+  // Мітка прочитання йде при відкритті розмови й з кожним новим повідомленням: ліміт вищий за ліміт відправки.
+  conversationRead: { max: 120, windowMs: MINUTE },
   upload: { max: 30, windowMs: 10 * MINUTE },
   phoneStart: { max: 10, windowMs: 60 * MINUTE },
   requestCreate: { max: 10, windowMs: 60 * MINUTE },

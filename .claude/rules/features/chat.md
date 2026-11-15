@@ -12,3 +12,4 @@ Feature doc: `docs/features/chat.md` (model, list, polling, realtime, notificati
 - A system line (`kind: "system"`) is not a human message: `talked` and the notification logic ignore it. Writing one must never break the action that caused it.
 - The Telegram notice key is `msg:<conversation>:<recipient>:<window>`: keep the recipient in it, otherwise a reply inside the same 10-minute window is dropped as a duplicate.
 - A failed send must leave the text and photos in the composer (`lib/chat/send-result.ts`); do not clear the draft before the server answers.
+- Unread is a per-side read mark on `conversations` (`customer_read_at`, `performer_read_at`), counted in one grouped query in `listConversations`; only the other side's `text` messages count, plus a system line when the deal waits for me. The client sends the mark (`POST .../read`) only while the thread is open and the tab visible, after the first load: never from a list view or a hidden tab.

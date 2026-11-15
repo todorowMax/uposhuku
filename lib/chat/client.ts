@@ -31,6 +31,11 @@ export const fetchMessages = async (conversationId: string, since = 0) => call<{
 export const postMessage = async (conversationId: string, text: string, attachmentIds: string[] = []) =>
   (await call<{ message: ChatMessageDto }>(`/api/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ text, attachmentIds }) })).message;
 
+/** Людина бачить стрічку: сервер ставить її мітку прочитання на «зараз». */
+export const markConversationRead = async (conversationId: string) => {
+  await call<{ ok: true }>(`/api/conversations/${conversationId}/read`, { method: "POST" });
+};
+
 /** Фото в розмову: тіло — стиснутий файл. Повертає id для attachmentIds і адресу для превʼю. */
 export const uploadChatPhoto = async (conversationId: string, blob: Blob) => {
   const response = await fetch(`/api/conversations/${conversationId}/attachments`, { method: "POST", headers: { "content-type": blob.type }, body: blob });

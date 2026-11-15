@@ -22,17 +22,19 @@ import type { InboxSize } from "./use-inbox-motion";
 export const Thread = ({
   conversation,
   size,
+  onRead,
   onBack,
   onClose,
   onToggleSize,
 }: {
   conversation: ConversationDto;
   size: InboxSize;
+  onRead: (conversationId: string) => void;
   onBack: () => void;
   onClose: () => void;
   onToggleSize: () => void;
 }) => {
-  const { chat, screen, setScreen, selectedDeal, response, listRef, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation);
+  const { chat, screen, setScreen, selectedDeal, response, listRef, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation, onRead);
   const role = conversation.role;
   const emptyChat = chat.lines.length === 0 && !conversation.lastMessage;
 

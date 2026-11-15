@@ -9,12 +9,13 @@
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { inboxLabel } from "@/lib/chat/unread";
 import { ConversationList } from "./parts/conversation-list";
 import { Thread } from "./thread";
 import { useInbox } from "./use-inbox";
 
 export const InboxPanel = () => {
-  const { buttonRef, panelRef, innerRef, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, size, toggleSize, close } = useInbox();
+  const { buttonRef, panelRef, innerRef, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead, size, toggleSize, close } = useInbox();
   if (!signedIn || (items.length === 0 && !open)) return null;
 
   return (
@@ -25,7 +26,7 @@ export const InboxPanel = () => {
         onClick={() => setOpen(true)}
         className="inbox-button"
         style={open ? { visibility: "hidden" } : undefined}
-        aria-label={`Повідомлення: ${items.length}`}
+        aria-label={inboxLabel(actionCount)}
       >
         <MessageCircle className="size-4" strokeWidth={1.9} />
         <span className="inbox-label">Повідомлення</span>
@@ -55,7 +56,7 @@ export const InboxPanel = () => {
               />
               <div className="inbox-main">
                 {active ? (
-                  <Thread key={active.id} conversation={active} size={size} onBack={() => setActive(null)} onClose={close} onToggleSize={toggleSize} />
+                  <Thread key={active.id} conversation={active} size={size} onRead={markRead} onBack={() => setActive(null)} onClose={close} onToggleSize={toggleSize} />
                 ) : (
                   <p className="inbox-empty">Оберіть розмову зі списку</p>
                 )}
