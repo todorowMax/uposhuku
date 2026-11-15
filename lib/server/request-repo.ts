@@ -8,6 +8,8 @@ import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
 import { RESTORE_WINDOW_MS, isDeadline } from "@/lib/requests/types";
 import { newId } from "@/lib/ids";
+import { stripContacts } from "@/lib/chat/contacts";
+import type { PublicRequest } from "@/lib/requests/public";
 import { getDb, inChunks } from "./db";
 
 type Row = typeof requests.$inferSelect;
@@ -118,6 +120,33 @@ export const updateRequest = async (userId: string, id: string, draft: RequestDr
   ];
   await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
   return (await findRequest(userId, id)) ?? "not_found";
+};
+
+/**
+ * Запит для публічної сторінки /zapyt/<id>. Лише потрібні поля, зібрані вручну: id автора, ім'я й файли в об'єкт не потрапляють.
+ * Бачить кожен, якщо автор дозволив показ (`channel_opt_in`); інакше запит бачить лише його автор (`viewerId`), для решти null,
+ * як і для неіснуючого id. Закритий запит повертається (сторінка покаже «Виконавця знайдено»).
+ */
+export const getPublicRequest = async (id: string, viewerId: string | null): Promise<PublicRequest | null> => {
+  const db = getDb();
+  const [row] = await db.select().from(requests).where(eq(requests.id, id)).limit(1);
+  if (!row) return null;
+  const own = viewerId !== null && row.userId === viewerId;
+  if (!row.channelOptIn && !own) return null;
+  const [tagRows, counts] = await Promise.all([db.select().from(requestTags).where(eq(requestTags.requestId, id)), responseCounts([id])]);
+  return {
+    id: row.id,
+    text: stripContacts(row.text),
+    tags: tagRows.map((tag) => ({ id: tag.tagId, label: tag.label })),
+    budget: row.budget,
+    deadline: isDeadline(row.deadline) ? row.deadline : null,
+    cityId: row.cityId,
+    status: row.status,
+    createdAt: new Date(row.createdAt).toISOString(),
+    responseCount: counts.get(id) ?? 0,
+    own,
+    shared: row.channelOptIn,
+  };
 };
 
 /** Відкриті запити інших людей: з них складається стрічка виконавця. */
