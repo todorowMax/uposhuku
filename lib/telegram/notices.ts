@@ -36,6 +36,9 @@ export const bucket = (now: number, windowMs = WINDOW_MS) => Math.floor(now / wi
 /** Шлях із позначками джерела, щоб аналітика бачила, звідки прийшли. */
 export const deepLink = (open: string, medium: "bot" | "channel" = "bot") => `/?open=${encodeURIComponent(open)}&utm_source=telegram&utm_medium=${medium}`;
 
+/** Публічна сторінка запиту без входу (кнопка в каналі й сповіщення «під ваші теги»); відгукнутися з неї веде у `/?open=request:<id>`. */
+export const requestLink = (requestId: string, medium: "bot" | "channel" = "bot") => `/zapyt/${encodeURIComponent(requestId)}?utm_source=telegram&utm_medium=${medium}`;
+
 const money = (value: number) => new Intl.NumberFormat("uk-UA").format(value).replace(/ /g, " ");
 
 export const offerNotice = (input: { requestId: string; requestText: string; price: number | null; days: number; now?: number }): Notice => ({
@@ -136,5 +139,5 @@ export const matchNotice = (input: { requestId: string; userId: string; text: st
   kind: "matching",
   key: `match:${input.requestId}:${input.userId}`,
   html: `Новий запит під ваші теги: «${escapeHtml(excerpt(stripContacts(input.text), 60))}».${input.budget ? ` ${escapeHtml(input.budget)} ·` : ""} ${escapeHtml(input.place)}`,
-  button: { text: "Подивитися", path: deepLink(`request:${input.requestId}`) },
+  button: { text: "Подивитися", path: requestLink(input.requestId) },
 });

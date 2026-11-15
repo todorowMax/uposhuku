@@ -7,6 +7,7 @@
 
 import { jwtVerify } from "jose";
 import { securityHeaders } from "../lib/security-headers";
+import { robotsHeader } from "../lib/seo/indexing";
 import { missingTickConfig } from "../lib/server/tick-config";
 import { sessionSecret } from "../lib/server/session-secret";
 import { logLater, type KitServerConfig } from "../kit/telemetry/core";
@@ -115,9 +116,11 @@ export default {
       }
     }
     const response: Response = await openNext.fetch(request, env, ctx);
-    // Поки сайт закритий від пошуківців: усе, що віддає Next, йде з noindex (разом з app/robots.ts).
+    // Індексацією керує один перемикач (lib/seo/indexing.ts): поки закрито, усе, що віддає Next, йде з noindex
+    // (разом з app/robots.ts і meta robots у layout); коли відкрито, заголовок не ставимо, щоб не перекрити noindex сторінок.
     const headers = new Headers(response.headers);
-    headers.set("X-Robots-Tag", "noindex, nofollow");
+    const robots = robotsHeader(env);
+    if (robots) headers.set("X-Robots-Tag", robots);
     for (const [name, value] of Object.entries(securityHeaders({ rpcUrl: env.CRYPTO_RPC_URL }))) headers.set(name, value);
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   },

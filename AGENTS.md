@@ -85,6 +85,7 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 - Per-environment variables (escrow cap `CRYPTO_MAX_DEAL_USDT`, safe-deal mode, feature-flag modes, Turnstile keys,
   `PHONE_HASH_KEY`, `ADMIN_TOTP_SECRET`) are set in `wrangler.jsonc` or as secrets; what each does and the values
   per environment: the feature docs in the map above. Variable names with placeholders: `.dev.vars.example`.
+- Індексація й адреса сайту (`lib/seo/indexing.ts`, `lib/server/seo.ts`): сайт відкритий для пошуковиків лише коли `DEPLOY_ENV=production` і змінна `SEO_INDEXING=on`; типово закрито всюди, на dev і локально `on` нічого не відкриває. Від одного перемикача залежать `app/robots.ts` (`Sitemap:` лише коли відкрито), `robots` у `generateMetadata` кореневого layout і заголовок `X-Robots-Tag` у `worker/index.ts` (відкрито: не ставиться, щоб не перекрити `noindex` окремих сторінок, наприклад закритого запиту). `SITE_URL` (прод `https://findlyfy.com`, dev `https://dev.findlyfy.com`, у `wrangler.jsonc`) дає `metadataBase`, canonical і карту сайту; без нього `http://localhost:3031`. Карта сайту бере з бази лише id профілів.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
 

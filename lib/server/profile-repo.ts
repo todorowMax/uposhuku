@@ -4,7 +4,7 @@
 // projects + project_tags (підтверджені). Збереження одним батчем, щоб
 // профіль не лишився напівзаписаним.
 
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, notLike } from "drizzle-orm";
 import { profileTags, profiles, projectTags, projects } from "@/db/schema";
 import { emptyProfile, type Profile, type ProfileWork } from "@/lib/profile/types";
 import { getDb, inChunks } from "./db";
@@ -101,6 +101,10 @@ export const listPublishedProfiles = async (): Promise<Map<string, Profile>> => 
   const rows = await getDb().select().from(profiles).where(eq(profiles.published, true));
   return load(rows);
 };
+
+/** Id опублікованих профілів без самих профілів: для карти сайту (без фото й робіт). Демо-виконавців з сіда не віддаємо. */
+export const listPublishedProfileIds = async (): Promise<string[]> =>
+  (await getDb().select({ userId: profiles.userId }).from(profiles).where(and(eq(profiles.published, true), notLike(profiles.userId, "demo-%")))).map((row) => row.userId);
 
 export const saveProfile = async (userId: string, profile: Profile): Promise<Profile> => {
   const db = getDb();

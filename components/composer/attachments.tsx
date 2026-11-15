@@ -2,13 +2,6 @@
 
 import { FileText, X } from "@/components/icons";
 
-export interface Attachment {
-  id: string;
-  file: File;
-  /** Посилання на прев'ю, лише для зображень. */
-  url: string | null;
-}
-
 /** Що потрібно, щоб показати вкладення: імʼя й прев'ю. Збережений запит має лише опис файла, без самого файла. */
 export interface AttachmentView {
   id: string;
@@ -18,8 +11,8 @@ export interface AttachmentView {
 
 /**
  * Прикріплені файли над текстом запиту, як прев'ю фото в месенджерах:
- * зображення — мініатюрою, решта — плашкою з назвою. Поки лише вигляд:
- * файли нікуди не відправляються.
+ * зображення — мініатюрою, решта — плашкою з назвою. Показує лише опис файлів,
+ * збережений у старих запитах: нових файлів композер не додає, на сервер вони не завантажуються.
  */
 export const Attachments = ({ items, onRemove }: { items: AttachmentView[]; onRemove: (id: string) => void }) => {
   if (items.length === 0) return null;

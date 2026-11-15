@@ -9,11 +9,10 @@ import { notFound } from "next/navigation";
 import { ProfileView } from "@/components/profile/profile-view";
 import { cityById } from "@/lib/map/cities";
 import { getPublicPerformer } from "@/lib/performers/server";
+import { siteUrl } from "@/lib/server/env";
 import { tagLabel } from "@/lib/tags/engine";
 
 type Props = { params: Promise<{ id: string }> };
-
-const SITE = "https://findlyfy.com";
 
 /** Виконавець із сіда dev-бази: id виду me-demo-…, вигаданий. */
 const isDemo = (id: string) => id.startsWith("me-demo-");
@@ -33,7 +32,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
-    alternates: { canonical: `${SITE}/p/${encodeURIComponent(id)}` },
+    alternates: { canonical: `${siteUrl()}/p/${encodeURIComponent(id)}` },
     // Свій openGraph замінює кореневий цілком, тож картинку для превью повторюємо.
     openGraph: { title, description, type: "profile", locale: "uk_UA", images: ["/og.png"] },
     // Демо-виконавців з сіда (me-demo-…) вигадані: в індекс їх не пускаємо.
@@ -52,7 +51,7 @@ export default async function PerformerPage({ params }: Props) {
     name: performer.name,
     jobTitle: performer.specialty,
     description: performer.bio || undefined,
-    url: `${SITE}/p/${encodeURIComponent(id)}`,
+    url: `${siteUrl()}/p/${encodeURIComponent(id)}`,
     homeLocation: { "@type": "Place", address: { "@type": "PostalAddress", addressLocality: city, addressCountry: "UA" } },
   };
   return (

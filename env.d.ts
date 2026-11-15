@@ -31,8 +31,10 @@ interface CloudflareEnv {
   NOTIFY_WHEN_ONLINE?: string;
   /** Id публічного каналу запитів (від'ємний, -100…). */
   TELEGRAM_CHANNEL_ID?: string;
-  /** Адреса сайту для посилань із бота й каналу. */
+  /** Адреса сайту для посилань із бота й каналу, canonical, Open Graph і карти сайту. Не секрет, у vars кожного середовища. */
   SITE_URL?: string;
+  /** "on" відкриває сайт для індексації, але лише разом із DEPLOY_ENV=production (lib/seo/indexing.ts). Типово закрито. */
+  SEO_INDEXING?: string;
   /** "1" вмикає публікацію запитів у канал. */
   CHANNEL_ENABLED?: string;
   /** Через скільки хвилин після створення запит потрапляє в канал (типово 20). */

@@ -24,7 +24,6 @@ export { CalendarDaysIcon as CalendarClock } from "./animated/calendar-days";
 export { SwitchCameraIcon as Camera } from "./animated/switch-camera";
 export { ArrowRightIcon as ChevronsRight } from "./animated/arrow-right";
 export { FolderCodeIcon as Code2 } from "./animated/folder-code";
-export { GalleryThumbnailsIcon as ImageIcon } from "./animated/gallery-thumbnails";
 export { MailboxIcon as Inbox } from "./animated/mailbox";
 export { BookTextIcon as Info } from "./animated/book-text";
 export { ClipboardCheckIcon as ListChecks } from "./animated/clipboard-check";

@@ -2,8 +2,11 @@
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { connection } from "next/server";
 import { Telemetry } from "@/kit/telemetry/client";
 import { ConsentBanner } from "@/components/legal/consent-banner";
+import { siteRobots } from "@/lib/server/seo";
+import { siteUrl } from "@/lib/server/env";
 
 const fixel = localFont({
   src: "../public/fonts/FixelVariable.woff2",
@@ -12,7 +15,6 @@ const fixel = localFont({
   display: "swap",
 });
 
-const SITE_URL = "https://findlyfy.com";
 const SITE_TITLE = "Findlyfy: виконавці й запити на карті України";
 const SITE_DESCRIPTION =
   "Опиши, що потрібно створити, і побач на карті, хто поруч уже робив схоже. " +
@@ -21,14 +23,19 @@ const SITE_DESCRIPTION =
 // Картинка для превью посилань: public/og.png, 1200×630. Адреса абсолютна через metadataBase.
 const SOCIAL_IMAGE = { url: "/og.png", width: 1200, height: 630, alt: SITE_TITLE };
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  // Закрито від індексації, доки не запустимось публічно (також X-Robots-Tag у worker/index.ts і app/robots.ts).
-  robots: { index: false, follow: false },
-  title: SITE_TITLE,
-  description: SITE_DESCRIPTION,
-  openGraph: { title: SITE_TITLE, description: SITE_DESCRIPTION, siteName: "Findlyfy", locale: "uk_UA", type: "website", url: "/", images: [SOCIAL_IMAGE] },
-  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [SOCIAL_IMAGE.url] },
+// Адреса сайту й індексація приходять зі змінних воркера (SITE_URL, DEPLOY_ENV, SEO_INDEXING), а вони відомі
+// лише під час запиту: connection() не дає зібрати метадані на збірці з адресою за замовчуванням.
+export const generateMetadata = async (): Promise<Metadata> => {
+  await connection();
+  return {
+    metadataBase: new URL(siteUrl()),
+    // Закрито, поки не відкрито явно: lib/seo/indexing.ts (так само X-Robots-Tag у worker/index.ts і app/robots.ts).
+    robots: siteRobots(),
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    openGraph: { title: SITE_TITLE, description: SITE_DESCRIPTION, siteName: "Findlyfy", locale: "uk_UA", type: "website", url: "/", images: [SOCIAL_IMAGE] },
+    twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION, images: [SOCIAL_IMAGE.url] },
+  };
 };
 
 export const viewport: Viewport = {

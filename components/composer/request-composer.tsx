@@ -5,16 +5,14 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type ChangeEvent,
   type FormEvent,
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { ArrowRight, ArrowUp, Code2, ImageIcon, Paperclip, Plus } from "@/components/icons";
+import { ArrowRight, ArrowUp } from "@/components/icons";
 import { applyGlassPreference } from "@/lib/ui/glass";
 import { setRequestTags } from "@/lib/map/request-tags";
 import { setMapMode } from "@/lib/feed/map-requests";
-import { Attachments, type Attachment } from "@/components/composer/attachments";
 import { RequestTagRow } from "@/components/composer/request-tag-row";
 import { useRequestTags } from "@/components/composer/use-request-tags";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
@@ -32,18 +30,15 @@ import * as tagEngine from "@/lib/tags/engine";
 import { EVENTS, track } from "@/lib/telemetry/track";
 import { useProposeTarget } from "./use-propose-target";
 
-/** Скільки файлів можна прикріпити до запиту. */
-const MAX_FILES = 10;
-
 /** Скільки рядків поле показує, перш ніж почати прокручуватися всередині. */
 const MAX_ROWS = 5;
 
 /**
  * Поле запиту над картою. Спершу компактне, як у асистента в ukoshiku:
- * один рядок, «+» ліворуч і маленька кнопка праворуч, карта під ним
- * майже вся видна. Коли людина натискає на поле, воно розкривається на
- * два поверхи: текст на всю ширину згори, дії знизу, і росте під текст
- * до п'яти рядків.
+ * один рядок і маленька кнопка праворуч, карта під ним майже вся видна.
+ * Коли людина натискає на поле, воно розкривається на два поверхи: текст
+ * на всю ширину згори, дії знизу, і росте під текст до п'яти рядків.
+ * Файлів до запиту поки не додаємо: вони нікуди не завантажуються.
  *
  * «Знайти виконавців» публікує запит: гість вводить пошту й код з листа
  * (components/auth/auth-panel), хто увійшов — публікує одразу. Поки вхід
@@ -53,8 +48,6 @@ export function RequestComposer() {
   const [text, setText] = useState("");
   const [inputPhase, setInputPhase] = useState<"closed" | "wide" | "opening" | "open" | "closing">("closed");
   const [narrowing, setNarrowing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [files, setFiles] = useState<Attachment[]>([]);
   const [params, setParams] = useState<RequestParamsValue>(EMPTY_PARAMS);
   const tags = useRequestTags(text);
   const { mentions, selected, suggestions } = tags;
@@ -72,13 +65,9 @@ export function RequestComposer() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const mirrorRef = useRef<HTMLDivElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
-  const filesRef = useRef<Attachment[]>([]);
   const phaseTimerRef = useRef<number | null>(null);
   const focusTracked = useRef(false);
   const tagsTracked = useRef(false);
-  filesRef.current = files;
   const wide = inputPhase !== "closed" && !narrowing;
   const expanded = inputPhase === "opening" || inputPhase === "open" || inputPhase === "closing";
   const actionsVisible = inputPhase === "open" || inputPhase === "opening";
@@ -120,13 +109,12 @@ export function RequestComposer() {
   });
 
   const closeInput = () => {
-    if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "" || files.length > 0) return;
+    if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "") return;
     clearPhaseTimer();
     if (inputPhase === "wide") {
       setInputPhase("closed");
       return;
     }
-    setMenuOpen(false);
     setInputPhase("closing");
     setNarrowing(false);
     phaseTimerRef.current = window.setTimeout(() => {
@@ -149,7 +137,7 @@ export function RequestComposer() {
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
-  }, [inputPhase, text, files]);
+  }, [inputPhase, text]);
 
   // Порожнє поле — чистий аркуш: прибрані й додані теги забуваємо.
   const resetTags = tags.reset;
@@ -183,30 +171,6 @@ export function RequestComposer() {
     if (loadDraft()?.pending) authFlowStore.set({ mode: "publish" });
   }, []);
 
-  // Прев'ю зображень живуть як blob-посилання: звільняємо, коли файл прибрали.
-  useEffect(() => () => filesRef.current.forEach((item) => item.url && URL.revokeObjectURL(item.url)), []);
-  const attach = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = [...(event.target.files ?? [])];
-    event.target.value = "";
-    setFiles((current) => [
-      ...current,
-      ...picked.slice(0, Math.max(0, MAX_FILES - current.length)).map((file) => ({
-        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 7)}`,
-        file,
-        url: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
-      })),
-    ]);
-    openInput();
-    inputRef.current?.focus();
-  };
-  const detach = (id: string) => {
-    setFiles((current) => {
-      const item = current.find((entry) => entry.id === id);
-      if (item?.url) URL.revokeObjectURL(item.url);
-      return current.filter((entry) => entry.id !== id);
-    });
-  };
-
   /*
    * Висота під текст. Скидаємо в auto перед виміром, інакше scrollHeight
    * пам'ятає стару висоту й поле вміє лише рости. useLayoutEffect, щоб
@@ -238,23 +202,6 @@ export function RequestComposer() {
   // Скло під полем лише там, де розмиття не гальмує (lib/ui/glass.ts).
   useEffect(applyGlassPreference, []);
 
-  // Меню закривається кліком повз нього і Escape.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onPointer = (event: PointerEvent) => {
-      if (!formRef.current?.contains(event.target as Node)) setMenuOpen(false);
-    };
-    const onKey = (event: globalThis.KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [menuOpen]);
-
   /*
    * Чернетку кладемо в браузер до входу: після Google сторінка
    * перезавантажується, і без неї запит загубився б.
@@ -268,15 +215,14 @@ export function RequestComposer() {
     const draft: RequestDraft = {
       text: text.trim(),
       tags: selected.map((id) => ({ id, label: tagEngine.tagLabel(id) })),
-      files: files.map(({ file }) => ({ name: file.name, size: file.size, type: file.type })),
+      files: [],
       budget: params.budget,
       deadline: params.deadline,
       cityId: params.cityId,
       channelOptIn: params.channel,
     };
     saveDraft(draft, true);
-    setMenuOpen(false);
-    track(EVENTS.requestSubmitClicked, { tags: draft.tags.length, has_budget: Boolean(draft.budget), has_city: Boolean(draft.cityId), files: draft.files.length });
+    track(EVENTS.requestSubmitClicked, { tags: draft.tags.length, has_budget: Boolean(draft.budget), has_city: Boolean(draft.cityId) });
     authFlowStore.set({ mode: "publish" });
   };
 
@@ -288,10 +234,6 @@ export function RequestComposer() {
     setInputPhase("closed");
     setNarrowing(false);
     setParams(EMPTY_PARAMS);
-    setFiles((current) => {
-      current.forEach((item) => item.url && URL.revokeObjectURL(item.url));
-      return [];
-    });
   };
 
   // Enter шукає, Shift+Enter переносить рядок, як у чатах.
@@ -302,15 +244,8 @@ export function RequestComposer() {
     }
   };
 
-  const pick = (kind: "file" | "image" | "code") => {
-    setMenuOpen(false);
-    if (kind === "file") fileInputRef.current?.click();
-    else if (kind === "image") imageInputRef.current?.click();
-    else inputRef.current?.focus();
-  };
-
   // Навіть коли тегів ще нема, під текстом стоїть «+ Додати тег».
-  const hasTray = files.length > 0 || selected.length > 0 || suggestions.length > 0 || text.trim() !== "";
+  const hasTray = selected.length > 0 || suggestions.length > 0 || text.trim() !== "";
 
   useLayoutEffect(() => {
     const form = formRef.current;
@@ -337,7 +272,7 @@ export function RequestComposer() {
       if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [inputPhase, expanded, text, files, selected, suggestions]);
+  }, [inputPhase, expanded, text, selected, suggestions]);
 
   return (
     <div
@@ -361,7 +296,6 @@ export function RequestComposer() {
       >
         {expanded && hasTray && (
           <div className="composer-tray">
-            <Attachments items={files} onRemove={detach} />
             <RequestTagRow tags={tags} canPropose={session.status === "user"} />
           </div>
         )}
@@ -390,21 +324,8 @@ export function RequestComposer() {
           />
         </div>
 
-        <input ref={fileInputRef} type="file" multiple hidden onChange={attach} />
-        <input ref={imageInputRef} type="file" accept="image/*" multiple hidden onChange={attach} />
-
         {expanded && (
           <div className="composer-actions">
-            <button
-              type="button"
-              onClick={() => setMenuOpen((open) => !open)}
-              aria-label="Додати файл, зображення або код"
-              aria-expanded={menuOpen}
-              tabIndex={actionsVisible ? 0 : -1}
-              className="composer-plus composer-action grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
-            >
-              <Plus className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`} />
-            </button>
             <RequestParams value={params} onChange={setParams} />
             <button
               type="submit"
@@ -417,21 +338,6 @@ export function RequestComposer() {
             </button>
           </div>
         )}
-
-        <span className="composer-compact-plus-wrap" style={{ position: "absolute", top: 8, left: 8, width: 40, height: 40 }}>
-          <button
-            type="button"
-            onClick={() => setMenuOpen((open) => !open)}
-            aria-label="Додати файл, зображення або код"
-            aria-expanded={menuOpen}
-            aria-hidden={expanded}
-            tabIndex={expanded ? -1 : 0}
-            className="composer-compact-plus grid size-10 place-items-center rounded-xl text-ink-muted hover:bg-white/65 hover:text-ink aria-expanded:bg-white/65 aria-expanded:text-ink"
-            style={{ transform: inputPhase === "opening" || inputPhase === "open" ? "translateX(-48px)" : "translateX(0)" }}
-          >
-            <Plus className={`size-5 transition-transform duration-200 ease-out ${menuOpen ? "rotate-45" : ""}`} />
-          </button>
-        </span>
 
         <span className="composer-compact-send-wrap" style={{ position: "absolute", top: 8, right: 8, width: 40, height: 40 }}>
           <button
@@ -446,22 +352,6 @@ export function RequestComposer() {
             <ArrowUp className="size-[18px]" />
           </button>
         </span>
-
-        {menuOpen && (
-          <div
-            className="composer-menu glass-panel absolute top-[calc(100%+8px)] left-0 z-10 w-64 rounded-2xl p-1.5"
-          >
-            <MenuItem icon={<Paperclip className="size-4" />} onClick={() => pick("file")}>
-              Прикріпити файл
-            </MenuItem>
-            <MenuItem icon={<ImageIcon className="size-4" />} onClick={() => pick("image")}>
-              Додати зображення
-            </MenuItem>
-            <MenuItem icon={<Code2 className="size-4" />} onClick={() => pick("code")}>
-              Код або посилання на репозиторій
-            </MenuItem>
-          </div>
-        )}
       </form>
 
       {authFlow ? (
@@ -493,25 +383,4 @@ function highlight(text: string, mentions: { start: number; end: number }[]): Re
   parts.push(text.slice(cursor));
   if (text.endsWith("\n")) parts.push(" ");
   return parts;
-}
-
-function MenuItem({
-  icon,
-  onClick,
-  children,
-}: {
-  icon: React.ReactNode;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium text-ink transition-colors hover:bg-white/65"
-    >
-      <span className="text-ink-muted">{icon}</span>
-      {children}
-    </button>
-  );
 }

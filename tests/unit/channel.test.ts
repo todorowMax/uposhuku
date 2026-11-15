@@ -65,7 +65,7 @@ describe("формат поста", () => {
     expect(html).toContain("&lt;для&gt;");
     expect(html).toContain("💰 до 15 000 ₴");
     expect(html).toContain("📍 Львів");
-    expect(button).toEqual({ text: "Відгукнутися на Findlyfy", path: "/?open=request%3Ar1&utm_source=telegram&utm_medium=channel" });
+    expect(button).toEqual({ text: "Відгукнутися на Findlyfy", path: "/zapyt/r1?utm_source=telegram&utm_medium=channel" });
   });
 
   it("довгий текст ріжеться по слову; без міста — «Віддалено»; закритий без кнопки", () => {

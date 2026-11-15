@@ -1,5 +1,5 @@
 ---
-paths: ["**/lib/requests/**", "**/components/requests/**", "**/lib/feed/**", "**/lib/server/request-repo.ts", "**/app/api/requests/**", "**/app/api/feed/**"]
+paths: ["**/lib/requests/**", "**/components/requests/**", "**/lib/feed/**", "**/lib/server/request-repo.ts", "**/app/api/requests/**", "**/app/api/feed/**", "**/app/zapyt/**", "**/components/request-page/**"]
 trigger: touching requests (publish, edit, restore, feed, request pin on the map)
 ---
 # Requests

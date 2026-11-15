@@ -10,4 +10,5 @@ Feature doc: `docs/features/chat.md` (model, list, polling, realtime, notificati
 - One conversation per customer + performer pair; deals live inside it. Do not add a chat per deal.
 - Realtime events carry only "what changed" (`lib/realtime/types.ts`), never message text: the client rereads through the REST API, where access is checked. `x-rt-user` is set only by `worker/index.ts`.
 - A system line (`kind: "system"`) is not a human message: `talked` and the notification logic ignore it. Writing one must never break the action that caused it.
-- The Telegram notice key `msg:<conversation>:<window>` is deduplicated; a change to it must keep the recipient in mind (see the doc, known defects).
+- The Telegram notice key is `msg:<conversation>:<recipient>:<window>`: keep the recipient in it, otherwise a reply inside the same 10-minute window is dropped as a duplicate.
+- A failed send must leave the text and photos in the composer (`lib/chat/send-result.ts`); do not clear the draft before the server answers.

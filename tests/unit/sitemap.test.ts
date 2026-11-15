@@ -5,7 +5,9 @@ import { saveProfile } from "@/lib/server/profile-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
+const savedSiteUrl = process.env.SITE_URL;
 beforeAll(async () => {
+  process.env.SITE_URL = "https://findlyfy.com";
   ctx = await useTestD1();
   for (const id of ["sm-pub", "sm-draft", "demo-x"]) await makeUser(ctx.db, id);
   await saveProfile("sm-pub", { ...emptyProfile("Відкрита"), cityId: "kyiv", specialty: "Дизайнерка", published: true });
@@ -13,6 +15,8 @@ beforeAll(async () => {
   await saveProfile("demo-x", { ...emptyProfile("Демо"), cityId: "kyiv", specialty: "Демо", published: true });
 });
 afterAll(async () => {
+  if (savedSiteUrl === undefined) delete process.env.SITE_URL;
+  else process.env.SITE_URL = savedSiteUrl;
   await ctx.close();
 });
 
