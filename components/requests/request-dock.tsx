@@ -10,6 +10,8 @@ import {
   composingStore,
   justClosedRequestStore,
   recentlyPublishedRequestStore,
+  refreshRequestCounts,
+  requestCountsStore,
   restoredRequestStore,
   showRequestsListStore,
 } from "@/lib/auth/client";
@@ -19,21 +21,14 @@ import { setMapMode, showAllPerformers } from "@/lib/feed/map-requests";
 import { Button } from "@/components/ui/button";
 import { ClampedText } from "@/components/ui/clamped-text";
 import { EditRequestScreen } from "@/components/requests/edit-request-screen";
+import { ClosePrompt, RenewPrompt } from "@/components/requests/request-prompts";
 import { useNow, useRestoreRequest } from "@/components/requests/use-restore-request";
 import { offersCollapsedStore, offersCountStore, offersMapStore } from "@/lib/requests/offers";
 import { requestFacts } from "@/lib/requests/format";
 import { canRestore, restoreLeftLabel } from "@/lib/requests/restore";
+import { requestSubline } from "@/lib/requests/subline";
 import type { PublishedRequest } from "@/lib/requests/types";
 import { useStore } from "@/lib/store";
-
-const plural = (count: number, one: string, few: string, many: string) => {
-  const tens = count % 100;
-  const ones = count % 10;
-  if (ones === 1 && tens !== 11) return one;
-  if (ones >= 2 && ones <= 4 && (tens < 12 || tens > 14)) return few;
-  return many;
-};
-const offerLabel = (count: number) => `${count} ${plural(count, "пропозиція", "пропозиції", "пропозицій")}`;
 
 /** Один активний запит над мапою; решта доступні у списку, не займаючи екран. */
 export function RequestDock({ requests, active }: { requests: PublishedRequest[]; active: PublishedRequest }) {
@@ -55,7 +50,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const [editing, setEditing] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [otherOfferCounts, setOtherOfferCounts] = useState<Record<string, number>>({});
+  const requestCounts = useStore(requestCountsStore);
   const rootRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -112,28 +107,10 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
     };
   }, [listOpen, menuOpen, detailsOpen]);
 
-  // Лічильники інших запитів потрібні лише коли людина відкрила їхній список.
+  // Лічильники відгуків приходять у списку запитів: при відкритті «Моїх запитів» оновлюємо їх одним запитом, а не по запиту на кожен.
   useEffect(() => {
-    if (!listOpen) return;
-    const controller = new AbortController();
-    const others = requests.filter((request) => request.status === "open" && request.id !== active.id);
-    void Promise.all(others.map(async (request) => {
-      try {
-        const response = await fetch(`/api/requests/${encodeURIComponent(request.id)}/responses`, {
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (!response.ok) return null;
-        const data = (await response.json()) as { responses?: unknown[] };
-        return [request.id, data.responses?.length ?? 0] as const;
-      } catch {
-        return null;
-      }
-    })).then((counts) => {
-      if (!controller.signal.aborted) setOtherOfferCounts(Object.fromEntries(counts.filter((item): item is readonly [string, number] => item !== null)));
-    });
-    return () => controller.abort();
-  }, [listOpen, requests, active.id]);
+    if (listOpen) void refreshRequestCounts();
+  }, [listOpen]);
 
   const openOffers = () => {
     setMapMode("performers");
@@ -175,7 +152,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
   const hasOfferAction = !closed && (offers > 0 || phase !== "none");
   const restoreLabel = closed ? restoreLeftLabel(active.restoreUntil, now) : null;
   const status = closed
-    ? restoreLabel === null ? "Запит закрито" : `Запит закрито · ${restoreLabel}`
+    ? `${active.closeReason === "expired" ? "Запит протермінований" : "Запит закрито"}${restoreLabel === null ? "" : ` · ${restoreLabel}`}`
     : recentlyPublished === active.id
       ? "Запит опубліковано · шукаємо виконавців"
       : phase === "done"
@@ -278,6 +255,9 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
       <p role="status" className="sr-only">{savedNotice ? "Запит збережено" : ""}</p>
       {editing && !closed && <EditRequestScreen request={active} offers={offers} onClose={() => setEditing(false)} onSaved={() => setSavedNotice(true)} />}
 
+      {!closed && <RenewPrompt request={active} closing={closing} onClose={() => void close()} />}
+      {!closed && (phase === "working" || phase === "done") && active.renewalDeadline === null && <ClosePrompt key={active.id} closing={closing} onClose={() => void close()} />}
+
       {/* Поки ніхто не відгукнувся, карта виконавців порожня: пояснюємо це й даємо вихід до всіх. */}
       {!closed && offers === 0 && phase === "none" && (
         <p className="px-3 pb-2 text-xs text-ink-muted">
@@ -307,15 +287,8 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
           <div className="request-switcher-heading">Мої запити <span>{requests.length}</span></div>
           <ul className="request-switcher-list" aria-label="Усі мої запити">
             {ordered.map((request) => {
-              const count = request.id === active.id ? offers : otherOfferCounts[request.id];
-              const closedLabel = restoreLeftLabel(request.restoreUntil, now);
-              const subline = request.status === "closed"
-                ? closedLabel === null ? "Закритий" : `Закрито · ${closedLabel}`
-                : count === undefined
-                  ? "Шукаємо виконавців"
-                  : count === 0
-                    ? "Очікує відгуків"
-                    : offerLabel(count);
+              const count = request.id === active.id ? offers : requestCounts[request.id];
+              const subline = requestSubline(request, count, now);
               return (
                 <li key={request.id} className="flex items-center gap-2">
                   <button

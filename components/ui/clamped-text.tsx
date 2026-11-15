@@ -14,10 +14,12 @@ export namespace ClampedTextTypes {
   export type Props = {
     text: string;
     className?: string;
+    /** Підпис кнопки розгортання; типово «Показати більше». */
+    moreLabel?: string;
   };
 }
 
-export const ClampedText = ({ text, className }: ClampedTextTypes.Props) => {
+export const ClampedText = ({ text, className, moreLabel = "Показати більше" }: ClampedTextTypes.Props) => {
   const [expanded, setExpanded] = useState(false);
   const { ref, clamped } = useIsClamped(text, expanded);
 
@@ -28,7 +30,7 @@ export const ClampedText = ({ text, className }: ClampedTextTypes.Props) => {
       </p>
       {(clamped || expanded) && (
         <Button variant="link" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)} className="ml-2 h-auto p-0 text-xs">
-          {expanded ? "Згорнути" : "Показати більше"}
+          {expanded ? "Згорнути" : moreLabel}
         </Button>
       )}
     </>

@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { notificationSettingsStore } from "@/components/account/notification-settings";
 import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
-import { authFlowStore, activeRequestStore, requestsStore, sessionStore } from "@/lib/auth/client";
+import { authFlowStore, activeRequestStore, composingStore, requestsStore, sessionStore, showRequestsListStore } from "@/lib/auth/client";
 import { mapSelectedRequest, setMapMode } from "@/lib/feed/map-requests";
 import { deepLinkNext, requestLinkStep } from "@/lib/map/deep-link";
 import { profileEditorStore, profileStore } from "@/lib/profile/client";
@@ -29,6 +29,22 @@ const openRequestLink = (id: string, profile: Parameters<typeof requestLinkStep>
 };
 
 /**
+ * `offers:<id>` відкриває пропозиції на мій запит; `renew:<id>` («Ще актуально?») відкриває «Мої запити» на цьому запиті, де стоїть питання.
+ * Чужого чи зниклого запиту просто немає.
+ */
+const openOwnRequestLink = (kind: "offers" | "renew", id: string, requests: { id: string }[]) => {
+  if (!requests.some((request) => request.id === id)) return;
+  activeRequestStore.set(id);
+  if (kind === "offers") {
+    offersViewStore.set({ kind: "list" });
+    offersCollapsedStore.set(false);
+    return;
+  }
+  composingStore.set(false);
+  showRequestsListStore.set(true);
+};
+
+/**
  * Посилання з Telegram ведуть на `/?open=…`: відкриваємо потрібну панель і
  * прибираємо параметр з адреси.
  *
@@ -36,6 +52,7 @@ const openRequestLink = (id: string, profile: Parameters<typeof requestLinkStep>
  *   inbox           «Повідомлення»
  *   chat:<id>       розмова
  *   offers:<id>     пропозиції на мій запит
+ *   renew:<id>      «Ще актуально?» на моєму запиті (Мої запити, запит стає активним)
  *   request:<id>    запит у стрічці виконавця
  *
  * Гостя спершу ведемо у вхід і після входу відкриваємо те, що просили (вхід через Google повертає на те саме посилання).
@@ -72,14 +89,10 @@ export function DeepLinkSync() {
     if (kind === "settings") notificationSettingsStore.set(true);
     else if (kind === "inbox") inboxOpenStore.set({ conversationId: null });
     else if (kind === "chat") inboxOpenStore.set({ conversationId: id });
-    else if (kind === "offers") {
+    else if (kind === "offers" || kind === "renew") {
       // Дані запитів ще вантажаться: чекаємо, щоб не відкрити панель порожньою.
       if (requests === null) return;
-      if (requests.some((request) => request.id === id)) {
-        activeRequestStore.set(id);
-        offersViewStore.set({ kind: "list" });
-        offersCollapsedStore.set(false);
-      }
+      openOwnRequestLink(kind, id, requests);
     } else if (kind === "request") {
       if (!openRequestLink(id, { status: profile.status, published }, editorAsked)) return;
     }

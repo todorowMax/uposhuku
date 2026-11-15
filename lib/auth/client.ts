@@ -112,6 +112,7 @@ export const logout = async () => {
   await call<void>("/api/auth/logout", { method: "POST" });
   sessionStore.set({ status: "guest" });
   requestsStore.set(null);
+  requestCountsStore.set({});
   activeRequestStore.set(null);
   justClosedRequestStore.set(null);
   restoredRequestStore.set(null);
@@ -126,7 +127,31 @@ export const logout = async () => {
 export const publishRequest = async (draft: RequestDraft) =>
   (await call<{ request: PublishedRequest }>("/api/requests", { method: "POST", body: JSON.stringify(draft) })).request;
 
-export const fetchMyRequests = async () => (await call<{ requests: PublishedRequest[] }>("/api/requests")).requests;
+/** Скільки відгуків на кожен мій відкритий запит (requestId → число); приходить разом зі списком запитів. */
+export const requestCountsStore = createStore<Record<string, number>>({});
+
+export const fetchMyRequests = async () => call<{ requests: PublishedRequest[]; responseCounts?: Record<string, number> }>("/api/requests");
+
+/** «Так, ще актуально»: строк життя запиту починається заново, питання зникає. */
+export const renewMyRequest = async (id: string) =>
+  (await call<{ request: PublishedRequest }>(`/api/requests/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ renew: true }),
+  })).request;
+
+export const renewActiveRequest = async (id: string) => {
+  const updated = await renewMyRequest(id);
+  requestsStore.set((requestsStore.get() ?? []).map((item) => (item.id === id ? updated : item)));
+};
+
+/** Оновлює лічильники відгуків (одним запитом) без скидання самих запитів; збій мовчки лишає старі. */
+export const refreshRequestCounts = async () => {
+  try {
+    requestCountsStore.set((await fetchMyRequests()).responseCounts ?? {});
+  } catch {
+    // Лічильники — підказка: без них список показує «Шукаємо виконавців».
+  }
+};
 
 export const closeMyRequest = async (id: string) =>
   (await call<{ request: PublishedRequest }>(`/api/requests/${encodeURIComponent(id)}`, {
@@ -148,7 +173,8 @@ const firstOpen = (requests: PublishedRequest[]) => requests.find((request) => r
 
 export const loadMyRequests = async () => {
   try {
-    const requests = await fetchMyRequests();
+    const { requests, responseCounts } = await fetchMyRequests();
+    requestCountsStore.set(responseCounts ?? {});
     requestsStore.set(requests);
     const active = activeRequestStore.get();
     if (!active || !requests.some((request) => request.id === active)) activeRequestStore.set(firstOpen(requests));
