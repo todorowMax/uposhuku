@@ -3,6 +3,7 @@
 - Created: 2026-11-13
 - Project / repo: uposhuku
 - Final status: partly done (код и тексты на dev, ждут владелец, банк, бот, прод)
+- Next step / owner: пункт 10 (проверка в браузере и cron после деплоя на dev), затем чеклист владельца `2026-11-13-legal-hardening/owner-checklist.md` и бот `docs/telegram-bot.md`; прод не трогали; Max.
 
 ## Goal
 

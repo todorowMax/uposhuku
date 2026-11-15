@@ -3,6 +3,7 @@
 - Created: 2026-11-04
 - Project / repo: uposhuku
 - Final status: partly done (код готов на `development`, не задеплоен; ждёт владельца, банк, юриста)
+- Next step / owner: волна 0 (пункты 1-5: терминал и письмо Monobank, вопросы юристу, оплата 100 ₴, HTTPS и HSTS, решения), пункты 19 и 21, пункт 25 (`blocked`); Max, список в разделе «Что нужно от владельца».
 
 ## Goal
 

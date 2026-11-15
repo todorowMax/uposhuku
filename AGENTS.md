@@ -6,6 +6,25 @@ the marked block at the end of this file and `.claude/rules/profile/`. `DESIGN.m
 rules, `docs/` the plans and drafts. Rule IDs (DS-2, CSS-2, ...) are the ones the linters print.
 If a statement here is wrong, fix it in the same PR that makes it wrong.
 
+Feature behaviour is not described here. It lives in `docs/features/<feature>.md`, and a short rule in
+`.claude/rules/features/<feature>.md` (loaded only when you touch that feature's code) points to it.
+
+## Feature map
+
+Read the feature doc before changing a feature's behaviour. Index: `docs/features/README.md`.
+
+| Feature | Doc | Main code |
+| --- | --- | --- |
+| Chat, realtime | `docs/features/chat.md` | `components/chat`, `lib/chat`, `lib/realtime`, `worker/realtime.ts`, `lib/server/chat-repo.ts` |
+| Requests, feed | `docs/features/requests.md` | `components/requests`, `lib/requests`, `lib/feed`, `lib/server/request-repo.ts` |
+| Deals, payments, escrow | `docs/features/deals-payments.md` | `lib/deals`, `components/deals`, `lib/crypto`, `components/wallet`, `lib/monobank` |
+| Legal consents | `docs/features/legal-consents.md` | `lib/legal`, `components/legal`, `lib/server/legal-*.ts` |
+| Account deletion | `docs/features/account-deletion.md` | `lib/server/account-*.ts`, `lib/account`, `components/account` |
+| Customer phone | `docs/features/phone.md` | `lib/phone`, `lib/server/phone-*.ts`, `components/phone` |
+| Telegram, notifications | `docs/features/telegram.md` | `lib/telegram`, `lib/server/notify*.ts`, `app/api/telegram` |
+| Security (CSP, limits, Turnstile, ids) | `docs/features/security.md` | `lib/security-headers.ts`, `lib/server/rate-limit.ts`, `lib/server/turnstile.ts`, `lib/ids.ts` |
+| Feature flags | `docs/features/feature-flags.md` | `lib/features`, `lib/server/features.ts`, `app/admin/features` |
+
 ## Stack
 
 - Next.js 16 App Router (Turbopack), React 19, TypeScript strict. Runs on Cloudflare Workers through OpenNext
@@ -15,13 +34,12 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 - Radix (the combined `radix-ui` package), cmdk and lucide-react; primitives in `components/ui`.
 - Map: MapLibre GL in a globe projection (`lib/map`, `components/map`, `components/maplibre`).
 - Data: Drizzle ORM on Cloudflare D1 (`db/`, migrations in `db/migrations`), a second D1 for telemetry
-  (`kit/telemetry`), R2 for uploads. Validation: zod.
+  (`kit/telemetry`), R2 for uploads. API routes read and check the request body by hand (`readJson` in
+  `lib/api/problem.ts`); zod is used in `lib/notification-prefs.ts` and `lib/monobank/client.ts` only.
 - Wallets: wagmi 3 + viem + react-query (`components/wallet`, `lib/crypto/pay-flow.ts`). They load only through
   `next/dynamic` in the payment and requisites panels; nothing imports them on the home page or the map. The
-  end-to-end check against a local Hardhat node is `npm run test:chain` (needs `contracts` built).
-  Escrow deals (`method: "escrow"`, amounts in whole USDT, one contract clone per stage) take their stage status only from
-  the contract state (`lib/deals/escrow-state.ts`, `lib/server/escrow-sync.ts`); `CRYPTO_MAX_DEAL_USDT` caps a deal
-  (default 1000, never above the factory limit read from the contract). Wallet reads go through the connected wallet's provider.
+  end-to-end check against a local Hardhat node is `npm run test:chain` (needs `contracts` built). Escrow rules:
+  `docs/features/deals-payments.md`.
 - `kit/` is a git subtree from `web-kit` (`npm run kit:pull`, `kit:push`); change it there, not here.
 - Tests: Vitest (`tests/unit`, repositories run against in-memory D1 and R2). No Playwright yet.
 - `@next/eslint-plugin-next` follows the Next major (`^16.4.3`); the shared lint config in
@@ -31,22 +49,30 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 
 - Token file: `app/globals.css`. Current state: tokens (`:root`, `@theme inline`) share the file
   with feature CSS; splitting them is pending.
-- Forms: React Hook Form + Yup through controlled wrappers (FORM-1) is the target. Current state: zod
-  without React Hook Form; migration pending.
+- Forms: React Hook Form + Yup through controlled wrappers (FORM-1) is the target. Current state: neither is
+  installed, forms keep their own state and validate by hand; migration pending.
 - Types: namespaces in the component file (COMP-16..18).
-- Animation: GSAP only (COMP-7). Current state: Motion is still imported in 39 files, among them the
-  animated icons in `components/icons`, GSAP in 13. Treat the Motion code as legacy: no new Motion
-  imports, migrate when a file is touched.
+- Animation: GSAP only (COMP-7). Current state: Motion is still imported in many files, among them the
+  animated icons in `components/icons`. Count: `grep -rlE "from ['\"](motion|framer-motion)" --include='*.ts' --include='*.tsx' app components lib | wc -l`
+  (the same with `gsap` counts GSAP). Treat the Motion code as legacy: no new Motion imports, migrate when a file is touched.
 - Folder layout: files are kebab-case, components PascalCase. Small components are flat in
-  `components/`; a feature with several components lives in `components/<feature>/`; hooks shared by
-  two features live in `hooks/`; server code in `lib/server`.
+  `components/`; a feature with several components lives in `components/<feature>/`. There is no `hooks/`
+  folder (COMP-13 names one): a hook of one feature sits next to its component (`use-*.ts`), UI hooks shared by
+  several features live in `lib/ui/`, other shared hooks next to their domain code in `lib/`. Server code in `lib/server`.
 - Git flow: work on `development`. Commit messages are in Ukrainian, as in the history. The HTTPS
   `origin` resolves to a work account, so push over SSH: `git push git@github.com:todorowMax/uposhuku.git development`.
 - Locales: the page is Ukrainian (`<html lang="uk">`). No i18n library and no message files exist yet;
   other locales are not set.
-- First-load JS budget: the home page `/` is 1.55 MB uncompressed (`firstLoadUncompressedJsBytes` in `.next/diagnostics/route-bundle-stats.json` after `npx next build`; measured 1.51 MB). The side panels (offers, feed, profile editor, placement dialog) load through `next/dynamic` when opened (`components/map/lazy-panels.tsx`); the inbox panel stays in the first load because it polls for conversations. A bigger number means something heavy landed in `app/(map)/layout.tsx`: load it lazily or raise the budget here on purpose.
+- Languages: rules and `AGENTS.md` are in English; task documents (`docs/tasks`) in Russian with the statuses
+  from the template (todo, in progress, done, blocked, dropped); UI text in Ukrainian. Feature docs in
+  `docs/features` stay in Ukrainian, as they were written.
+- First-load JS budget: the home page `/` is 1.55 MB uncompressed. Measure it after `npx next build` with
+  `node -p "require('./.next/diagnostics/route-bundle-stats.json').find(r=>r.route==='/').firstLoadUncompressedJsBytes"`.
+  The side panels (offers, feed, profile editor, placement dialog) load through `next/dynamic` when opened
+  (`components/map/lazy-panels.tsx`); the inbox panel stays in the first load because it polls for conversations.
+  A bigger number means something heavy landed in `app/(map)/layout.tsx`: load it lazily or raise the budget here on purpose.
 
-## Environments
+## Environments and deploy
 
 - `wrangler.jsonc` defines two environments. `development`: worker `uposhuku-development`, domain
   `dev.findlyfy.com`, `DEPLOY_ENV=development`, test sign-in (`MAIL_MODE=dev`). `production`: worker
@@ -56,53 +82,11 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
   never into `wrangler.jsonc`. The production deploy first removes `.open-next/assets/map/faces`
   (`scripts/strip-prod-assets.mjs`); `opennextjs-cloudflare deploy` does not rebuild assets from `public/`, so run
   `npm run cf:build` again before a development deploy.
-- Escrow cap `CRYPTO_MAX_DEAL_USDT`: development 1000, production 10000 (`wrangler.jsonc`). The production contract
-  is deployed with 50 000; raising the server cap above 10 000 waits for an audit. Code default 1000 is not changed.
-- Безпечна угода (гроші через Monobank) вмикається змінними `SAFE_DEAL_MODE` = `off` (типово) | `allowlist` | `on`
-  та `SAFE_DEAL_USERS` (пошти через кому). Нові угоди й оплата питають режим (`lib/server/safe-deal.ts`), гроші, що вже
-  в русі (вебхук, звірка, виплата, sweep), його не питають. Юридичні тексти показують її лише в режимі `on`; крипту (розділ «Крипта» в умовах, отримувачі в політиці) лише коли хоч один із `crypto_proof`, `crypto_wallet`, `crypto_escrow` у режимі `on` (`cryptoPublic()` у `lib/server/safe-deal.ts`); про `foreign_links` вони не кажуть ніде.
-  Токени: `MONOBANK_TOKEN` (звичайний термінал) і `MONOBANK_SPLIT_TOKEN` (розщеплення), `MONOBANK_PLATFORM_RECEIVER_ID`.
-  «Заморожено» і «виплачено» ставить лише підтверджена банком відповідь (`lib/deals/payment-status.ts`).
-- Захист (`lib/security-headers.ts`, `lib/server/rate-limit.ts`): заголовки ставить воркер і `next.config.ts`. CSP розділено:
-  `Content-Security-Policy` діє й містить лише `frame-ancestors 'none'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`;
-  повна політика зі `script-src` лишається в `Content-Security-Policy-Report-Only` (звіти в `/api/csp-report`), доки Next вставляє
-  inline-скрипти без nonce. Нове зовнішнє джерело (скрипт, фрейм, мережа) дописується в `contentSecurityPolicy`, а форма з `action`
-  на інший хост порушить `form-action`. HSTS не ставимо (зона Cloudflare). Ліміти частоти лежать у `RATE_RULES`.
-- Turnstile на відправці коду входу (`lib/server/turnstile.ts`, `components/auth/use-turnstile.ts`): `TURNSTILE_SITE_KEY` (публічний,
-  клієнт бере його з `GET /api/auth/turnstile`) і `TURNSTILE_SECRET` (секрет). Без обох перевірка вимкнена (локально, тести), на проді
-  без них у журналі `turnstile_not_configured`. Погана перевірка: 400, siteverify недоступний: 503 (закрито). Для розробки тестові
-  ключі Cloudflare (див. `.dev.vars.example`); тестовий секрет приймає будь-який токен, а відмову дає секрет `2x…AA`.
-- Telegram: чат, уже прив'язаний до іншого акаунта, бот передає лише після кнопки власника чату (`relink_yes`/`relink_no`, токен
-  не витрачається до відповіді); оновлення позначається обробленим після обробки (`isUpdateSeen`, `markUpdateSeen`).
-- Ідентифікатори нових `deal_`, `req_`, `conv_`, `rev_` це префікс і 16 hex (`lib/ids.ts`); старі 8-символьні живуть далі, id за
-  довжиною не розбирають. Решта префіксів (`msg_`, `pay_`, `resp_` та інші) поки 8–12 символів.
-  Грошові рішення модератора потребують `ADMIN_TOTP_SECRET`; на проді без нього вони вимкнені.
-- Прапорці функцій (`safe_deal`, `crypto_proof`, `crypto_wallet`, `crypto_escrow`, `nbu_qr`, `foreign_links`): режим `off` | `allowlist` | `on`
-  і список пошт. `foreign_links` вмикає PayPal і Wise у реквізитах (грошовий: TOTP і лист). Способи оплати виконавця
-  (банк, USDT, гаманець, Binance ID, PayPal, Wise) в `lib/deals/requisites.ts`: усі поля необов'язкові, потрібен
-  хоча б один спосіб; `paymentMethods()` дає список, `mask` без IBAN це мітка способу; «Я оплатив(ла)» пише
-  `stage.paidVia` лише зі способів знімка. Значення з таблиці `feature_flags` (сторінка `/admin/features`), інакше зі змінних `<ІМ'Я>_MODE` і
-  `<ІМ'Я>_USERS`, інакше `off`. Чиста логіка в `lib/features`, сервер у `lib/server/features.ts`. Зміна грошових
-  прапорців потребує TOTP.
-- Допомога у спорах (`lib/deals/dispute-aids.ts`, `complaints.ts`, `lib/admin/deal-timeline.ts`): «Що вважаємо готовим» (до 500) ставиться
-  при створенні умов і потім не змінюється; чек (`stage.receiptAttachmentId`) це картинка з розмови угоди, угода без `conversationId`
-  чек не приймає; результат етапу (`stage.delivery`: текст до 1000 і https-посилання) додається до «здати етап». Скарга на пряму угоду
-  (`deal_complaints`, `POST /api/deals/:id/complaint`) гроші й статус етапу не чіпає; закриває її модератор у `/admin?tab=complaints`,
-  закриття (хто, коли, коментар) лежить у самому рядку скарги, окремого журналу немає. Друга сторона бачить лише службовий рядок у розмові.
-- Правка запиту (`PATCH /api/requests/:id` з повною чернеткою, `lib/requests/parse-draft.ts`, `components/requests/edit-request-screen.tsx`): лише автор і лише відкритий запит (закритий дає 409), до 20 правок на годину. Зберігаємо тільки `edited_at` і `edit_count`, історії текстів немає. Правка не шле сповіщень «новий запит під ваші теги»; відгукнувшимся в розмову йде службовий рядок «Замовник оновив запит» (не частіше раз на 10 хв на розмову), виконавці бачать мітку «Змінено». Угоди правка не міняє: їхні умови лежать у самій угоді. У каналі вже опублікований пост редагується; знята галочка «в канал» видаляє пост (до 48 годин після публікації) або замінює його текст на «Автор прибрав цей запит» (старший пост, статус `withdrawn`, повторно не публікується).
-- Запит без міста («Віддалено») на карті стоїть пином у центрі України зі стабільним зсувом за id (`lib/feed/request-point.ts`); у списку виконавця свої запити стоять окремим рядком «Ваш запит».
-- Видалення акаунта (меню акаунта; `lib/server/account-delete.ts`, таблиця «що з чим» у шапці файла): рядок у `users` ніколи не видаляється фізично, він стає
-  «могилою» (`deleted_at`, пошта `deleted-<id>@deleted.invalid`), бо на нього ведуть `onDelete: cascade` угод, платежів і відгуків. Видалити не можна, поки є угода
-  з грошима в русі чи відкрита скарга; людям з угодами потрібен код з пошти (`lib/server/account-code.ts`). Виписка даних: `GET /api/account/export`. Строк зберігання
-  `RETENTION_YEARS = 3` (`lib/account/deletion.ts`), прибирання знімків реквізитів раз на добу в `app/api/internal/tick`. У коді немає `DELETE` по `users`, це перевіряє тест.
-- Відновлення закритого запиту (`requests.closed_at`, `reopenRequest` у `lib/server/request-repo.ts`, `PATCH /api/requests/:id {status:"open"}`): автор може відкрити запит знову лише протягом `RESTORE_WINDOW_MS` (24 год, `lib/requests/types.ts`) від **першого** закриття; повторне закриття `closed_at` не міняє, запит, закритий до міграції 0023 (`closed_at` порожній), не відновлюється. Чужий або відкритий запит: 404, доба минула: 409. Відновлення не шле сповіщень «новий запит під ваші теги» і не пише рядків у розмови, `createdAt` лишається. `restoreUntil` у `PublishedRequest` рахує сервер. У каналі крок tick `reopen_posts` повертає наш пост «Виконавця знайдено» (`closed` без `error`) до звичайного вигляду; `withdrawn`, `failed` і `closed` з помилкою не чіпає.
+- Per-environment variables (escrow cap `CRYPTO_MAX_DEAL_USDT`, safe-deal mode, feature-flag modes, Turnstile keys,
+  `PHONE_HASH_KEY`, `ADMIN_TOTP_SECRET`) are set in `wrangler.jsonc` or as secrets; what each does and the values
+  per environment: the feature docs in the map above. Variable names with placeholders: `.dev.vars.example`.
 - `.github/workflows/ci.yml` only checks (lint:ci, typecheck, tests) on pushes to `development` and on
   pull requests to `development` and `main`. It does not deploy. A production branch is not set.
-
-- Телефон замовника (`lib/phone/`, `lib/server/phone-repo.ts`, `lib/server/phone-gate.ts`): прапорець `phone_verify` (не грошовий), номер підтверджується лише в Telegram-боті кнопкою «Поділитися номером» (`user_id` контакту має дорівнювати `from.id`). У `users` лежать `phone_hash` (HMAC-SHA256 від E.164 з секретом `PHONE_HASH_KEY`, `openssl rand -hex 32`), `phone_mask` і `phone_verified_at`; номера в базі й журналі немає. Хеш унікальний серед живих акаунтів; «могила» зберігає хеш (маску ні): з боргом комісії чи в `phone_blocks` номер не віддається новому акаунту, без боргу віддається. Замовник без номера при увімкненому прапорці отримує 409 `phone_required` на публікації запиту, пропозиції й прийнятті угоди (`phoneGate`); без ключа підтвердження дає 503 і `phone_hash_key_missing`.
-
-- Згоди (`legal_acceptances`, `lib/legal/acceptance.ts`, `lib/server/legal-repo.ts`, `lib/server/legal-gate.ts`): версії документів у `LEGAL_VERSIONS` (`lib/legal/config.ts`, рядок-дата), їх піднімають вручну, коли змінюється сенс тексту, і `UPDATED` рахується від них. Вхід вимагає `accepted: true` від нового (і від того, хто не приймав чинні умови та політику), запис із джерелом `signup`; `GET /api/legal/status`, `POST /api/legal/accept`. Грошові дії (створення й прийняття угоди, «я оплатив», заморожування, оплата безпечної угоди, розміщення, відгук) без чинних умов дають 409 `legal_reaccept_required`; дії з USDT (хеш, оплата з гаманця, ескроу, USDT і Binance ID в реквізитах, підтвердження гаманця, звірка з гаманцем замовника) ще й без `cryptoRisk` дають 409 `risk_ack_required`. Нова грошова дія з USDT на сервері додає `cryptoGate`; на клієнті `withRiskAck` (серверна відмова) або `ensureRiskAck` (до транзакції в гаманці). Нова версія документа дає повторне прийняття; у тестах `makeUser` приймає всі документи, `accepted: false` лишає без згод.
-- «Перевірена угода» (`reviews.verified`, `lib/deals/verified.ts`): сервер ставить її при створенні відгуку, якщо угода `completed` і оплату кожного етапу підтвердив банк (`paidAmount`), контракт (`paidUnits`) або блокчейн (запис у `crypto_proofs`). Переказ на IBAN, Binance, PayPal і Wise ніколи не дає позначки; старі відгуки мають `verified = 0`.
 
 ## Styles
 
@@ -112,8 +96,8 @@ If a statement here is wrong, fix it in the same PR that makes it wrong.
 ## Legacy and the lint ratchet
 
 Older code predates some of the shared rules. The linters report it as warnings and
-`npm run lint:ci` fails when the number grows. Current ceilings (from `package.json`): ESLint
-463 warnings, Stylelint 5. The numbers only go down: fix findings in the files you touch and lower the
+`npm run lint:ci` fails when the number grows. The ceilings are the `--max-warnings` values of `lint:ci` in
+`package.json`. They only go down: fix findings in the files you touch and lower the
 ceiling in the same PR; never silence a rule to get past it. `npm run deadcode` lists dead code.
 
 ## Before you say "done"
