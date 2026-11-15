@@ -27,7 +27,7 @@ import { MapSkeleton } from "@/components/map-skeleton";
 import { VibeMap } from "@/components/maplibre/vibe-map";
 
 /* Карта на весь екран, поле запиту над нею, нижні панелі в одному ряду. */
-export default function MapLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function MapLayout({ children, modal }: Readonly<{ children: React.ReactNode; modal: React.ReactNode }>) {
   return (
     <main className="map-page relative h-dvh w-full overflow-clip">
       <a href="#request" className="skip-link">
@@ -62,6 +62,8 @@ export default function MapLayout({ children }: Readonly<{ children: React.React
       <PanelPreload />
       <LegalSheets />
       {children}
+      {/* Профіль виконавця, відкритий з карти: перехоплений маршрут @modal/(.)p/[id]. */}
+      {modal}
     </main>
   );
 }

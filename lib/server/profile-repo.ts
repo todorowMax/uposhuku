@@ -6,8 +6,12 @@
 
 import { and, asc, eq, inArray, notLike } from "drizzle-orm";
 import { profileTags, profiles, projectTags, projects } from "@/db/schema";
+import { CITIES } from "@/lib/map/cities";
+import { toPublicProfile, type PublicProfile } from "@/lib/profile/public";
 import { emptyProfile, type Profile, type ProfileWork } from "@/lib/profile/types";
 import { getDb, inChunks } from "./db";
+import { reviewsFor } from "./review-repo";
+import { performerStatsOf } from "./stats-repo";
 
 const iso = (value: number) => new Date(value).toISOString();
 
@@ -77,6 +81,19 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
   const [row] = await getDb().select().from(profiles).where(eq(profiles.userId, userId)).limit(1);
   if (!row) return null;
   return (await load([row])).get(userId) ?? null;
+};
+
+/**
+ * Публічний профіль для сторінки /p/<id> (id виду me-<userId>): лише опублікований, з відгуками й цифрами, без пошти
+ * та службових полів (lib/profile/public.ts). Не опублікований, невідомий і з невідомим містом дають null.
+ */
+export const getPublicProfile = async (id: string): Promise<PublicProfile | null> => {
+  if (!id.startsWith("me-")) return null;
+  const userId = id.slice(3);
+  const profile = userId ? await getProfile(userId) : null;
+  if (!profile?.published || !CITIES.some((city) => city.id === profile.cityId)) return null;
+  const [reviews, stats] = await Promise.all([reviewsFor(id), performerStatsOf(userId)]);
+  return toPublicProfile({ profile, userId, reviews, stats });
 };
 
 /** Профілі за списком користувачів пачкою (без запиту на кожного): userId → профіль; відсутні в мапі. */
