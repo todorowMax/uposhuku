@@ -1,0 +1,66 @@
+/* Перемикач карти «Виконавці | Запити» і картка запиту на карті. */
+.mode-switch {
+  display: inline-flex;
+  flex: none;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid rgb(255 255 255 / 56%);
+  border-radius: 20px;
+  background: rgb(220 231 228 / 54%);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 12px 32px rgb(0 54 74 / 16%);
+  pointer-events: auto;
+}
+
+.mode-switch button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 94%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.mode-switch button:hover:not([aria-pressed="true"]) {
+  color: var(--ink);
+  background: var(--hover-blue);
+}
+
+.mode-switch button[aria-pressed="true"] {
+  background: var(--ocean);
+  border-color: var(--ocean);
+  color: #ffffff;
+}
+
+/* Перемикач стоїть поруч із меню, у спільному нижньому ряду. */
+.mode-dock {
+  position: relative;
+}
+
+/* На вужчих екранах перемикач лишає лише іконки, щоб обидві панелі вмістилися. */
+@media (max-width: 1149px) {
+  .mode-label {
+    display: none;
+  }
+
+  .mode-dock button {
+    min-width: 40px;
+    justify-content: center;
+    padding: 0 10px;
+  }
+}
+
+.feed-bare {
+  display: block;
+}
+
+.request-map-card .feed-bare .offer-primary {
+  min-height: 40px;
+}

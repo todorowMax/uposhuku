@@ -10,7 +10,7 @@
     "start": "next start -p ${PORT:-3031}",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint . && stylelint \"**/*.css\"",
-    "lint:ci": "eslint . --max-warnings 414 && stylelint \"**/*.css\" --max-warnings 5",
+    "lint:ci": "eslint . --max-warnings 414 && stylelint \"**/*.css\" --max-warnings 4",
     "budget": "node scripts/check-bundle-budget.mjs",
     "deadcode": "knip --include files,dependencies,unlisted,unresolved",
     "test": "vitest run --config vitest.config.mts",

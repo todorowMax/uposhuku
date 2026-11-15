@@ -9,7 +9,7 @@
 
 ## Color
 
-UI-токени в `app/globals.css`, OKLCH. Кольори карти в
+UI-токени в `app/styles/tokens.css`, OKLCH. Кольори карти в
 `lib/map/palette.ts` у sRGB, бо стиль MapLibre і canvas у скриптах не
 читають CSS-змінних. Поточна палітра спирається на погоджений референс.
 

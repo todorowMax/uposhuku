@@ -1,0 +1,261 @@
+/*
+  «Стати на карту» (components/placement): екран, на десктопі вікно по центру.
+  Три розміри показано у справжній пропорції маркерів.
+*/
+.place-hero {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 11px;
+  overflow: hidden;
+  padding: 28px 20px 24px;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse 150px 110px at 72% 17%, rgb(242 105 60 / 17%), transparent 100%),
+    radial-gradient(ellipse 310px 190px at 16% 14%, rgb(106 185 206 / 56%), transparent 100%),
+    linear-gradient(180deg, #dce7e4 0%, #f4f8f8 66%, #ffffff 100%);
+  text-align: center;
+}
+
+.place-hero-lead {
+  max-width: 370px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.place-faces {
+  position: relative;
+  width: 152px;
+  height: 152px;
+  margin-top: 4px;
+}
+
+.place-face {
+  display: grid;
+  place-items: center;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background-color: #dce7e4;
+  box-shadow: 0 5px 16px rgb(0 54 74 / 16%);
+  color: var(--ocean);
+  font-weight: 700;
+}
+
+.place-face-center {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  width: 54px;
+  height: 54px;
+  border-width: 3px;
+  background: #ffffff;
+  box-shadow: 0 0 0 5px rgb(255 255 255 / 36%), 0 10px 24px rgb(0 54 74 / 17%);
+  transform: translate(-50%, -50%);
+}
+
+.place-face-orbiter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--orbit-angle));
+  animation: place-orbit 26s linear infinite;
+}
+
+.place-face-orbit-avatar {
+  position: absolute;
+  top: -21px;
+  left: 30px;
+  width: 42px;
+  height: 42px;
+  transform: rotate(calc(0deg - var(--orbit-angle)));
+  animation: place-counter-orbit 26s linear infinite;
+}
+
+@keyframes place-orbit {
+  from { transform: rotate(var(--orbit-angle)); }
+  to { transform: rotate(calc(var(--orbit-angle) + 360deg)); }
+}
+
+@keyframes place-counter-orbit {
+  from { transform: rotate(calc(0deg - var(--orbit-angle))); }
+  to { transform: rotate(calc(-360deg - var(--orbit-angle))); }
+}
+
+.place-body {
+  display: grid;
+  gap: 16px;
+}
+
+.place-dot {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background-color: #d3dcdd;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 2px rgb(255 255 255 / 70%);
+  opacity: 0.55;
+  transition: opacity 200ms, box-shadow 200ms;
+}
+
+.place-tier[data-current] .place-dot {
+  opacity: 0.9;
+  box-shadow: inset 0 0 0 2px #ffffff, 0 0 0 2px #a3bdb0;
+}
+
+.place-tier[data-selected] .place-dot {
+  opacity: 1;
+  background-color: #eef1f1;
+  box-shadow: 0 0 0 3px #ffffff, 0 8px 18px -6px rgb(0 54 74 / 24%);
+  color: var(--ink);
+}
+
+.place-dot-big {
+  opacity: 1;
+  box-shadow: 0 0 0 4px #ffffff, 0 0 0 7px var(--brand), 0 14px 28px -8px rgb(172 103 57 / 50%);
+}
+
+.place-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  border: 0;
+}
+
+.place-tier {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 144px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  background: rgb(0 54 74 / 4.5%);
+  box-shadow: inset 0 0 0 1.5px transparent;
+  font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 150ms, box-shadow 150ms;
+}
+
+.place-tier-preview {
+  display: flex;
+  min-height: 86px;
+  align-items: center;
+  justify-content: center;
+}
+
+.place-tier:hover:not([data-owned]):not([data-selected]) {
+  background: rgb(0 54 74 / 8%);
+}
+
+.place-tier[data-selected] {
+  background: var(--brand-solid);
+  box-shadow: none;
+}
+
+.place-tier[data-selected] .place-tier-name,
+.place-tier[data-selected] .place-tier-price {
+  color: #ffffff;
+}
+
+.place-tier[data-owned] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.place-tier[data-selected][data-owned] {
+  opacity: 1;
+}
+
+.ui-radio-tile-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.place-tier:has(.ui-radio-tile-input:focus-visible) {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.place-tier-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.place-tier-price {
+  flex: none;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: lining-nums proportional-nums;
+  color: var(--ink-muted);
+}
+
+.place-choice-description {
+  min-height: 18px;
+  margin-top: -4px;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--ink-muted);
+  animation: place-description-in 180ms ease-out both;
+}
+
+@keyframes place-description-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.place-publish {
+  margin-top: 5px;
+  background: #c94a25;
+  color: #ffffff;
+}
+
+.place-publish:hover {
+  background: #af3d1c;
+  color: #ffffff;
+}
+
+.place-footnote {
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .place-face-orbiter,
+  .place-face-orbit-avatar,
+  .place-choice-description {
+    animation: none;
+  }
+}
+
+.place-tier[data-selected] .place-tier-price {
+  font-weight: 600;
+}
+
+.place-checkout {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgb(0 54 74 / 5%);
+  text-align: center;
+}
+
+.place-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgb(0 54 74 / 4.5%);
+}

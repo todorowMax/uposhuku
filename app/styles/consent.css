@@ -1,0 +1,107 @@
+/* Запит згоди на статистику (components/legal/consent-banner.tsx). */
+.consent-banner {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 35;
+  display: grid;
+  gap: 10px;
+  width: min(340px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink);
+  animation: consent-in 220ms var(--ease-out-quint);
+}
+
+.consent-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.consent-cookie {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  margin-top: 2px;
+  transform-origin: 50% 60%;
+  animation: consent-cookie-in 600ms var(--ease-out-quint) 120ms both;
+}
+
+@keyframes consent-cookie-in {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-cookie {
+    animation: none;
+  }
+}
+
+.consent-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.consent-actions > * {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+@keyframes consent-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+/* Поки нижні кнопки по центру не вміщаються поруч із карткою (до 1119 px), картка над ними. */
+@media (max-width: 1119px) {
+  .consent-banner {
+    bottom: calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 639px) {
+  .consent-banner {
+    left: 16px;
+    right: 16px;
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .consent-banner {
+    animation: none;
+  }
+}
+
+/* Тег, запропонований людиною, але ще не доданий до словника (components/profile/tag-chips.tsx). */
+.tag-chip[data-kind="pending"] {
+  padding-left: 8px;
+  padding-right: 4px;
+  border: 1px dashed rgb(165 62 27 / 45%);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.ui-command-note[data-tone="notice"] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+.ui-command-propose:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* Дії під рядком Telegram у налаштуваннях сповіщень. */
+.notif-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 0 8px 30px;
+}

@@ -1,0 +1,800 @@
+/*
+  Вікно-месенджер має два розміри. Компактний: вузька панель, одна колонка (список або
+  діалог), карта поруч лишається видна. Розгорнутий: двоколонковий месенджер. Вужче 760px
+  розгорнутий означає «на весь екран», колонка завжди одна.
+*/
+.inbox-split {
+  flex-direction: row;
+}
+
+.inbox-side {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.inbox-main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  padding-bottom: 14px;
+}
+
+.inbox-panel[data-view="thread"] .inbox-side,
+.inbox-panel[data-view="list"] .inbox-main {
+  display: none;
+}
+
+.inbox-empty {
+  margin: auto;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.inbox-row[data-active] {
+  background: rgb(16 45 55 / 7%);
+}
+
+/* Непрочитана розмова: ім'я жирніше, превʼю темніше; число в пілюлі (.inbox-badge) лише коли є текст від співрозмовника. */
+.inbox-row[data-unread] .inbox-name {
+  font-weight: 700;
+}
+
+.inbox-row[data-unread] .inbox-preview {
+  color: var(--ink);
+}
+
+.inbox-panel[data-size="wide"] {
+  width: min(1040px, calc(100vw - 32px));
+  height: calc(100dvh - 32px);
+}
+
+@media (min-width: 768px) {
+  .inbox-panel[data-size="wide"] .inbox-side,
+  .inbox-panel[data-size="wide"] .inbox-main {
+    display: flex;
+  }
+
+  .inbox-panel[data-size="wide"] .inbox-side {
+    flex: 0 0 320px;
+    border-right: 1px solid rgb(16 45 55 / 8%);
+  }
+
+  .inbox-panel[data-size="wide"] .inbox-back,
+  .inbox-panel[data-size="wide"] .inbox-close-list,
+  .inbox-panel[data-size="wide"] .inbox-side .inbox-expand {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Телефон: чат на весь екран, без відступів і заокруглень; над клавіатурою, з урахуванням вирізу й нижньої смуги iPhone. */
+  .inbox-panel {
+    inset: 0 0 var(--kb, 0px) 0;
+    width: auto;
+    height: auto;
+    max-height: var(--vvh, 100dvh);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .inbox-main {
+    padding-bottom: 10px;
+  }
+
+  /* «Розгорнути» на телефоні не потрібне; у розмові закриття через «←» до списку. */
+  .inbox-expand,
+  .inbox-close-thread {
+    display: none;
+  }
+}
+
+/* Подія в стрічці: по центру, без бульбашки. */
+.dm-system {
+  align-self: center;
+  max-width: 90%;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgb(16 45 55 / 6%);
+  font-size: 12px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.dm-system time {
+  margin-left: 8px;
+  opacity: 0.7;
+}
+
+/* Розділювач дня: підпис по центру між двома лініями. */
+.dm-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 2px;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.dm-day::before,
+.dm-day::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: var(--line);
+}
+
+/* Подія угоди: ліворуч, з іконкою, чипом номера й часом. */
+.dm-event {
+  display: flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.dm-event p {
+  min-width: 0;
+}
+
+.dm-event time {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.dm-events {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.dm-events-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dm-events-toggle svg {
+  transition: transform 150ms;
+}
+
+.dm-events-toggle svg[data-open] {
+  transform: rotate(180deg);
+}
+
+.dm-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6eef0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dm-chip:not([data-static]):hover {
+  background: var(--hover-blue);
+}
+
+/* Рішення модератора: окрема карточка, найважливіше в розмові. */
+.dm-decision {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #ffffff;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.dm-decision h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dm-decision-comment {
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  color: var(--ink-muted);
+  white-space: pre-wrap;
+}
+
+.dm-decision time {
+  align-self: flex-end;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+/* Плашка «Нові повідомлення»: липне до низу стрічки. */
+.dm-new {
+  position: sticky;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--brand-solid);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand-ink);
+  box-shadow: var(--shadow-window);
+}
+
+.dm-new:hover {
+  background: var(--brand-solid-hover);
+}
+
+.dm-new:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Співрозмовник видалив акаунт: поле вводу замінено текстом. */
+.dm-closed {
+  margin-top: 8px;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgb(16 45 55 / 6%);
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.dm-counter[data-over] {
+  font-weight: 600;
+}
+
+/* Аватар: коло з фото чи ініціалами (components/ui/avatar.tsx). */
+.ui-avatar {
+  display: inline-flex;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--hover-blue);
+}
+
+.ui-avatar-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ui-avatar-fallback {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inbox-header h2 {
+  flex: 1;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  padding: 0 8px 12px;
+}
+
+/* Переписці завжди лишається місце над рядком угоди й полем вводу. */
+.inbox-main > .inbox-thread {
+  flex: 1 1 140px;
+  min-height: 140px;
+  margin: 4px 0 8px;
+  padding: 0 16px;
+}
+
+.inbox-main > :is(.dm-input-row, .dm-warn, .dm-closed) {
+  margin-left: 16px;
+  margin-right: 16px;
+}
+
+.inbox-row {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-align: left;
+  transition: background-color 150ms;
+}
+
+.inbox-row:hover {
+  background: rgb(16 45 55 / 6%);
+}
+
+.inbox-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* Рядок розмови: аватар ліворуч, тіло праворуч. */
+.inbox-row-body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inbox-avatar {
+  margin-top: 2px;
+}
+
+.inbox-time {
+  padding-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.inbox-list-note {
+  padding: 4px 16px 8px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.inbox-list-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 8px 8px;
+}
+
+.inbox-name em {
+  margin-left: 8px;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.inbox-preview {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-thread {
+  margin-top: 0;
+}
+
+/* Мітка угоди в списку розмов; оранжева, коли чекають моєї дії. */
+.inbox-deal-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #e6eef0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.inbox-deal-tag[data-action] {
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* ───────────── Вибір тегу: shadcn Popover + Command + Sheet (components/tags/tag-picker.tsx) ───────────── */
+.tag-chip[data-kind="add"] {
+  padding-left: 8px;
+  border: 1px solid rgb(0 54 74 / 24%);
+  color: var(--ink);
+  background: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.tag-chip[data-kind="add"]:hover,
+.tag-chip[data-kind="add"][aria-expanded="true"] {
+  background: var(--hover-blue);
+  border-color: rgb(0 54 74 / 38%);
+}
+
+.tag-chip[data-kind="add"]:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.ui-popover {
+  z-index: 90;
+  width: 360px;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  border: 1px solid rgb(184 196 199 / 70%);
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 12px 32px -8px rgb(48 54 58 / 28%), 0 2px 6px rgb(48 54 58 / 8%);
+  transform-origin: var(--radix-popover-content-transform-origin);
+  outline: none;
+}
+
+.ui-popover[data-state="open"] {
+  animation: ui-select-in 140ms var(--ease-out-quint);
+}
+
+.ui-popover[data-state="closed"] {
+  animation: ui-select-out 100ms ease-in;
+}
+
+.ui-command {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: inherit;
+  color: var(--ink);
+}
+
+.ui-popover-picker .ui-command {
+  max-height: min(420px, calc(var(--radix-popover-content-available-height, 420px) - 8px));
+}
+
+.ui-command-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border-bottom: 1px solid rgb(184 196 199 / 55%);
+}
+
+.ui-command-search {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--ink-muted);
+}
+
+.ui-command-input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+}
+
+.ui-command-input::placeholder {
+  color: var(--ink-muted);
+}
+
+.ui-command-note {
+  margin: 0;
+  padding: 8px 14px;
+  background: #f1f4f4;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.ui-command-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+}
+
+.ui-command-group [cmdk-group-heading] {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.ui-command-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 10px;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ui-command-item[data-selected="true"] {
+  background: #eef1f1;
+}
+
+.ui-command-item[data-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ui-command-item[data-checked] .ui-command-title {
+  font-weight: 600;
+}
+
+.ui-command-check {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  flex: none;
+  color: #4e6262;
+}
+
+.ui-command-main {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+
+.ui-command-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-command-title b {
+  font-weight: 700;
+  color: var(--ink);
+  background: linear-gradient(transparent 62%, rgb(242 105 60 / 28%) 62%);
+}
+
+.ui-command-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+
+.ui-command-meta {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.ui-command-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+.ui-command-propose {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-ink);
+}
+
+.ui-command-propose:hover {
+  background: #fbd6c4;
+}
+
+.ui-command-more {
+  width: 100%;
+  min-height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--ink-muted);
+}
+
+.ui-command-more:hover {
+  background: #eef1f1;
+  color: var(--ink);
+}
+
+.ui-command-more:focus-visible,
+.ui-command-propose:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.ui-inline-picker {
+  overflow: hidden;
+  border: 1px solid rgb(184 196 199 / 70%);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.ui-inline-picker .ui-command-list {
+  max-height: 280px;
+}
+
+/* Шторка знизу (телефон), від 768px маленьке вікно по центру. Правила: DESIGN.md, розділ «Шари». */
+.ui-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgb(3 9 13 / 45%);
+}
+
+.ui-sheet-overlay[data-state="open"] {
+  animation: ui-sheet-fade 200ms ease-out;
+}
+
+.ui-sheet-overlay[data-state="closed"] {
+  animation: ui-sheet-fade 140ms ease-in reverse;
+}
+
+.ui-sheet {
+  position: fixed;
+  inset: auto 0 var(--kb, 0px) 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  max-height: min(85dvh, calc(var(--vvh, 100dvh) - 16px));
+  padding-bottom: max(0px, calc(env(safe-area-inset-bottom) - var(--kb, 0px)));
+  border-radius: 20px 20px 0 0;
+  background: #ffffff;
+  box-shadow: 0 -12px 40px -12px rgb(48 54 58 / 35%);
+  outline: none;
+  transform: translateY(var(--sheet-drag, 0px));
+}
+
+/* Після недотягнутого свайпу шторка повертається на місце; під пальцем без згладжування. */
+.ui-sheet:not([data-dragging]) {
+  transition: transform 200ms var(--ease-out-quint);
+}
+
+.ui-sheet[data-state="open"] {
+  animation: ui-sheet-in 260ms var(--ease-out-quint);
+}
+
+.ui-sheet[data-state="closed"] {
+  animation: ui-sheet-in 160ms ease-in reverse;
+}
+
+.ui-sheet[data-size="tall"] {
+  height: min(85dvh, calc(var(--vvh, 100dvh) - 16px));
+}
+
+.ui-sheet[data-size="tall"] .ui-command {
+  flex: 1;
+}
+
+/* Прокручується лише ця частина, заголовок і сітка зверху стоять. */
+.ui-sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 16px 16px;
+}
+
+.ui-sheet-grip,
+.offers-grip {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgb(0 54 74 / 18%);
+}
+
+.ui-sheet-grip {
+  align-self: center;
+  margin: 8px 0 4px;
+}
+
+.ui-sheet-title {
+  padding: 4px 16px 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+@media (min-width: 768px) {
+  .ui-sheet {
+    inset: 0;
+    width: min(420px, calc(100vw - 32px));
+    height: fit-content;
+    margin: auto;
+    padding-bottom: 0;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px -12px rgb(16 45 55 / 28%);
+    transform: none;
+  }
+
+  .ui-sheet[data-size="tall"] {
+    height: min(640px, 85dvh);
+  }
+
+  .ui-sheet-grip {
+    display: none;
+  }
+
+  /* Окном по центру ручки нет, а отступы телефона (4 сверху, 16 по бокам) для него тесны: заголовок липнет к краю. */
+  .ui-sheet-title {
+    padding: 24px 24px 12px;
+    font-size: 18px;
+  }
+
+  .ui-sheet-body {
+    padding: 0 24px 24px;
+  }
+
+  .ui-sheet-body.auth-sheet {
+    padding-top: 28px;
+  }
+
+  .ui-sheet[data-state="open"] {
+    animation: ui-sheet-pop 180ms var(--ease-out-quint);
+  }
+
+  .ui-sheet[data-state="closed"] {
+    animation: ui-sheet-pop 120ms ease-in reverse;
+  }
+}
+
+@keyframes ui-sheet-fade {
+  from { opacity: 0; }
+}
+
+@keyframes ui-sheet-in {
+  from { transform: translateY(100%); }
+}
+
+@keyframes ui-sheet-pop {
+  from { opacity: 0; transform: translateY(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-popover[data-state] {
+    animation: none;
+  }
+
+  /* Шторка не їде, а проявляється: рух прибираємо, зникнення лишаємо. */
+  .ui-sheet[data-state="open"] {
+    animation: ui-sheet-fade 120ms ease-out;
+  }
+
+  .ui-sheet[data-state="closed"] {
+    animation: ui-sheet-fade 100ms ease-in reverse;
+  }
+
+  .ui-sheet:not([data-dragging]) {
+    transition: none;
+  }
+}

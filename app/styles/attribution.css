@@ -1,0 +1,36 @@
+/* Подяка авторам даних (вимога ліцензій OSM/OpenMapTiles): лишається, але тихо. */
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--ink-muted);
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact {
+  min-height: 24px;
+  margin: 8px;
+  border-radius: 12px;
+}
+
+.maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background-size: 14px;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: inherit;
+}
+
+/* Курсор-піна над картою вибору точки; вістря піна (14, 27) — місце кліку. */
+.loc-map .maplibregl-canvas-container.maplibregl-interactive,
+.loc-map .maplibregl-canvas-container.maplibregl-interactive:active {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'%3E%3Cg stroke='%23ffffff' stroke-width='5'%3E%3Cpath d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/g%3E%3Cg stroke='%2330363a' stroke-width='2'%3E%3Cpath d='M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0'/%3E%3Ccircle cx='12' cy='10' r='3'/%3E%3C/g%3E%3C/svg%3E") 14 26, crosshair;
+}
+
+.loc-map .maplibregl-canvas-container.maplibregl-interactive.maplibregl-track-pointer,
+.loc-map .maplibregl-marker {
+  cursor: grab;
+}

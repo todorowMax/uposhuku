@@ -1,0 +1,121 @@
+/* Вибір міста й точки на карті в профілі (components/profile/location-picker.tsx). */
+.loc-field {
+  display: flex;
+  gap: 8px;
+}
+
+.loc-field > [data-slot="select-trigger"] {
+  min-width: 0;
+  flex: 1;
+}
+
+.loc-button {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  border-radius: 14px;
+  border: 1px solid rgb(66 116 132 / 70%);
+  background: rgb(255 255 255 / 70%);
+  color: var(--ink-muted);
+  transition: background-color 150ms, color 150ms;
+}
+
+.loc-button:hover {
+  background: var(--hover-blue);
+  color: var(--ink);
+}
+
+.loc-button[data-set] {
+  border-color: var(--brand);
+  color: var(--accent-ink);
+}
+
+/* Екран вибору точки: карта займає все, що лишилось, підпис під нею. */
+.loc-pane {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  height: 100%;
+  min-height: 60dvh;
+}
+
+.loc-map-wrap {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.loc-map,
+.loc-map-wrap > .loc-map.maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+.loc-hint,
+.loc-fail {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  max-width: calc(100% - 32px);
+  transform: translateX(-50%);
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 8px 22px rgb(45 60 67 / 16%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  pointer-events: none;
+  text-align: center;
+}
+
+.loc-fail {
+  top: 50%;
+  border-radius: 16px;
+  pointer-events: auto;
+}
+
+.loc-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}
+
+.loc-pin {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 38px;
+  cursor: grab;
+}
+
+.loc-pin-dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px 999px 999px 0;
+  transform: rotate(-45deg);
+  background: var(--brand);
+  border: 3px solid #ffffff;
+  box-shadow: 0 4px 12px rgb(45 60 67 / 35%);
+}
+
+.pe-notice {
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--accent-ink);
+}
+
+.place-warn {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #f1f4f4;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ink-muted);
+}

@@ -1,0 +1,220 @@
+/*
+  Роботи в картці виконавця: стрічка вбік до країв картки (p-5 = 20px),
+  з прилипанням до плиток і згасанням справа, що натякає на продовження.
+*/
+.works-strip {
+  display: flex;
+  gap: 10px;
+  margin: 8px -20px 0;
+  padding: 2px 20px 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 20px;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 28px), transparent 100%);
+}
+
+.works-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.works-strip > li {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+/* Повний профіль: роботи сіткою замість стрічки. */
+.works-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 10px;
+  margin-top: 8px;
+}
+
+.work-detail {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgb(0 54 74 / 5%);
+}
+
+.work-tile[aria-pressed="true"] .work-thumb {
+  box-shadow: inset 0 0 0 2px var(--brand);
+}
+
+.work-tile {
+  display: block;
+  width: 132px;
+  text-align: left;
+  border-radius: 12px;
+}
+
+.work-tile:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+.work-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 88px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: linear-gradient(145deg, hsl(var(--h) 34% 90%), hsl(calc(var(--h) + 30) 38% 80%));
+  box-shadow: inset 0 0 0 1px rgb(0 54 74 / 8%);
+  transition: transform 180ms ease-out, box-shadow 180ms;
+}
+
+.work-tile:hover .work-thumb {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgb(0 54 74 / 8%), 0 6px 14px rgb(48 68 64 / 16%);
+}
+
+.work-thumb > span {
+  box-shadow: 0 4px 10px rgb(48 68 64 / 12%);
+}
+
+.work-window {
+  position: absolute;
+  inset: 12px 12px -6px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  padding: 7px;
+  border-radius: 7px;
+  background: rgb(255 255 255 / 92%);
+}
+
+.work-window-row {
+  display: flex;
+  gap: 6px;
+}
+
+.work-dots {
+  width: 18px;
+  height: 4px;
+  background: radial-gradient(circle, hsl(var(--h) 20% 70%) 1.6px, transparent 1.8px) 0 0 / 6px 4px repeat-x;
+}
+
+.work-hero {
+  height: 20px;
+  border-radius: 4px;
+  background: hsl(var(--h) 40% 78%);
+}
+
+.work-line {
+  height: 4px;
+  border-radius: 2px;
+  background: hsl(var(--h) 12% 84%);
+}
+
+.work-sidebar {
+  width: 16px;
+  border-radius: 3px;
+  background: hsl(var(--h) 20% 90%);
+}
+
+.work-bars {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  gap: 4px;
+  height: 52px;
+}
+
+.work-bars > span {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: hsl(var(--h) 42% 72%);
+}
+
+.work-phone {
+  position: absolute;
+  top: 10px;
+  bottom: -10px;
+  left: 50%;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  width: 50px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 94%);
+  transform: translateX(-50%);
+}
+
+.work-pill {
+  justify-self: center;
+  width: 26px;
+  height: 8px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: hsl(var(--h) 42% 66%);
+}
+
+.work-chat {
+  display: grid;
+  gap: 5px;
+  width: 92px;
+  padding: 8px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 90%);
+}
+
+.work-bubble {
+  width: 70%;
+  height: 10px;
+  border-radius: 6px 6px 6px 2px;
+  background: hsl(var(--h) 14% 88%);
+}
+
+.work-bubble-own {
+  justify-self: end;
+  border-radius: 6px 6px 2px 6px;
+  background: hsl(var(--h) 45% 72%);
+}
+
+.work-swatches {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 90%);
+}
+
+.work-aa {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1;
+  color: hsl(var(--h) 30% 38%);
+}
+
+.work-swatch-row {
+  display: flex;
+  gap: 4px;
+}
+
+.work-swatch-row > span {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: hsl(var(--h) 45% 70%);
+}
+
+.work-swatch-row > span:nth-child(2) {
+  background: hsl(calc(var(--h) + 40) 40% 60%);
+}
+
+.work-swatch-row > span:nth-child(3) {
+  background: hsl(calc(var(--h) + 180) 25% 45%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .work-thumb {
+    transition: none;
+  }
+}

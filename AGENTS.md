@@ -31,7 +31,7 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 - Next.js 16 App Router (Turbopack), React 19, TypeScript strict. Runs on Cloudflare Workers through OpenNext
   (`worker/index.ts` wraps the OpenNext worker and adds WebSockets on a Durable Object).
 - Tailwind CSS v4, configured in CSS: the tokens and the `@theme inline` block live in
-  `app/globals.css`. There is no `tailwind.config`.
+  `app/styles/tokens.css`, imported by `app/globals.css` together with the feature sections. There is no `tailwind.config`.
 - Radix (the combined `radix-ui` package), cmdk and lucide-react; primitives in `components/ui`.
 - Map: MapLibre GL in a globe projection (`lib/map`, `components/map`, `components/maplibre`).
 - Data: Drizzle ORM on Cloudflare D1 (`db/`, migrations in `db/migrations`), a second D1 for telemetry
@@ -49,8 +49,9 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 
 ## Choices the profile leaves to the project (RULES-5)
 
-- Token file: `app/globals.css`. Current state: tokens (`:root`, `@theme inline`) share the file
-  with feature CSS; splitting them is pending.
+- Token file: `app/styles/tokens.css` (`:root`, `@theme inline`). `app/globals.css` only imports `app/styles/*.css`, one
+  section per feature, in cascade order: do not reorder the imports. Current state: the feature files still carry raw
+  colours (Stylelint treats them like the token file, see `stylelint.config.mjs`); replacing them with tokens is pending.
 - Forms: React Hook Form + Yup through controlled wrappers (FORM-1) is the target. Current state: neither is
   installed, forms keep their own state and validate by hand; migration pending.
 - Types: namespaces in the component file (COMP-16..18).

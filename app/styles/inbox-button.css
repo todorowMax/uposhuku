@@ -1,0 +1,54 @@
+/* Вхідні повідомлення (components/chat/inbox-panel) */
+.inbox-button {
+  position: absolute;
+  right: 16px;
+  bottom: 76px;
+  z-index: var(--z-controls);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 6px 18px -6px rgb(45 60 67 / 30%);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.inbox-badge {
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--brand-solid);
+  font-size: 11px;
+  color: #ffffff;
+}
+
+.inbox-panel {
+  position: fixed;
+  overflow: hidden;
+  z-index: 60;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--chat-width), calc(100vw - 32px));
+  height: var(--chat-height);
+  padding: 0;
+  border-radius: var(--radius-window);
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: var(--shadow-window), inset 0 0 0 1px rgb(255 255 255 / 80%);
+}
+
+.inbox-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 8px;
+}
