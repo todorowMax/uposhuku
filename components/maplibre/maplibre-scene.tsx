@@ -473,6 +473,7 @@ const ownRequestOnMap = (request: PublishedRequest, responses: number): MapReque
   response: null,
   point: requestPoint(request.id, request.cityId ?? null),
   remote: !request.cityId,
+  sameCity: false,
   own: true,
 });
 

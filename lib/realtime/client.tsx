@@ -189,14 +189,39 @@ export function RealtimeSync() {
   return null;
 }
 
+/** Звичайна затримка між подією й перечитуванням: зливає серію подій в одну. */
+const DEBOUNCE_MS = 120;
+/** Подія `feed` приходить усім виконавцям водночас: кожен перечитує через випадковий час до цієї межі. */
+export const FEED_JITTER_MS = 5000;
+
+/** Скільки чекати після події, перш ніж перечитувати. `random` підставляють у тестах. */
+export const eventDelay = (type: RealtimeType, random: () => number = Math.random): number => (type === "feed" ? Math.floor(random() * FEED_JITTER_MS) : DEBOUNCE_MS);
+
+/**
+ * Реагує на події потрібних типів: `run` викликається після `eventDelay` (серія подій зливається
+ * в один виклик). Для `feed` затримка випадкова 0-5 с, щоб публікація запиту не будила всіх разом.
+ * Повертає функцію зупинки.
+ */
+export const onRealtimeEvent = (types: RealtimeType[], run: () => void): (() => void) => {
+  let timer = 0;
+  const off = onRealtime((event) => {
+    if (!types.includes(event.t)) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(run, eventDelay(event.t));
+  });
+  return () => {
+    window.clearTimeout(timer);
+    off();
+  };
+};
+
 /**
  * Опитування, яке оживає від подій. Звичайно кожні `ms`, а поки сокети живі,
  * вісім разів рідше (запасний шлях). Подія потрібного типу запускає `run`
- * одразу. Повертає функцію зупинки.
+ * (див. `onRealtimeEvent`). Повертає функцію зупинки.
  */
 export const startPolling = (run: () => void, ms: number, types: RealtimeType[]): (() => void) => {
   let timer = 0;
-  let debounce = 0;
   const schedule = () => {
     timer = window.setTimeout(() => {
       run();
@@ -204,14 +229,9 @@ export const startPolling = (run: () => void, ms: number, types: RealtimeType[])
     }, realtimeConnected.get() ? Math.max(ms * 8, 20_000) : ms);
   };
   schedule();
-  const off = onRealtime((event) => {
-    if (!types.includes(event.t)) return;
-    window.clearTimeout(debounce);
-    debounce = window.setTimeout(run, 120);
-  });
+  const off = onRealtimeEvent(types, run);
   return () => {
     window.clearTimeout(timer);
-    window.clearTimeout(debounce);
     off();
   };
 };

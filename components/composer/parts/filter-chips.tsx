@@ -63,6 +63,8 @@ export const RequestChips = () => {
   // Рахуємо чужі запити, як і список «Запити для вас»: свої там не показуємо.
   const others = items.filter((item) => !item.own);
   const remote = others.filter((item) => item.remote).length;
+  // Чип з'являється, коли в місті виконавця є запити (або вже вибраний, щоб його можна було зняти).
+  const sameCity = others.filter((item) => item.sameCity).length;
 
   const chip = (id: RequestFilter, label: string) => (
     <Button key={id} variant="bare" aria-pressed={filter === id} onClick={() => requestFilterStore.set(id)} className="filter-chip">
@@ -75,6 +77,7 @@ export const RequestChips = () => {
     <>
       {chip("all", "Усі")}
       {performer && chip("matched", "Під мої теги")}
+      {performer && (sameCity > 0 || filter === "city") && chip("city", "Моє місто")}
       {chip("urgent", "Терміново")}
       {chip("budget", "З бюджетом")}
       {performer && remote > 0 && (

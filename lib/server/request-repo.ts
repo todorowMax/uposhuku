@@ -149,9 +149,45 @@ export const getPublicRequest = async (id: string, viewerId: string | null): Pro
   };
 };
 
-/** Відкриті запити інших людей: з них складається стрічка виконавця. */
-export const listOthersOpen = async (exceptUserId: string) =>
-  hydrate(await getDb().select().from(requests).where(and(eq(requests.status, "open"), ne(requests.userId, exceptUserId))).orderBy(desc(requests.createdAt)).limit(200));
+/** Скільки найновіших чужих запитів бачить карта: пини листати не можна, тож стеля лишається. */
+export const MAP_REQUESTS_LIMIT = 200;
+
+/** Відкриті запити інших людей, найновіші першими: для пинів на карті. Стрічка йде курсором (`listOthersOpenSummaries`). */
+export const listOthersOpen = async (exceptUserId: string, limit = MAP_REQUESTS_LIMIT) =>
+  hydrate(await getDb().select().from(requests).where(and(eq(requests.status, "open"), ne(requests.userId, exceptUserId))).orderBy(desc(requests.createdAt), desc(requests.id)).limit(limit));
+
+/** Лише відкриті запити самої людини: історію закритих для карти не вантажимо. */
+export const listOpenOwn = async (userId: string) =>
+  hydrate(await getDb().select().from(requests).where(and(eq(requests.userId, userId), eq(requests.status, "open"))).orderBy(desc(requests.createdAt), desc(requests.id)));
+
+/** Легка зведена картка відкритого чужого запиту: з неї рахується ранг стрічки без тексту й файлів. */
+export interface OpenSummary {
+  id: string;
+  cityId: string | null;
+  createdAt: number;
+  tags: string[];
+}
+
+/** Усі відкриті запити інших людей зведеннями: два запити до бази, без IN-списків. */
+export const listOthersOpenSummaries = async (exceptUserId: string): Promise<OpenSummary[]> => {
+  const db = getDb();
+  const open = and(eq(requests.status, "open"), ne(requests.userId, exceptUserId));
+  const [rows, tagRows] = await Promise.all([
+    db.select({ id: requests.id, cityId: requests.cityId, createdAt: requests.createdAt }).from(requests).where(open),
+    db.select({ requestId: requestTags.requestId, tagId: requestTags.tagId }).from(requestTags).innerJoin(requests, eq(requests.id, requestTags.requestId)).where(open),
+  ]);
+  const tags = new Map<string, string[]>();
+  for (const row of tagRows) tags.set(row.requestId, [...(tags.get(row.requestId) ?? []), row.tagId]);
+  return rows.map((row) => ({ id: row.id, cityId: row.cityId, createdAt: row.createdAt, tags: tags.get(row.id) ?? [] }));
+};
+
+/** Повні відкриті запити за id у порядку списку; зниклі чи закриті пропускаємо. */
+export const listOpenByIds = async (ids: string[]): Promise<PublishedRequest[]> => {
+  if (ids.length === 0) return [];
+  const rows = await inChunks(ids, (chunk) => getDb().select().from(requests).where(and(inArray(requests.id, chunk), eq(requests.status, "open"))));
+  const byId = new Map((await hydrate(rows)).map((request) => [request.id, request]));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+};
 
 /** Чи відкритий запит існує і чий він: потрібно для відгуків. */
 export const requestOwner = async (id: string) => {
