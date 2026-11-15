@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notifyTyping, startPolling, useTyping } from "@/lib/realtime/client";
 import { createStore } from "@/lib/store";
+import { statusOfError, type SendResult } from "./send-result";
 import type { ChatMessageDto, ConversationDto } from "./types";
 
 const POLL_MS = 3500;
@@ -118,18 +119,20 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
   }, [enabled, performerId, pull]);
 
   const send = useCallback(
-    async (text: string, attachmentIds: string[] = []) => {
+    async (text: string, attachmentIds: string[] = []): Promise<SendResult> => {
       try {
         if (!conversationRef.current) {
           conversationRef.current = await openConversation(performerId);
           setConversationId(conversationRef.current);
         }
         const message = await postMessage(conversationRef.current, text, attachmentIds);
-        sinceRef.current = Math.max(sinceRef.current, Date.parse(message.at));
+        // Мітку `since` не рухаємо: чуже повідомлення з меншим часом, яке ще не забрали, інакше загубилось би.
+        // Своє повернеться з наступним опитуванням, а merge відсікає дубль за id.
         merge(toLines([message], roleRef.current));
-        setError(false);
-      } catch {
-        setError(true);
+        return { ok: true };
+      } catch (failure) {
+        // Невдала відправка не «немає звʼязку»: опитування тут ні до чого, помилку показує той, хто викликав.
+        return { ok: false, status: statusOfError(failure) };
       }
     },
     [merge, performerId],

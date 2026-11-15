@@ -46,9 +46,9 @@ export const offerNotice = (input: { requestId: string; requestText: string; pri
   email: { type: "offer", title: excerpt(stripContacts(input.requestText), 60), open: `offers:${input.requestId}` },
 });
 
-export const messageNotice = (input: { conversationId: string; fromName: string; text: string; now?: number }): Notice => ({
+export const messageNotice = (input: { conversationId: string; toUserId: string; fromName: string; text: string; now?: number }): Notice => ({
   kind: "messages",
-  key: `msg:${input.conversationId}:${bucket(input.now ?? Date.now())}`,
+  key: `msg:${input.conversationId}:${input.toUserId}:${bucket(input.now ?? Date.now())}`,
   html: `<b>${escapeHtml(excerpt(input.fromName, 40))}</b>: ${escapeHtml(excerpt(input.text, 100))}`,
   button: { text: "Відповісти", path: deepLink(`chat:${input.conversationId}`) },
   // У листі тексту повідомлення немає, лише ім'я.

@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRemoteChat } from "@/lib/chat/client";
+import { draftAfterSend, sendErrorText } from "@/lib/chat/send-result";
 import type { ConversationDto } from "@/lib/chat/types";
 import { afterLayerHistory } from "@/lib/ui/use-layer-history";
 import { offersMapStore } from "@/lib/requests/offers";
@@ -28,6 +29,10 @@ export const useThread = (conversation: ConversationDto) => {
   const dealState = useThreadDeals(conversation);
   const staging = usePhotoStaging(conversation.id);
   const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  /** Замок від подвійної відправки: стан оновиться лише з наступним рендером, а Enter може прийти раніше. */
+  const sendingRef = useRef(false);
   const [viewer, setViewer] = useState<string | null>(null);
   const [sheet, setSheet] = useState<ThreadSheet | null>(null);
   const [screen, setScreen] = useState<ThreadScreen | null>(null);
@@ -67,20 +72,29 @@ export const useThread = (conversation: ConversationDto) => {
 
   useProposeIntent(conversation.performerId, dealState.ready, openDeals);
 
-  const canSend = (draft.trim().length > 0 || staging.ready.length > 0) && !staging.uploading;
+  const canSend = (draft.trim().length > 0 || staging.ready.length > 0) && !staging.uploading && !sending;
 
-  const submit = (event?: FormEvent) => {
+  /** Поле й фото чистяться лише після успіху: при відмові текст і фото лишаються, а людина бачить причину. */
+  const submit = async (event?: FormEvent) => {
     event?.preventDefault();
-    if (!canSend) return;
-    void chat.send(
-      draft.trim(),
+    if (!canSend || sendingRef.current) return;
+    sendingRef.current = true;
+    setSending(true);
+    setSendError(null);
+    const submitted = draft;
+    const result = await chat.send(
+      submitted.trim(),
       staging.ready.map((photo) => photo.id as string),
     );
-    setDraft("");
+    sendingRef.current = false;
+    setSending(false);
+    if (!result.ok) return setSendError(sendErrorText(result.status));
     staging.clearPhotos();
+    setDraft((current) => draftAfterSend(current, submitted));
   };
 
   const type = (value: string) => {
+    setSendError(null);
     setDraft(value);
     chat.onType();
   };
@@ -108,6 +122,7 @@ export const useThread = (conversation: ConversationDto) => {
     type,
     submit,
     canSend,
+    sendError,
     listRef,
     rowRef,
     closeScreen,

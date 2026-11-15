@@ -94,7 +94,7 @@ describe("диспетчер сповіщень", () => {
     await link();
     await markPresence(ctx.db, "u1", true, NOON);
     expect(await notifyUser("u1", notice(), NOON)).toBe("online");
-    expect(await notifyUser("u1", messageNotice({ conversationId: "c1", fromName: "Оля", text: "привіт", now: NOON }), NOON)).toBe("online");
+    expect(await notifyUser("u1", messageNotice({ conversationId: "c1", toUserId: "u1", fromName: "Оля", text: "привіт", now: NOON }), NOON)).toBe("online");
     expect(await notifyUser("u1", dealNotice({ dealId: "d1", action: "accept" })!, NOON)).toBe("sent");
     // Пульс застарів: людина вже не на сайті.
     await markPresence(ctx.db, "u1", true, NOON - 10 * 60_000);
@@ -118,6 +118,17 @@ describe("диспетчер сповіщень", () => {
     expect(await notifyUser("u1", notice(), NOON)).toBe("sent");
     expect(await notifyUser("u1", notice(), NOON)).toBe("duplicate");
     expect(await notifyUser("u1", notice({ key: "offer:r1:інше-вікно" }), NOON)).toBe("sent");
+    expect(calls).toHaveLength(2);
+  });
+
+  it("відповідь у тій самій розмові й тому самому вікні доходить обом, повтор тому самому одержувачу ні", async () => {
+    await link("u1");
+    await link("u2");
+    const toB = messageNotice({ conversationId: "c1", toUserId: "u2", fromName: "Оля", text: "привіт", now: NOON });
+    const toA = messageNotice({ conversationId: "c1", toUserId: "u1", fromName: "Іван", text: "добрий день", now: NOON });
+    expect(await notifyUser("u2", toB, NOON)).toBe("sent");
+    expect(await notifyUser("u1", toA, NOON)).toBe("sent");
+    expect(await notifyUser("u2", toB, NOON)).toBe("duplicate");
     expect(calls).toHaveLength(2);
   });
 
@@ -193,7 +204,7 @@ describe("тексти сповіщень", () => {
     expect(html).toContain("&lt;b&gt;");
     expect(html).not.toMatch(/380|nick_name/);
     expect(html).toContain("ціну обговоримо");
-    expect(messageNotice({ conversationId: "c", fromName: "<i>Хакер</i>", text: "a & b" }).html).toBe("<b>&lt;i&gt;Хакер&lt;/i&gt;</b>: a &amp; b");
+    expect(messageNotice({ conversationId: "c", toUserId: "u1", fromName: "<i>Хакер</i>", text: "a & b" }).html).toBe("<b>&lt;i&gt;Хакер&lt;/i&gt;</b>: a &amp; b");
   });
 
   it("stripContacts: телефони, пошта, @ніки, посилання", () => {

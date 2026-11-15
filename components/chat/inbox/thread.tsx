@@ -32,7 +32,7 @@ export const Thread = ({
   onClose: () => void;
   onToggleSize: () => void;
 }) => {
-  const { chat, screen, setScreen, selectedDeal, response, listRef, rowRef, closeScreen, photos, photoError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation);
+  const { chat, screen, setScreen, selectedDeal, response, listRef, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation);
   const role = conversation.role;
   const emptyChat = chat.lines.length === 0 && !conversation.lastMessage;
 
@@ -46,10 +46,11 @@ export const Thread = ({
         placeholder={emptyChat ? "Опишіть задачу" : "Повідомлення"}
         photos={photos}
         photoError={photoError}
+        sendError={sendError}
         canSend={canSend}
         fileRef={fileRef}
         onType={type}
-        onSubmit={submit}
+        onSubmit={() => void submit()}
         onPlus={() => setSheet("attach")}
         onFiles={(files) => void addFiles(files)}
         onRemovePhoto={removePhoto}

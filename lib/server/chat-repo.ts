@@ -210,16 +210,20 @@ export const listConversations = async (userId: string): Promise<ConversationDto
       const customer = people.find((user) => user.id === row.customerUserId);
       other = { name: customer?.deletedAt != null ? DELETED_NAME : (customer?.displayName ?? "Замовник") };
     }
-    const dealRow = liveDeals.find((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
+    const pairDeals = liveDeals.filter((item) => (role === "customer" ? item.ownerUserId === userId && item.performerId === row.performerId : item.performerId === `me-${userId}` && item.ownerUserId === row.customerUserId));
     let deal: ConversationDto["deal"];
     let phase: ConversationDto["phase"] = "chat";
-    if (dealRow) {
-      phase = dealRow.status === "completed" ? "done" : "deal";
-      const parsed = JSON.parse(dealRow.data) as Deal;
-      const needs = role === "performer" ? performerNeeds(parsed) !== null : needsAction(parsed) !== null;
-      const mine = parsed.proposedBy ? parsed.proposedBy === role : role === "customer";
-      const label = parsed.status === "completed" ? "Угоду завершено" : parsed.status === "proposed" ? (mine ? "Угоду запропоновано" : "Пропонує угоду") : "Угода в роботі";
-      deal = { label, needsMe: needs };
+    if (pairDeals.length > 0) {
+      // Усі живі угоди пари, кожен рядок розбираємо один раз: підпис бере найважливішу (чекає на мене, потім незавершена, потім завершена).
+      const summaries = pairDeals.map((item) => {
+        const parsed = JSON.parse(item.data) as Deal;
+        return { parsed, completed: item.status === "completed", needs: (role === "performer" ? performerNeeds(parsed) : needsAction(parsed)) !== null };
+      });
+      const main = summaries.find((item) => item.needs) ?? summaries.find((item) => !item.completed) ?? summaries[0];
+      phase = summaries.every((item) => item.completed) ? "done" : "deal";
+      const mine = main.parsed.proposedBy ? main.parsed.proposedBy === role : role === "customer";
+      const label = main.parsed.status === "completed" ? "Угоду завершено" : main.parsed.status === "proposed" ? (mine ? "Угоду запропоновано" : "Пропонує угоду") : "Угода в роботі";
+      deal = { label, needsMe: summaries.some((item) => item.needs) };
     }
     const offerRow = offerRows.find((item) => item.customer === row.customerUserId && item.performer === row.performerUserId);
     const offer = offerRow ? { title: offerRow.text.length > 40 ? `${offerRow.text.slice(0, 39).trimEnd()}…` : offerRow.text } : undefined;

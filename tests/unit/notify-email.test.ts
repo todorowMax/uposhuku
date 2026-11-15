@@ -47,7 +47,7 @@ afterEach(() => {
   for (const name of ["RESEND_API_KEY", "SITE_URL", "MAIL_MODE"]) delete process.env[name];
 });
 
-const message = (text = SECRET_TEXT) => messageNotice({ conversationId: "c1", fromName: "Оля", text, now: NOON });
+const message = (text = SECRET_TEXT) => messageNotice({ conversationId: "c1", toUserId: "u1", fromName: "Оля", text, now: NOON });
 const offer = () => offerNotice({ requestId: "r1", requestText: "Потрібен сайт для кав'ярні, дзвоніть +380 99 111 22 33", price: 1000, days: 3 });
 const mailText = (index = 0) => JSON.stringify(sent[index].body);
 
@@ -166,7 +166,7 @@ describe("що не потрапляє в лист", () => {
   });
 
   it("ім'я з HTML екранується, переносів у темі немає", async () => {
-    await notifyEmail("u1", messageNotice({ conversationId: "c9", fromName: "<b>Хакер</b>\nBcc: x@y.z", text: "т", now: NOON }), NOON);
+    await notifyEmail("u1", messageNotice({ conversationId: "c9", toUserId: "u1", fromName: "<b>Хакер</b>\nBcc: x@y.z", text: "т", now: NOON }), NOON);
     const body = sent[0].body as { subject: string; html: string };
     expect(body.subject).not.toMatch(/[\r\n]/);
     expect(body.html).not.toContain("<b>Хакер");

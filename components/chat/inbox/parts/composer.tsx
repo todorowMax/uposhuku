@@ -18,6 +18,7 @@ export const Composer = ({
   placeholder,
   photos,
   photoError,
+  sendError,
   canSend,
   fileRef,
   onType,
@@ -30,6 +31,7 @@ export const Composer = ({
   placeholder: string;
   photos: StagedPhoto[];
   photoError: string | null;
+  sendError: string | null;
   canSend: boolean;
   fileRef: React.Ref<HTMLInputElement>;
   onType: (value: string) => void;
@@ -42,6 +44,11 @@ export const Composer = ({
     {mentionsContacts(draft) && <p className="dm-warn">Домовляйтеся тут: поза чатом ми не побачимо домовленостей.</p>}
     {mentionsPaymentDetails(draft) && <p className="dm-warn">{PAYMENT_HINT}</p>}
     {photoError && <p className="dm-warn">{photoError}</p>}
+    {sendError && (
+      <p className="dm-warn" role="alert">
+        {sendError}
+      </p>
+    )}
     {photos.length > 0 && (
       <ul className="dm-staged">
         {photos.map((photo) => (

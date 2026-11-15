@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: Ctx) {
     // Співрозмовнику в Telegram: з іменем відправника, якщо він не на сайті.
     const recipient = access.role === "customer" ? access.conversation.performerUserId : access.conversation.customerUserId;
     const fromName = access.role === "performer" ? ((await getProfile(user.id))?.name || "Виконавець") : (user.name?.split(/\s+/)[0] || "Замовник");
-    notifyLater(recipient, messageNotice({ conversationId: access.conversation.id, fromName, text: text || "📷 Фото" }));
+    if (recipient) notifyLater(recipient, messageNotice({ conversationId: access.conversation.id, toUserId: recipient, fromName, text: text || "📷 Фото" }));
     return Response.json({ message }, { status: 201 });
   } catch (error) {
     return failure(error, request);

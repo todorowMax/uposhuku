@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { conversations, messages } from "@/db/schema";
 import { addSystemMessage, listConversations } from "@/lib/server/chat-repo";
 import { getDb } from "@/lib/server/db";
+import { seedDeal } from "../helpers/account-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
@@ -32,5 +33,26 @@ describe("розмова: чи хтось писав сам", () => {
     expect(after.find((item) => item.id === target.id)?.talked).toBe(true);
     expect(after.find((item) => item.performerId === `me-${lone}`)?.talked).toBe(false);
     expect(await getDb().select().from(conversations)).toHaveLength(2);
+  });
+});
+
+describe("розмова з кількома угодами пари", () => {
+  it("завершена й активна разом: фаза «угода», підпис не «Угоду завершено»; лише завершені: «done»", async () => {
+    const customer = await makeUser(ctx.db, "ml-customer");
+    const busy = await makeUser(ctx.db, "ml-busy");
+    const finished = await makeUser(ctx.db, "ml-finished");
+    await addSystemMessage(customer, busy, "Угоду #0001 запропоновано", "deal_ml1");
+    await addSystemMessage(customer, finished, "Угоду #0003 запропоновано", "deal_ml3");
+    await seedDeal({ id: "deal_ml1", owner: customer, performer: busy, status: "completed", stages: ["released"], updatedAt: 5000 });
+    await seedDeal({ id: "deal_ml2", owner: customer, performer: busy, status: "accepted", stages: ["pending"], updatedAt: 2000 });
+    await seedDeal({ id: "deal_ml3", owner: customer, performer: finished, status: "completed", stages: ["released"], updatedAt: 3000 });
+    await seedDeal({ id: "deal_ml4", owner: customer, performer: finished, status: "completed", stages: ["released"], updatedAt: 4000 });
+    const list = await listConversations(customer);
+    const mixed = list.find((item) => item.performerId === `me-${busy}`)!;
+    expect(mixed.phase).toBe("deal");
+    expect(mixed.deal?.label).not.toBe("Угоду завершено");
+    const done = list.find((item) => item.performerId === `me-${finished}`)!;
+    expect(done.phase).toBe("done");
+    expect(done.deal?.label).toBe("Угоду завершено");
   });
 });
