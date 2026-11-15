@@ -220,7 +220,7 @@ body:has(.map-page) {
 
 /* Те саме поле у двох станах; змінені лише матеріал і геометрія. */
 .composer {
-  /* Свій шар над фільтрами: «ще +N» і меню «+» відкриваються поверх чипів
+  /* Свій шар над фільтрами: «ще +N» відкривається поверх чипів
      під полем, а чипи зі склом інакше малюються вище. */
   position: relative;
   z-index: 2;
@@ -232,7 +232,7 @@ body:has(.map-page) {
   column-gap: 4px;
   height: 58px;
   max-width: 560px;
-  padding: 8px 56px;
+  padding: 8px 56px 8px 16px;
   border-radius: 16px;
   box-shadow: 0 16px 38px -20px rgb(47 60 68 / 28%), inset 0 1px rgb(255 255 255 / 60%);
   transition:
@@ -294,7 +294,7 @@ html[data-glass] .composer {
 }
 
 .composer[data-phase="closing"] {
-  padding: 8px 56px;
+  padding: 8px 56px 8px 16px;
 }
 
 .composer[data-phase="opening"] .composer-actions {
@@ -319,8 +319,8 @@ html[data-glass] .composer {
 .composer-actions {
   grid-area: actions;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas: "plus params send";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "params send";
   align-items: center;
   column-gap: 4px;
   min-width: 0;
@@ -402,33 +402,24 @@ html[data-glass] .composer {
   padding: 8px 4px;
 }
 
-.composer-plus {
-  grid-area: plus;
-}
-
 .composer-send {
   grid-area: send;
   width: 40px;
 }
 
-.composer-compact-send-wrap,
-.composer-compact-plus-wrap {
+.composer-compact-send-wrap {
   position: absolute;
   top: 8px;
+  right: 8px;
   width: 40px;
   height: 40px;
 }
 
-.composer-compact-send-wrap { right: 8px; }
-.composer-compact-plus-wrap { left: 8px; }
-
-.composer-compact-send,
-.composer-compact-plus {
+.composer-compact-send {
   transition: transform 540ms cubic-bezier(0.22, 0.75, 0.25, 1), background-color 150ms ease;
 }
 
-.composer[data-phase="open"] .composer-compact-send,
-.composer[data-phase="open"] .composer-compact-plus {
+.composer[data-phase="open"] .composer-compact-send {
   opacity: 0;
 }
 
@@ -438,14 +429,7 @@ html[data-glass] .composer {
   pointer-events: none;
 }
 
-.composer[data-phase="opening"] .composer-compact-plus,
-.composer[data-phase="open"] .composer-compact-plus {
-  transform: translateX(-48px);
-  pointer-events: none;
-}
-
-.composer[data-phase="closing"] .composer-compact-send,
-.composer[data-phase="closing"] .composer-compact-plus {
+.composer[data-phase="closing"] .composer-compact-send {
   pointer-events: none;
 }
 
@@ -643,22 +627,8 @@ html[data-glass] .composer {
   box-shadow: 0 0 0 2px #ffffff;
 }
 
-.composer-menu {
-  box-shadow: 0 18px 40px -18px rgb(47 60 68 / 25%);
-  animation: composer-menu-in 160ms var(--ease-out-quint);
-  transform-origin: top left;
-}
-
-@keyframes composer-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .composer,
-  .composer-menu,
   .tag-chip,
   .tag-panel {
     transition: none;
@@ -2631,8 +2601,8 @@ html[data-glass] .offers-panel {
 @media (max-width: 639px) {
   .composer-actions {
     grid-template-areas:
-      "params params params"
-      "plus . send";
+      "params params"
+      ". send";
     /* Без проміжку рядок чипів майже торкався кнопки «Знайти» (2 px). */
     row-gap: 8px;
   }
