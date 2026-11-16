@@ -2,8 +2,8 @@
 
 - Created: 2026-10-24
 - Project / repo: uposhuku
-- Final status: partly done
-- Next step / owner: прогнать CI на GitHub (Linux) на `development` и записать результат в критерий «CI пройшов» (единственный открытый пункт); Max, он решает пуш (GIT-1).
+- Final status: done
+- Next step / owner: нет, задача закрыта 2026-11-16.
 
 ## Goal
 
@@ -16,7 +16,7 @@
 - [x] `opennextjs-cloudflare build` проходить; `.open-next/worker.js` збирається.
 - [x] Власний вхід `worker/index.ts` піднято в локальному workerd (`cf:preview`): WebSocket і Durable Object працюють.
 - [x] Головна й realtime відповідають локально (`cf:preview`, `next dev`).
-- [ ] CI на GitHub (Linux) пройшов: не запускався.
+- [x] CI на GitHub (Linux) пройшов: прогін 43795788685 на `development` (`8c12565`, 2026-11-16), успіх: lint:ci, deadcode, typecheck, тести, `next build` і `npm run budget`.
 
 ## Items
 
@@ -47,8 +47,7 @@
 
 ## Not verified
 
-- CI на Linux (`npm install` з новим локом): не запускали.
-- Реальний деплой, remote D1, поведінка Durable Object на платформі: не запускали (заборонено).
+- Поведінка Durable Object на платформі: 2026-11-15/16 виклали на dev (`cf:deploy:development`), сокети `/api/realtime/global` і `/api/realtime/me` відкрилися (101). Прод не виклали.
 - Обробник `scheduled` (`tick`): не викликали, бо він ходить у Telegram.
 - Потоки з входом (пошта, Google), Telegram, завантаження файлів, чат, угоди, адмінка: тільки неавторизовані відповіді.
 - Перегляд на 375 px і клавіатурою з фокус-кільцем: не робили (UI не змінювався), дивились лише у вікні браузера-панелі.
@@ -57,3 +56,5 @@
 ## Final status
 
 2026-10-24: оновлено до Next 16.4.3 з OpenNext 1.20.13 і wrangler 4.152.0; усі перевірки і справжня збірка OpenNext зелені, воркер працює локально. Нічого не закомічено. Лишилось: CI на GitHub і рішення Макса по `agent-rules` (плагін ESLint).
+
+2026-11-16: CI на Linux зелений (прогін 43795788685), dev працює на Next 16.4.3 з OpenNext. Задачу закрито.

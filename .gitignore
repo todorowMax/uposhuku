@@ -11,6 +11,9 @@ cloudflare-env.d.ts
 node_modules/
 tsconfig.tsbuildinfo
 
+# Чернетки дизайн-концептів (великі картинки), у репозиторій не потрапляють
+/concepts/
+
 # Воркер MapLibre, копіюється scripts/copy-maplibre-worker.mjs
 /public/maplibre/
 

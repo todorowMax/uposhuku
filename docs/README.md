@@ -21,6 +21,7 @@
 | [tasks/…/risk-register.md](tasks/2026-11-13-legal-hardening/risk-register.md) | Реєстр ризиків і рішення без юриста | актуально |
 | [competitors-payment-providers.md](competitors-payment-providers.md) | Конкуренти й їхні платіжні провайдери | довідка |
 | [freelancehunt-benchmark.md](freelancehunt-benchmark.md) | Що в Freelancehunt і що взяти | довідка |
+| [vibe-map/vibe-map-concept.md](vibe-map/vibe-map-concept.md) | Концепт головного екрана: глобус, країна, чат; поруч робочий прототип `prototype-globe.html` | довідка |
 | [uapay-research.md](uapay-research.md) | UAPAY: що відомо | довідка |
 | [telemetry.md](telemetry.md) | Телеметрія: помилки, аналітика, словник тегів | актуально |
 | [telegram-bot.md](telegram-bot.md) | Як увімкнути Telegram-бота, що з приватністю | актуально |
