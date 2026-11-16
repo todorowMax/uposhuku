@@ -1,12 +1,14 @@
 // /api/conversations/:id/messages — переписка.
-// GET ?since=<мс> — повідомлення новіші за мітку (опитування); POST {text} —
-// написати. Доступ лише замовнику й виконавцю цієї розмови.
+// GET ?since=<мс> — повідомлення новіші за мітку (опитування); GET ?before=<мс>:<id> — сторінка
+// старіших («Показати раніше»); POST {text} — написати. Відповідь GET: {role, messages, hasMore}.
+// Доступ лише замовнику й виконавцю цієї розмови.
 
 import { rateLimited } from "@/lib/server/rate-limit";
 import { problem, readJson } from "@/lib/api/problem";
+import { parseCursor } from "@/lib/chat/cursor";
 import { CHAT_PHOTOS_MAX, CHAT_TEXT_MAX } from "@/lib/chat/types";
 import { getSessionUser } from "@/lib/server/auth";
-import { accessibleConversation, addMessage, claimableAttachments, listMessages, OTHER_SIDE_GONE, otherSideGone } from "@/lib/server/chat-repo";
+import { accessibleConversation, addMessage, claimableAttachments, listMessagesPage, OTHER_SIDE_GONE, otherSideGone } from "@/lib/server/chat-repo";
 import { pushUser } from "@/lib/server/realtime";
 import { failure } from "@/lib/server/route";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -24,8 +26,13 @@ export async function GET(request: Request, { params }: Ctx) {
   try {
     const access = await accessibleConversation((await params).id, user.id);
     if (!access) return problem(404, "Розмову не знайдено");
-    const since = Number(new URL(request.url).searchParams.get("since") ?? 0);
-    return Response.json({ role: access.role, messages: await listMessages(access.conversation.id, Number.isFinite(since) ? since : 0) }, { headers: { "cache-control": "no-store" } });
+    const query = new URL(request.url).searchParams;
+    const rawBefore = query.get("before");
+    const before = parseCursor(rawBefore);
+    if (rawBefore !== null && !before) return problem(400, "Некоректний курсор");
+    const since = Number(query.get("since") ?? 0);
+    const page = await listMessagesPage(access.conversation.id, { since: Number.isFinite(since) ? since : 0, before });
+    return Response.json({ role: access.role, ...page }, { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return failure(error, request);
   }
@@ -37,7 +44,9 @@ export async function POST(request: Request, { params }: Ctx) {
   const limited = await rateLimited("message", user.id);
   if (limited) return limited;
   const body = await readJson(request);
-  const text = typeof body?.text === "string" ? body.text.trim().slice(0, CHAT_TEXT_MAX) : "";
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  // Не обрізаємо мовчки: людина мала б надіслати не те, що написала. Клієнт цього не пропускає, але маршрут відкритий для інших.
+  if (text.length > CHAT_TEXT_MAX) return problem(413, "Повідомлення задовге", `Повідомлення не може бути довшим за ${CHAT_TEXT_MAX} знаків`);
   const requested = Array.isArray(body?.attachmentIds) ? [...new Set(body.attachmentIds.filter((id: unknown): id is string => typeof id === "string"))].slice(0, CHAT_PHOTOS_MAX) : [];
   if (!text && requested.length === 0) return problem(400, "Порожнє повідомлення");
   try {

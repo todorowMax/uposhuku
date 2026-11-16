@@ -2,6 +2,7 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConversationDto } from "@/lib/chat/types";
 import type { SendResult } from "@/lib/chat/send-result";
+import { DELETED_NAME } from "@/lib/account/deletion";
 
 const mocks = vi.hoisted(() => ({
   send: vi.fn<(text: string, photoIds: string[]) => Promise<SendResult>>(),
@@ -78,5 +79,18 @@ describe("useThread: відправка", () => {
     expect(mocks.send).toHaveBeenCalledTimes(1);
     await act(async () => finish({ ok: true }));
     expect(result.current.draft).toBe("");
+  });
+});
+
+describe("useThread: співрозмовник видалив акаунт", () => {
+  it("рядок угоди не відкриває форму умов, а без видалення відкриває", () => {
+    const gone = { ...conversation, other: { name: DELETED_NAME } } as unknown as ConversationDto;
+    const live = { ...conversation, other: { name: "Олена" } } as unknown as ConversationDto;
+    const goneHook = renderHook(() => useThread(gone, vi.fn()));
+    act(() => goneHook.result.current.openDeals());
+    expect(goneHook.result.current.screen).toBeNull();
+    const liveHook = renderHook(() => useThread(live, vi.fn()));
+    act(() => liveHook.result.current.openDeals());
+    expect(liveHook.result.current.screen).toEqual({ kind: "terms" });
   });
 });

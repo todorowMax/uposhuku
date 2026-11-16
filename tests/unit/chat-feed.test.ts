@@ -4,7 +4,7 @@ import type { ChatLine } from "@/lib/chat/client";
 import { dayLabel, listTime } from "@/lib/chat/dates";
 import { conversationTitle, initialsOf, isOtherGone } from "@/lib/chat/display";
 import { draftLimit } from "@/lib/chat/draft-limit";
-import { buildFeed, isNearBottom, parseModeratorDecision, resolveDealId } from "@/lib/chat/feed";
+import { buildFeed, isNearBottom, parseModeratorDecision, resolveDealId, scrollTopAfterPrepend } from "@/lib/chat/feed";
 
 const NOW = new Date(2026, 10, 15, 14, 0);
 /** Місцевий час, а не UTC: розділювачі днів рахуються за датою глядача. */
@@ -80,6 +80,11 @@ describe("прокрутка", () => {
   it("внизу з запасом чи ні", () => {
     expect(isNearBottom({ scrollHeight: 1000, scrollTop: 450, clientHeight: 500 })).toBe(true);
     expect(isNearBottom({ scrollHeight: 1000, scrollTop: 100, clientHeight: 500 })).toBe(false);
+  });
+
+  it("після вставки старіших зверху позиція зсувається на приріст висоти, тож людина лишається на тому самому повідомленні", () => {
+    expect(scrollTopAfterPrepend({ scrollHeight: 1000, scrollTop: 0 }, 1800)).toBe(800);
+    expect(scrollTopAfterPrepend({ scrollHeight: 1000, scrollTop: 30 }, 1000)).toBe(30);
   });
 });
 

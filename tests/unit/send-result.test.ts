@@ -21,6 +21,8 @@ describe("результат відправки повідомлення", () =>
   it("текст помилки: 429, 409 і все інше", () => {
     expect(sendErrorText(429)).toBe(SEND_ERROR_TEXTS.rateLimit);
     expect(sendErrorText(409)).toBe(SEND_ERROR_TEXTS.otherSideGone);
+    expect(sendErrorText(413)).toBe(SEND_ERROR_TEXTS.tooLong);
+    expect(SEND_ERROR_TEXTS.tooLong).toContain("4000");
     expect(sendErrorText(500)).toBe(SEND_ERROR_TEXTS.generic);
     expect(sendErrorText(null)).toBe(SEND_ERROR_TEXTS.generic);
     expect(SEND_ERROR_TEXTS.generic).toContain("Текст лишився в полі");

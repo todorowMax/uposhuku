@@ -8,7 +8,8 @@ import { eq, like } from "drizzle-orm";
 import { POST as UPLOAD } from "@/app/api/uploads/route";
 import { authAttempts, dealReleaseCodes, emailCodes } from "@/db/schema";
 import { reviewAuthor } from "@/lib/reviews/author";
-import { addMessage, getOrCreateConversation, listMessages } from "@/lib/server/chat-repo";
+import { encodeCursor } from "@/lib/chat/cursor";
+import { addMessage, getOrCreateConversation, listMessages, listMessagesPage, MESSAGES_PAGE } from "@/lib/server/chat-repo";
 import { getDb } from "@/lib/server/db";
 import { overLimit, RATE_RULES } from "@/lib/server/rate-limit";
 import { readBodyLimited } from "@/lib/server/read-body";
@@ -101,5 +102,41 @@ describe("довгий розмова", () => {
     const incremental = await listMessages(conv.id, base + 599);
     expect(incremental.map((message) => message.text)).toEqual(["нове"]);
     expect(Date.parse(fresh.at)).toBeGreaterThan(base + 599);
+  });
+
+  it("«показати раніше»: перша сторінка каже hasMore, before віддає решту без пропусків і повторів навіть при однаковому часі на межі", async () => {
+    const conv = await getOrCreateConversation("hd-cust", "me-hd-perf-tie", "hd-perf");
+    const at = Date.now() - 5_000_000;
+    // Усі 700 з однією мілісекундою: межа сторінки лягає всередину групи однакового часу.
+    const total = MESSAGES_PAGE + 200;
+    const rows = Array.from({ length: total }, (_, index) => ({ id: `tie-${String(index).padStart(4, "0")}`, text: `t${index}` }));
+    // Порціями по 100 запитів у одному batch: сімсот окремих звернень на завантаженій машині не вкладались у таймаут.
+    for (let start = 0; start < rows.length; start += 100) {
+      await ctx.db.batch(rows.slice(start, start + 100).map((row) => ctx.db.prepare("insert into messages (id, conversation_id, \"from\", text, kind, context_id, created_at) values (?, ?, ?, ?, 'text', null, ?)").bind(row.id, conv.id, "customer", row.text, at)));
+    }
+    const first = await listMessagesPage(conv.id);
+    expect(first.messages).toHaveLength(MESSAGES_PAGE);
+    expect(first.hasMore).toBe(true);
+    expect(first.messages[0].id).toBe("tie-0200");
+    const older = await listMessagesPage(conv.id, { before: { at: Date.parse(first.messages[0].at), id: first.messages[0].id } });
+    expect(older.hasMore).toBe(false);
+    expect(older.messages).toHaveLength(200);
+    const ids = [...older.messages, ...first.messages].map((message) => message.id);
+    expect(new Set(ids).size).toBe(total);
+    expect(ids).toEqual([...ids].sort());
+    // Курсор на найстаріше повідомлення групи нічого не повертає.
+    expect(await listMessagesPage(conv.id, { before: { at, id: "tie-0000" } })).toEqual({ messages: [], hasMore: false });
+    expect(encodeCursor(first.messages[0])).toBe(`${at}:tie-0200`);
+  });
+
+  it("опитування від мітки не залежить від before: hasMore хибне, порядок зростаючий", async () => {
+    const conv = await getOrCreateConversation("hd-cust", "me-hd-perf-poll", "hd-perf");
+    const at = Date.now() - 4_000_000;
+    for (const [index, id] of ["p-b", "p-a", "p-c"].entries()) {
+      await ctx.db.prepare("insert into messages (id, conversation_id, \"from\", text, kind, context_id, created_at) values (?, ?, ?, ?, 'text', null, ?)").bind(id, conv.id, "customer", id, at + (index === 2 ? 5 : 0)).run();
+    }
+    const page = await listMessagesPage(conv.id, { since: at - 1 });
+    expect(page.messages.map((message) => message.id)).toEqual(["p-a", "p-b", "p-c"]);
+    expect(page.hasMore).toBe(false);
   });
 });

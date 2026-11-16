@@ -78,3 +78,9 @@ export const resolveDealId = (lines: Pick<ChatLine, "contextId">[], number: stri
 
 /** Людина дивиться на низ стрічки (запас у пікселях): лише тоді нове повідомлення прокручує її донизу. */
 export const isNearBottom = (box: { scrollHeight: number; scrollTop: number; clientHeight: number }, threshold = 80): boolean => box.scrollHeight - box.scrollTop - box.clientHeight <= threshold;
+
+/**
+ * Куди прокрутити стрічку, коли зверху додались старіші повідомлення: на скільки виросла висота, на стільки
+ * зсуваємо позицію, тож людина лишається на тому самому повідомленні.
+ */
+export const scrollTopAfterPrepend = (before: { scrollHeight: number; scrollTop: number }, scrollHeight: number): number => before.scrollTop + (scrollHeight - before.scrollHeight);

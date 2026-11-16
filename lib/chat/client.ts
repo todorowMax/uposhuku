@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { notifyTyping, startPolling, useTyping } from "@/lib/realtime/client";
 import { createStore } from "@/lib/store";
+import { encodeCursor } from "./cursor";
 import { statusOfError, type SendResult } from "./send-result";
 import type { ChatMessageDto, ConversationDto } from "./types";
 
@@ -26,7 +27,14 @@ const call = async <T,>(input: string, init?: RequestInit): Promise<T> => {
 
 export const openConversation = async (performerId: string) => (await call<{ conversation: { id: string } }>("/api/conversations", { method: "POST", body: JSON.stringify({ performerId }) })).conversation.id;
 
-export const fetchMessages = async (conversationId: string, since = 0) => call<{ role: "customer" | "performer"; messages: ChatMessageDto[] }>(`/api/conversations/${conversationId}/messages?since=${since}`);
+/** Сторінка повідомлень: `hasMore` каже, чи є старіші (змістовне для першої сторінки й для `fetchEarlierMessages`). */
+export type MessagesResponse = { role: "customer" | "performer"; messages: ChatMessageDto[]; hasMore: boolean };
+
+export const fetchMessages = async (conversationId: string, since = 0) => call<MessagesResponse>(`/api/conversations/${conversationId}/messages?since=${since}`);
+
+/** Сторінка старіших за повідомлення `oldest` («Показати раніше»). */
+export const fetchEarlierMessages = async (conversationId: string, oldest: Pick<ChatMessageDto, "id" | "at">) =>
+  call<MessagesResponse>(`/api/conversations/${conversationId}/messages?before=${encodeURIComponent(encodeCursor(oldest))}`);
 
 export const postMessage = async (conversationId: string, text: string, attachmentIds: string[] = []) =>
   (await call<{ message: ChatMessageDto }>(`/api/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ text, attachmentIds }) })).message;
@@ -75,10 +83,17 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
   /** Перше завантаження відбулось (успішно чи ні): до цього показуємо індикатор, а не порожню стрічку. */
   const [loaded, setLoaded] = useState(Boolean(seed));
   const [conversationId, setConversationId] = useState<string | null>(existing?.id ?? null);
+  /** Старіші за те, що вже в стрічці, є на сервері: показуємо «Показати раніше». */
+  const [hasMore, setHasMore] = useState(false);
+  const [earlier, setEarlier] = useState<"idle" | "loading" | "error">("idle");
+  /** Найстаріше повідомлення, яке вже отримано з сервера: від нього рахується наступна сторінка. */
+  const oldestRef = useRef<ChatMessageDto | null>(null);
   // Розмову можна передати готовою (вхідні виконавця), інакше знайдемо чи створимо за виконавцем.
   const conversationRef = useRef<string | null>(existing?.id ?? null);
   const sinceRef = useRef(0);
   const roleRef = useRef<"customer" | "performer">(existing?.role ?? "customer");
+  /** Замок від подвійного натискання: стан оновиться лише з наступним рендером. */
+  const earlierBusy = useRef(false);
 
   const merge = useCallback((fresh: ChatLine[]) => {
     if (fresh.length === 0) return;
@@ -91,8 +106,14 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
   const pull = useCallback(async () => {
     const id = conversationRef.current;
     if (!id) return;
-    const { role, messages } = await fetchMessages(id, sinceRef.current);
+    const firstPage = sinceRef.current === 0;
+    const { role, messages, hasMore: more } = await fetchMessages(id, sinceRef.current);
     roleRef.current = role;
+    // Прапорець «є старіші» й межу сторінки бере лише перше завантаження: опитування від мітки про них нічого не знає.
+    if (firstPage) {
+      setHasMore(more);
+      oldestRef.current = messages[0] ?? null;
+    }
     if (messages.length) {
       sinceRef.current = Math.max(sinceRef.current, ...messages.map((message) => Date.parse(message.at)));
       merge(toLines(messages, role));
@@ -145,9 +166,32 @@ export const useRemoteChat = (performerId: string, enabled: boolean, seed?: Chat
     [merge, performerId],
   );
 
+  /** «Показати раніше»: старіша сторінка стає на початок стрічки; `since` і дописування нових це не чіпає. */
+  const loadEarlier = useCallback(async () => {
+    const id = conversationRef.current;
+    const oldest = oldestRef.current;
+    if (!id || !oldest || earlierBusy.current) return;
+    earlierBusy.current = true;
+    setEarlier("loading");
+    try {
+      const page = await fetchEarlierMessages(id, oldest);
+      oldestRef.current = page.messages[0] ?? oldest;
+      setLines((current) => {
+        const known = new Set(current.map((line) => line.id));
+        return [...toLines(page.messages, roleRef.current).filter((line) => !known.has(line.id)), ...current];
+      });
+      setHasMore(page.hasMore);
+      setEarlier("idle");
+    } catch {
+      setEarlier("error");
+    } finally {
+      earlierBusy.current = false;
+    }
+  }, []);
+
   const typing = useTyping(conversationId);
   /** Вызывать при наборі в полі: друга сторона побачить «друкує…». */
   const onType = useCallback(() => notifyTyping(conversationRef.current), []);
 
-  return { lines, send, error, typing, onType, conversationId, loaded };
+  return { lines, send, error, typing, onType, conversationId, loaded, hasMore, earlier, loadEarlier };
 };
