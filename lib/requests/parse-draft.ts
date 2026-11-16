@@ -5,10 +5,19 @@
 import { CITIES } from "@/lib/map/cities";
 import { resolveDeadlineDate } from "@/lib/requests/deadline-date";
 import { withTags } from "@/lib/requests/derive-tags";
-import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type Deadline, type RequestDraft } from "@/lib/requests/types";
+import { REQUEST_FILES_MAX } from "@/lib/requests/file-types";
+import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, isDeadline, type Deadline, type RequestDraft, type RequestFileRef } from "@/lib/requests/types";
 
 const MAX_TAGS = 30;
-const MAX_FILES = 10;
+
+/** Файли в чернетці це лише id вже завантажених; решта полів (ім'я, розмір, тип) береться з бази. Дублі й сміття відкидаємо. */
+const fileRefs = (sent: unknown[]): RequestFileRef[] => {
+  const ids = sent.flatMap((file) => {
+    const id = (file as { id?: unknown } | null)?.id;
+    return typeof id === "number" && Number.isSafeInteger(id) && id > 0 ? [id] : [];
+  });
+  return [...new Set(ids)].slice(0, REQUEST_FILES_MAX).map((id) => ({ id }));
+};
 
 export interface ParseDraftOptions {
   /** «Зараз»: від нього рахується, чи дата терміну не минула й не задалека. */
@@ -52,9 +61,6 @@ export const parseDraft = (body: Record<string, unknown> | null, options: ParseD
         .slice(0, MAX_TAGS)
         .map(({ id, label }) => ({ id: id.slice(0, 64), label: label.slice(0, 80) })),
     ),
-    files: files
-      .filter((file): file is { name: string; size: number; type: string } => typeof file?.name === "string" && typeof file?.size === "number")
-      .slice(0, MAX_FILES)
-      .map(({ name, size, type }) => ({ name: name.slice(0, 200), size, type: typeof type === "string" ? type.slice(0, 100) : "" })),
+    files: fileRefs(files),
   };
 };

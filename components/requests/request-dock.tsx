@@ -28,6 +28,7 @@ import { requestFacts } from "@/lib/requests/format";
 import { canRestore, restoreLeftLabel } from "@/lib/requests/restore";
 import { requestSubline } from "@/lib/requests/subline";
 import type { PublishedRequest } from "@/lib/requests/types";
+import { RequestFileLinks } from "@/components/requests/parts/request-file-links";
 import { useStore } from "@/lib/store";
 import { prefersReducedMotion } from "@/lib/ui/media";
 
@@ -279,7 +280,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
               {active.tags.map((tag) => <span key={tag.id} className="auth-draft-tag max-w-full" title={tag.label}><span className="truncate">{tag.label}</span></span>)}
             </div>
           )}
-          {active.files.length > 0 && <p className="request-details-facts">Прикріплено файлів: {active.files.length}</p>}
+          <RequestFileLinks files={active.files} label="Прикріплені файли" />
         </div>
       )}
 

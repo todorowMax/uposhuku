@@ -8,6 +8,7 @@ import { parseDraft } from "@/lib/requests/parse-draft";
 import { noteRequestEdited } from "@/lib/server/chat-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { pushGlobal } from "@/lib/server/realtime";
+import { checkDraftFiles } from "@/lib/server/request-files";
 import { renewRequest } from "@/lib/server/request-lifetime";
 import { closeRequest, findRequest, reopenRequest, updateRequest } from "@/lib/server/request-repo";
 import { route } from "@/lib/server/route";
@@ -44,6 +45,8 @@ export const PATCH = route<"user", undefined, { id: string }>({ auth: "user" }, 
   const current = await findRequest(user.id, id);
   const draft = parseDraft(body, { now: new Date(), keepDate: current?.deadlineDate ?? null });
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
+  const filesError = current ? await checkDraftFiles(user.id, id, draft.files) : null;
+  if (filesError) return problem(400, "Файли не прийнято", filesError);
   const updated = await updateRequest(user.id, id, draft);
   if (updated === "not_found") return problem(404, "Запит не знайдено");
   if (updated === "closed") return problem(409, "Запит закрито", "Запит закрито, його не можна змінити.");

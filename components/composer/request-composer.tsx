@@ -13,7 +13,10 @@ import { ArrowRight, ArrowUp } from "@/components/icons";
 import { applyGlassPreference } from "@/lib/ui/glass";
 import { setRequestTags } from "@/lib/map/request-tags";
 import { setMapMode } from "@/lib/feed/map-requests";
+import { Attachments } from "@/components/composer/attachments";
+import { FilePickerButton } from "@/components/composer/file-picker-button";
 import { RequestTagRow } from "@/components/composer/request-tag-row";
+import { useRequestFiles } from "@/components/composer/use-request-files";
 import { useRequestTags } from "@/components/composer/use-request-tags";
 import { SpecialistFilters } from "@/components/composer/specialist-filters";
 import { EMPTY_PARAMS, RequestParams, type RequestParamsValue } from "@/components/composer/request-params";
@@ -38,7 +41,8 @@ const MAX_ROWS = 5;
  * один рядок і маленька кнопка праворуч, карта під ним майже вся видна.
  * Коли людина натискає на поле, воно розкривається на два поверхи: текст
  * на всю ширину згори, дії знизу, і росте під текст до п'яти рядків.
- * Файлів до запиту поки не додаємо: вони нікуди не завантажуються.
+ * Файли (скріпка в нижньому ряду) лише для тих, хто увійшов: вони вантажаться в R2 одразу після вибору,
+ * а в чернетку йдуть їхні id (components/composer/use-request-files, app/api/request-files).
  *
  * «Знайти виконавців» публікує запит: гість вводить пошту й код з листа
  * (components/auth/auth-panel), хто увійшов — публікує одразу. Поки вхід
@@ -50,6 +54,7 @@ export function RequestComposer() {
   const [narrowing, setNarrowing] = useState(false);
   const [params, setParams] = useState<RequestParamsValue>(EMPTY_PARAMS);
   const tags = useRequestTags(text);
+  const files = useRequestFiles();
   const { mentions, selected, suggestions } = tags;
   const authFlow = useStore(authFlowStore);
   const session = useStore(sessionStore);
@@ -109,7 +114,7 @@ export function RequestComposer() {
   });
 
   const closeInput = () => {
-    if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "") return;
+    if (inputPhase === "closed" || inputPhase === "closing" || text.trim() !== "" || files.items.length > 0) return;
     clearPhaseTimer();
     if (inputPhase === "wide") {
       setInputPhase("closed");
@@ -137,7 +142,7 @@ export function RequestComposer() {
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
-  }, [inputPhase, text]);
+  }, [inputPhase, text, files.items.length]);
 
   // Порожнє поле — чистий аркуш: прибрані й додані теги забуваємо.
   const resetTags = tags.reset;
@@ -212,10 +217,12 @@ export function RequestComposer() {
       inputRef.current?.focus();
       return;
     }
+    // Запит з файлами, що ще вантажаться, пішов би без них.
+    if (files.busy) return;
     const draft: RequestDraft = {
       text: text.trim(),
       tags: selected.map((id) => ({ id, label: tagEngine.tagLabel(id) })),
-      files: [],
+      files: files.files.map(({ id }) => ({ id })),
       budget: params.budget,
       deadline: params.deadline,
       deadlineDate: params.deadlineDate,
@@ -223,7 +230,7 @@ export function RequestComposer() {
       channelOptIn: params.channel,
     };
     saveDraft(draft, true);
-    track(EVENTS.requestSubmitClicked, { tags: draft.tags.length, has_budget: Boolean(draft.budget), has_city: Boolean(draft.cityId) });
+    track(EVENTS.requestSubmitClicked, { tags: draft.tags.length, has_budget: Boolean(draft.budget), has_city: Boolean(draft.cityId), files: draft.files.length });
     authFlowStore.set({ mode: "publish" });
   };
 
@@ -235,6 +242,7 @@ export function RequestComposer() {
     setInputPhase("closed");
     setNarrowing(false);
     setParams(EMPTY_PARAMS);
+    files.reset();
   };
 
   // Enter шукає, Shift+Enter переносить рядок, як у чатах.
@@ -246,7 +254,7 @@ export function RequestComposer() {
   };
 
   // Навіть коли тегів ще нема, під текстом стоїть «+ Додати тег».
-  const hasTray = selected.length > 0 || suggestions.length > 0 || text.trim() !== "";
+  const hasTray = selected.length > 0 || suggestions.length > 0 || text.trim() !== "" || files.items.length > 0;
 
   useLayoutEffect(() => {
     const form = formRef.current;
@@ -273,7 +281,7 @@ export function RequestComposer() {
       if (element) observer.observe(element);
     }
     return () => observer.disconnect();
-  }, [inputPhase, expanded, text, selected, suggestions]);
+  }, [inputPhase, expanded, text, selected, suggestions, files.items, files.notice]);
 
   return (
     <div
@@ -297,6 +305,7 @@ export function RequestComposer() {
       >
         {expanded && hasTray && (
           <div className="composer-tray">
+            <Attachments items={files.items} notice={files.notice} onRemove={files.remove} />
             <RequestTagRow tags={tags} canPropose={session.status === "user"} />
           </div>
         )}
@@ -327,12 +336,14 @@ export function RequestComposer() {
 
         {expanded && (
           <div className="composer-actions">
+            {session.status === "user" && <FilePickerButton onPick={files.pick} tabIndex={actionsVisible ? 0 : -1} />}
             <RequestParams value={params} onChange={setParams} />
             <button
               type="submit"
               tabIndex={actionsVisible ? 0 : -1}
+              disabled={files.busy}
               aria-label="Знайти виконавців"
-              className="composer-send composer-action flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--brand-solid)] px-4 text-[15px] font-medium text-white hover:bg-[var(--brand-solid-hover)] active:scale-[0.97]"
+              className="composer-send composer-action flex h-10 items-center justify-center gap-2 rounded-xl bg-[var(--brand-solid)] px-4 text-[15px] font-medium text-white hover:bg-[var(--brand-solid-hover)] active:scale-[0.97] disabled:pointer-events-none disabled:opacity-60"
             >
               <span className="pl-1">Знайти виконавців</span>
               <ArrowRight className="size-4" />

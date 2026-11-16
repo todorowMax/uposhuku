@@ -189,19 +189,23 @@ export const requestTags = sqliteTable(
   (table) => [primaryKey({ columns: [table.requestId, table.tagId] })],
 );
 
-/** Файли запиту: поки лише опис (R2 ще немає). */
+/**
+ * Файли запиту: байти лежать у R2 за `key`, тут опис і зв'язок. `request_id` порожній, поки файл завантажено,
+ * а запит ще не збережено (осиротілі прибирає tick через добу). Рядок без `key` лишився від часів, коли зберігався лише опис.
+ */
 export const requestFiles = sqliteTable(
   "request_files",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    requestId: text("request_id")
-      .notNull()
-      .references(() => requests.id, { onDelete: "cascade" }),
+    requestId: text("request_id").references(() => requests.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     size: integer("size").notNull(),
     type: text("type").notNull().default(""),
+    key: text("key"),
+    uploaderUserId: text("uploader_user_id").references(() => users.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at"),
   },
-  (table) => [index("request_files_request_idx").on(table.requestId)],
+  (table) => [index("request_files_request_idx").on(table.requestId), index("request_files_uploader_idx").on(table.uploaderUserId, table.requestId)],
 );
 
 /** Відгук виконавця (справжнього акаунта) на запит: один на пару. */

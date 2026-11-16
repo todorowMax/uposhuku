@@ -11,7 +11,7 @@ import { getDb } from "@/lib/server/db";
 import { runPayReminders } from "@/lib/server/pay-reminders";
 import { pushGlobal } from "@/lib/server/realtime";
 import { askRenewals, expireUnanswered } from "@/lib/server/request-lifetime";
-import { pruneEmailCodes, pruneOrphanAttachments, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
+import { pruneEmailCodes, pruneOrphanAttachments, pruneOrphanRequestFiles, pruneReleaseCodes, pruneSessions } from "@/lib/server/tick-cleanup";
 import { readVar } from "@/lib/server/env";
 import { pruneTelegram } from "@/lib/server/telegram-repo";
 import { closeFinishedPosts, postDueRequests, removeOptedOutPosts, restoreReopenedPosts, syncEditedPosts } from "@/lib/telegram/channel";
@@ -71,6 +71,7 @@ export const POST = async (request: Request) => {
     emailCodes: await step("prune_email_codes", () => pruneEmailCodes(now)),
     releaseCodes: await step("prune_release_codes", () => pruneReleaseCodes(now)),
     chatPhotos: await step("prune_chat_photos", () => pruneOrphanAttachments(now)),
+    requestFiles: await step("prune_request_files", () => pruneOrphanRequestFiles(now)),
   };
   const sweepFailed = failed.includes("sweep");
   return Response.json({ ok: failed.length === 0, failed, ...posted, removed: removal?.removed ?? null, withdrawn: removal?.withdrawn ?? null, edited, closed, reopened, renewalsAsked, expired, sweep, payReminders, purged, pruned }, { status: sweepFailed ? 500 : 200 });

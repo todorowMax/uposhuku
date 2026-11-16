@@ -17,6 +17,7 @@ import { pushGlobal } from "@/lib/server/realtime";
 import { closeRequest, createRequest, findRequest, listOthersOpen, reopenRequest } from "@/lib/server/request-repo";
 import { exhaust, jsonRequest, openRequest, ctxOf } from "../helpers/route-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
+import { PDF_BYTES, attach } from "../helpers/request-file-fixtures";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 const as = (id: string | null) => {
@@ -52,7 +53,7 @@ describe("відновлення закритого запиту", () => {
   });
 
   it("у межах доби запит відновлюється: open, closed_at порожній, createdAt і дані ті самі, feed оновлено, без сповіщень", async () => {
-    const created = await createRequest("rs-cust", { text: "Потрібен сайт для майстерні", budget: 3000, deadline: "week", cityId: "lviv", tags: [{ id: "website", label: "Сайт" }], files: [{ name: "a.pdf", size: 5, type: "" }] });
+    const created = await createRequest("rs-cust", { text: "Потрібен сайт для майстерні", budget: 3000, deadline: "week", cityId: "lviv", tags: [{ id: "website", label: "Сайт" }], files: [{ id: (await attach("rs-cust", "a.pdf", PDF_BYTES)).id }] });
     await send(created.id, "closed");
     const messagesBefore = (await getDb().select().from(messages)).length;
     vi.mocked(pushGlobal).mockClear();

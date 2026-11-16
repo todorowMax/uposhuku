@@ -24,6 +24,7 @@ import { getBucket } from "@/lib/server/uploads";
 import { emptyProfile } from "@/lib/profile/types";
 import { seedBankInvoice, seedComplaint, seedDeal } from "../helpers/account-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
+import { PDF_BYTES, attach, textBytes } from "../helpers/request-file-fixtures";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
@@ -83,7 +84,9 @@ const seedRich = async (an: string) => {
   await getBucket().put(`photos/${an}/a.jpg`, bytes);
   await getBucket().put(`photos/${an}/b.jpg`, bytes);
   // Запит із тегами, файлами, постом у каналі й відгуком чужого виконавця; її відгук на чужий запит.
-  const request = await createRequest(an, { text: "Потрібен сайт", budget: null, deadline: null, cityId: null, tags: [{ id: "site", label: "Сайт" }], files: [{ name: "brief.pdf", size: 10, type: "application/pdf" }] });
+  const request = await createRequest(an, { text: "Потрібен сайт", budget: null, deadline: null, cityId: null, tags: [{ id: "site", label: "Сайт" }], files: [{ id: (await attach(an, "brief.pdf", PDF_BYTES)).id }] });
+  // Ще один файл, завантажений, але не доданий до запиту: теж лишає слід у R2.
+  await attach(an, "draft.txt", textBytes("чернетка"));
   await d.insert(schema.channelPosts).values({ requestId: request.id, chatId: "-100", messageId: 777, status: "posted", postedAt: 1, updatedAt: 1 });
   await saveResponse(perf1, request.id, { price: 100, days: 2, message: "Зроблю" });
   const foreign = await createRequest(cust, { text: "Чужий запит", budget: null, deadline: null, cityId: null, tags: [], files: [] });
@@ -160,6 +163,8 @@ describe("видалення «багатого» акаунта: що з кож
   it("запит, його теги, файли, пост у каналі й чужі відгуки на нього зникли, пост видалено в Telegram", async () => {
     expect(await count("requestTags", mine("request_id", seed.requestId))).toBe(0);
     expect(await count("requestFiles", mine("request_id", seed.requestId))).toBe(0);
+    expect(await count("requestFiles", mine("uploader_user_id", an))).toBe(0);
+    expect(await keysOf("requests/")).toEqual([]);
     expect(await count("channelPosts", mine("request_id", seed.requestId))).toBe(0);
     expect(await count("responses", mine("request_id", seed.requestId))).toBe(0);
     expect(telegram.deleted).toContain(777);

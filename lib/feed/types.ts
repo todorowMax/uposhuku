@@ -3,6 +3,8 @@
 // Стрічка запитів виконавця: що йому показуємо й що він відповідає.
 // Контракт спільний для сервера й клієнта.
 
+import type { RequestFile } from "@/lib/requests/types";
+
 export interface FeedTag {
   id: string;
   label: string;
@@ -38,6 +40,8 @@ export interface FeedItem {
   createdAt: string;
   /** ISO-час останньої правки автором; null, якщо запит не змінювали. */
   editedAt: string | null;
+  /** Файли запиту: стрічка й карта віддаються лише виконавцю з опублікованим профілем, тож список бачить він (байти: `/api/request-files/<id>`). Необов'язкове: власний запит, який карта збирає зі стору (`ownRequestOnMap`), файлів не несе. */
+  files?: RequestFile[];
   /** Скільки виконавців уже відгукнулось. */
   responses: number;
   /** Скільки тегів запиту закриває профіль. */

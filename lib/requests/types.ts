@@ -8,12 +8,26 @@ export interface RequestTag {
   label: string;
 }
 
-/** Файл, прикріплений до запиту. Поки лише опис: R2 ще немає. */
-export interface RequestFile {
+/** Посилання на вже завантажений файл: у чернетці йдуть лише id, ім'я, розмір і тип сервер бере зі свого рядка. */
+export interface RequestFileRef {
+  id: number;
+}
+
+/**
+ * Файл запиту, як його бачать автор і виконавець. Байти лежать у R2 і віддаються через `/api/request-files/<id>`
+ * лише тим, хто має доступ до запиту (`lib/server/request-files.ts`).
+ */
+export interface RequestFile extends RequestFileRef {
   name: string;
   size: number;
+  /** Тип, який визначив сервер за вмістом (не клієнтський). */
   type: string;
+  /** false — старий запис без файла (від часів, коли зберігався лише опис): лише назва, відкрити нічого. */
+  stored: boolean;
 }
+
+/** Адреса, за якою авторизована людина з доступом до запиту відкриває файл. */
+export const requestFileUrl = (id: number) => `/api/request-files/${id}`;
 
 /** Коли потрібен результат. Пресети, а не дата: так швидше обрати, і виконавець бачить масштаб. */
 export const DEADLINES = {
@@ -30,7 +44,7 @@ export const isDeadline = (value: unknown): value is Deadline => typeof value ==
 export interface RequestDraft {
   text: string;
   tags: RequestTag[];
-  files: RequestFile[];
+  files: RequestFileRef[];
   /** Бюджет «до N ₴»; null — не вказано або «за домовленістю». */
   budget?: number | null;
   deadline?: Deadline | null;
@@ -47,6 +61,7 @@ export interface RequestDraft {
 
 export interface PublishedRequest extends RequestDraft {
   id: string;
+  files: RequestFile[];
   status: "open" | "closed";
   /** ISO-час публікації. */
   createdAt: string;

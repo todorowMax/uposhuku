@@ -21,6 +21,7 @@ import { getDb } from "@/lib/server/db";
 import { findRequest, saveResponse, updateRequest } from "@/lib/server/request-repo";
 import { exhaust, jsonRequest, openRequest, ctxOf } from "../helpers/route-fixtures";
 import { makeUser, useTestD1 } from "../helpers/d1";
+import { PNG_BYTES, attach, textBytes } from "../helpers/request-file-fixtures";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 const as = (id: string | null) => {
@@ -55,14 +56,14 @@ describe("PATCH /api/requests/:id: правка", () => {
       cityId: "kyiv",
       channelOptIn: false,
       tags: [{ id: "website", label: "Сайт" }],
-      files: [{ name: "logo.png", size: 900, type: "image/png" }, { name: "text.docx", size: 400, type: "" }],
+      files: [{ id: (await attach("re-cust", "logo.png", PNG_BYTES)).id }, { id: (await attach("re-cust", "notes.txt", textBytes("нотатки"))).id }],
     });
     expect(response.status).toBe(200);
     const after = (await body(response)).request;
     expect(after).toMatchObject({ id: before.id, text: "Потрібен сайт-візитка для майстерні", budget: 12000, deadline: "month", cityId: "kyiv", channelOptIn: false, status: "open", createdAt: before.createdAt });
     expect(after.tags.map((tag) => tag.id)).toContain("website");
     expect(after.tags.map((tag) => tag.id)).not.toContain("telegram-bot");
-    expect(after.files.map((file) => file.name)).toEqual(["logo.png", "text.docx"]);
+    expect(after.files.map((file) => file.name)).toEqual(["logo.png", "notes.txt"]);
     expect(after.editedAt).not.toBeNull();
     const [row] = await getDb().select().from(requests).where(eq(requests.id, before.id));
     expect(row.editCount).toBe(1);

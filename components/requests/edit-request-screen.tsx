@@ -11,9 +11,10 @@ import { RequestParams } from "@/components/composer/request-params";
 import { Attachments } from "@/components/composer/attachments";
 import { Loader2, Paperclip } from "@/components/icons";
 import { EditRequestCloseSheet } from "@/components/requests/parts/edit-request-close-sheet";
-import { MAX_FILES, useEditRequest } from "@/components/requests/use-edit-request";
+import { useEditRequest } from "@/components/requests/use-edit-request";
 import { Button } from "@/components/ui/button";
 import { FileInput } from "@/components/ui/file-input";
+import { REQUEST_FILE_ACCEPT } from "@/lib/requests/file-types";
 import { Field, Textarea } from "@/components/ui/input";
 import { Screen } from "@/components/ui/screen";
 import { REQUEST_TEXT_MAX, type PublishedRequest } from "@/lib/requests/types";
@@ -34,7 +35,6 @@ export const EditRequestScreen = ({ request, offers, onClose, onSaved }: EditReq
   const edit = useEditRequest({ request, onClose, onSaved });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const session = useStore(sessionStore);
-  const attachments = edit.files.map((file, index) => ({ id: `${file.name}-${index}`, file, url: null }));
   return (
     <>
       <Screen
@@ -100,9 +100,9 @@ export const EditRequestScreen = ({ request, offers, onClose, onSaved }: EditReq
             <h3 id="edit-request-files" className="pe-label">
               Файли
             </h3>
-            <Attachments items={attachments} onRemove={edit.detach} />
-            <FileInput ref={fileInputRef} multiple onChange={edit.attach} />
-            <Button variant="quiet" className="-ml-2" disabled={edit.files.length >= MAX_FILES} onClick={() => fileInputRef.current?.click()}>
+            <Attachments items={edit.files.items} notice={edit.files.notice} onRemove={edit.files.remove} />
+            <FileInput ref={fileInputRef} multiple accept={REQUEST_FILE_ACCEPT} onChange={edit.files.pick} />
+            <Button variant="quiet" className="-ml-2" disabled={edit.filesFull} onClick={() => fileInputRef.current?.click()}>
               <Paperclip className="size-4" aria-hidden />
               Додати файл
             </Button>

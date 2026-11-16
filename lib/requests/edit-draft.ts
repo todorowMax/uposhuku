@@ -3,14 +3,15 @@
 // Правка свого запиту: з чого складається форма, чи є що зберігати, яку чернетку слати на PATCH.
 // Чисті функції без React і браузера; екран у `components/requests/edit-request-screen.tsx`.
 
-import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, type Deadline, type RequestDraft, type RequestFile, type RequestTag } from "./types";
+import { REQUEST_TEXT_MAX, REQUEST_TEXT_MIN, type Deadline, type RequestDraft, type RequestFileRef, type RequestTag } from "./types";
 
 /** Що людина бачить у формі правки; чипи умов і теги мапляться в нього без втрат. */
 export interface EditForm {
   text: string;
   /** Усі теги запиту: з тексту й додані вручну, без прибраних. */
   tagIds: string[];
-  files: RequestFile[];
+  /** Файли запиту: збережені й щойно завантажені; на сервер їдуть лише id. */
+  files: RequestFileRef[];
   budget: number | null;
   deadline: Deadline | null;
   /** Своя дата «до»; коли вона є, готовий строк не враховується. */
@@ -57,7 +58,7 @@ export const draftFromForm = (form: EditForm, saved: readonly RequestTag[], labe
   return {
     text: form.text.trim(),
     tags: form.tagIds.map((id) => ({ id, label: known.get(id) ?? labelOf(id) })),
-    files: form.files,
+    files: form.files.map((file) => ({ id: file.id })),
     budget: form.budget,
     deadline: form.deadline,
     deadlineDate: form.deadlineDate,
@@ -67,7 +68,7 @@ export const draftFromForm = (form: EditForm, saved: readonly RequestTag[], labe
 };
 
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
-const fileKeys = (files: readonly RequestFile[]) => files.map((file) => `${file.name}:${file.size}`);
+const fileKeys = (files: readonly RequestFileRef[]) => files.map((file) => String(file.id));
 
 /** Строк змінено? Зі своєю датою готовий строк це знімок і в порівнянні не бере участі. */
 const deadlineChanged = (before: EditForm, form: EditForm) => before.deadlineDate !== form.deadlineDate || (form.deadlineDate === null && before.deadline !== form.deadline);

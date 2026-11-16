@@ -5,6 +5,7 @@
 import { problem, readJson } from "@/lib/api/problem";
 import { createRequest, listRequests, responseCounts } from "@/lib/server/request-repo";
 import { parseDraft } from "@/lib/requests/parse-draft";
+import { checkDraftFiles } from "@/lib/server/request-files";
 import { phoneGate } from "@/lib/server/phone-gate";
 import { pushGlobal } from "@/lib/server/realtime";
 import { EVENTS } from "@/lib/telemetry/events";
@@ -19,6 +20,8 @@ export const POST = route({ auth: "user", rate: "requestCreate", unauthorized: (
   if (phone) return phone;
   const draft = parseDraft(await readJson(request), { now: new Date() });
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
+  const filesError = await checkDraftFiles(user.id, null, draft.files);
+  if (filesError) return problem(400, "Файли не прийнято", filesError);
   const created = await createRequest(user.id, draft);
   // Слова, яких словник не знає, лічимо без зв'язку з людиною: звідти росте словник. Після відповіді, помилка не страшна.
   const counting = recordUnknownTerms(draft.text);

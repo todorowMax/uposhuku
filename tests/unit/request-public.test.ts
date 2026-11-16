@@ -10,6 +10,7 @@ import {
   saveResponse,
 } from "@/lib/server/request-repo";
 import { makeUser, useTestD1 } from "../helpers/d1";
+import { PDF_BYTES, attach } from "../helpers/request-file-fixtures";
 
 let ctx: Awaited<ReturnType<typeof useTestD1>>;
 beforeAll(async () => {
@@ -21,7 +22,7 @@ afterAll(async () => {
   await ctx.close();
 });
 
-const publish = (over: { channelOptIn?: boolean; text?: string } = {}) =>
+const publish = async (over: { channelOptIn?: boolean; text?: string } = {}) =>
   createRequest("pb-author", {
     text:
       over.text ??
@@ -30,7 +31,7 @@ const publish = (over: { channelOptIn?: boolean; text?: string } = {}) =>
     deadline: "week",
     cityId: "lviv",
     tags: [{ id: "website", label: "Сайт" }],
-    files: [{ name: "brief.pdf", size: 1200, type: "application/pdf" }],
+    files: [{ id: (await attach("pb-author", "brief.pdf", PDF_BYTES)).id }],
     channelOptIn: over.channelOptIn,
   });
 
