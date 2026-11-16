@@ -18,7 +18,8 @@ import { PATCH } from "@/app/api/requests/[id]/route";
 import { POST as publish } from "@/app/api/requests/route";
 import { requestFiles } from "@/db/schema";
 import { feedPage, mapRequests } from "@/lib/feed/feed";
-import { REQUEST_FILES_PENDING_MAX, REQUEST_FILES_TOTAL_BYTES, REQUEST_FILE_MAX_BYTES, REQUEST_FILE_ORPHAN_MS, detectRequestFile, sanitizeFileName } from "@/lib/requests/file-types";
+import { REQUEST_FILES_MAX, REQUEST_FILES_PENDING_MAX, REQUEST_FILES_TOTAL_BYTES, REQUEST_FILE_MAX_BYTES, REQUEST_FILE_ORPHAN_MS, detectRequestFile, sanitizeFileName } from "@/lib/requests/file-types";
+import { parseDraft } from "@/lib/requests/parse-draft";
 import type { PublishedRequest } from "@/lib/requests/types";
 import { getDb } from "@/lib/server/db";
 import { readableRequestFile, saveRequestFile } from "@/lib/server/request-files";
@@ -263,5 +264,16 @@ describe("DELETE /api/request-files/:id і чистка осиротілих", (
     expect(await getDb().select().from(requestFiles).where(eq(requestFiles.id, fresh.id))).toHaveLength(1);
     expect(await getDb().select().from(requestFiles).where(eq(requestFiles.id, attachedOld.id))).toHaveLength(1);
     expect(await pruneOrphanRequestFiles(now)).toBe(0);
+  });
+});
+
+describe("parseDraft: файли в чернетці", () => {
+  const parse = (files: unknown[]) => parseDraft({ text: "Потрібен сайт для кав'ярні", files }, { now: new Date() });
+
+  it("лишає тільки додатні цілі id без дублів, імена й розміри з клієнта ігнорує, не більше десяти", () => {
+    const draft = parse([{ id: 1, name: "x.pdf", size: 5 }, { id: 1 }, { id: -3 }, { id: "2" }, { id: 1.5 }, { id: 0 }, null, { name: "без id" }, { id: 7 }]);
+    expect(typeof draft === "string" ? draft : draft.files).toEqual([{ id: 1 }, { id: 7 }]);
+    const many = parse(Array.from({ length: 30 }, (_, index) => ({ id: index + 1 })));
+    expect(typeof many === "string" ? [] : many.files).toHaveLength(REQUEST_FILES_MAX);
   });
 });

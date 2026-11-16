@@ -1,5 +1,5 @@
 ---
-paths: ["**/lib/requests/**", "**/components/requests/**", "**/lib/feed/**", "**/lib/server/request-repo.ts", "**/app/api/requests/**", "**/app/api/feed/**", "**/app/zapyt/**", "**/components/request-page/**"]
+paths: ["**/lib/requests/**", "**/components/requests/**", "**/lib/feed/**", "**/lib/server/request-repo.ts", "**/app/api/requests/**", "**/app/api/request-files/**", "**/lib/server/request-files.ts", "**/app/api/feed/**", "**/app/zapyt/**", "**/components/request-page/**"]
 trigger: touching requests (publish, edit, restore, feed, request pin on the map)
 ---
 # Requests
@@ -12,4 +12,5 @@ Feature doc: `docs/features/requests.md` (edit, restore window, remote pin, chan
 - Response status (`new | shortlisted | declined | chosen`) is set only by the request author and is never shown to the performer.
 - Deadline: the bucket `deadline` stays and drives filters, ranking and matching; a custom date (`deadlineDate`, `YYYY-MM-DD`, Kyiv calendar day, today..+365) derives the bucket once at save time and is never re-derived later. Show deadlines only through `deadlineText` / `deadlineLabel` in `lib/requests/format.ts`.
 - Neither edit nor restore sends "new request for your tags" notifications. Deals are not changed by an edit: their terms live in the deal.
+- Files: uploaded to R2 first (`POST /api/request-files`, signed-in only), the draft carries only file ids, the server reads name, size and type from its own row and decides the type by extension plus magic bytes (never the client `Content-Type`). Bytes are served only through `GET /api/request-files/:id` (author, performer with a published profile while the request is open, or a performer who responded); never through a public URL, never in `PublicRequest` or to guests.
 - A request without a city is pinned at a stable offset by id (`lib/feed/request-point.ts`); do not randomise it.
