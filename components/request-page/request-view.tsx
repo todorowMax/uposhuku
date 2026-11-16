@@ -2,7 +2,7 @@ import Link from "next/link";
 import { RespondAction } from "@/components/request-page/respond-action";
 import { CITIES } from "@/lib/map/cities";
 import { requestTitle, type PublicRequest } from "@/lib/requests/public";
-import { DEADLINES } from "@/lib/requests/types";
+import { deadlineLabel } from "@/lib/requests/format";
 import { tagLabel } from "@/lib/tags/engine";
 
 export namespace RequestViewTypes {
@@ -115,9 +115,7 @@ export const RequestView = ({ request }: RequestViewTypes.Props) => {
                     : "За домовленістю"}
                 </Fact>
                 <Fact label="Термін">
-                  {request.deadline
-                    ? DEADLINES[request.deadline]
-                    : "Не вказано"}
+                  {deadlineLabel(request, new Date()) ?? "Не вказано"}
                 </Fact>
                 <Fact label="Опубліковано">
                   <time dateTime={request.createdAt}>

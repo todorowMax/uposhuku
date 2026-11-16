@@ -29,6 +29,7 @@ interface Raw {
   place: string;
   budget: string | null;
   deadline: string | null;
+  deadlineDate: string | null;
   createdAt: string;
   editedAt: string | null;
   responses: number;
@@ -51,6 +52,7 @@ const toRaw = (request: PublishedRequest, responses: number, own: boolean): Raw 
   place: request.cityId ? cityName(request.cityId) : "Віддалено",
   budget: request.budget ? money(request.budget) : null,
   deadline: request.deadline ? DEADLINES[request.deadline] : null,
+  deadlineDate: request.deadlineDate ?? null,
   createdAt: request.createdAt,
   editedAt: request.editedAt,
   responses,
@@ -81,6 +83,7 @@ const toItem = (raw: Raw, viewer: Viewer, mine: Map<string, MyResponse> | null):
     sameCity: isSameCity(viewer.cityId, raw.cityId),
     budget: raw.budget,
     deadline: raw.deadline,
+    deadlineDate: raw.deadlineDate,
     createdAt: raw.createdAt,
     editedAt: raw.editedAt,
     responses: raw.responses,

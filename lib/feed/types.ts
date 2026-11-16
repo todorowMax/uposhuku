@@ -31,8 +31,10 @@ export interface FeedItem {
   sameCity: boolean;
   /** Бюджет, якщо замовник його вказав. */
   budget: string | null;
-  /** Коли потрібен результат: «Терміново, до 3 днів». */
+  /** Підпис готового строку: «Терміново, до 3 днів» (за ним працює фільтр «Терміново»; для показу див. `deadlineDate`). */
   deadline: string | null;
+  /** Своя дата «до» (`YYYY-MM-DD`); null — готовий строк. Підпис для людини дає `deadlineText` (`lib/requests/format.ts`). */
+  deadlineDate: string | null;
   createdAt: string;
   /** ISO-час останньої правки автором; null, якщо запит не змінювали. */
   editedAt: string | null;

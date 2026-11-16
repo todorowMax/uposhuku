@@ -13,6 +13,8 @@ export interface PublicRequest {
   tags: RequestTag[];
   budget: number | null;
   deadline: Deadline | null;
+  /** Своя дата «до» (`YYYY-MM-DD`); null — готовий строк. */
+  deadlineDate: string | null;
   cityId: string | null;
   status: "open" | "closed";
   /** ISO-час публікації. */

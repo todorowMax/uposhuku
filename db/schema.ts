@@ -154,6 +154,8 @@ export const requests = sqliteTable(
     text: text("text").notNull(),
     budget: integer("budget"),
     deadline: text("deadline"),
+    /** Своя дата «до» (`YYYY-MM-DD`, календарна дата за Києвом); null — обрано готовий строк. `deadline` лишається знімком на момент збереження. */
+    deadlineDate: text("deadline_date"),
     cityId: text("city_id"),
     status: text("status", { enum: ["open", "closed"] }).notNull().default("open"),
     /** Можна показати запит у публічному Telegram-каналі (без контактів, з відгуком лише на платформі). */

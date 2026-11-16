@@ -13,6 +13,8 @@ export interface EditForm {
   files: RequestFile[];
   budget: number | null;
   deadline: Deadline | null;
+  /** Своя дата «до»; коли вона є, готовий строк не враховується. */
+  deadlineDate: string | null;
   cityId: string | null;
   channel: boolean;
 }
@@ -44,6 +46,7 @@ export const formFromRequest = (request: RequestDraft): EditForm => ({
   files: request.files,
   budget: request.budget ?? null,
   deadline: request.deadline ?? null,
+  deadlineDate: request.deadlineDate ?? null,
   cityId: request.cityId ?? null,
   channel: request.channelOptIn !== false,
 });
@@ -57,6 +60,7 @@ export const draftFromForm = (form: EditForm, saved: readonly RequestTag[], labe
     files: form.files,
     budget: form.budget,
     deadline: form.deadline,
+    deadlineDate: form.deadlineDate,
     cityId: form.cityId,
     channelOptIn: form.channel,
   };
@@ -65,13 +69,16 @@ export const draftFromForm = (form: EditForm, saved: readonly RequestTag[], labe
 const sameList = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((item, index) => item === b[index]);
 const fileKeys = (files: readonly RequestFile[]) => files.map((file) => `${file.name}:${file.size}`);
 
+/** Строк змінено? Зі своєю датою готовий строк це знімок і в порівнянні не бере участі. */
+const deadlineChanged = (before: EditForm, form: EditForm) => before.deadlineDate !== form.deadlineDate || (form.deadlineDate === null && before.deadline !== form.deadline);
+
 /** Форма відрізняється від збереженого запиту? Порядок тегів не важливий, порядок файлів важливий. */
 export const formChanged = (saved: RequestDraft, form: EditForm): boolean => {
   const before = formFromRequest(saved);
   return (
     before.text !== form.text.trim() ||
     before.budget !== form.budget ||
-    before.deadline !== form.deadline ||
+    deadlineChanged(before, form) ||
     before.cityId !== form.cityId ||
     before.channel !== form.channel ||
     !sameList([...before.tagIds].sort(), [...form.tagIds].sort()) ||

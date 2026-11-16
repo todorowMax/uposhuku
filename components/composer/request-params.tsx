@@ -11,7 +11,7 @@ import { BudgetPop, CityPop, DeadlinePop } from "@/components/composer/parts/par
 import { ParamPopup } from "@/components/composer/parts/param-popup";
 import { EMPTY_PARAMS, useRequestParams, type RequestParamsTypes } from "@/components/composer/use-request-params";
 import { Button } from "@/components/ui/button";
-import { DEADLINES } from "@/lib/requests/types";
+import { deadlineLabel } from "@/lib/requests/format";
 
 export type RequestParamsValue = RequestParamsTypes.Value;
 export { EMPTY_PARAMS };
@@ -54,7 +54,7 @@ export const RequestParams = ({ value, onChange }: RequestParamsScreenTypes.Prop
   return (
     <div className="composer-params" role="group" aria-label="Умови запиту">
       {chip("budget", <Wallet className="size-3.5 shrink-0" />, "Бюджет", value.budget ? `до ${PRICE.format(value.budget)} ₴` : null, params.clearBudget, <BudgetPop value={value} params={params} />)}
-      {chip("deadline", <CalendarClock className="size-3.5 shrink-0" />, "Термін", value.deadline ? DEADLINES[value.deadline] : null, () => params.set({ deadline: null }), <DeadlinePop value={value} params={params} />)}
+      {chip("deadline", <CalendarClock className="size-3.5 shrink-0" />, "Термін", deadlineLabel(value, new Date()), params.clearDeadline, <DeadlinePop value={value} params={params} />)}
       {chip("city", <MapPin className="size-3.5 shrink-0" />, "Де", place, () => params.set({ cityId: null, remote: false }), <CityPop value={value} params={params} />, true)}
       {params.channelEnabled && (
         <span className="param-chip" data-filled={value.channel || undefined}>

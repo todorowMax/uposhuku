@@ -218,6 +218,7 @@ export function RequestComposer() {
       files: [],
       budget: params.budget,
       deadline: params.deadline,
+      deadlineDate: params.deadlineDate,
       cityId: params.cityId,
       channelOptIn: params.channel,
     };

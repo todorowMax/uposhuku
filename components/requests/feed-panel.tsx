@@ -18,7 +18,7 @@ import type { PlacementTier } from "@/lib/map/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
-import { daysLabel, plural, priceLabel } from "@/lib/requests/format";
+import { daysLabel, deadlineText, plural, priceLabel } from "@/lib/requests/format";
 import { useStore } from "@/lib/store";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
@@ -238,6 +238,7 @@ export function FeedCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
+  const deadline = deadlineText(item.deadline, item.deadlineDate, new Date());
 
   useLayoutEffect(() => {
     if (!formOpen || !formRef.current || prefersReducedMotion()) return;
@@ -314,10 +315,10 @@ export function FeedCard({
             {item.budget}
           </span>
         )}
-        {item.deadline && (
+        {deadline && (
           <span className="inline-flex items-center gap-1 font-medium text-ink">
             <CalendarClock className="size-3.5" />
-            {item.deadline}
+            {deadline}
           </span>
         )}
         <span>

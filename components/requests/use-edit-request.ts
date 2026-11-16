@@ -30,6 +30,7 @@ const paramsOf = (request: PublishedRequest): RequestParamsValue => ({
   ...EMPTY_PARAMS,
   budget: request.budget ?? null,
   deadline: request.deadline ?? null,
+  deadlineDate: request.deadlineDate ?? null,
   cityId: request.cityId ?? null,
   remote: initialRemote(request.cityId),
   channel: request.channelOptIn !== false,
@@ -50,7 +51,7 @@ export const useEditRequest = ({ request, onClose, onSaved }: EditRequestTypes.O
   const [error, setError] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
 
-  const form: EditForm = { text, tagIds: tags.selected, files, budget: params.budget, deadline: params.deadline, cityId: params.cityId, channel: params.channel };
+  const form: EditForm = { text, tagIds: tags.selected, files, budget: params.budget, deadline: params.deadline, deadlineDate: params.deadlineDate, cityId: params.cityId, channel: params.channel };
   const dirty = formChanged(request, form);
   const canSave = canSaveEdit(request, form);
   const tooShort = text.trim().length < REQUEST_TEXT_MIN;
