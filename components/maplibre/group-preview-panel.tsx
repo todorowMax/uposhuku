@@ -5,13 +5,13 @@
 // Список людей групи під курсором (десктоп): заголовок, прокручувана стопка рядків і під нею коротка картка
 // активного рядка, тобто того, що прокрутка поставила нагору (data-centered від сцени). Картка частина панелі,
 // а не окреме вікно збоку: вона стоїть там, де курсор, не закриває маркер і не залежить від ширини вікна.
-// «Написати» стоїть окремою кнопкою під карткою, а зона панелі для курсора доходить до її низу: тягнучись до кнопки, список не зникає.
+// «Профіль» і «Написати» стоять двома кнопками в самому низу картки, а зона панелі для курсора доходить до її низу: тягнучись до кнопки, список не зникає.
 // Наведення мишею картку не перемикає. Саму панель (місце, поява, відстеження курсора) веде сцена.
 
 import { useState } from "react";
 import type { RefObject, UIEventHandler } from "react";
 import { PerformerShortCard } from "@/components/maplibre/performer-short-card";
-import { ChevronRight, MessageSquareText } from "@/components/icons";
+import { ChevronRight, MessageSquareText, UserRound, X } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { CITIES } from "@/lib/map/cities";
 import { avatarBackground } from "@/lib/map/avatar-style";
@@ -27,6 +27,8 @@ export namespace GroupPreviewPanelTypes {
     listRef: RefObject<HTMLUListElement | null>;
     onScroll: UIEventHandler<HTMLUListElement>;
     onOpenPerson: (performer: Performer) => void;
+    /** Закрити список хрестиком: на дотик чи у вузькому вікні курсором його не прибереш. */
+    onClose: () => void;
     /** «Написати» з картки активної людини, ще до її профілю. */
     onWrite: (performer: Performer) => void;
     onOpenRequest: (request: MapRequest) => void;
@@ -40,7 +42,7 @@ const scrollRowIntoStack = (list: HTMLUListElement | null, item: HTMLElement | n
   list.scrollTo({ top: item.offsetTop - first.offsetTop, behavior: reduce ? "auto" : "smooth" });
 };
 
-export const GroupPreviewPanel = ({ members, requests, listRef, onScroll, onOpenPerson, onWrite, onOpenRequest }: GroupPreviewPanelTypes.Props) => {
+export const GroupPreviewPanel = ({ members, requests, listRef, onScroll, onOpenPerson, onClose, onWrite, onOpenRequest }: GroupPreviewPanelTypes.Props) => {
   const [activeId, setActiveId] = useState<string | null>(members[0]?.id ?? null);
   const active = members.find((performer) => performer.id === activeId);
 
@@ -53,7 +55,12 @@ export const GroupPreviewPanel = ({ members, requests, listRef, onScroll, onOpen
 
   return (
     <>
-      <p className="group-preview-title">{groupTitle(members.length, requests.length)}</p>
+      <div className="group-preview-head">
+        <p className="group-preview-title">{groupTitle(members.length, requests.length)}</p>
+        <Button variant="icon" className="group-preview-close" aria-label="Закрити список" onClick={onClose}>
+          <X aria-hidden className="size-4" />
+        </Button>
+      </div>
       <ul ref={listRef} className="group-preview-list" style={{ "--rows": members.length + requests.length } as React.CSSProperties} onScroll={handleScroll} aria-label="Виконавці й запити у групі">
         {members.map((performer) => (
           <li key={performer.id} data-person={performer.id}>
@@ -87,14 +94,25 @@ export const GroupPreviewPanel = ({ members, requests, listRef, onScroll, onOpen
       </ul>
       {active && (
         <div key={active.id} role="group" aria-label={`Коротко про ${active.name}`} className="group-preview-card">
-          <PerformerShortCard performer={active} cityName={CITIES.find((city) => city.id === active.cityId)?.name} />
+          <PerformerShortCard
+            performer={active}
+            cityName={CITIES.find((city) => city.id === active.cityId)?.name}
+            actions={
+              <>
+                <Button variant="quiet" onClick={() => onOpenPerson(active)}>
+                  <UserRound aria-hidden className="size-4" />
+                  Профіль
+                </Button>
+                {!active.mine && (
+                  <Button variant="offer" onClick={() => onWrite(active)}>
+                    <MessageSquareText aria-hidden className="size-4" />
+                    Написати
+                  </Button>
+                )}
+              </>
+            }
+          />
         </div>
-      )}
-      {active && !active.mine && (
-        <Button variant="offer" className="group-preview-write" onClick={() => onWrite(active)}>
-          <MessageSquareText aria-hidden className="size-4" />
-          Написати
-        </Button>
       )}
     </>
   );

@@ -82,7 +82,7 @@
 */
 .group-preview-card {
   overflow: hidden;
-  min-height: 172px;
+  min-height: 250px;
   margin-inline: 36px;
   padding: 14px;
   border: 1px solid var(--line);
@@ -91,11 +91,11 @@
   box-shadow: var(--shadow-window);
 }
 
-/* «Написати» під карткою: невелика кнопка по центру, окремо від картки. */
-.group-preview-write {
-  justify-self: center;
-  margin-top: 4px;
-  padding-inline: 18px;
+/* Дві кнопки в самому низу картки: «Профіль» і «Написати» порівну по ширині. */
+.short-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .group-preview-card .short-card-tags {
@@ -186,4 +186,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 8px;
+}
+
+/* Телефон: картка під стопкою групи майже на всю ширину панелі. */
+@media (max-width: 639px) {
+  .group-preview-card {
+    margin-inline: 8px;
+  }
 }

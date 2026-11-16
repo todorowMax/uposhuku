@@ -5,7 +5,7 @@
 // Шторки карти на дотик: карусель коротких карток групи й коротка картка одиночного маркера. Стан і жести
 // дає use-touch-sheets.ts; тут лише розмітка. Шторка — спільний примітив (фокус, Escape, свайп вниз).
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { PerformerShortCard } from "@/components/maplibre/performer-short-card";
 import { useProposeWork } from "@/components/maplibre/use-propose-work";
 import { writeToPerformer } from "@/components/maplibre/write-to-performer";
@@ -78,6 +78,9 @@ const GroupSheet = ({
           <SheetTitle className="min-w-0 flex-1 truncate text-base font-semibold text-ink">{groupTitle(group.members.length, group.requests.length)}</SheetTitle>
           <Button variant="secondary" onClick={onZoom}>
             Наблизити
+          </Button>
+          <Button variant="icon" aria-label="Закрити" onClick={onClose}>
+            <X aria-hidden className="size-4" />
           </Button>
         </div>
         <ul ref={listRef} className="group-carousel" onScroll={onScroll} aria-label="Виконавці й запити у групі">

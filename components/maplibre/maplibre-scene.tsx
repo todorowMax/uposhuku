@@ -1807,11 +1807,16 @@ export default function MapLibreScene() {
     if (!list) return;
     const box = list.getBoundingClientRect();
     const shadowSpace = Math.max(0, Number.parseFloat(getComputedStyle(list).paddingLeft) - 8);
-    // Картка активної людини й «Написати» під нею входять в зону панелі: курсор на них не закриває список.
-    const tail = groupRef.current?.querySelectorAll(".group-preview-card, .group-preview-write");
-    const last = tail?.[tail.length - 1];
-    const bottom = (last ? last.getBoundingClientRect().bottom : box.bottom) - 16;
-    const inside = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < bottom;
+    // Картка активної людини (з «Написати») стоїть під списком і входить в зону панелі: курсор на ній не закриває список.
+    const card = groupRef.current?.querySelector(".group-preview-card")?.getBoundingClientRect();
+    const overCard = Boolean(card && x >= card.left && x <= card.right && y >= card.top && y <= card.bottom);
+    const overList = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < box.bottom - 16;
+    // Проміжок між списком і карткою теж зона панелі.
+    const inGap = Boolean(card && x >= card.left && x <= card.right && y > box.bottom - 16 && y < card.top);
+    // Шапка з хрестиком теж зона панелі: тягнучись до нього, список не зникає.
+    const head = groupRef.current?.querySelector(".group-preview-head")?.getBoundingClientRect();
+    const overHead = Boolean(head && x >= head.left && x <= head.right && y >= head.top && y <= box.top + 16);
+    const inside = overList || overCard || inGap || overHead;
     if (inside === groupPointerInsideRef.current) return;
     groupPointerInsideRef.current = inside;
     if (inside) lensControlRef.current.enterPanel();
@@ -1952,6 +1957,7 @@ export default function MapLibreScene() {
             listRef={groupListRef}
             onScroll={updateGroupStack}
             onOpenPerson={openFromGroup}
+            onClose={() => lensControlRef.current.hide(true)}
             onWrite={(performer) => {
               lensControlRef.current.hide(true);
               writeToPerformer(performer.id);

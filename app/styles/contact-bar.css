@@ -53,27 +53,38 @@
 
 /* Велике поле: текст зверху, внизу «Скасувати» ліворуч і «Надіслати» праворуч. */
 .contact-bar-form {
+  position: relative;
   display: grid;
-  gap: 4px;
-  padding: 14px 8px 8px 16px;
+  gap: 6px;
+  padding: 14px 10px 10px 16px;
+}
+
+/* Хрестик у правому верхньому куті поля, як у вікон: не займає свого рядка й не зсуває текст. */
+.contact-bar-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
 }
 
 .contact-bar-form .contact-bar-text {
   width: 100%;
   min-width: 0;
-  /* Довге слово без пробілів переноситься, а не розпирає поле вбік; текст, що не вліз, прокручується по вертикалі. */
-  max-height: none;
-  padding: 0 8px 0 0;
+  /* Велике поле: від чверті висоти екрана, росте під текст до 45 % і далі прокручується по вертикалі.
+     Довге слово без пробілів переноситься, а не розпирає поле вбік. */
+  min-height: max(160px, 24dvh);
+  max-height: 45dvh;
+  padding: 0 34px 0 0;
   overflow-x: hidden;
   overflow-y: auto;
   overflow-wrap: anywhere;
-  field-sizing: fixed;
+  field-sizing: content;
 }
 
 .contact-bar-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
 }
 
 .contact-bar-note {

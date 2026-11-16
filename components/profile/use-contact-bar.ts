@@ -12,7 +12,6 @@ import { gsap } from "gsap";
 import type { Flip } from "gsap/Flip";
 import { draftLimit } from "@/lib/chat/draft-limit";
 import { sendErrorText, type SendResult } from "@/lib/chat/send-result";
-import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { prefersReducedMotion } from "@/lib/ui/media";
 
 export namespace ContactBarTypes {
@@ -29,8 +28,7 @@ export const useContactBar = ({ onStart, onSend }: ContactBarTypes.Options) => {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Поле росте під текст до 9 рядків, далі прокручується всередині по вертикалі; цей же ref ставить у нього фокус.
-  const textRef = useAutoGrow(draft, 9);
+  const textRef = useRef<HTMLTextAreaElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const flipRef = useRef<typeof Flip | null>(null);
   const stateRef = useRef<Flip.FlipState | null>(null);

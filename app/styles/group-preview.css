@@ -12,8 +12,28 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
-  /* Заголовок, стопка, картка активної людини, «Написати». */
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  /* Заголовок, стопка, картка активної людини. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.group-preview-head {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+/* Хрестик праворуч від заголовка групи: лише на телефоні, де список не закриєш відведенням курсора. */
+.group-preview-head .group-preview-close {
+  display: none;
+}
+
+.group-preview-close {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  translate: 0 -50%;
+  background: rgb(255 255 255 / 92%);
+  box-shadow: 0 6px 20px rgb(45 60 67 / 10%);
 }
 
 .group-preview-title {
@@ -154,5 +174,20 @@
 
   .group-preview-list {
     scroll-behavior: auto;
+  }
+}
+
+/* Телефон: список і картка майже на всю ширину екрана, а хрестик закриває список. */
+@media (max-width: 639px) {
+  .group-preview {
+    width: min(420px, calc(100vw - 24px));
+  }
+
+  .group-preview-list {
+    padding-inline: 20px;
+  }
+
+  .group-preview-head .group-preview-close {
+    display: grid;
   }
 }

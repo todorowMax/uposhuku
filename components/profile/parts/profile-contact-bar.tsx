@@ -58,6 +58,9 @@ export const ProfileContactBar = ({ performerName, hasDialog, onOpenChat, onStar
               void submit();
             }}
           >
+            <Button variant="icon" className="contact-bar-close" aria-label="Скасувати" onClick={cancel}>
+              <X aria-hidden className="size-4" />
+            </Button>
             <label htmlFor="profile-task" className="sr-only">
               {`Опишіть задачу для ${firstName}`}
             </label>
@@ -66,7 +69,7 @@ export const ProfileContactBar = ({ performerName, hasDialog, onOpenChat, onStar
               ref={textRef}
               variant="chat"
               className="contact-bar-text"
-              rows={5}
+              rows={6}
               value={draft}
               onChange={(event) => type(event.target.value)}
               onKeyDown={(event) => {
@@ -78,9 +81,6 @@ export const ProfileContactBar = ({ performerName, hasDialog, onOpenChat, onStar
               placeholder={`Опишіть задачу для ${firstName}: що потрібно зробити, строки й бюджет`}
             />
             <div className="contact-bar-actions">
-              <Button variant="icon" aria-label="Скасувати" onClick={cancel}>
-                <X aria-hidden className="size-4" />
-              </Button>
               <Button type="submit" variant="bare" className="dm-send" aria-label="Надіслати" disabled={!canSend}>
                 <Send aria-hidden className="size-4" />
               </Button>

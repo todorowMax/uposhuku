@@ -17,10 +17,12 @@ export namespace PerformerShortCardTypes {
   export interface Props extends Omit<React.ComponentProps<"div">, "children"> {
     performer: Performer;
     cityName?: string;
+    /** Кнопки в самому низу картки (два стовпці), наприклад «Профіль» і «Написати». */
+    actions?: React.ReactNode;
   }
 }
 
-export const PerformerShortCard = ({ performer, cityName, className, ...props }: PerformerShortCardTypes.Props) => {
+export const PerformerShortCard = ({ performer, cityName, actions, className, ...props }: PerformerShortCardTypes.Props) => {
   const verified = performer.stats?.verifiedReviews ?? 0;
   const stats = shortStats(performer.stats);
   const tags = performer.tags.slice(0, MAX_TAGS);
@@ -60,6 +62,7 @@ export const PerformerShortCard = ({ performer, cityName, className, ...props }:
           ))}
         </div>
       )}
+      {actions && <div className="short-card-actions">{actions}</div>}
     </div>
   );
 };
