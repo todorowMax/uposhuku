@@ -8,7 +8,7 @@ const saved: RequestDraft = {
     { id: "telegram-bot", label: "Telegram-бот" },
     { id: "online-booking", label: "Онлайн-запис" },
   ],
-  files: [{ name: "brief.pdf", size: 1200, type: "application/pdf" }],
+  files: [{ id: 7 }],
   budget: 15000,
   deadline: "week",
   cityId: "lviv",
@@ -40,6 +40,8 @@ describe("правка запиту: що змінилось", () => {
     ["тег додано", { tagIds: ["telegram-bot", "online-booking", "crm"] }],
     ["тег знято", { tagIds: ["telegram-bot"] }],
     ["файл прибрано", { files: [] }],
+    ["файл додано", { files: [{ id: 7 }, { id: 8 }] }],
+    ["файл замінено", { files: [{ id: 8 }] }],
   ])("помічає зміну: %s", (_name, patch) => {
     expect(formChanged(saved, { ...formFromRequest(saved), ...patch })).toBe(true);
   });
@@ -74,7 +76,7 @@ describe("правка запиту: чернетка для сервера", ()
         { id: "telegram-bot", label: "Telegram-бот" },
         { id: "crm", label: "Назва crm" },
       ],
-      files: saved.files,
+      files: [{ id: 7 }],
       budget: null,
       deadline: "week",
       deadlineDate: null,

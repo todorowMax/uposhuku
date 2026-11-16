@@ -14,6 +14,7 @@ import { addReview, getReviewStats, reviewOfDeal, reviewsFor } from "@/lib/serve
 import { findDisputeAttachment, getDisputeCard, listDisputes } from "@/lib/server/admin-repo";
 import { allPerformerStats, performerStatsOf } from "@/lib/server/stats-repo";
 import { makeUser, makeUsers, rowChunks, seedProfiles, useTestD1 } from "../helpers/d1";
+import { PDF_BYTES, attach } from "../helpers/request-file-fixtures";
 
 /** «Заморожено» ставить лише банк: у тесті підставляємо його підтвердження холду. */
 const fundByBank = async (dealId: string, at: number) => {
@@ -104,14 +105,14 @@ describe("запити на D1", () => {
     const created = await createRequest("c1", {
       text: "Потрібен сайт",
       tags: [{ id: "website", label: "Сайт" }, { id: "website", label: "Сайт" }],
-      files: [{ name: "brief.pdf", size: 1200, type: "application/pdf" }],
+      files: [{ id: (await attach("c1", "brief.pdf", PDF_BYTES)).id }],
       budget: 15000,
       deadline: "week",
       cityId: "kyiv",
     });
     expect(created).toMatchObject({ status: "open", budget: 15000, deadline: "week", cityId: "kyiv" });
     expect(created.tags).toEqual([{ id: "website", label: "Сайт" }]);
-    expect(created.files).toEqual([{ name: "brief.pdf", size: 1200, type: "application/pdf" }]);
+    expect(created.files).toEqual([{ id: expect.any(Number), name: "brief.pdf", size: PDF_BYTES.length, type: "application/pdf", stored: true }]);
     expect(await findRequest("c1", created.id)).toMatchObject({ id: created.id });
     expect(await findRequest("c2", created.id)).toBeNull();
   });

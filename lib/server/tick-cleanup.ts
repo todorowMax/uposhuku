@@ -4,8 +4,9 @@
 // Кожна функція самостійна і повертає, скільки рядків прибрала; крок у tick обгорнуто в try/catch окремо.
 
 import { and, inArray, isNull, lt, or } from "drizzle-orm";
-import { chatAttachments, dealReleaseCodes, emailCodes, sessions } from "@/db/schema";
+import { chatAttachments, dealReleaseCodes, emailCodes, requestFiles, sessions } from "@/db/schema";
 import { SESSION_IDLE_MS } from "@/lib/auth/config";
+import { REQUEST_FILE_ORPHAN_MS } from "@/lib/requests/file-types";
 import { getDb } from "./db";
 import { getBucket } from "./uploads";
 
@@ -36,5 +37,20 @@ export const pruneOrphanAttachments = async (now = Date.now()): Promise<number> 
   if (orphans.length === 0) return 0;
   await getBucket().delete(orphans.map((row) => row.key));
   await db.delete(chatAttachments).where(inArray(chatAttachments.id, orphans.map((row) => row.id)));
+  return orphans.length;
+};
+
+/** Файли запитів, завантажені, але так і не додані до збереженого запиту понад добу: R2 і рядок. Спершу R2, як для фото чату. */
+export const pruneOrphanRequestFiles = async (now = Date.now()): Promise<number> => {
+  const db = getDb();
+  const orphans = await db
+    .select({ id: requestFiles.id, key: requestFiles.key })
+    .from(requestFiles)
+    .where(and(isNull(requestFiles.requestId), lt(requestFiles.createdAt, now - REQUEST_FILE_ORPHAN_MS)))
+    .limit(ORPHAN_BATCH);
+  if (orphans.length === 0) return 0;
+  const keys = orphans.flatMap((row) => (row.key ? [row.key] : []));
+  if (keys.length) await getBucket().delete(keys);
+  await db.delete(requestFiles).where(inArray(requestFiles.id, orphans.map((row) => row.id)));
   return orphans.length;
 };

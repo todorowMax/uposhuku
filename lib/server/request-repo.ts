@@ -2,7 +2,7 @@
 //
 // Запити замовників і відгуки виконавців на D1.
 
-import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, notInArray } from "drizzle-orm";
 import { requestFiles, requestTags, requests, responses } from "@/db/schema";
 import type { MyResponse } from "@/lib/feed/types";
 import type { PublishedRequest, RequestDraft } from "@/lib/requests/types";
@@ -12,6 +12,7 @@ import { newId } from "@/lib/ids";
 import { stripContacts } from "@/lib/chat/contacts";
 import type { PublicRequest } from "@/lib/requests/public";
 import { getDb, inChunks } from "./db";
+import { deleteRequestFileKeys, toRequestFile } from "./request-files";
 
 type Row = typeof requests.$inferSelect;
 
@@ -44,7 +45,7 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     deadlineDate: row.deadlineDate,
     cityId: row.cityId,
     tags: tagRows.filter((tag) => tag.requestId === row.id).map((tag) => ({ id: tag.tagId, label: tag.label })),
-    files: fileRows.filter((file) => file.requestId === row.id).map((file) => ({ name: file.name, size: file.size, type: file.type })),
+    files: fileRows.filter((file) => file.requestId === row.id).sort((a, b) => a.id - b.id).map(toRequestFile),
     channelOptIn: row.channelOptIn,
     status: row.status,
     createdAt: new Date(row.createdAt).toISOString(),
@@ -55,6 +56,13 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
   }));
 };
 
+/** Забирає завантажені файли в запит: лише мої й ще не прикріплені, тож чужий id нічого не зачепить. */
+const claimFiles = (userId: string, requestId: string, refs: { id: number }[]) =>
+  getDb()
+    .update(requestFiles)
+    .set({ requestId })
+    .where(and(inArray(requestFiles.id, refs.map((ref) => ref.id)), eq(requestFiles.uploaderUserId, userId), isNull(requestFiles.requestId)));
+
 export const createRequest = async (userId: string, draft: RequestDraft): Promise<PublishedRequest> => {
   const db = getDb();
   const id = newId("req");
@@ -62,7 +70,7 @@ export const createRequest = async (userId: string, draft: RequestDraft): Promis
   const statements = [
     db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, deadlineDate: draft.deadlineDate ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: now, renewedAt: now }),
     ...(draft.tags.length ? [db.insert(requestTags).values(draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index))] : []),
-    ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
+    ...(draft.files.length ? [claimFiles(userId, id, draft.files)] : []),
   ];
   await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
   const [saved] = await hydrate(await db.select().from(requests).where(eq(requests.id, id)).limit(1));
@@ -117,17 +125,24 @@ export const updateRequest = async (userId: string, id: string, draft: RequestDr
   // Дату не міняли: готовий строк лишається знімком першого збереження, а не перераховується від сьогодні.
   const deadlineDate = draft.deadlineDate ?? null;
   const deadline = deadlineDate !== null && deadlineDate === row.deadlineDate ? row.deadline : (draft.deadline ?? null);
+  // Файли, яких у новій чернетці вже нема: рядок іде в тому ж пакеті, байти в R2 прибираємо після нього.
+  const keep = draft.files.map((file) => file.id);
+  const dropped = await db
+    .select({ id: requestFiles.id, key: requestFiles.key })
+    .from(requestFiles)
+    .where(and(eq(requestFiles.requestId, id), keep.length ? notInArray(requestFiles.id, keep) : undefined));
   const statements = [
     db
       .update(requests)
       .set({ text: draft.text, budget: draft.budget ?? null, deadline, deadlineDate, cityId: draft.cityId ?? null, channelOptIn: draft.channelOptIn !== false, editedAt: now, editCount: row.editCount + 1 })
       .where(and(eq(requests.id, id), eq(requests.status, "open"))),
     db.delete(requestTags).where(eq(requestTags.requestId, id)),
-    db.delete(requestFiles).where(eq(requestFiles.requestId, id)),
+    ...(dropped.length ? [db.delete(requestFiles).where(inArray(requestFiles.id, dropped.map((file) => file.id)))] : []),
     ...(tags.length ? [db.insert(requestTags).values(tags)] : []),
-    ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
+    ...(draft.files.length ? [claimFiles(userId, id, draft.files)] : []),
   ];
   await db.batch(statements as [(typeof statements)[number], ...(typeof statements)[number][]]);
+  await deleteRequestFileKeys(dropped.flatMap((file) => (file.key ? [file.key] : [])));
   return (await findRequest(userId, id)) ?? "not_found";
 };
 

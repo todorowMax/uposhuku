@@ -209,7 +209,7 @@ export const deleteAccount = async (userId: string, now = Date.now()): Promise<D
     db.delete(profileTags).where(eq(profileTags.userId, userId)),
     db.delete(profiles).where(eq(profiles.userId, userId)),
     db.delete(requestTags).where(inArray(requestTags.requestId, myRequests)),
-    db.delete(requestFiles).where(inArray(requestFiles.requestId, myRequests)),
+    db.delete(requestFiles).where(or(inArray(requestFiles.requestId, myRequests), eq(requestFiles.uploaderUserId, userId))),
     db.delete(channelPosts).where(inArray(channelPosts.requestId, myRequests)),
     db.delete(responses).where(or(eq(responses.performerUserId, userId), inArray(responses.requestId, myRequests))),
     db.delete(requests).where(eq(requests.userId, userId)),

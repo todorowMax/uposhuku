@@ -4,8 +4,8 @@
 // базі телеметрії. Спершу збираємо адреси (до видалення рядків), після успішного запису в базу прибираємо. Збій тут
 // лише пишемо в журнал: акаунт уже видалено, а залишок підбере наступне прибирання вручну.
 
-import { eq, inArray, and, isNotNull } from "drizzle-orm";
-import { channelPosts, chatAttachments, requests } from "@/db/schema";
+import { eq, inArray, and, isNotNull, or } from "drizzle-orm";
+import { channelPosts, chatAttachments, requestFiles, requests } from "@/db/schema";
 import { telemetryConfig } from "@/lib/telemetry/server";
 import { logServer } from "@/lib/telemetry/log";
 import { deleteMessage } from "@/lib/telegram/api";
@@ -14,7 +14,7 @@ import { getDb, inChunks } from "./db";
 import { getBucket, photoKeyPrefix } from "./uploads";
 
 export interface Outside {
-  /** Ключі файлів у R2: фото профілю й робіт, фото розмов, які прибираємо. */
+  /** Ключі файлів у R2: фото профілю й робіт, фото розмов, файли запитів (і завантажені, але не додані до запиту), які прибираємо. */
   keys: string[];
   /** Пости запитів у каналі. */
   posts: { chatId: string; messageId: number }[];
@@ -34,16 +34,21 @@ const listPrefix = async (prefix: string): Promise<string[]> => {
 /** Збирає, що прибрати поза базою. Викликати до видалення рядків. */
 export const collectOutside = async (input: { userId: string; conversationIds: string[] }): Promise<Outside> => {
   const db = getDb();
-  const [photos, attachments, posts] = await Promise.all([
+  const [photos, attachments, files, posts] = await Promise.all([
     listPrefix(photoKeyPrefix(input.userId)),
     inChunks(input.conversationIds, (chunk) => db.select({ key: chatAttachments.key }).from(chatAttachments).where(inArray(chatAttachments.conversationId, chunk))),
+    db
+      .select({ key: requestFiles.key })
+      .from(requestFiles)
+      .leftJoin(requests, eq(requests.id, requestFiles.requestId))
+      .where(and(isNotNull(requestFiles.key), or(eq(requestFiles.uploaderUserId, input.userId), eq(requests.userId, input.userId)))),
     db
       .select({ chatId: channelPosts.chatId, messageId: channelPosts.messageId })
       .from(channelPosts)
       .innerJoin(requests, eq(requests.id, channelPosts.requestId))
       .where(and(eq(requests.userId, input.userId), isNotNull(channelPosts.messageId))),
   ]);
-  return { keys: [...photos, ...attachments.map((item) => item.key)], posts: posts.flatMap((post) => (post.messageId === null ? [] : [{ chatId: post.chatId, messageId: post.messageId }])) };
+  return { keys: [...photos, ...attachments.map((item) => item.key), ...files.flatMap((item) => (item.key ? [item.key] : []))], posts: posts.flatMap((post) => (post.messageId === null ? [] : [{ chatId: post.chatId, messageId: post.messageId }])) };
 };
 
 const forgetInTelemetry = async (userId: string): Promise<void> => {

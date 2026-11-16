@@ -4,7 +4,7 @@
 // Підбір: скільки тегів запиту закриває профіль виконавця, потім збіг міста.
 
 import { CITIES } from "@/lib/map/cities";
-import { DEADLINES, type PublishedRequest } from "@/lib/requests/types";
+import { DEADLINES, type PublishedRequest, type RequestFile } from "@/lib/requests/types";
 import { listOpenByIds, listOpenOwn, listOthersOpen, listOthersOpenSummaries, myResponses, removeResponse, requestOwner, responseCounts, saveResponse } from "@/lib/server/request-repo";
 import { TAGS_BY_ID } from "@/lib/tags/dictionary";
 import { MATCH_THRESHOLD, tagSimilarity } from "@/lib/tags/match";
@@ -32,6 +32,7 @@ interface Raw {
   deadlineDate: string | null;
   createdAt: string;
   editedAt: string | null;
+  files: RequestFile[];
   responses: number;
   own: boolean;
 }
@@ -55,6 +56,7 @@ const toRaw = (request: PublishedRequest, responses: number, own: boolean): Raw 
   deadlineDate: request.deadlineDate ?? null,
   createdAt: request.createdAt,
   editedAt: request.editedAt,
+  files: request.files,
   responses,
   own,
 });
@@ -86,6 +88,7 @@ const toItem = (raw: Raw, viewer: Viewer, mine: Map<string, MyResponse> | null):
     deadlineDate: raw.deadlineDate,
     createdAt: raw.createdAt,
     editedAt: raw.editedAt,
+    files: raw.files,
     responses: raw.responses,
     matchedTags: matched.size,
     response: mine?.get(raw.id) ?? null,

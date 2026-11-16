@@ -21,6 +21,7 @@ vi.mock("@/lib/server/tick-cleanup", () => ({
   pruneEmailCodes: run("prune_email_codes", 2),
   pruneReleaseCodes: run("prune_release_codes", 1),
   pruneOrphanAttachments: run("prune_chat_photos", 4),
+  pruneOrphanRequestFiles: run("prune_request_files", 5),
 }));
 vi.mock("@/lib/server/telegram-repo", () => ({ pruneTelegram: run("prune_telegram") }));
 vi.mock("@/lib/server/db", () => ({ getDb: () => ({ delete: () => ({ where: run("prune_db") }) }) }));
@@ -123,15 +124,15 @@ describe("/api/internal/tick", () => {
     }
   });
 
-  it("прибирання сесій, кодів і фото чату: кожен крок окремо, збій одного не чіпає решту", async () => {
-    expect(await (await tick()).json()).toMatchObject({ ok: true, pruned: { sessions: 3, emailCodes: 2, releaseCodes: 1, chatPhotos: 4 } });
-    for (const name of ["prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos"]) {
+  it("прибирання сесій, кодів, фото чату і файлів запитів: кожен крок окремо, збій одного не чіпає решту", async () => {
+    expect(await (await tick()).json()).toMatchObject({ ok: true, pruned: { sessions: 3, emailCodes: 2, releaseCodes: 1, chatPhotos: 4, requestFiles: 5 } });
+    for (const name of ["prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos", "prune_request_files"]) {
       fail.step = name;
       calls.length = 0;
       const response = await tick();
       expect(response.status).toBe(200);
       expect(await response.json()).toMatchObject({ ok: false, failed: [name] });
-      expect(calls).toEqual(expect.arrayContaining(["sweep", "post", "prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos"]));
+      expect(calls).toEqual(expect.arrayContaining(["sweep", "post", "prune_sessions", "prune_email_codes", "prune_release_codes", "prune_chat_photos", "prune_request_files"]));
     }
   });
 
