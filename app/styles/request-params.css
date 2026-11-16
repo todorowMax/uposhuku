@@ -14,8 +14,8 @@
 @media (max-width: 639px) {
   .composer-actions {
     grid-template-areas:
-      "params params"
-      ". send";
+      "params params params"
+      "attach . send";
     /* Без проміжку рядок чипів майже торкався кнопки «Знайти» (2 px). */
     row-gap: 8px;
   }

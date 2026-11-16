@@ -19,6 +19,7 @@ import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
 import { daysLabel, deadlineText, plural, priceLabel } from "@/lib/requests/format";
+import { RequestFileLinks } from "@/components/requests/parts/request-file-links";
 import { useStore } from "@/lib/store";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
@@ -307,6 +308,8 @@ export function FeedCard({
           </span>
         ))}
       </div>
+
+      <RequestFileLinks files={item.files ?? []} />
 
       <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-ink-muted">
         {item.budget && (
