@@ -42,6 +42,18 @@
   --radius-window: 24px;
   --shadow-window: 0 24px 60px -12px rgb(16 45 55 / 28%);
   --font-ui: var(--font-fixel), system-ui, sans-serif;
+
+  /* Рух: шкала тривалостей і кривих (DESIGN.md, «Motion»). Ті самі числа в lib/ui/motion-tokens.ts, за збігом стежить тест. */
+  --dur-instant: 120ms;
+  --dur-fast: 150ms;
+  --dur-base: 220ms;
+  --dur-enter: 300ms;
+  --dur-exit: 200ms;
+  --dur-morph: 460ms;
+  --dur-morph-back: 340ms;
+  --ease-enter: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-move: cubic-bezier(0.65, 0, 0.35, 1);
 }
 
 @theme inline {
@@ -70,7 +82,8 @@
   --z-screen: 70;
   --z-skip-link: 100;
 
-  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Стара назва кривої появи; нове правило пише var(--ease-enter). */
+  --ease-out-quint: var(--ease-enter);
 }
 
 html,

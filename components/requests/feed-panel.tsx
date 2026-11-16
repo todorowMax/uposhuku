@@ -18,6 +18,7 @@ import type { PlacementTier } from "@/lib/map/types";
 import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
+import { enterLayer, revealItems } from "@/lib/ui/transitions";
 import { daysLabel, deadlineText, plural, priceLabel } from "@/lib/requests/format";
 import { RequestFileLinks } from "@/components/requests/parts/request-file-links";
 import { useStore } from "@/lib/store";
@@ -73,13 +74,8 @@ export function FeedPanel() {
   useEffect(() => () => hoveredFeedRequestStore.set(null), []);
 
   useLayoutEffect(() => {
-    if (!active || !panelRef.current || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(
-      panelRef.current,
-      isPhoneViewport() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
-      // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
-      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" }
-    );
+    if (!active || !panelRef.current) return;
+    const tween = enterLayer(panelRef.current, isPhoneViewport() ? "bottom" : "right");
     return () => {
       tween.kill();
     };
@@ -91,8 +87,8 @@ export function FeedPanel() {
     if (!body) return;
     const fresh = [...body.querySelectorAll<HTMLElement>("[data-feed]")].filter((card) => !known.current.has(card.dataset.feed ?? ""));
     for (const card of fresh) known.current.add(card.dataset.feed ?? "");
-    if (!fresh.length || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(fresh, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.06, ease: "power2.out" });
+    if (!fresh.length) return;
+    const tween = revealItems(fresh);
     return () => {
       tween.kill();
     };

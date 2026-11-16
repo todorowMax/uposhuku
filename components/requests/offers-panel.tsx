@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { ClampedText } from "@/components/ui/clamped-text";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { gsap } from "gsap";
 import {
   ArrowUp,
   Check,
@@ -34,7 +33,8 @@ import { useOpenProfile } from "@/lib/profile/navigation";
 import { useStore } from "@/lib/store";
 import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
-import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
+import { isPhoneViewport } from "@/lib/ui/media";
+import { enterLayer, revealItems } from "@/lib/ui/transitions";
 import { daysLabel, plural, priceLabel } from "@/lib/requests/format";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
@@ -139,13 +139,8 @@ export function OffersPanel() {
 
   // Панель виїжджає збоку (на телефоні — знизу), коли з'являється або розгортається.
   useLayoutEffect(() => {
-    if (!panelRef.current || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(
-      panelRef.current,
-      isPhoneViewport() ? { y: 24, opacity: 0 } : { x: 24, opacity: 0 },
-      // clearProps: після появи transform знову віддаємо CSS, інакше inline-стиль GSAP глушить зсув свайпом (`--sheet-drag`).
-      { x: 0, y: 0, opacity: 1, duration: 0.34, ease: "power3.out", clearProps: "transform" },
-    );
+    if (!panelRef.current) return;
+    const tween = enterLayer(panelRef.current, isPhoneViewport() ? "bottom" : "right");
     return () => {
       tween.kill();
     };
@@ -159,12 +154,8 @@ export function OffersPanel() {
       ...body.querySelectorAll<HTMLElement>("[data-offer]"),
     ].filter((card) => !known.current.has(card.dataset.offer ?? ""));
     for (const card of fresh) known.current.add(card.dataset.offer ?? "");
-    if (!fresh.length || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(
-      fresh,
-      { opacity: 0, y: 10 },
-      { opacity: 1, y: 0, duration: 0.3, stagger: 0.06, ease: "power2.out" },
-    );
+    if (!fresh.length) return;
+    const tween = revealItems(fresh);
     return () => {
       tween.kill();
     };

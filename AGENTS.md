@@ -58,6 +58,13 @@ Read the feature doc before changing a feature's behaviour. Index: `docs/feature
 - Animation: GSAP only (COMP-7). Current state: Motion is still imported in many files, among them the
   animated icons in `components/icons`. Count: `grep -rlE "from ['\"](motion|framer-motion)" --include='*.ts' --include='*.tsx' app components lib | wc -l`
   (the same with `gsap` counts GSAP). Treat the Motion code as legacy: no new Motion imports, migrate when a file is touched.
+  Durations and easings come from one scale: CSS tokens `--dur-*` and `--ease-*` in `app/styles/tokens.css`, the same numbers for
+  GSAP in `lib/ui/motion-tokens.ts` (`tests/unit/motion-tokens.test.ts` compares them), shared GSAP movements in
+  `lib/ui/transitions.ts`. Which situation gets which movement, and when a button morphs into a window: `DESIGN.md`, "Motion".
+  Current state: only the offers and feed panels use the presets; the other GSAP calls and the CSS transitions keep their own numbers.
+- UI flow: a new screen, panel, sheet, dialog or popover starts with the flow brief in `.claude/rules/features/ui-flow.md`
+  (trigger, layer, place, open, close, inside, other surfaces, phone and input, reduced motion), written into the task document;
+  answers that `DESIGN.md` does not give are asked from the owner before coding.
 - Folder layout: files are kebab-case, components PascalCase. Small components are flat in
   `components/`; a feature with several components lives in `components/<feature>/`. There is no `hooks/`
   folder (COMP-13 names one): a hook of one feature sits next to its component (`use-*.ts`), UI hooks shared by
