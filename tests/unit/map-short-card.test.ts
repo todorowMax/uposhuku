@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dealsLabel, groupTitle, pluralUk, pluralWordUk, rowLine, shortStats } from "@/lib/map/short-card";
+import { dealsLabel, groupTitle, pluralUk, pluralWordUk, shortStats } from "@/lib/map/short-card";
 import { placeBeside } from "@/lib/maplibre/place-beside";
 import type { PerformerStats } from "@/lib/map/types";
-
-const stats = (patch: Partial<PerformerStats> = {}): PerformerStats => ({ months: 8, orders: 7, rating: 4.8, reviews: 12, verifiedReviews: 0, ...patch });
 
 describe("множина українською", () => {
   it("угоди: 1, 2-4, 5-20, 21, 22, 11", () => {
@@ -17,13 +15,6 @@ describe("множина українською", () => {
   });
   it("довільні форми", () => {
     expect(pluralUk(5, ["a", "b", "c"])).toBe("5 c");
-  });
-});
-
-describe("рядок у списку групи", () => {
-  it("рядок списку", () => {
-    expect(rowLine(stats())).toBe("★ 4,8 · 7 угод");
-    expect(rowLine(stats({ rating: null, reviews: 0, orders: 1 }))).toBe("Ще без відгуків · 1 угода");
   });
 });
 

@@ -57,9 +57,3 @@ const REQUESTS: Forms = ["запит", "запити", "запитів"];
 /** Заголовок групи: «4 виконавці · 1 запит». */
 export const groupTitle = (performers: number, requests: number) =>
   [performers ? pluralUk(performers, PERFORMERS) : null, requests ? pluralUk(requests, REQUESTS) : null].filter(Boolean).join(" · ");
-
-/** Рядок у списку групи:«★ 4,8 · 7 угод» або «Ще без відгуків · 7 угод». */
-export const rowLine = (stats: PerformerStats | undefined) => {
-  const head = hasReviews(stats) ? `★ ${ratingLabel(stats.rating)}` : "Ще без відгуків";
-  return `${head} · ${dealsLabel(stats?.orders ?? 0)}`;
-};
