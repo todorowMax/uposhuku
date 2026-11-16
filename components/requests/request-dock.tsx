@@ -31,6 +31,7 @@ import type { PublishedRequest } from "@/lib/requests/types";
 import { RequestFileLinks } from "@/components/requests/parts/request-file-links";
 import { useStore } from "@/lib/store";
 import { prefersReducedMotion } from "@/lib/ui/media";
+import { DURATION_MS, EASE_GSAP } from "@/lib/ui/motion-tokens";
 
 /** Один активний запит над мапою; решта доступні у списку, не займаючи екран. */
 export function RequestDock({ requests, active }: { requests: PublishedRequest[]; active: PublishedRequest }) {
@@ -72,7 +73,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
 
   useLayoutEffect(() => {
     if (!rootRef.current || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(rootRef.current, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" });
+    const tween = gsap.fromTo(rootRef.current, { opacity: 0, y: -8 }, { opacity: 1, y: 0, duration: DURATION_MS.enter / 1000, ease: EASE_GSAP.reveal });
     return () => {
       tween.kill();
     };
@@ -80,7 +81,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
 
   useLayoutEffect(() => {
     if (!listOpen || !listRef.current || prefersReducedMotion()) return;
-    const tween = gsap.fromTo(listRef.current, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: 0.2, ease: "power2.out" });
+    const tween = gsap.fromTo(listRef.current, { opacity: 0, y: -6 }, { opacity: 1, y: 0, duration: DURATION_MS.base / 1000, ease: EASE_GSAP.reveal });
     return () => {
       tween.kill();
     };

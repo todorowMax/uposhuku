@@ -19,6 +19,7 @@ import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { isPhoneViewport, prefersReducedMotion } from "@/lib/ui/media";
 import { enterLayer, revealItems } from "@/lib/ui/transitions";
+import { useLayerExit } from "@/lib/ui/use-layer-exit";
 import { daysLabel, deadlineText, plural, priceLabel } from "@/lib/requests/format";
 import { RequestFileLinks } from "@/components/requests/parts/request-file-links";
 import { useStore } from "@/lib/store";
@@ -65,6 +66,14 @@ export function FeedPanel() {
     setPanelNode(node);
   }, []);
   usePanelSwipe(panelNode, collapseFeed);
+  const tabRef = useRef<HTMLButtonElement>(null);
+  /** «Згорнути» в шапці: панель виходить до свого краю, фокус переходить на язичок. Свайп згортає одразу. */
+  const collapseWithExit = useLayerExit({
+    layer: () => panelRef.current,
+    edge: () => (isPhoneViewport() ? "bottom" : "right"),
+    close: collapseFeed,
+    returnFocusTo: () => tabRef.current,
+  });
 
   useLayoutEffect(() => {
     if (!active || collapsed) hoveredFeedRequestStore.set(null);
@@ -106,7 +115,7 @@ export function FeedPanel() {
 
   if (collapsed) {
     return (
-      <Button variant="bare" onClick={() => feedCollapsedStore.set(false)} className="offers-tab feed-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
+      <Button ref={tabRef} variant="bare" onClick={() => feedCollapsedStore.set(false)} className="offers-tab feed-tab glass-panel" aria-label={`Розгорнути запити: ${total}`}>
         <Inbox className="size-4" />
         Запити для вас
         {total > 0 && <span className="filter-all-badge">{total}</span>}
@@ -135,7 +144,7 @@ export function FeedPanel() {
           </h2>
           <p className="offers-header-note">Усі відкриті, найвідповідніші під ваші теги першими</p>
         </div>
-        <Button variant="icon" onClick={collapseFeed} aria-label="Згорнути запити" className="-mr-1.5">
+        <Button variant="icon" onClick={collapseWithExit} aria-label="Згорнути запити" className="-mr-1.5">
           <ChevronsRight className="hidden size-4 lg:block" />
           <ChevronDown className="size-4 lg:hidden" />
         </Button>

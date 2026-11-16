@@ -42,3 +42,22 @@ export const revealItems = (targets: gsap.TweenTarget): gsap.core.Tween =>
     stagger: seconds(STAGGER_MS),
     ease: EASE_GSAP.reveal,
   });
+
+/** Кінцевий стан шару на виході: до свого краю й у прозорість; без руху лише прозорість. */
+export const layerEnd = (edge: LayerEdge, reduced: boolean): gsap.TweenVars => {
+  if (reduced) return { opacity: 0 };
+  return edge === "bottom" ? { y: SHIFT_PX.layer, opacity: 0 } : { x: SHIFT_PX.layer, opacity: 0 };
+};
+
+/**
+ * Шар виходить до того краю, з якого прийшов, коротше за вхід. `onDone` знімає його з екрана: поки рух триває,
+ * шар лишається в розмітці. Рух появи, якщо він ще йде, перебивається.
+ */
+export const exitLayer = (target: gsap.TweenTarget, edge: LayerEdge, onDone: () => void): gsap.core.Tween =>
+  gsap.to(target, {
+    ...layerEnd(edge, prefersReducedMotion()),
+    duration: seconds(DURATION_MS.exit),
+    ease: EASE_GSAP.exit,
+    overwrite: true,
+    onComplete: onDone,
+  });

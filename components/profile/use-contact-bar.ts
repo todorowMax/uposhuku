@@ -5,7 +5,7 @@
 // Низ профілю виконавця: кнопка «Описати задачу» перетворюється на поле введення тут же, у профілі, а не відкриває
 // чат поверх нього. Хрестик повертає кнопку, нічого не закриваючи. Надіслати: перше повідомлення йде в розмову,
 // далі профіль закривається й відкривається чат (це робить `onSend`). Гостю замість цього відкриється вхід, а текст
-// збережеться. Морф кнопки в поле: GSAP Flip, який вантажиться окремо від першого завантаження профілю (MOT-6).
+// збережеться. Морф кнопки в поле й назад: GSAP Flip, який вантажиться окремо від першого завантаження профілю (MOT-6).
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
@@ -13,6 +13,7 @@ import type { Flip } from "gsap/Flip";
 import { draftLimit } from "@/lib/chat/draft-limit";
 import { sendErrorText, type SendResult } from "@/lib/chat/send-result";
 import { prefersReducedMotion } from "@/lib/ui/media";
+import { DURATION_MS, EASE_GSAP } from "@/lib/ui/motion-tokens";
 
 export namespace ContactBarTypes {
   export type Mode = "idle" | "compose";
@@ -62,9 +63,22 @@ export const useContactBar = ({ onStart, onSend }: ContactBarTypes.Options) => {
     // Поле з'явилось після дотику людини на кнопці: фокус у нього, а не autoFocus у розмітці.
     if (mode === "compose") textRef.current?.focus();
     if (!shell || !plugin || !state) return;
-    plugin.from(state, { duration: 0.5, ease: "expo.out", absolute: false, props: MORPH_PROPS });
+    // Кнопка росте в поле довше й з м'яким кінцем; назад у кнопку коротше (шкала руху, DESIGN.md «Motion»).
+    const opening = mode === "compose";
+    plugin.from(state, {
+      duration: (opening ? DURATION_MS.morph : DURATION_MS.morphBack) / 1000,
+      ease: opening ? EASE_GSAP.morph : EASE_GSAP.move,
+      absolute: false,
+      props: MORPH_PROPS,
+    });
     const inner = shell.firstElementChild;
-    if (inner) gsap.fromTo(inner, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.24, delay: 0.12, ease: "power2.out", clearProps: "opacity,transform" });
+    if (inner) {
+      gsap.fromTo(
+        inner,
+        { opacity: 0, y: 6 },
+        { opacity: 1, y: 0, duration: DURATION_MS.base / 1000, delay: DURATION_MS.instant / 1000, ease: EASE_GSAP.reveal, clearProps: "opacity,transform" },
+      );
+    }
   }, [mode, textRef]);
 
   const open = () => {

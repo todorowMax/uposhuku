@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DURATION_MS, EASE_CSS } from "@/lib/ui/motion-tokens";
-import { layerStart } from "@/lib/ui/transitions";
+import { layerEnd, layerStart } from "@/lib/ui/transitions";
 
 const css = readFileSync(join(process.cwd(), "app/styles/tokens.css"), "utf8");
 
@@ -44,5 +44,16 @@ describe("layerStart: звідки шар приїжджає", () => {
   it("з prefers-reduced-motion зсуву немає, лишається проявлення", () => {
     expect(layerStart("right", true)).toEqual({ opacity: 0 });
     expect(layerStart("bottom", true)).toEqual({ opacity: 0 });
+  });
+});
+
+describe("layerEnd: куди шар виходить", () => {
+  it("виходить до того самого краю, з якого прийшов", () => {
+    expect(layerEnd("right", false)).toEqual(layerStart("right", false));
+    expect(layerEnd("bottom", false)).toEqual(layerStart("bottom", false));
+  });
+
+  it("з prefers-reduced-motion лише гасне", () => {
+    expect(layerEnd("right", true)).toEqual({ opacity: 0 });
   });
 });

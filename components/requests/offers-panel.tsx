@@ -35,6 +35,7 @@ import { inboxOpenStore } from "@/components/chat/inbox/inbox-store";
 import { usePanelSwipe } from "@/lib/ui/use-panel-swipe";
 import { isPhoneViewport } from "@/lib/ui/media";
 import { enterLayer, revealItems } from "@/lib/ui/transitions";
+import { useLayerExit } from "@/lib/ui/use-layer-exit";
 import { daysLabel, plural, priceLabel } from "@/lib/requests/format";
 import { EVENTS, track } from "@/lib/telemetry/track";
 
@@ -107,6 +108,14 @@ export function OffersPanel() {
     setPanelNode(node);
   }, []);
   usePanelSwipe(panelNode, collapseOffers);
+  const tabRef = useRef<HTMLButtonElement>(null);
+  /** «Згорнути» в шапці: панель виходить до свого краю, фокус переходить на язичок. Свайп і відкриття чату згортають одразу. */
+  const collapseWithExit = useLayerExit({
+    layer: () => panelRef.current,
+    edge: () => (isPhoneViewport() ? "bottom" : "right"),
+    close: collapseOffers,
+    returnFocusTo: () => tabRef.current,
+  });
 
   // Інший запит — починаємо зі згорнутої панелі, щоб спершу була видна мапа.
   useEffect(() => {
@@ -167,8 +176,9 @@ export function OffersPanel() {
 
   if (collapsed) {
     return (
-      <button
-        type="button"
+      <Button
+        ref={tabRef}
+        variant="bare"
         onClick={() => offersCollapsedStore.set(false)}
         className="offers-tab glass-panel"
         aria-label={`Розгорнути пропозиції: ${total}`}
@@ -187,7 +197,7 @@ export function OffersPanel() {
           className="size-4 lg:hidden"
           style={{ rotate: "180deg" }}
         />
-      </button>
+      </Button>
     );
   }
 
@@ -221,7 +231,7 @@ export function OffersPanel() {
             </div>
             <Button
               variant="icon"
-              onClick={collapseOffers}
+              onClick={collapseWithExit}
               aria-label="Згорнути пропозиції"
               className="-mr-1.5"
             >
