@@ -7,8 +7,9 @@
 // Закриття: якщо людина прийшла з застосунку, повертаємось назад по історії,
 // якщо відкрила посилання, ведемо на головну.
 
-import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { afterLayerHistory } from "@/lib/ui/use-layer-history";
 
 let openedInApp = false;
 
@@ -33,4 +34,35 @@ export const useCloseProfile = () => {
       router.replace("/");
     }
   }, [router]);
+};
+
+/** Що виконати, коли адреса профілю справді зникла: чат не відкриваємо, поки профіль ще стоїть під ним. */
+let afterClose: (() => void) | null = null;
+
+export const isProfilePath = (pathname: string) => pathname.startsWith("/p/");
+
+/** Закрити профіль і лише потім виконати `then` (наприклад, відкрити чат з цим виконавцем). */
+export const useCloseProfileThen = () => {
+  const close = useCloseProfile();
+  return useCallback(
+    (then: () => void) => {
+      afterClose = then;
+      close();
+    },
+    [close],
+  );
+};
+
+/**
+ * Виконує відкладене `then` з `useCloseProfileThen`, щойно адреса вийшла з /p/…: роутер Next і історія шарів закінчили
+ * перехід, тож шар чату не потрапить у його історію. Монтується один раз у шаблоні карти.
+ */
+export const useRunAfterProfileClose = () => {
+  const pathname = usePathname();
+  useEffect(() => {
+    if (isProfilePath(pathname) || !afterClose) return;
+    const run = afterClose;
+    afterClose = null;
+    afterLayerHistory(() => setTimeout(run, 0));
+  }, [pathname]);
 };

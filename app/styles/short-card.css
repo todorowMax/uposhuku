@@ -53,9 +53,8 @@
   border-radius: 999px;
 }
 
-/* Поповер біля маркера й картка збоку списку групи: лише показ, мишу пропускають крізь себе. */
-.pin-hover,
-.group-preview-card {
+/* Поповер над одиночним маркером: лише показ, мишу пропускає крізь себе. */
+.pin-hover {
   position: absolute;
   top: 0;
   left: 0;
@@ -72,10 +71,36 @@
   pointer-events: none;
 }
 
-.pin-hover[data-placed],
-.group-preview-card[data-placed] {
+.pin-hover[data-placed] {
   opacity: 1;
   animation: short-card-in 140ms var(--ease-out-quint);
+}
+
+/*
+  Картка активної людини під стопкою групи (десктоп): частина панелі, тож стоїть біля курсора й не лізе за край.
+  Висота постійна, щоб перемикання людей не смикало панель; теги в один рядок і обрізаються. Є кнопка «Написати».
+*/
+.group-preview-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  overflow: hidden;
+  min-height: 228px;
+  margin-inline: 36px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-window);
+  background: var(--panel);
+  box-shadow: var(--shadow-window);
+}
+
+.group-preview-card .short-card-tags {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.group-preview-card .short-card-tag {
+  flex: none;
 }
 
 @keyframes short-card-in {
@@ -86,8 +111,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pin-hover[data-placed],
-  .group-preview-card[data-placed] {
+  .pin-hover[data-placed] {
     animation: ui-sheet-fade 100ms ease-out;
   }
 }
@@ -152,4 +176,10 @@
   display: grid;
   gap: 8px;
   margin-top: 16px;
+}
+
+.pin-sheet-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 8px;
 }

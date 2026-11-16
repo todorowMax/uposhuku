@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { sessionStore } from "@/lib/auth/client";
 import { fetchConversations, fetchMessages, openConversation, postMessage, toLines } from "@/lib/chat/client";
+import { statusOfError, type SendResult } from "@/lib/chat/send-result";
 import { startPolling } from "@/lib/realtime/client";
 
 import { createStore, useStore } from "@/lib/store";
@@ -83,6 +84,25 @@ export const useDialogSync = (performerId: string, active: boolean) => {
 };
 
 export const useDialog = (performerId: string) => useStore(dialogsStore)[performerId] ?? null;
+
+/**
+ * Перше повідомлення з профілю: на відміну від `startDialog` чекаємо відповіді сервера й повідомляємо, чим усе скінчилось
+ * (поле в профілі лишає текст, якщо не вийшло). Розмову створює чи знаходить сервер.
+ */
+export const sendFirstMessage = async (performerId: string, text: string): Promise<SendResult> => {
+  try {
+    let id = conversationIds.get(performerId);
+    if (!id) {
+      id = await openConversation(performerId);
+      conversationIds.set(performerId, id);
+    }
+    await postMessage(id, text);
+    void syncDialog(performerId);
+    return { ok: true };
+  } catch (failure) {
+    return { ok: false, status: statusOfError(failure) };
+  }
+};
 
 /** Новий чат: задача стає першим повідомленням. Якщо чат уже є, задача дописується до нього. */
 export const startDialog = (performerId: string, text: string) => void send(performerId, text);

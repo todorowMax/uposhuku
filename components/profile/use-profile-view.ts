@@ -12,10 +12,11 @@ import { CITIES } from "@/lib/map/cities";
 import { usePerformers } from "@/lib/map/performers";
 import { performerStats } from "@/lib/map/stats";
 import type { Performer } from "@/lib/map/types";
-import { useCloseProfile } from "@/lib/profile/navigation";
+import type { ContactBarTypes } from "@/components/profile/use-contact-bar";
+import { useCloseProfile, useCloseProfileThen } from "@/lib/profile/navigation";
 import { profileToPerformer } from "@/lib/profile/to-performer";
 import type { Profile } from "@/lib/profile/types";
-import { savePending, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
+import { savePending, sendFirstMessage, useDialog, useDialogSync } from "@/lib/requests/direct-chat";
 import { fetchReviews } from "@/lib/reviews/client";
 import type { Review } from "@/lib/reviews/types";
 import { useStore } from "@/lib/store";
@@ -83,15 +84,37 @@ export const useProfileView = (id: string, initial: Performer | null, initialLab
     openAfterLayers(() => setTimeout(closeRoute, 0));
   };
 
-  /** «Описати задачу»: гість спершу входить (вхід відкривається над профілем), далі розмова з цим виконавцем відкривається в месенджері. */
-  const contact = () => {
+  const closeProfileThen = useCloseProfileThen();
+  /** Закрити профіль і лише потім виконати `then`: чат не відкривається поверх профілю, що лишився б під ним. */
+  const closeThen = (then: () => void) => {
+    setOpen(false);
+    openAfterLayers(() => setTimeout(() => closeProfileThen(then), 0));
+  };
+  const openChatWith = () => inboxOpenStore.set({ conversationId: null, performerId: id });
+
+  /** Розмова з цим виконавцем уже є: «Відкрити чат» закриває профіль і відкриває її. */
+  const openChat = () => {
     track(EVENTS.chatOpened, { from: "profile" });
+    closeThen(openChatWith);
+  };
+
+  /** Людина натиснула «Описати задачу»: кнопка стала полем. */
+  const startTask = () => track(EVENTS.chatOpened, { from: "profile" });
+
+  /**
+   * Задача виконавцю з поля в профілі. Гість спершу входить (вхід відкривається над профілем, текст збережено, а після
+   * входу задачу надішле DirectChatSync). Увійшов: перше повідомлення йде в розмову, далі профіль закривається й
+   * відкривається чат. Не вийшло: профіль лишається, поле тримає текст.
+   */
+  const sendTask = async (text: string): Promise<ContactBarTypes.Outcome> => {
     if (session.status !== "user") {
-      savePending(id, "");
+      savePending(id, text);
       authFlowStore.set({ mode: "login" });
-      return;
+      return "login";
     }
-    inboxOpenStore.set({ conversationId: null, performerId: id });
+    const result = await sendFirstMessage(id, text);
+    if (result.ok) closeThen(openChatWith);
+    return result;
   };
 
   useEffect(() => {
@@ -121,7 +144,7 @@ export const useProfileView = (id: string, initial: Performer | null, initialLab
   const city = performer ? CITIES.find((item) => item.id === performer.cityId)?.name : undefined;
   const proven = useMemo(() => new Set(performer?.works.flatMap((work) => work.tags ?? []) ?? []), [performer]);
 
-  return { open, close, performer, failed, dialog: Boolean(dialog), contact, labels, reviews, tags, stats, city, proven };
+  return { open, close, performer, failed, dialog: Boolean(dialog), openChat, startTask, sendTask, labels, reviews, tags, stats, city, proven };
 };
 
 export type ProfileViewState = ReturnType<typeof useProfileView>;

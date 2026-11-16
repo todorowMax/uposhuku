@@ -7,7 +7,8 @@
 // був текст профілю. Це екран за DESIGN.md («Шари»): на телефоні на весь екран, від 768 px вікно по центру.
 // Логіка в `use-profile-view.ts`.
 
-import { Loader2, MessageSquareText } from "@/components/icons";
+import { Loader2 } from "@/components/icons";
+import { ProfileContactBar } from "@/components/profile/parts/profile-contact-bar";
 import { ProfileViewBody } from "@/components/profile/parts/profile-view-body";
 import { ProfileViewReviews } from "@/components/profile/parts/profile-view-reviews";
 import { useProfileView } from "@/components/profile/use-profile-view";
@@ -34,10 +35,7 @@ export const ProfileView = ({ id, initial, initialLabels = {} }: ProfileViewScre
         Редагувати профіль
       </Button>
     ) : (
-      <Button className="w-full" onClick={view.contact}>
-        <MessageSquareText className="size-4" />
-        {view.dialog ? "Відкрити чат" : "Описати задачу виконавцю"}
-      </Button>
+      <ProfileContactBar performerName={performer.name} hasDialog={view.dialog} onOpenChat={view.openChat} onStart={view.startTask} onSend={view.sendTask} />
     )
   ) : undefined;
   return (

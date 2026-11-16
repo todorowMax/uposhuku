@@ -8,6 +8,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { PerformerShortCard } from "@/components/maplibre/performer-short-card";
 import { useProposeWork } from "@/components/maplibre/use-propose-work";
+import { writeToPerformer } from "@/components/maplibre/write-to-performer";
 import type { TouchSheetsTypes } from "@/components/maplibre/use-touch-sheets";
 import { useCarouselIndex } from "@/components/maplibre/use-carousel-index";
 import { Button } from "@/components/ui/button";
@@ -21,15 +22,28 @@ const cityName = (performer: Performer) => CITIES.find((city) => city.id === per
 
 const noop = () => undefined;
 
-/** Дії під каруселлю для активної людини: окремий компонент, бо хук пропозиції прив'язаний до виконавця. */
-const PersonActions = ({ performer, onClose, onOpenPerson }: { performer: Performer; onClose: () => void; onOpenPerson: (performer: Performer) => void }) => {
+/** Дії під карткою: головна «Запропонувати роботу», поруч «Написати» (ще до профілю) і «Профіль». */
+const SheetActions = ({ performer, onClose, onOpenProfile }: { performer: Performer; onClose: () => void; onOpenProfile: () => void }) => {
   const proposeWork = useProposeWork(performer, onClose, noop);
   return (
     <div className="pin-sheet-actions">
-      <Button variant="secondary" onClick={() => onOpenPerson(performer)}>
-        Профіль
-      </Button>
       {!performer.mine && <Button onClick={proposeWork}>Запропонувати роботу</Button>}
+      <div className="pin-sheet-pair">
+        {!performer.mine && (
+          <Button
+            variant="secondary"
+            onClick={() => {
+              onClose();
+              writeToPerformer(performer.id);
+            }}
+          >
+            Написати
+          </Button>
+        )}
+        <Button variant="secondary" onClick={onOpenProfile}>
+          Профіль
+        </Button>
+      </div>
     </div>
   );
 };
@@ -94,7 +108,7 @@ const GroupSheet = ({
           </div>
         )}
         <SheetBody>
-          {active?.kind === "person" && <PersonActions key={active.performer.id} performer={active.performer} onClose={onClose} onOpenPerson={onOpenPerson} />}
+          {active?.kind === "person" && <SheetActions key={active.performer.id} performer={active.performer} onClose={onClose} onOpenProfile={() => onOpenPerson(active.performer)} />}
           {active?.kind === "request" && (
             <div className="pin-sheet-actions">
               <Button onClick={() => onOpenRequest(active.request)}>Відкрити запит</Button>
@@ -106,31 +120,24 @@ const GroupSheet = ({
   );
 };
 
-const PinSheet = ({ performer, onClose, onOpenCard }: { performer: Performer; onClose: () => void; onOpenCard: (id: string) => void }) => {
-  const proposeWork = useProposeWork(performer, onClose, noop);
-  return (
-    <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent aria-describedby={undefined}>
-        <SheetTitle className="sr-only">{`Коротко про ${performer.name}`}</SheetTitle>
-        <SheetBody>
-          <PerformerShortCard performer={performer} cityName={cityName(performer)} />
-          <div className="pin-sheet-actions">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                onClose();
-                onOpenCard(performer.id);
-              }}
-            >
-              Профіль
-            </Button>
-            {!performer.mine && <Button onClick={proposeWork}>Запропонувати роботу</Button>}
-          </div>
-        </SheetBody>
-      </SheetContent>
-    </Sheet>
-  );
-};
+const PinSheet = ({ performer, onClose, onOpenCard }: { performer: Performer; onClose: () => void; onOpenCard: (id: string) => void }) => (
+  <Sheet open onOpenChange={(open) => !open && onClose()}>
+    <SheetContent aria-describedby={undefined}>
+      <SheetTitle className="sr-only">{`Коротко про ${performer.name}`}</SheetTitle>
+      <SheetBody>
+        <PerformerShortCard performer={performer} cityName={cityName(performer)} />
+        <SheetActions
+          performer={performer}
+          onClose={onClose}
+          onOpenProfile={() => {
+            onClose();
+            onOpenCard(performer.id);
+          }}
+        />
+      </SheetBody>
+    </SheetContent>
+  </Sheet>
+);
 
 export const TouchSheets = ({
   state,

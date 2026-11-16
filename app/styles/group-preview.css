@@ -6,13 +6,14 @@
   display: grid;
   gap: 4px;
   width: min(380px, calc(100vw - 32px));
-  max-height: min(440px, calc(100% - 140px));
+  max-height: min(660px, calc(100% - 140px));
   padding: 4px 0;
   border: 0;
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
-  grid-template-rows: auto minmax(0, 1fr);
+  /* Заголовок, стопка, картка активної людини. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .group-preview-title {
@@ -32,7 +33,7 @@
   display: flex;
   flex-direction: column;
   /* Висота за вмістом (84px рядок, крок 72px), але не вище за межу: 2 людини не тягнуть порожній список. */
-  height: min(350px, calc(100dvh - 240px), calc(var(--rows, 3) * 72px + 40px));
+  height: min(300px, max(170px, calc(100dvh - 520px)), calc(var(--rows, 3) * 72px + 40px));
   /* Зверху місце під край попереднього рядка: видно, що вище ще хтось є. Активний рядок стоїть під ним. */
   padding: 36px 36px 20px;
   overflow-y: auto;

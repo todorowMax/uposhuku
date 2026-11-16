@@ -1,0 +1,73 @@
+/*
+  Низ профілю виконавця (components/profile/parts/profile-contact-bar.tsx): оболонка .contact-bar спершу виглядає
+  головною кнопкою, а після дотику стає полем введення. Колір, радіус і тінь морфить GSAP Flip; поле й «Надіслати»
+  ті самі, що в чаті (.dm-input, .dm-send).
+*/
+.contact-bar-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.contact-bar {
+  min-height: 46px;
+  border-radius: 14px;
+  background: var(--brand-solid);
+  color: var(--brand-ink);
+}
+
+.contact-bar[data-mode="compose"] {
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: inset 0 0 0 1px rgb(16 45 55 / 12%);
+  color: var(--ink);
+}
+
+.contact-bar[data-mode="compose"]:focus-within {
+  box-shadow: inset 0 0 0 1.5px var(--brand), 0 0 0 4px rgb(242 105 60 / 14%);
+}
+
+.contact-bar-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  border-radius: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms;
+}
+
+.contact-bar-open:hover {
+  background: var(--brand-solid-hover);
+}
+
+.contact-bar-open:focus-visible {
+  outline: 2px solid var(--brand-ink);
+  outline-offset: -4px;
+}
+
+.contact-bar-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 6px 6px 6px 8px;
+}
+
+/* Хрестик 30px по центру однорядкового поля 36px; коли текст виріс, лишається внизу. */
+.contact-bar-cancel {
+  flex: none;
+  margin-bottom: 3px;
+}
+
+.contact-bar-note {
+  padding-inline: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.contact-bar-note[data-tone="error"] {
+  color: var(--accent-ink);
+}

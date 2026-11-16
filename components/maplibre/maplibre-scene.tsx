@@ -9,6 +9,7 @@ import { gsap } from "gsap";
 import type { FeatureCollection, Point } from "geojson";
 import type { ExpressionSpecification } from "@maplibre/maplibre-gl-style-spec";
 import { GroupPreviewPanel } from "@/components/maplibre/group-preview-panel";
+import { writeToPerformer } from "@/components/maplibre/write-to-performer";
 import { PinHoverCard } from "@/components/maplibre/pin-hover-card";
 import { TouchSheets } from "@/components/maplibre/touch-sheets";
 import type { TouchSheetsTypes } from "@/components/maplibre/use-touch-sheets";
@@ -1806,7 +1807,10 @@ export default function MapLibreScene() {
     if (!list) return;
     const box = list.getBoundingClientRect();
     const shadowSpace = Math.max(0, Number.parseFloat(getComputedStyle(list).paddingLeft) - 8);
-    const inside = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < box.bottom - 16;
+    // Картка активної людини стоїть під списком і входить в зону панелі: курсор на ній не закриває список.
+    const card = groupRef.current?.querySelector(".group-preview-card");
+    const bottom = (card ? card.getBoundingClientRect().bottom : box.bottom) - 16;
+    const inside = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < bottom;
     if (inside === groupPointerInsideRef.current) return;
     groupPointerInsideRef.current = inside;
     if (inside) lensControlRef.current.enterPanel();
@@ -1945,9 +1949,12 @@ export default function MapLibreScene() {
             members={groupPreview.members}
             requests={groupPreview.requests}
             listRef={groupListRef}
-            panelRef={groupRef}
             onScroll={updateGroupStack}
             onOpenPerson={openFromGroup}
+            onWrite={(performer) => {
+              lensControlRef.current.hide(true);
+              writeToPerformer(performer.id);
+            }}
             onOpenRequest={openRequestFromGroup}
           />
         </div>

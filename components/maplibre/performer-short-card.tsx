@@ -52,7 +52,7 @@ export const PerformerShortCard = ({ performer, cityName, className, ...props }:
       </dl>
       {verified > 0 && <p className="short-card-verified text-xs">✓ Перевірених відгуків: {verified}</p>}
       {tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 text-xs text-ink-muted">
+        <div className="short-card-tags flex flex-wrap gap-1.5 text-xs text-ink-muted">
           {tags.map((tag) => (
             <span key={tag} className="short-card-tag">
               {tagLabel(tag)}
