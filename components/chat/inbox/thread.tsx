@@ -35,7 +35,7 @@ export const Thread = ({
   onClose: () => void;
   onToggleSize: () => void;
 }) => {
-  const { chat, screen, setScreen, selectedDeal, response, listRef, onScroll, unseen, live, toBottom, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto } = useThread(conversation, onRead);
+  const { chat, screen, setScreen, selectedDeal, response, listRef, onScroll, unseen, live, toBottom, rowRef, closeScreen, photos, photoError, sendError, fileRef, addFiles, removePhoto, deals, ready, apply, reload, draft, type, submit, canSend, viewer, setViewer, sheet, setSheet, openDeals, openScreenAfterClose, attachPhoto, loadEarlier } = useThread(conversation, onRead);
   const role = conversation.role;
   const emptyChat = chat.lines.length === 0 && !conversation.lastMessage;
 
@@ -51,6 +51,9 @@ export const Thread = ({
         error={Boolean(chat.error)}
         empty={emptyChat}
         live={live}
+        hasMore={chat.hasMore}
+        earlier={chat.earlier}
+        onLoadEarlier={loadEarlier}
         unseen={unseen}
         onScroll={onScroll}
         onJumpDown={toBottom}

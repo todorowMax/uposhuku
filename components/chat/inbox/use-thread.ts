@@ -40,7 +40,12 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
   const [viewer, setViewer] = useState<string | null>(null);
   const [sheet, setSheet] = useState<ThreadSheet | null>(null);
   const [screen, setScreen] = useState<ThreadScreen | null>(null);
-  const feedScroll = useFeedScroll(chat.lines, chat.loaded);
+  const feedScroll = useFeedScroll(chat.lines, chat.loaded, chat.earlier === "loading");
+  /** «Показати раніше»: запам'ятовуємо позицію прокрутки, потім просимо в клієнта старішу сторінку. */
+  const loadEarlier = () => {
+    feedScroll.holdPosition();
+    void chat.loadEarlier();
+  };
   const rowRef = useRef<HTMLButtonElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const frame = useRef<number | null>(null);
@@ -123,6 +128,7 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
     submit,
     canSend,
     sendError,
+    loadEarlier,
     ...feedScroll,
     rowRef,
     closeScreen,
