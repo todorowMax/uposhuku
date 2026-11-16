@@ -41,6 +41,7 @@ const hydrate = async (rows: Row[]): Promise<PublishedRequest[]> => {
     text: row.text,
     budget: row.budget,
     deadline: isDeadline(row.deadline) ? row.deadline : null,
+    deadlineDate: row.deadlineDate,
     cityId: row.cityId,
     tags: tagRows.filter((tag) => tag.requestId === row.id).map((tag) => ({ id: tag.tagId, label: tag.label })),
     files: fileRows.filter((file) => file.requestId === row.id).map((file) => ({ name: file.name, size: file.size, type: file.type })),
@@ -59,7 +60,7 @@ export const createRequest = async (userId: string, draft: RequestDraft): Promis
   const id = newId("req");
   const now = Date.now();
   const statements = [
-    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: now, renewedAt: now }),
+    db.insert(requests).values({ id, userId, text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, deadlineDate: draft.deadlineDate ?? null, cityId: draft.cityId ?? null, status: "open", channelOptIn: draft.channelOptIn !== false, createdAt: now, renewedAt: now }),
     ...(draft.tags.length ? [db.insert(requestTags).values(draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index))] : []),
     ...(draft.files.length ? [db.insert(requestFiles).values(draft.files.map((file) => ({ requestId: id, name: file.name, size: file.size, type: file.type })))] : []),
   ];
@@ -113,10 +114,13 @@ export const updateRequest = async (userId: string, id: string, draft: RequestDr
   if (!row) return "not_found";
   if (row.status !== "open") return "closed";
   const tags = draft.tags.map((tag) => ({ requestId: id, tagId: tag.id, label: tag.label })).filter((tag, index, all) => all.findIndex((other) => other.tagId === tag.tagId) === index);
+  // Дату не міняли: готовий строк лишається знімком першого збереження, а не перераховується від сьогодні.
+  const deadlineDate = draft.deadlineDate ?? null;
+  const deadline = deadlineDate !== null && deadlineDate === row.deadlineDate ? row.deadline : (draft.deadline ?? null);
   const statements = [
     db
       .update(requests)
-      .set({ text: draft.text, budget: draft.budget ?? null, deadline: draft.deadline ?? null, cityId: draft.cityId ?? null, channelOptIn: draft.channelOptIn !== false, editedAt: now, editCount: row.editCount + 1 })
+      .set({ text: draft.text, budget: draft.budget ?? null, deadline, deadlineDate, cityId: draft.cityId ?? null, channelOptIn: draft.channelOptIn !== false, editedAt: now, editCount: row.editCount + 1 })
       .where(and(eq(requests.id, id), eq(requests.status, "open"))),
     db.delete(requestTags).where(eq(requestTags.requestId, id)),
     db.delete(requestFiles).where(eq(requestFiles.requestId, id)),
@@ -145,6 +149,7 @@ export const getPublicRequest = async (id: string, viewerId: string | null): Pro
     tags: tagRows.map((tag) => ({ id: tag.tagId, label: tag.label })),
     budget: row.budget,
     deadline: isDeadline(row.deadline) ? row.deadline : null,
+    deadlineDate: row.deadlineDate,
     cityId: row.cityId,
     status: row.status,
     createdAt: new Date(row.createdAt).toISOString(),

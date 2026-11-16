@@ -169,7 +169,7 @@ export function RequestDock({ requests, active }: { requests: PublishedRequest[]
     if (a.status !== b.status) return a.status === "open" ? -1 : 1;
     return b.createdAt.localeCompare(a.createdAt);
   });
-  const facts = requestFacts(active);
+  const facts = requestFacts(active, new Date());
 
   return (
     <section ref={rootRef} className="request-summary glass-panel" aria-label="Активний запит" data-closed={closed || undefined}>

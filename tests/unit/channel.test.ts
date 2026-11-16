@@ -37,10 +37,10 @@ afterEach(() => {
   for (const name of ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "TELEGRAM_CHANNEL_ID", "CHANNEL_ENABLED", "CHANNEL_DELAY_MIN", "SITE_URL", "INTERNAL_TOKEN"]) delete process.env[name];
 });
 
-const addRequest = async (id: string, extra: { user?: string; ageMin?: number; optIn?: boolean; status?: string; text?: string; tags?: [string, string][]; budget?: number | null; city?: string | null } = {}) => {
+const addRequest = async (id: string, extra: { user?: string; ageMin?: number; optIn?: boolean; status?: string; text?: string; tags?: [string, string][]; budget?: number | null; city?: string | null; deadlineDate?: string | null } = {}) => {
   await ctx.db
-    .prepare("insert into requests (id, user_id, text, budget, deadline, city_id, status, channel_opt_in, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-    .bind(id, extra.user ?? "a", extra.text ?? "Потрібен Telegram-бот для запису клієнтів", extra.budget ?? 15000, "Протягом тижня", extra.city === undefined ? "lviv" : extra.city, extra.status ?? "open", extra.optIn === false ? 0 : 1, NOW - (extra.ageMin ?? 30) * MIN)
+    .prepare("insert into requests (id, user_id, text, budget, deadline, deadline_date, city_id, status, channel_opt_in, created_at) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(id, extra.user ?? "a", extra.text ?? "Потрібен Telegram-бот для запису клієнтів", extra.budget ?? 15000, "Протягом тижня", extra.deadlineDate ?? null, extra.city === undefined ? "lviv" : extra.city, extra.status ?? "open", extra.optIn === false ? 0 : 1, NOW - (extra.ageMin ?? 30) * MIN)
     .run();
   for (const [tag, label] of extra.tags ?? [["telegram-bot", "Telegram-бот"]]) await ctx.db.prepare("insert into request_tags (request_id, tag_id, label) values (?, ?, ?)").bind(id, tag, label).run();
 };
@@ -66,6 +66,14 @@ describe("формат поста", () => {
     expect(html).toContain("💰 до 15 000 ₴");
     expect(html).toContain("📍 Львів");
     expect(button).toEqual({ text: "Відгукнутися на Findlyfy", path: "/zapyt/r1?utm_source=telegram&utm_medium=channel" });
+  });
+
+  it("термін у пості: своя дата замість готового строку; рік лише коли він не поточний", () => {
+    const now = new Date("2026-11-16T10:00:00Z");
+    expect(formatChannelPost({ ...request, deadline: "week", deadlineDate: null }, { now }).html).toContain("⏱ Протягом тижня");
+    expect(formatChannelPost({ ...request, deadline: "week", deadlineDate: "2026-11-25" }, { now }).html).toContain("⏱ До 25 листопада");
+    expect(formatChannelPost({ ...request, deadline: "week", deadlineDate: "2027-02-01" }, { now }).html).toContain("⏱ До 1 лютого 2027 р.");
+    expect(formatChannelPost({ ...request, deadline: null, deadlineDate: null }, { now }).html).not.toContain("⏱");
   });
 
   it("довгий текст ріжеться по слову; без міста — «Віддалено»; закритий без кнопки", () => {
@@ -177,6 +185,22 @@ describe("оновлення постів після правки", () => {
     expect(await status("r")).toBe("posted");
     expect(await syncEditedPosts(NOW + 4 * MIN)).toBe(0);
     expect(edits()).toHaveLength(1);
+  });
+
+  it("змінена дата терміну оновлює вже опублікований пост: «До …» замість готового строку", async () => {
+    const year = new Date().getUTCFullYear();
+    await addRequest("d", { deadlineDate: `${year}-12-24` });
+    await postDueRequests(NOW);
+    expect(String(sent()[0].body.text)).toContain("⏱ До 24 грудня");
+    expect(String(sent()[0].body.text)).not.toContain("Протягом тижня");
+    await ctx.db.prepare("update requests set deadline_date = ?, edited_at = ?, edit_count = edit_count + 1 where id = 'd'").bind(`${year}-12-30`, NOW + 2 * MIN).run();
+    expect(await syncEditedPosts(NOW + 3 * MIN)).toBe(1);
+    expect(String(edits()[0].body.text)).toContain("⏱ До 30 грудня");
+    expect(String(edits()[0].body.text)).not.toContain("24 грудня");
+    // Дату прибрано: пост знову показує готовий строк.
+    await ctx.db.prepare("update requests set deadline = 'week', deadline_date = null, edited_at = ?, edit_count = edit_count + 1 where id = 'd'").bind(NOW + 4 * MIN).run();
+    expect(await syncEditedPosts(NOW + 5 * MIN)).toBe(1);
+    expect(String(edits()[1].body.text)).toContain("⏱ Протягом тижня");
   });
 
   it("поста ще немає, закритий запит чи запис failed: нічого не редагуємо", async () => {

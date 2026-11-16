@@ -45,6 +45,7 @@ describe("публічний запит", () => {
         "createdAt",
         "cityId",
         "deadline",
+        "deadlineDate",
         "id",
         "own",
         "responseCount",
@@ -69,12 +70,18 @@ describe("публічний запит", () => {
     expect(result).toMatchObject({
       budget: 5000,
       deadline: "week",
+      deadlineDate: null,
       cityId: "lviv",
       tags: [{ id: "website", label: "Сайт" }],
       status: "open",
       own: false,
       shared: true,
     });
+  });
+
+  it("своя дата терміну потрапляє на публічну сторінку", async () => {
+    const created = await createRequest("pb-author", { text: "Потрібен сайт для пекарні", deadline: "month", deadlineDate: "2026-12-10", tags: [], files: [], channelOptIn: true });
+    expect(await getPublicRequest(created.id, null)).toMatchObject({ deadline: "month", deadlineDate: "2026-12-10" });
   });
 
   it("рахує відгуки виконавців", async () => {

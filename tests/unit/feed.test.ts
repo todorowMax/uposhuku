@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { applyRequestFilter } from "@/lib/feed/map-requests";
+import { addKyivDays } from "@/lib/requests/deadline-date";
 import { feedPage, mapRequests, parseResponse, removeResponse, saveResponse } from "@/lib/feed/feed";
 import { responsesFor } from "@/lib/requests/responses";
 import { emptyProfile } from "@/lib/profile/types";
@@ -36,6 +38,18 @@ describe("стрічка запитів виконавця", () => {
     // Без збігу запит теж у стрічці (з нулем збігів); свої запити виконавець у стрічці не бачить.
     expect((await feedFor("perf-a", ["branding"])).find((item) => item.id === a.id)?.matchedTags).toBe(0);
     expect((await feedFor("cust-a", ["telegram-bot"])).some((item) => item.id === a.id)).toBe(false);
+  });
+
+  it("запит зі своєю датою: у стрічці є deadlineDate, а підпис готового строку лишається, тож фільтр «Терміново» працює", async () => {
+    const soon = await createRequest("cust-a", { ...bot, text: "Бот за два дні", deadline: "asap", deadlineDate: addKyivDays(new Date(), 2) });
+    const far = await createRequest("cust-b", { ...store, text: "Магазин без поспіху", deadline: "flexible", deadlineDate: addKyivDays(new Date(), 90) });
+    const plain = await createRequest("cust-b", { ...store, text: "Магазин без дати", deadline: "week" });
+    const items = await feedFor("perf-a", ["telegram-bot"]);
+    expect(items.find((item) => item.id === soon.id)).toMatchObject({ deadline: "Терміново, до 3 днів", deadlineDate: addKyivDays(new Date(), 2) });
+    expect(items.find((item) => item.id === plain.id)).toMatchObject({ deadline: "Протягом тижня", deadlineDate: null });
+    const urgent = applyRequestFilter(items, "urgent").map((item) => item.id);
+    expect(urgent).toEqual(expect.arrayContaining([soon.id, plain.id]));
+    expect(urgent).not.toContain(far.id);
   });
 
   it("відгук лишається в запиті, рахується й знімається", async () => {
@@ -124,9 +138,9 @@ describe("теги запиту без поля запиту", () => {
 describe("умови запиту словами", () => {
   it("бюджет, термін і місто чипами; порожнє не показуємо", async () => {
     const { requestFacts } = await import("@/lib/requests/format");
-    expect(requestFacts({ budget: 15000, deadline: "week", cityId: "lviv" })).toEqual([expect.stringMatching(/^до 15\D000 ₴$/), "Протягом тижня", "Львів"]);
-    expect(requestFacts({ budget: null, deadline: null, cityId: null })).toEqual([]);
-    expect(requestFacts({})).toEqual([]);
+    expect(requestFacts({ budget: 15000, deadline: "week", cityId: "lviv" }, new Date())).toEqual([expect.stringMatching(/^до 15\D000 ₴$/), "Протягом тижня", "Львів"]);
+    expect(requestFacts({ budget: null, deadline: null, cityId: null }, new Date())).toEqual([]);
+    expect(requestFacts({}, new Date())).toEqual([]);
   });
 });
 

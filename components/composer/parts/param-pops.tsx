@@ -3,7 +3,7 @@
 // Вміст вікон умов запиту: бюджет (готові суми й своя), термін, місце (віддалено чи місто зі списку).
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Field, Input } from "@/components/ui/input";
 import { CITIES } from "@/lib/map/cities";
 import { DEADLINES, type Deadline } from "@/lib/requests/types";
 import type { RequestParamsTypes, useRequestParams } from "@/components/composer/use-request-params";
@@ -57,20 +57,37 @@ export const DeadlinePop = ({ value, params }: ParamPopsTypes.Props) => (
     <p className="param-pop-title">Коли потрібен результат</p>
     <div className="grid gap-1">
       {(Object.keys(DEADLINES) as Deadline[]).map((key) => (
-        <Button
-          key={key}
-          variant="bare"
-          className="param-row"
-          data-on={value.deadline === key || undefined}
-          onClick={() => {
-            params.set({ deadline: value.deadline === key ? null : key });
-            params.close();
-          }}
-        >
+        <Button key={key} variant="bare" className="param-row" data-on={(value.deadline === key && value.deadlineDate === null) || undefined} onClick={() => params.pickDeadline(key)}>
           {DEADLINES[key]}
         </Button>
       ))}
+      <Button variant="bare" className="param-row" data-on={value.deadlineDate !== null || undefined} aria-expanded={params.dateOpen} onClick={params.startDate}>
+        Вказати дату
+      </Button>
     </div>
+    {params.dateOpen && (
+      <div className="mt-2 grid gap-2">
+        <Field label="Зробити до" htmlFor="param-deadline-date" error={params.dateError}>
+          <Input
+            id="param-deadline-date"
+            type="date"
+            value={params.dateText}
+            min={params.dateRange.min}
+            max={params.dateRange.max}
+            onChange={(event) => params.changeDate(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              params.applyDate();
+            }}
+            className="min-h-9.5 min-w-0 px-3 text-sm"
+          />
+        </Field>
+        <Button variant="offer" className="justify-self-end" onClick={params.applyDate}>
+          Готово
+        </Button>
+      </div>
+    )}
   </>
 );
 

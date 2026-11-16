@@ -10,5 +10,6 @@ Feature doc: `docs/features/requests.md` (edit, restore window, remote pin, chan
 - Restore is allowed only within `RESTORE_WINDOW_MS` (24 h) of the first close; `closed_at` is never overwritten by a second close.
 - Lifetime: 14 days, then "Ще актуально?" once (Telegram + email, key carries the recipient); no answer in 3 days closes the request with `close_reason = 'expired'`, restorable for 7 days. Any restore restarts the clock; "Так, ще актуально" notifies nobody.
 - Response status (`new | shortlisted | declined | chosen`) is set only by the request author and is never shown to the performer.
+- Deadline: the bucket `deadline` stays and drives filters, ranking and matching; a custom date (`deadlineDate`, `YYYY-MM-DD`, Kyiv calendar day, today..+365) derives the bucket once at save time and is never re-derived later. Show deadlines only through `deadlineText` / `deadlineLabel` in `lib/requests/format.ts`.
 - Neither edit nor restore sends "new request for your tags" notifications. Deals are not changed by an edit: their terms live in the deal.
 - A request without a city is pinned at a stable offset by id (`lib/feed/request-point.ts`); do not randomise it.

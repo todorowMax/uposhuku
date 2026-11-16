@@ -77,6 +77,7 @@ describe("правка запиту: чернетка для сервера", ()
       files: saved.files,
       budget: null,
       deadline: "week",
+      deadlineDate: null,
       cityId: "lviv",
       channelOptIn: true,
     });

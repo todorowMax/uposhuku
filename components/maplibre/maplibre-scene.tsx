@@ -436,6 +436,7 @@ const ownRequestOnMap = (request: PublishedRequest, responses: number): MapReque
   place: CITIES.find((item) => item.id === request.cityId)?.name ?? "Віддалено",
   budget: request.budget ? `до ${new Intl.NumberFormat("uk-UA").format(request.budget)} ₴` : null,
   deadline: request.deadline ? DEADLINES[request.deadline] : null,
+  deadlineDate: request.deadlineDate ?? null,
   createdAt: request.createdAt,
   editedAt: request.editedAt,
   responses,

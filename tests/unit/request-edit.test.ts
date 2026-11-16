@@ -12,6 +12,7 @@ import { PATCH } from "@/app/api/requests/[id]/route";
 import { POST } from "@/app/api/requests/route";
 import { requestFiles, requestTags, requests } from "@/db/schema";
 import { conversations } from "@/db/schema";
+import { addKyivDays } from "@/lib/requests/deadline-date";
 import type { PublishedRequest } from "@/lib/requests/types";
 import { REQUEST_EDITED_NOTICE, REQUEST_EDITED_NOTICE_WINDOW_MS, addSystemMessage, getOrCreateConversation, listMessages, noteRequestEdited } from "@/lib/server/chat-repo";
 import { pushGlobal } from "@/lib/server/realtime";
@@ -160,5 +161,46 @@ describe("службовий рядок після правки", () => {
     // Після вікна новий рядок з'являється.
     await noteRequestEdited("re-cust", own.id, Date.now() + REQUEST_EDITED_NOTICE_WINDOW_MS + 1000);
     expect(await notices(perfTalk)).toHaveLength(2);
+  });
+});
+
+describe("своя дата терміну: публікація й правка", () => {
+  const inDays = (days: number) => addKyivDays(new Date(), days);
+
+  it("публікація зі своєю датою зберігає її й виводить готовий строк з днів; без дати поле null", async () => {
+    const created = (await body(await POST(jsonRequest("POST", { ...draft, deadline: "asap", deadlineDate: inDays(10) })))).request;
+    expect(created).toMatchObject({ deadline: "two_weeks", deadlineDate: inDays(10) });
+    const [row] = await getDb().select().from(requests).where(eq(requests.id, created.id));
+    expect(row).toMatchObject({ deadline: "two_weeks", deadlineDate: inDays(10) });
+    const plain = (await body(await POST(jsonRequest("POST", draft)))).request;
+    expect(plain).toMatchObject({ deadline: "week", deadlineDate: null });
+  });
+
+  it("минула, задалека й неправильна дата дають 400 без запиту", async () => {
+    for (const bad of [inDays(-1), inDays(366), "2026-02-30", "скоро"]) {
+      const response = await POST(jsonRequest("POST", { ...draft, deadlineDate: bad }));
+      expect(response.status, bad).toBe(400);
+    }
+  });
+
+  it("правка міняє дату, перераховує готовий строк і прибирає дату, коли обрано готовий", async () => {
+    const created = (await body(await POST(jsonRequest("POST", { ...draft, deadlineDate: inDays(2) })))).request;
+    expect(created.deadline).toBe("asap");
+    const changed = (await body(await edit(created.id, { ...draft, deadline: "asap", deadlineDate: inDays(40) }))).request;
+    expect(changed).toMatchObject({ deadline: "flexible", deadlineDate: inDays(40) });
+    const cleared = (await body(await edit(created.id, { ...draft, deadline: "month" }))).request;
+    expect(cleared).toMatchObject({ deadline: "month", deadlineDate: null });
+  });
+
+  it("незмінена дата лишає готовий строк знімком і не заважає правці, навіть коли дата вже минула", async () => {
+    const created = (await body(await POST(jsonRequest("POST", { ...draft, deadlineDate: inDays(5) })))).request;
+    expect(created.deadline).toBe("week");
+    // Дата «минула» вчора: рядок у базі зсуваємо назад, готовий строк-знімок лишається.
+    await getDb().update(requests).set({ deadlineDate: inDays(-1) }).where(eq(requests.id, created.id));
+    const edited = await edit(created.id, { ...draft, text: "Потрібен Telegram-бот, оновлений текст", deadline: "asap", deadlineDate: inDays(-1) });
+    expect(edited.status).toBe(200);
+    expect((await body(edited)).request).toMatchObject({ deadline: "week", deadlineDate: inDays(-1) });
+    // Інша минула дата все одно відхиляється.
+    expect((await edit(created.id, { ...draft, deadlineDate: inDays(-2) })).status).toBe(400);
   });
 });

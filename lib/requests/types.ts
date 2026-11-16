@@ -34,6 +34,11 @@ export interface RequestDraft {
   /** Бюджет «до N ₴»; null — не вказано або «за домовленістю». */
   budget?: number | null;
   deadline?: Deadline | null;
+  /**
+   * Своя дата «до» (`YYYY-MM-DD`, день за Києвом); null — обрано готовий строк. Коли дата є, `deadline` це знімок,
+   * виведений з неї при збереженні (`lib/requests/deadline-date.ts`), і з часом не міняється.
+   */
+  deadlineDate?: string | null;
   /** Місто замовника; null — «Віддалено» або не вказано. */
   cityId?: string | null;
   /** Можна показати запит у публічному Telegram-каналі (без контактів). Типово так. */

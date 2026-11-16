@@ -9,7 +9,7 @@ import { noteRequestEdited } from "@/lib/server/chat-repo";
 import { rateLimited } from "@/lib/server/rate-limit";
 import { pushGlobal } from "@/lib/server/realtime";
 import { renewRequest } from "@/lib/server/request-lifetime";
-import { closeRequest, reopenRequest, updateRequest } from "@/lib/server/request-repo";
+import { closeRequest, findRequest, reopenRequest, updateRequest } from "@/lib/server/request-repo";
 import { route } from "@/lib/server/route";
 
 /** «Так, ще актуально»: строк життя заново; виконавцям нічого не йде, стрічка не змінюється. */
@@ -41,7 +41,8 @@ export const PATCH = route<"user", undefined, { id: string }>({ auth: "user" }, 
   if (limited) return limited;
   if (body?.renew === true) return renewResponse(user.id, id);
   if (body?.status === "open") return reopenResponse(user.id, id);
-  const draft = parseDraft(body);
+  const current = await findRequest(user.id, id);
+  const draft = parseDraft(body, { now: new Date(), keepDate: current?.deadlineDate ?? null });
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const updated = await updateRequest(user.id, id, draft);
   if (updated === "not_found") return problem(404, "Запит не знайдено");

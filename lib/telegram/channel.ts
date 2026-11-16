@@ -16,6 +16,7 @@ import { and, asc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, sql } fro
 import { channelPosts, requestTags, requests } from "@/db/schema";
 import { stripContacts } from "@/lib/chat/contacts";
 import { CITIES } from "@/lib/map/cities";
+import { deadlineText } from "@/lib/requests/format";
 import { DEADLINES, isDeadline } from "@/lib/requests/types";
 import { getDb } from "@/lib/server/db";
 import { logServer } from "@/lib/telemetry/log";
@@ -37,6 +38,8 @@ export interface ChannelRequest {
   text: string;
   budget: number | null;
   deadline: string | null;
+  /** Своя дата «до» (`YYYY-MM-DD`); коли вона є, у пості стоїть вона, а не готовий строк. */
+  deadlineDate?: string | null;
   cityId: string | null;
   tags: { id: string; label: string }[];
 }
@@ -51,13 +54,14 @@ export const hashtag = (label: string): string => {
 export const WITHDRAWN_POST_HTML = "<b>Автор прибрав цей запит</b>";
 
 /** Текст поста й кнопка. `closed`: запит закрито, кнопки немає. */
-export const formatChannelPost = (request: ChannelRequest, options: { closed?: boolean } = {}): { html: string; button: { text: string; path: string } | null } => {
+export const formatChannelPost = (request: ChannelRequest, options: { closed?: boolean; now?: Date } = {}): { html: string; button: { text: string; path: string } | null } => {
   const tags = [...new Set(request.tags.map((tag) => hashtag(tag.label)).filter(Boolean))].slice(0, HASHTAGS_MAX).join(" ");
   const city = CITIES.find((item) => item.id === request.cityId)?.name ?? "Віддалено";
+  const deadline = deadlineText(isDeadline(request.deadline) ? DEADLINES[request.deadline] : null, request.deadlineDate, options.now ?? new Date());
   const facts = [
     request.budget ? `💰 до ${new Intl.NumberFormat("uk-UA").format(request.budget).replace(/[\u00a0\u202f]/g, " ")} ₴` : null,
     `📍 ${city}`,
-    isDeadline(request.deadline) ? `⏱ ${DEADLINES[request.deadline]}` : null,
+    deadline ? `⏱ ${deadline}` : null,
   ].filter(Boolean);
   const html = [
     options.closed ? "✅ <b>Виконавця знайдено</b>" : null,
@@ -72,7 +76,7 @@ export const formatChannelPost = (request: ChannelRequest, options: { closed?: b
 
 const keyboard = (config: TelegramConfig, button: { text: string; path: string } | null) => (button ? { inline_keyboard: [[{ text: button.text, url: `${config.siteUrl}${button.path}` }]] } : undefined);
 
-const withTags = async (rows: { id: string; text: string; budget: number | null; deadline: string | null; cityId: string | null }[]): Promise<ChannelRequest[]> => {
+const withTags = async (rows: { id: string; text: string; budget: number | null; deadline: string | null; deadlineDate: string | null; cityId: string | null }[]): Promise<ChannelRequest[]> => {
   if (rows.length === 0) return [];
   const tags = await getDb().select().from(requestTags).where(inArray(requestTags.requestId, rows.map((row) => row.id)));
   return rows.map((row) => ({ ...row, tags: tags.filter((tag) => tag.requestId === row.id).map((tag) => ({ id: tag.tagId, label: tag.label })) }));
@@ -87,7 +91,7 @@ export const duePosts = async (config: TelegramConfig, now: number): Promise<Cha
   const delay = config.channelDelayMin * 60_000;
   const posted = db.select({ id: channelPosts.requestId }).from(channelPosts);
   const candidates = await db
-    .select({ id: requests.id, userId: requests.userId, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId })
+    .select({ id: requests.id, userId: requests.userId, text: requests.text, budget: requests.budget, deadline: requests.deadline, deadlineDate: requests.deadlineDate, cityId: requests.cityId })
     .from(requests)
     .where(and(eq(requests.status, "open"), eq(requests.channelOptIn, true), lt(requests.createdAt, now - delay + 1), gt(requests.createdAt, now - DAY_MS), notInArray(requests.id, posted)))
     .orderBy(requests.createdAt)
@@ -149,7 +153,7 @@ export const postDueRequests = async (now = Date.now(), config = telegramConfig(
 /** Опубліковані пости відкритих запитів, які автор змінив після останнього оновлення поста: від давніших правок до новіших. */
 export const editedPosts = async (limit = POSTS_PER_RUN): Promise<(ChannelRequest & { chatId: string; messageId: number })[]> => {
   const rows = await getDb()
-    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, deadlineDate: requests.deadlineDate, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
     .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "open"), eq(requests.channelOptIn, true), isNotNull(channelPosts.messageId), gt(requests.editedAt, channelPosts.updatedAt)))
@@ -276,7 +280,7 @@ export const closeFinishedPosts = async (now = Date.now(), config = telegramConf
   if (!channelReady(config)) return 0;
   const db = getDb();
   const rows = await db
-    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, deadlineDate: requests.deadlineDate, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
     .where(and(eq(channelPosts.status, "posted"), eq(requests.status, "closed")))
@@ -303,7 +307,7 @@ export const closeFinishedPosts = async (now = Date.now(), config = telegramConf
 /** Наші пости «Виконавця знайдено» (статус `closed`, без помилки, повідомлення є), чий запит автор знову відкрив і дозволив для каналу. */
 export const reopenedPosts = async (limit = POSTS_PER_RUN): Promise<(ChannelRequest & { chatId: string; messageId: number })[]> => {
   const rows = await getDb()
-    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
+    .select({ id: requests.id, text: requests.text, budget: requests.budget, deadline: requests.deadline, deadlineDate: requests.deadlineDate, cityId: requests.cityId, chatId: channelPosts.chatId, messageId: channelPosts.messageId })
     .from(channelPosts)
     .innerJoin(requests, eq(requests.id, channelPosts.requestId))
     .where(and(eq(channelPosts.status, "closed"), isNull(channelPosts.error), eq(requests.status, "open"), eq(requests.channelOptIn, true), isNotNull(channelPosts.messageId)))

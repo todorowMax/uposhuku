@@ -17,7 +17,7 @@ import { route } from "@/lib/server/route";
 export const POST = route({ auth: "user", rate: "requestCreate", unauthorized: () => problem(401, "Потрібен вхід", "Підтвердьте пошту, щоб опублікувати запит.") }, async ({ request, user }) => {
   const phone = await phoneGate(user);
   if (phone) return phone;
-  const draft = parseDraft(await readJson(request));
+  const draft = parseDraft(await readJson(request), { now: new Date() });
   if (typeof draft === "string") return problem(400, "Запит не заповнено", draft);
   const created = await createRequest(user.id, draft);
   // Слова, яких словник не знає, лічимо без зв'язку з людиною: звідти росте словник. Після відповіді, помилка не страшна.
