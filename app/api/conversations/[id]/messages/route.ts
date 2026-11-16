@@ -44,7 +44,9 @@ export async function POST(request: Request, { params }: Ctx) {
   const limited = await rateLimited("message", user.id);
   if (limited) return limited;
   const body = await readJson(request);
-  const text = typeof body?.text === "string" ? body.text.trim().slice(0, CHAT_TEXT_MAX) : "";
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  // Не обрізаємо мовчки: людина мала б надіслати не те, що написала. Клієнт цього не пропускає, але маршрут відкритий для інших.
+  if (text.length > CHAT_TEXT_MAX) return problem(413, "Повідомлення задовге", `Повідомлення не може бути довшим за ${CHAT_TEXT_MAX} знаків`);
   const requested = Array.isArray(body?.attachmentIds) ? [...new Set(body.attachmentIds.filter((id: unknown): id is string => typeof id === "string"))].slice(0, CHAT_PHOTOS_MAX) : [];
   if (!text && requested.length === 0) return problem(400, "Порожнє повідомлення");
   try {

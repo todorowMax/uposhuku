@@ -143,6 +143,17 @@ describe("/api/conversations/:id/messages", () => {
     }
   });
 
+  it("текст довший за 4000 знаків не обрізається мовчки: 413 і нічого не записано; рівно 4000 проходить", async () => {
+    const before = await messageCount(convId);
+    const tooLong = await POST_MESSAGE(jsonRequest("POST", { text: "а".repeat(4001) }), ctxOf({ id: convId }));
+    expect(tooLong.status).toBe(413);
+    expect(((await body(tooLong)).detail as string) ?? "").toContain("4000");
+    expect(await messageCount(convId)).toBe(before);
+    // Пробіли по краях не рахуються: сервер їх обрізає, клієнт теж шле обрізане.
+    expect((await POST_MESSAGE(jsonRequest("POST", { text: `  ${"б".repeat(4000)}  ` }), ctxOf({ id: convId }))).status).toBe(201);
+    expect(await messageCount(convId)).toBe(before + 1);
+  });
+
   it("чуже фото до повідомлення не прикріпити: ні з іншої розмови, ні завантажене іншою людиною", async () => {
     // Фото, завантажене виконавцем у цій же розмові, замовник приєднати не може.
     as("ac-perf");
