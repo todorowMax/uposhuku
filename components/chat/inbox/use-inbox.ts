@@ -32,6 +32,9 @@ export const useInbox = () => {
   /** Останнє опитування списку не вдалось: показуємо рядок з «Спробувати ще раз». */
   const [listError, setListError] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  /** Розмову з виконавцем (профіль, відгук) не вдалось відкрити: людина бачить той самий рядок з «Спробувати ще раз», а не порожнє вікно. */
+  const [openFailed, setOpenFailed] = useState(false);
+  const [openAttempt, setOpenAttempt] = useState(0);
   const signedIn = session.status === "user";
   const motion = useInboxMotion(open, setOpen);
   useKeyboardInset(motion.panelRef, open);
@@ -113,12 +116,13 @@ export const useInbox = () => {
         setItems(list);
         const target = list.find((item) => item.id === id);
         if (target) setActive(target);
+        setOpenFailed(false);
       })
-      .catch(() => {});
+      .catch(() => !cancelled && setOpenFailed(true));
     return () => {
       cancelled = true;
     };
-  }, [handled]);
+  }, [handled, openAttempt]);
 
   // Бейдж: розмови з непрочитаним і ті, де угода чекає на мене.
   const actionCount = attentionCount(items);
@@ -126,7 +130,10 @@ export const useInbox = () => {
   // Відкрита розмова відмічена прочитаною: гасимо її в списку одразу, не чекаючи наступного опитування.
   const markRead = (conversationId: string) => setItems((list) => list.map((item) => (item.id === conversationId ? { ...item, unread: 0, unreadDeal: false } : item)));
 
-  const retry = () => setAttempt((value) => value + 1);
+  const retry = () => {
+    setAttempt((value) => value + 1);
+    if (openFailed) setOpenAttempt((value) => value + 1);
+  };
 
-  return { ...motion, listError, retry, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead };
+  return { ...motion, listError: listError || openFailed, retry, signedIn, items, open, setOpen, active, setActive, filter, setFilter, actionCount, markRead };
 };
