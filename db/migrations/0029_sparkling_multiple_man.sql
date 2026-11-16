@@ -12,7 +12,7 @@ CREATE TABLE `__new_request_files` (
 	FOREIGN KEY (`uploader_user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
 );
 --> statement-breakpoint
-INSERT INTO `__new_request_files`("id", "request_id", "name", "size", "type", "key", "uploader_user_id", "created_at") SELECT "id", "request_id", "name", "size", "type", "key", "uploader_user_id", "created_at" FROM `request_files`;--> statement-breakpoint
+INSERT INTO `__new_request_files`(`id`, `request_id`, `name`, `size`, `type`) SELECT `id`, `request_id`, `name`, `size`, `type` FROM `request_files`;--> statement-breakpoint
 DROP TABLE `request_files`;--> statement-breakpoint
 ALTER TABLE `__new_request_files` RENAME TO `request_files`;--> statement-breakpoint
 PRAGMA foreign_keys=ON;--> statement-breakpoint
