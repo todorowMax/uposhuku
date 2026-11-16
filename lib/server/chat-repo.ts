@@ -9,6 +9,7 @@ import { chatAttachments, conversations, deals, messages, requests, responses, u
 import { DELETED_NAME } from "@/lib/account/deletion";
 import type { Deal } from "@/lib/deals/types";
 import { needsAction, performerNeeds } from "@/lib/deals/machine";
+import type { MessageCursor } from "@/lib/chat/cursor";
 import type { ChatMessageDto, ConversationDto } from "@/lib/chat/types";
 import { newId } from "@/lib/ids";
 import { getDb, inChunks } from "./db";
@@ -74,20 +75,43 @@ const attachmentsOf = async (messageIds: string[]) => {
   return inChunks(messageIds, (chunk) => getDb().select({ id: chatAttachments.id, messageId: chatAttachments.messageId }).from(chatAttachments).where(inArray(chatAttachments.messageId, chunk)));
 };
 
-const MESSAGES_PAGE = 500;
+export const MESSAGES_PAGE = 500;
 
-/**
- * Перше завантаження (since = 0) віддає останні 500 повідомлень (спершу беремо найновіші, потім розвертаємо),
- * щоб довга розмова не показувала лише початок. Опитування (since > 0) читає зростаюче від мітки, як і раніше:
- * так жодне нове повідомлення не губиться.
- */
-export const listMessages = async (conversationId: string, sinceMs = 0): Promise<ChatMessageDto[]> => {
-  const where = and(eq(messages.conversationId, conversationId), gt(messages.createdAt, sinceMs));
-  const query = getDb().select().from(messages).where(where);
-  const rows = sinceMs > 0 ? await query.orderBy(asc(messages.createdAt)).limit(MESSAGES_PAGE) : (await query.orderBy(desc(messages.createdAt)).limit(MESSAGES_PAGE)).reverse();
+export type MessagesPage = { messages: ChatMessageDto[]; /** Є ще старіші за те, що віддано: показати кнопку «Показати раніше». Лише для першої сторінки й для `before`. */ hasMore: boolean };
+
+const withAttachments = async (rows: (typeof messages.$inferSelect)[]): Promise<ChatMessageDto[]> => {
   const files = await attachmentsOf(rows.map((row) => row.id));
   return rows.map((row) => toMessage(row, files.filter((file) => file.messageId === row.id)));
 };
+
+/**
+ * Сторінка повідомлень розмови. Три режими:
+ * - `since > 0`: зростаюче від мітки (опитування), як і раніше, так жодне нове не губиться; `hasMore` хибне;
+ * - `before`: сторінка старіших за курсор (час, id), зростаюче в межах сторінки;
+ * - інакше: перше завантаження, найновіші 500 (беремо з кінця, розвертаємо).
+ * Читання «з кінця» впорядковане за (час, id), тож межа сторінки при однаковому часі однозначна. Беремо на один рядок
+ * більше за сторінку: його наявність і є `hasMore`.
+ */
+export const listMessagesPage = async (conversationId: string, opts: { since?: number; before?: MessageCursor | null } = {}): Promise<MessagesPage> => {
+  const { since = 0, before = null } = opts;
+  const db = getDb();
+  if (!before && since > 0) {
+    const rows = await db.select().from(messages).where(and(eq(messages.conversationId, conversationId), gt(messages.createdAt, since))).orderBy(asc(messages.createdAt), asc(messages.id)).limit(MESSAGES_PAGE);
+    return { messages: await withAttachments(rows), hasMore: false };
+  }
+  const olderThan = before ? or(lt(messages.createdAt, before.at), and(eq(messages.createdAt, before.at), lt(messages.id, before.id))) : undefined;
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.conversationId, conversationId), olderThan))
+    .orderBy(desc(messages.createdAt), desc(messages.id))
+    .limit(MESSAGES_PAGE + 1);
+  const page = rows.slice(0, MESSAGES_PAGE).reverse();
+  return { messages: await withAttachments(page), hasMore: rows.length > MESSAGES_PAGE };
+};
+
+/** Лише повідомлення: перше завантаження чи опитування від мітки (див. `listMessagesPage`). */
+export const listMessages = async (conversationId: string, sinceMs = 0): Promise<ChatMessageDto[]> => (await listMessagesPage(conversationId, { since: sinceMs })).messages;
 
 export const addMessage = async (conversationId: string, from: "customer" | "performer", text: string, extra: { kind?: "text" | "system"; contextId?: string; attachmentIds?: string[] } = {}): Promise<ChatMessageDto> => {
   const db = getDb();

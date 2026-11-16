@@ -110,6 +110,22 @@ describe("/api/conversations/:id/messages", () => {
     expect((read.messages as { text: string }[]).map((message) => message.text)).toEqual(expect.arrayContaining(["Добрий день", "Вітаю"]));
   });
 
+  it("?before віддає старіші за курсор і hasMore; зламаний курсор 400, чужа людина 404", async () => {
+    const all = (await body(await GET_MESSAGES(get(), ctxOf({ id: convId })))) as { messages: { id: string; at: string }[]; hasMore: boolean };
+    expect(all.hasMore).toBe(false);
+    expect(all.messages.length).toBeGreaterThanOrEqual(2);
+    const last = all.messages.at(-1) as { id: string; at: string };
+    const before = (cursor: string, user = "ac-cust") => {
+      as(user);
+      return GET_MESSAGES(new Request(`https://findlyfy.test/x?before=${encodeURIComponent(cursor)}`), ctxOf({ id: convId }));
+    };
+    const older = await body(await before(`${Date.parse(last.at)}:${last.id}`));
+    expect((older.messages as { id: string }[]).map((message) => message.id)).toEqual(all.messages.slice(0, -1).map((message) => message.id));
+    expect(older.hasMore).toBe(false);
+    for (const bad of ["abc", "123", "x:y", ":id", "12:", "12:a b"]) expect((await before(bad)).status).toBe(400);
+    expect((await before(`${Date.parse(last.at)}:${last.id}`, "ac-stranger")).status).toBe(404);
+  });
+
   it("чужа переписка: стороння людина не читає (404) і не пише (404), повідомлення не з'являється", async () => {
     const before = await messageCount(convId);
     as("ac-stranger");
