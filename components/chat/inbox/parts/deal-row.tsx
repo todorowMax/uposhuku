@@ -56,10 +56,13 @@ export const DealRow = ({
   role,
   response,
   panelOpen,
+  gone = false,
   onOpen,
   openRef,
 }: {
   ready: boolean;
+  /** Співрозмовник видалив акаунт: нову угоду оформити не можна (сервер відповів би 409). */
+  gone?: boolean;
   deals: Deal[];
   role: NextStepTypes.Role;
   response: OfferResponse | undefined;
@@ -87,6 +90,13 @@ export const DealRow = ({
           <span className="truncate">{countText(deals.length, waiting)}</span>
           {waiting > 0 && <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand" />}
         </Button>
+      </div>
+    );
+  }
+  if (gone) {
+    return (
+      <div className={ROW}>
+        <span className="truncate text-xs text-ink-muted">Нову угоду оформити не можна: співрозмовник видалив акаунт</span>
       </div>
     );
   }

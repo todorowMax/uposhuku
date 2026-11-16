@@ -42,7 +42,7 @@ export const Thread = ({
   return (
     <>
       <ThreadHeader conversation={conversation} typing={chat.typing} size={size} onBack={onBack} onToggleSize={onToggleSize} onClose={onClose} />
-      <DealRow ready={ready} deals={deals} role={role} response={response} panelOpen={Boolean(selectedDeal)} onOpen={openDeals} openRef={rowRef} />
+      <DealRow ready={ready} deals={deals} role={role} response={response} panelOpen={Boolean(selectedDeal)} gone={isOtherGone(conversation)} onOpen={openDeals} openRef={rowRef} />
       <MessageList
         ref={listRef}
         lines={chat.lines}

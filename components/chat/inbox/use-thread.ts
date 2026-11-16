@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRemoteChat } from "@/lib/chat/client";
+import { isOtherGone } from "@/lib/chat/display";
 import { draftAfterSend, sendErrorText } from "@/lib/chat/send-result";
 import type { ConversationDto } from "@/lib/chat/types";
 import { afterLayerHistory } from "@/lib/ui/use-layer-history";
@@ -72,6 +73,8 @@ export const useThread = (conversation: ConversationDto, onRead: (conversationId
     if (dealState.deals.length > 1) return setSheet("deals");
     const only = dealState.deals[0];
     if (only) return setScreen({ kind: "deal", id: only.id });
+    // Співрозмовник видалив акаунт: умов не оформити, форма привела б до відмови сервера (409) після заповнення.
+    if (isOtherGone(conversation)) return;
     setScreen(response ? { kind: "composer" } : { kind: "terms" });
   };
 
