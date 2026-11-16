@@ -5,13 +5,13 @@
 // Список людей групи під курсором (десктоп): заголовок, прокручувана стопка рядків і під нею коротка картка
 // активного рядка, тобто того, що прокрутка поставила нагору (data-centered від сцени). Картка частина панелі,
 // а не окреме вікно збоку: вона стоїть там, де курсор, не закриває маркер і не залежить від ширини вікна.
-// Картка інтерактивна («Написати»), а зона панелі для курсора доходить до її низу: тягнучись до кнопки, список не зникає.
+// «Написати» стоїть окремою кнопкою під карткою, а зона панелі для курсора доходить до її низу: тягнучись до кнопки, список не зникає.
 // Наведення мишею картку не перемикає. Саму панель (місце, поява, відстеження курсора) веде сцена.
 
 import { useState } from "react";
 import type { RefObject, UIEventHandler } from "react";
 import { PerformerShortCard } from "@/components/maplibre/performer-short-card";
-import { ChevronRight } from "@/components/icons";
+import { ChevronRight, MessageSquareText } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { CITIES } from "@/lib/map/cities";
 import { avatarBackground } from "@/lib/map/avatar-style";
@@ -88,12 +88,13 @@ export const GroupPreviewPanel = ({ members, requests, listRef, onScroll, onOpen
       {active && (
         <div key={active.id} role="group" aria-label={`Коротко про ${active.name}`} className="group-preview-card">
           <PerformerShortCard performer={active} cityName={CITIES.find((city) => city.id === active.cityId)?.name} />
-          {!active.mine && (
-            <Button variant="secondary" className="w-full" onClick={() => onWrite(active)}>
-              Написати
-            </Button>
-          )}
         </div>
+      )}
+      {active && !active.mine && (
+        <Button variant="offer" className="group-preview-write" onClick={() => onWrite(active)}>
+          <MessageSquareText aria-hidden className="size-4" />
+          Написати
+        </Button>
       )}
     </>
   );

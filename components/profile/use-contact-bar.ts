@@ -12,6 +12,7 @@ import { gsap } from "gsap";
 import type { Flip } from "gsap/Flip";
 import { draftLimit } from "@/lib/chat/draft-limit";
 import { sendErrorText, type SendResult } from "@/lib/chat/send-result";
+import { useAutoGrow } from "@/lib/ui/auto-grow";
 import { prefersReducedMotion } from "@/lib/ui/media";
 
 export namespace ContactBarTypes {
@@ -28,8 +29,9 @@ export const useContactBar = ({ onStart, onSend }: ContactBarTypes.Options) => {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Поле росте під текст до 9 рядків, далі прокручується всередині по вертикалі; цей же ref ставить у нього фокус.
+  const textRef = useAutoGrow(draft, 9);
   const shellRef = useRef<HTMLDivElement>(null);
-  const textRef = useRef<HTMLTextAreaElement>(null);
   const flipRef = useRef<typeof Flip | null>(null);
   const stateRef = useRef<Flip.FlipState | null>(null);
   /** Замок від подвійної відправки: стан оновиться лише з наступним рендером, а Enter може прийти раніше. */
@@ -62,10 +64,10 @@ export const useContactBar = ({ onStart, onSend }: ContactBarTypes.Options) => {
     // Поле з'явилось після дотику людини на кнопці: фокус у нього, а не autoFocus у розмітці.
     if (mode === "compose") textRef.current?.focus();
     if (!shell || !plugin || !state) return;
-    plugin.from(state, { duration: 0.4, ease: "expo.out", absolute: false, props: MORPH_PROPS });
+    plugin.from(state, { duration: 0.5, ease: "expo.out", absolute: false, props: MORPH_PROPS });
     const inner = shell.firstElementChild;
     if (inner) gsap.fromTo(inner, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.24, delay: 0.12, ease: "power2.out", clearProps: "opacity,transform" });
-  }, [mode]);
+  }, [mode, textRef]);
 
   const open = () => {
     onStart();

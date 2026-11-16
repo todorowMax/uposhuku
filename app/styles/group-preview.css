@@ -12,8 +12,8 @@
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
-  /* Заголовок, стопка, картка активної людини. */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Заголовок, стопка, картка активної людини, «Написати». */
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
 }
 
 .group-preview-title {
@@ -33,7 +33,7 @@
   display: flex;
   flex-direction: column;
   /* Висота за вмістом (84px рядок, крок 72px), але не вище за межу: 2 людини не тягнуть порожній список. */
-  height: min(300px, max(170px, calc(100dvh - 520px)), calc(var(--rows, 3) * 72px + 40px));
+  height: min(300px, max(170px, calc(100dvh - 500px)), calc(var(--rows, 3) * 72px + 40px));
   /* Зверху місце під край попереднього рядка: видно, що вище ще хтось є. Активний рядок стоїть під ним. */
   padding: 36px 36px 20px;
   overflow-y: auto;

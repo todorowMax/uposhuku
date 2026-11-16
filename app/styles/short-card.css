@@ -78,20 +78,24 @@
 
 /*
   Картка активної людини під стопкою групи (десктоп): частина панелі, тож стоїть біля курсора й не лізе за край.
-  Висота постійна, щоб перемикання людей не смикало панель; теги в один рядок і обрізаються. Є кнопка «Написати».
+  Висота постійна, щоб перемикання людей не смикало панель; теги в один рядок і обрізаються.
 */
 .group-preview-card {
-  display: grid;
-  align-content: start;
-  gap: 10px;
   overflow: hidden;
-  min-height: 228px;
+  min-height: 172px;
   margin-inline: 36px;
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: var(--radius-window);
   background: var(--panel);
   box-shadow: var(--shadow-window);
+}
+
+/* «Написати» під карткою: невелика кнопка по центру, окремо від картки. */
+.group-preview-write {
+  justify-self: center;
+  margin-top: 4px;
+  padding-inline: 18px;
 }
 
 .group-preview-card .short-card-tags {

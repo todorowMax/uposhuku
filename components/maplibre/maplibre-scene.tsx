@@ -1807,9 +1807,10 @@ export default function MapLibreScene() {
     if (!list) return;
     const box = list.getBoundingClientRect();
     const shadowSpace = Math.max(0, Number.parseFloat(getComputedStyle(list).paddingLeft) - 8);
-    // Картка активної людини стоїть під списком і входить в зону панелі: курсор на ній не закриває список.
-    const card = groupRef.current?.querySelector(".group-preview-card");
-    const bottom = (card ? card.getBoundingClientRect().bottom : box.bottom) - 16;
+    // Картка активної людини й «Написати» під нею входять в зону панелі: курсор на них не закриває список.
+    const tail = groupRef.current?.querySelectorAll(".group-preview-card, .group-preview-write");
+    const last = tail?.[tail.length - 1];
+    const bottom = (last ? last.getBoundingClientRect().bottom : box.bottom) - 16;
     const inside = x > box.left + shadowSpace && x < box.right - shadowSpace && y > box.top + 16 && y < bottom;
     if (inside === groupPointerInsideRef.current) return;
     groupPointerInsideRef.current = inside;
