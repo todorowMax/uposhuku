@@ -110,8 +110,9 @@ describe("довгий розмова", () => {
     // Усі 700 з однією мілісекундою: межа сторінки лягає всередину групи однакового часу.
     const total = MESSAGES_PAGE + 200;
     const rows = Array.from({ length: total }, (_, index) => ({ id: `tie-${String(index).padStart(4, "0")}`, text: `t${index}` }));
-    for (let start = 0; start < rows.length; start += 10) {
-      await ctx.db.batch(rows.slice(start, start + 10).map((row) => ctx.db.prepare("insert into messages (id, conversation_id, \"from\", text, kind, context_id, created_at) values (?, ?, ?, ?, 'text', null, ?)").bind(row.id, conv.id, "customer", row.text, at)));
+    // Порціями по 100 запитів у одному batch: сімсот окремих звернень на завантаженій машині не вкладались у таймаут.
+    for (let start = 0; start < rows.length; start += 100) {
+      await ctx.db.batch(rows.slice(start, start + 100).map((row) => ctx.db.prepare("insert into messages (id, conversation_id, \"from\", text, kind, context_id, created_at) values (?, ?, ?, ?, 'text', null, ?)").bind(row.id, conv.id, "customer", row.text, at)));
     }
     const first = await listMessagesPage(conv.id);
     expect(first.messages).toHaveLength(MESSAGES_PAGE);
