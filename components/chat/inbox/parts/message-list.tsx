@@ -10,6 +10,7 @@ import { clockTime } from "@/lib/chat/dates";
 import { buildFeed, resolveDealId } from "@/lib/chat/feed";
 import { DayDivider, DealEvents, ModeratorCard, Pill } from "./feed-items";
 import { LoadEarlier, type LoadEarlierTypes } from "./load-earlier";
+import { MessageText } from "./message-text";
 
 export namespace MessageListTypes {
   export type Props = {
@@ -69,7 +70,7 @@ export const MessageList = ({ ref, lines, deals, loaded, error, empty, live, has
                 ))}
               </div>
             )}
-            {line.text && <p>{line.text}</p>}
+            {line.text && <MessageText text={line.text} />}
             <time dateTime={line.at}>{clockTime(line.at)}</time>
           </div>
         );
